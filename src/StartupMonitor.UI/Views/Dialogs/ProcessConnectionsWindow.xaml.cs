@@ -26,6 +26,9 @@ public partial class ProcessConnectionsWindow
 
     public string WindowTitle => $"{_targetProcess.ProcessName} (PID: {_targetProcess.Pid}) — Сетевые соединения";
 
+    /// <summary>ProcessConnectionsWindow: Выполняет операцию ProcessConnectionsWindow.</summary>
+    /// <param name="targetProcess">Входные данные: значение параметра targetProcess (ProcessInfo).</param>
+    /// <param name="pipeClient">Входные данные: значение параметра pipeClient (PipeClient).</param>
     public ProcessConnectionsWindow(ProcessInfo targetProcess, PipeClient pipeClient)
     {
         InitializeComponent();
@@ -54,6 +57,7 @@ public partial class ProcessConnectionsWindow
         Closed += (_, _) => _pollTimer.Stop();
     }
 
+    /// <summary>LoadConnectionsAsync: Загружает данные ConnectionsAsync.</summary>
     private async Task LoadConnectionsAsync()
     {
         using var _prof = ExecutionProfiler.Measure("UI.Sockets.LoadConnections");
@@ -83,6 +87,7 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>ApplyFilter: Выполняет операцию ApplyFilter.</summary>
     private void ApplyFilter()
     {
         var filter = TxtSearch.Text.Trim();
@@ -105,16 +110,25 @@ public partial class ProcessConnectionsWindow
         PanelEmpty.Visibility = (_allSockets.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>OnSearchTextChanged: Обрабатывает событие OnSearchTextChanged.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (TextChangedEventArgs).</param>
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
         ApplyFilter();
     }
 
+    /// <summary>OnRefreshClick: Обрабатывает событие OnRefreshClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private async void OnRefreshClick(object sender, RoutedEventArgs e)
     {
         await LoadConnectionsAsync();
     }
 
+    /// <summary>OnAutoRefreshChanged: Обрабатывает событие OnAutoRefreshChanged.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnAutoRefreshChanged(object sender, RoutedEventArgs e)
     {
         if (_pollTimer == null) return;
@@ -128,6 +142,9 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>OnCopyRemoteIpClick: Обрабатывает событие OnCopyRemoteIpClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCopyRemoteIpClick(object sender, RoutedEventArgs e)
     {
         if (GridConnections.SelectedItem is ProcessNetworkSocket socket && !string.IsNullOrEmpty(socket.RemoteAddress) && socket.RemoteAddress != "*")
@@ -137,6 +154,9 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>OnCopyRemoteEndpointClick: Обрабатывает событие OnCopyRemoteEndpointClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCopyRemoteEndpointClick(object sender, RoutedEventArgs e)
     {
         if (GridConnections.SelectedItem is ProcessNetworkSocket socket)
@@ -146,6 +166,9 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>OnOpenWhoisClick: Обрабатывает событие OnOpenWhoisClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnOpenWhoisClick(object sender, RoutedEventArgs e)
     {
         if (GridConnections.SelectedItem is ProcessNetworkSocket socket && !string.IsNullOrEmpty(socket.RemoteAddress) && socket.RemoteAddress != "*")
@@ -159,6 +182,9 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>OnOpenVirusTotalClick: Обрабатывает событие OnOpenVirusTotalClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnOpenVirusTotalClick(object sender, RoutedEventArgs e)
     {
         if (GridConnections.SelectedItem is ProcessNetworkSocket socket && !string.IsNullOrEmpty(socket.RemoteAddress) && socket.RemoteAddress != "*")
@@ -172,6 +198,9 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>OnCloseClick: Обрабатывает событие OnCloseClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCloseClick(object sender, RoutedEventArgs e)
     {
         Close();

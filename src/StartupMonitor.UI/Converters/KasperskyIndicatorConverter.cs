@@ -11,6 +11,12 @@ namespace StartupMonitor.UI.Converters;
 /// </summary>
 public class KasperskyIndicatorConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         // Определяем символ по названию зоны
@@ -25,6 +31,12 @@ public class KasperskyIndicatorConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -43,6 +55,11 @@ public class KasperskyColorConverter : IValueConverter
     private static readonly SolidColorBrush GreenBrush = CreateFrozen(0x00, 0xCC, 0x6A);
     private static readonly SolidColorBrush GreyBrush = CreateFrozen(0x80, 0x80, 0x80);
 
+    /// <summary>CreateFrozen: Выполняет операцию CreateFrozen.</summary>
+    /// <param name="r">Входные данные: значение параметра r (byte).</param>
+    /// <param name="g">Входные данные: значение параметра g (byte).</param>
+    /// <param name="b">Входные данные: значение параметра b (byte).</param>
+    /// <returns>Выходные данные: результирующее значение типа SolidColorBrush.</returns>
     private static SolidColorBrush CreateFrozen(byte r, byte g, byte b)
     {
         var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
@@ -51,6 +68,12 @@ public class KasperskyColorConverter : IValueConverter
         return brush;
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         // Выбираем готовую замороженную кисть по названию зоны (без new).
@@ -65,6 +88,12 @@ public class KasperskyColorConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }

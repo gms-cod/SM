@@ -107,6 +107,10 @@ public static class CliHeuristicAnalyzer
         return result;
     }
 
+    /// <summary>CheckBase64Patterns: Выполняет операцию CheckBase64Patterns.</summary>
+    /// <param name="text">Входные данные: значение параметра text (string).</param>
+    /// <param name="indicators">Входные данные: значение параметра indicators (List<string>).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool CheckBase64Patterns(string text, List<string> indicators)
     {
         bool found = false;
@@ -132,6 +136,10 @@ public static class CliHeuristicAnalyzer
         return found;
     }
 
+    /// <summary>CheckDownloaderPatterns: Выполняет операцию CheckDownloaderPatterns.</summary>
+    /// <param name="text">Входные данные: значение параметра text (string).</param>
+    /// <param name="indicators">Входные данные: значение параметра indicators (List<string>).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool CheckDownloaderPatterns(string text, List<string> indicators)
     {
         bool found = false;
@@ -167,6 +175,10 @@ public static class CliHeuristicAnalyzer
         return found;
     }
 
+    /// <summary>CheckHiddenExecutionPatterns: Выполняет операцию CheckHiddenExecutionPatterns.</summary>
+    /// <param name="text">Входные данные: значение параметра text (string).</param>
+    /// <param name="indicators">Входные данные: значение параметра indicators (List<string>).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool CheckHiddenExecutionPatterns(string text, List<string> indicators)
     {
         bool found = false;
@@ -194,6 +206,11 @@ public static class CliHeuristicAnalyzer
         return found;
     }
 
+    /// <summary>CheckSuspiciousLocations: Выполняет операцию CheckSuspiciousLocations.</summary>
+    /// <param name="path">Входные данные: значение параметра path (string).</param>
+    /// <param name="cmd">Входные данные: значение параметра cmd (string).</param>
+    /// <param name="indicators">Входные данные: значение параметра indicators (List<string>).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool CheckSuspiciousLocations(string path, string cmd, List<string> indicators)
     {
         bool found = false;
@@ -220,6 +237,11 @@ public static class CliHeuristicAnalyzer
         return found;
     }
 
+    /// <summary>CheckDoubleExtension: Выполняет операцию CheckDoubleExtension.</summary>
+    /// <param name="path">Входные данные: значение параметра path (string).</param>
+    /// <param name="cmd">Входные данные: значение параметра cmd (string).</param>
+    /// <param name="indicators">Входные данные: значение параметра indicators (List<string>).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool CheckDoubleExtension(string path, string cmd, List<string> indicators)
     {
         string target = !string.IsNullOrWhiteSpace(path) ? path : cmd;
@@ -257,6 +279,10 @@ public static class CliHeuristicAnalyzer
         return false;
     }
 
+    /// <summary>CheckBypassPolicy: Выполняет операцию CheckBypassPolicy.</summary>
+    /// <param name="text">Входные данные: значение параметра text (string).</param>
+    /// <param name="indicators">Входные данные: значение параметра indicators (List<string>).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool CheckBypassPolicy(string text, List<string> indicators)
     {
         bool found = false;

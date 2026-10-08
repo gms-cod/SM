@@ -777,6 +777,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SyncAutoGuardConfig();
     }
 
+    /// <summary>SyncAutoGuardConfig: Выполняет операцию SyncAutoGuardConfig.</summary>
     private void SyncAutoGuardConfig()
     {
         _ = _pipeClient.SetAutoGuardConfigAsync(new AutoGuardConfigPayload(
@@ -1210,6 +1211,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.Disconnected += OnPipeClientDisconnected;
     }
 
+    /// <summary>OnPipeClientConnected: Обрабатывает событие OnPipeClientConnected.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object?).</param>
+    /// <param name="args">Входные данные: значение параметра args (EventArgs).</param>
     private async void OnPipeClientConnected(object? sender, EventArgs args)
     {
         App.Log("MainViewModel: Connected event");
@@ -1241,6 +1245,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         App.Log("MainViewModel: Connected handler завершён");
     }
 
+    /// <summary>OnPipeClientEventsReceived: Обрабатывает событие OnPipeClientEventsReceived.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object?).</param>
+    /// <param name="batch">Входные данные: значение параметра batch (List<PipeMessage>).</param>
     private async void OnPipeClientEventsReceived(object? sender, List<PipeMessage> batch)
     {
         if (batch.Any(m => m.Type == PipeMessageTypes.EntryAdded
@@ -1312,6 +1319,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>OnPipeClientDisconnected: Обрабатывает событие OnPipeClientDisconnected.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object?).</param>
+    /// <param name="args">Входные данные: значение параметра args (EventArgs).</param>
     private async void OnPipeClientDisconnected(object? sender, EventArgs args)
     {
         App.Log("MainViewModel: Disconnected event");

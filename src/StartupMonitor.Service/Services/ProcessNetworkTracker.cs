@@ -73,6 +73,10 @@ public class ProcessNetworkTracker
         return (processSpeeds, totalSpeed, socketCounts);
     }
 
+    /// <summary>CollectIpv4Sockets: Собирает метрики и информацию Ipv4Sockets.</summary>
+    /// <param name="currentSocketBytes">Входные данные: значение параметра currentSocketBytes (Dictionary<string, ulong>).</param>
+    /// <param name="accumulatedBytesByPid">Входные данные: значение параметра accumulatedBytesByPid (Dictionary<int, ulong>).</param>
+    /// <param name="socketCounts">Входные данные: значение параметра socketCounts (Dictionary<int, int>).</param>
     private void CollectIpv4Sockets(Dictionary<string, ulong> currentSocketBytes, Dictionary<int, ulong> accumulatedBytesByPid, Dictionary<int, int> socketCounts)
     {
         int size = 0;
@@ -141,6 +145,10 @@ public class ProcessNetworkTracker
         }
     }
 
+    /// <summary>CollectIpv6Sockets: Собирает метрики и информацию Ipv6Sockets.</summary>
+    /// <param name="currentSocketBytes">Входные данные: значение параметра currentSocketBytes (Dictionary<string, ulong>).</param>
+    /// <param name="accumulatedBytesByPid">Входные данные: значение параметра accumulatedBytesByPid (Dictionary<int, ulong>).</param>
+    /// <param name="socketCounts">Входные данные: значение параметра socketCounts (Dictionary<int, int>).</param>
     private void CollectIpv6Sockets(Dictionary<string, ulong> currentSocketBytes, Dictionary<int, ulong> accumulatedBytesByPid, Dictionary<int, int> socketCounts)
     {
         int size = 0;
@@ -209,6 +217,8 @@ public class ProcessNetworkTracker
         }
     }
 
+    /// <summary>CollectUdpPids: Собирает метрики и информацию UdpPids.</summary>
+    /// <param name="socketCounts">Входные данные: значение параметра socketCounts (Dictionary<int, int>).</param>
     private void CollectUdpPids(Dictionary<int, int> socketCounts)
     {
         // 1. UDP IPv4
@@ -314,6 +324,10 @@ public class ProcessNetworkTracker
         return sockets;
     }
 
+    /// <summary>CollectTcp4Sockets: Собирает метрики и информацию Tcp4Sockets.</summary>
+    /// <param name="sockets">Входные данные: значение параметра sockets (List<ProcessNetworkSocket>).</param>
+    /// <param name="targetPid">Входные данные: значение параметра targetPid (int).</param>
+    /// <param name="getProcName">Входные данные: значение параметра getProcName (Func<int, string>).</param>
     private void CollectTcp4Sockets(List<ProcessNetworkSocket> sockets, int targetPid, Func<int, string> getProcName)
     {
         int size = 0;
@@ -363,6 +377,10 @@ public class ProcessNetworkTracker
         }
     }
 
+    /// <summary>CollectTcp6Sockets: Собирает метрики и информацию Tcp6Sockets.</summary>
+    /// <param name="sockets">Входные данные: значение параметра sockets (List<ProcessNetworkSocket>).</param>
+    /// <param name="targetPid">Входные данные: значение параметра targetPid (int).</param>
+    /// <param name="getProcName">Входные данные: значение параметра getProcName (Func<int, string>).</param>
     private void CollectTcp6Sockets(List<ProcessNetworkSocket> sockets, int targetPid, Func<int, string> getProcName)
     {
         int size = 0;
@@ -412,6 +430,10 @@ public class ProcessNetworkTracker
         }
     }
 
+    /// <summary>CollectUdp4Sockets: Собирает метрики и информацию Udp4Sockets.</summary>
+    /// <param name="sockets">Входные данные: значение параметра sockets (List<ProcessNetworkSocket>).</param>
+    /// <param name="targetPid">Входные данные: значение параметра targetPid (int).</param>
+    /// <param name="getProcName">Входные данные: значение параметра getProcName (Func<int, string>).</param>
     private void CollectUdp4Sockets(List<ProcessNetworkSocket> sockets, int targetPid, Func<int, string> getProcName)
     {
         int size = 0;
@@ -458,6 +480,10 @@ public class ProcessNetworkTracker
         }
     }
 
+    /// <summary>CollectUdp6Sockets: Собирает метрики и информацию Udp6Sockets.</summary>
+    /// <param name="sockets">Входные данные: значение параметра sockets (List<ProcessNetworkSocket>).</param>
+    /// <param name="targetPid">Входные данные: значение параметра targetPid (int).</param>
+    /// <param name="getProcName">Входные данные: значение параметра getProcName (Func<int, string>).</param>
     private void CollectUdp6Sockets(List<ProcessNetworkSocket> sockets, int targetPid, Func<int, string> getProcName)
     {
         int size = 0;
@@ -504,15 +530,33 @@ public class ProcessNetworkTracker
         }
     }
 
+    /// <summary>ParsePort: Выполняет операцию ParsePort.</summary>
+    /// <param name="portNetworkOrder">Входные данные: значение параметра portNetworkOrder (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа int.</returns>
     public static int ParsePort(uint portNetworkOrder) =>
         (ushort)(((portNetworkOrder & 0xFF) << 8) | ((portNetworkOrder >> 8) & 0xFF));
 
+    /// <summary>ParseIpv4: Выполняет операцию ParseIpv4.</summary>
+    /// <param name="ipDword">Входные данные: значение параметра ipDword (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string ParseIpv4(uint ipDword) =>
+        /// <summary>IPAddress: Выполняет операцию IPAddress.</summary>
+        /// <param name="(long)ipDword).ToString(">Входные данные: значение параметра (long)ipDword).ToString( ().</param>
         new IPAddress((long)ipDword).ToString();
 
+    /// <summary>ParseIpv6: Выполняет операцию ParseIpv6.</summary>
+    /// <param name="bytes">Входные данные: значение параметра bytes (byte[]).</param>
+    /// <param name="scopeId">Входные данные: значение параметра scopeId (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string ParseIpv6(byte[] bytes, uint scopeId) =>
+        /// <summary>IPAddress: Выполняет операцию IPAddress.</summary>
+        /// <param name="bytes">Входные данные: значение параметра bytes ().</param>
+        /// <param name="scopeId).ToString(">Входные данные: значение параметра scopeId).ToString( ().</param>
         new IPAddress(bytes, scopeId).ToString();
 
+    /// <summary>GetTcpStateString: Возвращает TcpStateString.</summary>
+    /// <param name="state">Входные данные: значение параметра state (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string GetTcpStateString(uint state) => state switch
     {
         1 => "CLOSED",

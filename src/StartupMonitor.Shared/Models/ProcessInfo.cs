@@ -11,6 +11,8 @@ public class ProcessInfo : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    /// <summary>OnPropertyChanged: Обрабатывает событие OnPropertyChanged.</summary>
+    /// <param name="name">Входные данные: значение параметра name ([CallerMemberName] string?).</param>
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 

@@ -32,10 +32,20 @@ public static class AppIconService
     private const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
 
     [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+    /// <summary>SHGetFileInfo: Выполняет операцию SHGetFileInfo.</summary>
+    /// <param name="pszPath">Входные данные: значение параметра pszPath (string).</param>
+    /// <param name="dwFileAttributes">Входные данные: значение параметра dwFileAttributes (uint).</param>
+    /// <param name="psfi">Входные данные: значение параметра psfi (ref SHFILEINFO).</param>
+    /// <param name="cbFileInfo">Входные данные: значение параметра cbFileInfo (uint).</param>
+    /// <param name="uFlags">Входные данные: значение параметра uFlags (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>DestroyIcon: Выполняет операцию DestroyIcon.</summary>
+    /// <param name="hIcon">Входные данные: значение параметра hIcon (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool DestroyIcon(IntPtr hIcon);
 
     /// <summary>
@@ -53,6 +63,9 @@ public static class AppIconService
         return Cache.GetOrAdd(cleanPath, ExtractIconCore);
     }
 
+    /// <summary>ExtractIconCore: Выполняет операцию ExtractIconCore.</summary>
+    /// <param name="path">Входные данные: значение параметра path (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа ImageSource?.</returns>
     private static ImageSource? ExtractIconCore(string path)
     {
         try
@@ -88,6 +101,9 @@ public static class AppIconService
         }
     }
 
+    /// <summary>CleanPath: Выполняет операцию CleanPath.</summary>
+    /// <param name="input">Входные данные: значение параметра input (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string CleanPath(string input)
     {
         var trimmed = input.Trim().Trim('"', '\'');

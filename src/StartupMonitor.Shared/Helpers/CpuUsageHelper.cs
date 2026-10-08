@@ -12,9 +12,19 @@ public static class CpuUsageHelper
 {
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>GetSystemTimes: Возвращает SystemTimes.</summary>
+    /// <param name="lpIdleTime">Входные данные: значение параметра lpIdleTime (out long).</param>
+    /// <param name="lpKernelTime">Входные данные: значение параметра lpKernelTime (out long).</param>
+    /// <param name="lpUserTime">Входные данные: значение параметра lpUserTime (out long).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool GetSystemTimes(out long lpIdleTime, out long lpKernelTime, out long lpUserTime);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>OpenProcess: Выполняет операцию OpenProcess.</summary>
+    /// <param name="dwDesiredAccess">Входные данные: значение параметра dwDesiredAccess (uint).</param>
+    /// <param name="bInheritHandle">Входные данные: значение параметра bInheritHandle ([MarshalAs(UnmanagedType.Bool)] bool).</param>
+    /// <param name="dwProcessId">Входные данные: значение параметра dwProcessId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenProcess(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, int dwProcessId);
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -28,6 +38,9 @@ public static class CpuUsageHelper
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -54,6 +67,7 @@ public static class CpuUsageHelper
     private static int _lastExternalUsageFast;
     private static bool _fastInitialized;
 
+    /// <summary>CpuUsageHelper: Выполняет операцию CpuUsageHelper.</summary>
     static CpuUsageHelper()
     {
         Initialize();

@@ -56,9 +56,15 @@ public static class UserSessionLauncher
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>WTSGetActiveConsoleSessionId: Выполняет операцию WTSGetActiveConsoleSessionId.</summary>
+    /// <returns>Выходные данные: результирующее значение типа extern uint.</returns>
     private static extern uint WTSGetActiveConsoleSessionId();
 
     [DllImport("wtsapi32.dll", SetLastError = true)]
+    /// <summary>WTSQueryUserToken: Выполняет операцию WTSQueryUserToken.</summary>
+    /// <param name="sessionId">Входные данные: значение параметра sessionId (uint).</param>
+    /// <param name="phToken">Входные данные: значение параметра phToken (out IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool WTSQueryUserToken(uint sessionId, out IntPtr phToken);
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -71,9 +77,17 @@ public static class UserSessionLauncher
         out IntPtr phNewToken);
 
     [DllImport("userenv.dll", SetLastError = true)]
+    /// <summary>CreateEnvironmentBlock: Выполняет операцию CreateEnvironmentBlock.</summary>
+    /// <param name="lpEnvironment">Входные данные: значение параметра lpEnvironment (out IntPtr).</param>
+    /// <param name="hToken">Входные данные: значение параметра hToken (IntPtr).</param>
+    /// <param name="bInherit">Входные данные: значение параметра bInherit (bool).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CreateEnvironmentBlock(out IntPtr lpEnvironment, IntPtr hToken, bool bInherit);
 
     [DllImport("userenv.dll", SetLastError = true)]
+    /// <summary>DestroyEnvironmentBlock: Выполняет операцию DestroyEnvironmentBlock.</summary>
+    /// <param name="lpEnvironment">Входные данные: значение параметра lpEnvironment (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool DestroyEnvironmentBlock(IntPtr lpEnvironment);
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -91,6 +105,9 @@ public static class UserSessionLauncher
         out PROCESS_INFORMATION lpProcessInformation);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     /// <summary>

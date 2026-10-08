@@ -234,7 +234,11 @@ public class CreateSnapshotPayload
 {
     public string? Name { get; set; }
     public string? Description { get; set; }
+    /// <summary>CreateSnapshotPayload: Выполняет операцию CreateSnapshotPayload.</summary>
     public CreateSnapshotPayload() { }
+    /// <summary>CreateSnapshotPayload: Выполняет операцию CreateSnapshotPayload.</summary>
+    /// <param name="name">Входные данные: значение параметра name (string?).</param>
+    /// <param name="description">Входные данные: значение параметра description (string?).</param>
     public CreateSnapshotPayload(string? name, string? description) { Name = name; Description = description; }
 }
 
@@ -261,12 +265,17 @@ public record MonitoringStatePayload
         }
     }
 
+    /// <summary>MonitoringStatePayload: Выполняет операцию MonitoringStatePayload.</summary>
     public MonitoringStatePayload() { }
+    /// <summary>MonitoringStatePayload: Выполняет операцию MonitoringStatePayload.</summary>
+    /// <param name="isPaused">Входные данные: значение параметра isPaused (bool).</param>
     public MonitoringStatePayload(bool isPaused)
     {
         IsPaused = isPaused;
     }
 
+    /// <summary>Deconstruct: Выполняет операцию Deconstruct.</summary>
+    /// <param name="isPaused">Входные данные: значение параметра isPaused (out bool).</param>
     public void Deconstruct(out bool isPaused) => isPaused = IsPaused;
 }
 
@@ -297,7 +306,10 @@ public sealed class EntriesRevisionRequest
     [JsonPropertyName("clientRevision")]
     public long ClientRevision { get; set; }
 
+    /// <summary>EntriesRevisionRequest: Выполняет операцию EntriesRevisionRequest.</summary>
     public EntriesRevisionRequest() { }
+    /// <summary>EntriesRevisionRequest: Выполняет операцию EntriesRevisionRequest.</summary>
+    /// <param name="clientRevision">Входные данные: значение параметра clientRevision (long).</param>
     public EntriesRevisionRequest(long clientRevision) { ClientRevision = clientRevision; }
 }
 
@@ -316,7 +328,12 @@ public sealed class EntriesDeltaResponse
     [JsonPropertyName("entries")]
     public List<StartupEntry>? Entries { get; set; }
 
+    /// <summary>EntriesDeltaResponse: Выполняет операцию EntriesDeltaResponse.</summary>
     public EntriesDeltaResponse() { }
+    /// <summary>EntriesDeltaResponse: Выполняет операцию EntriesDeltaResponse.</summary>
+    /// <param name="newRevision">Входные данные: значение параметра newRevision (long).</param>
+    /// <param name="isModified">Входные данные: значение параметра isModified (bool).</param>
+    /// <param name="entries">Входные данные: значение параметра entries (List<StartupEntry>?).</param>
     public EntriesDeltaResponse(long newRevision, bool isModified, List<StartupEntry>? entries = null)
     {
         NewRevision = newRevision;

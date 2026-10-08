@@ -21,6 +21,10 @@ public class KasperskyScanService
     /// <summary>Тестовый SHA256 хэш (системный Windows cmd.exe) для проверки API-токена.</summary>
     private const string TestVerificationHash = "308caeee4c0706a8ab67c5e0aa0ac21926239711c5017561be97e0c9dfbb01f3";
 
+    /// <summary>KasperskyScanService: Выполняет операцию KasperskyScanService.</summary>
+    /// <param name="store">Входные данные: значение параметра store (JsonDataStore).</param>
+    /// <param name="logger">Входные данные: значение параметра logger (ILogger<KasperskyScanService>).</param>
+    /// <param name="httpClient">Входные данные: значение параметра httpClient (HttpClient?).</param>
     public KasperskyScanService(JsonDataStore store, ILogger<KasperskyScanService> logger, HttpClient? httpClient = null)
     {
         _store = store;

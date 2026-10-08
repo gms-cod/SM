@@ -191,6 +191,10 @@ public static class EntryOperations
             var fullPath = BuildPayloadPath(entry, subKey);
             // Сериализуем бэкап в DisablePayload для последующего восстановления
             entry.DisablePayload = JsonSerializer.Serialize(
+                /// <summary>RegistryPayload: Выполняет операцию RegistryPayload.</summary>
+                /// <param name="fullPath">Входные данные: значение параметра fullPath ().</param>
+                /// <param name="valueName">Входные данные: значение параметра valueName ().</param>
+                /// <param name="existing">Входные данные: значение параметра existing ().</param>
                 new RegistryPayload(fullPath, valueName, existing),
                 JsonOptions);
         }
@@ -1475,16 +1479,30 @@ public static class EntryOperations
     private const uint PROCESS_SUSPEND_RESUME = 0x0800;
 
     [DllImport("ntdll.dll", SetLastError = true)]
+    /// <summary>NtSuspendProcess: Выполняет операцию NtSuspendProcess.</summary>
+    /// <param name="processHandle">Входные данные: значение параметра processHandle (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern int.</returns>
     private static extern int NtSuspendProcess(IntPtr processHandle);
 
     [DllImport("ntdll.dll", SetLastError = true)]
+    /// <summary>NtResumeProcess: Выполняет операцию NtResumeProcess.</summary>
+    /// <param name="processHandle">Входные данные: значение параметра processHandle (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern int.</returns>
     private static extern int NtResumeProcess(IntPtr processHandle);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>OpenProcess: Выполняет операцию OpenProcess.</summary>
+    /// <param name="processAccess">Входные данные: значение параметра processAccess (uint).</param>
+    /// <param name="bInheritHandle">Входные данные: значение параметра bInheritHandle (bool).</param>
+    /// <param name="processId">Входные данные: значение параметра processId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     private static readonly ConcurrentDictionary<int, bool> _suspendedPids = new();

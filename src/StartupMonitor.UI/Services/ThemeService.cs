@@ -184,6 +184,12 @@ public static class ThemeService
             Color.FromArgb(0x00, 0xF4, 0xF6, 0xFA));
     }
 
+    /// <summary>CreateSolidBrush: Выполняет операцию CreateSolidBrush.</summary>
+    /// <param name="a">Входные данные: значение параметра a (byte).</param>
+    /// <param name="r">Входные данные: значение параметра r (byte).</param>
+    /// <param name="g">Входные данные: значение параметра g (byte).</param>
+    /// <param name="b">Входные данные: значение параметра b (byte).</param>
+    /// <returns>Выходные данные: результирующее значение типа SolidColorBrush.</returns>
     private static SolidColorBrush CreateSolidBrush(byte a, byte r, byte g, byte b)
     {
         var brush = new SolidColorBrush(Color.FromArgb(a, r, g, b));
@@ -191,6 +197,10 @@ public static class ThemeService
         return brush;
     }
 
+    /// <summary>CreateLinearBrush: Выполняет операцию CreateLinearBrush.</summary>
+    /// <param name="c1">Входные данные: значение параметра c1 (Color).</param>
+    /// <param name="c2">Входные данные: значение параметра c2 (Color).</param>
+    /// <returns>Выходные данные: результирующее значение типа LinearGradientBrush.</returns>
     private static LinearGradientBrush CreateLinearBrush(Color c1, Color c2)
     {
         var brush = new LinearGradientBrush(c1, c2, new Point(0, 0), new Point(0, 1));
@@ -198,6 +208,13 @@ public static class ThemeService
         return brush;
     }
 
+    /// <summary>CreateRadialBrush: Выполняет операцию CreateRadialBrush.</summary>
+    /// <param name="cx">Входные данные: значение параметра cx (double).</param>
+    /// <param name="cy">Входные данные: значение параметра cy (double).</param>
+    /// <param name="c1">Входные данные: значение параметра c1 (Color).</param>
+    /// <param name="c2">Входные данные: значение параметра c2 (Color).</param>
+    /// <param name="c3">Входные данные: значение параметра c3 (Color).</param>
+    /// <returns>Выходные данные: результирующее значение типа RadialGradientBrush.</returns>
     private static RadialGradientBrush CreateRadialBrush(double cx, double cy, Color c1, Color c2, Color c3)
     {
         var brush = new RadialGradientBrush
@@ -207,9 +224,21 @@ public static class ThemeService
             RadiusY = 0.75,
             GradientStops = new GradientStopCollection
             {
+                /// <summary>GradientStop: Выполняет операцию GradientStop.</summary>
+                /// <param name="c1">Входные данные: значение параметра c1 ().</param>
+                /// <param name="0.0">Входные данные: значение параметра 0.0 ().</param>
                 new GradientStop(c1, 0.0),
+                /// <summary>GradientStop: Выполняет операцию GradientStop.</summary>
+                /// <param name="c2">Входные данные: значение параметра c2 ().</param>
+                /// <param name="0.45">Входные данные: значение параметра 0.45 ().</param>
                 new GradientStop(c2, 0.45),
+                /// <summary>GradientStop: Выполняет операцию GradientStop.</summary>
+                /// <param name="c3">Входные данные: значение параметра c3 ().</param>
+                /// <param name="0.75">Входные данные: значение параметра 0.75 ().</param>
                 new GradientStop(c3, 0.75),
+                /// <summary>GradientStop: Выполняет операцию GradientStop.</summary>
+                /// <param name="0)">Входные данные: значение параметра 0) (Color.FromArgb(0, 0, 0,).</param>
+                /// <param name="1.0">Входные данные: значение параметра 1.0 ().</param>
                 new GradientStop(Color.FromArgb(0, 0, 0, 0), 1.0),
             }
         };

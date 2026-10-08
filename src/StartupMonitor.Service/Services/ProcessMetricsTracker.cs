@@ -48,6 +48,9 @@ public class ProcessMetricsTracker : IDisposable
     /// <summary>Событие готовности свежего снимка производительности и процессов.</summary>
     public event EventHandler<SystemPerformanceSnapshot>? SnapshotReady;
 
+    /// <summary>ProcessMetricsTracker: Выполняет операцию ProcessMetricsTracker.</summary>
+    /// <param name="enricher">Входные данные: значение параметра enricher (ProcessMetadataEnricher).</param>
+    /// <param name="linker">Входные данные: значение параметра linker (ProcessStartupLinker).</param>
     public ProcessMetricsTracker(ProcessMetadataEnricher enricher, ProcessStartupLinker linker)
     {
         _enricher = enricher;
@@ -91,6 +94,8 @@ public class ProcessMetricsTracker : IDisposable
     public List<ProcessNetworkSocket> GetProcessSockets(int pid = -1) =>
         _networkTracker.GetSockets(pid);
 
+    /// <summary>OnPollTick: Обрабатывает событие OnPollTick.</summary>
+    /// <param name="state">Входные данные: значение параметра state (object?).</param>
     private void OnPollTick(object? state)
     {
         if (_subscribersCount <= 0) return;
@@ -108,6 +113,8 @@ public class ProcessMetricsTracker : IDisposable
         }
     }
 
+    /// <summary>CollectSnapshotCore: Собирает метрики и информацию SnapshotCore.</summary>
+    /// <returns>Выходные данные: результирующее значение типа SystemPerformanceSnapshot.</returns>
     private SystemPerformanceSnapshot CollectSnapshotCore()
     {
         using var _profSnapshot = ExecutionProfiler.Profile("Service.ProcessMetricsSnapshot");
@@ -349,6 +356,8 @@ public class ProcessMetricsTracker : IDisposable
         return snapshot;
     }
 
+    /// <summary>CalculateSystemCpuPercent: Выполняет операцию CalculateSystemCpuPercent.</summary>
+    /// <returns>Выходные данные: результирующее значение типа double.</returns>
     private double CalculateSystemCpuPercent()
     {
         if (!GetSystemTimes(out var idleTime, out var kernelTime, out var userTime)) return 0.0;
@@ -381,6 +390,9 @@ public class ProcessMetricsTracker : IDisposable
         return Math.Clamp(cpu, 0.0, 100.0);
     }
 
+    /// <summary>FileTimeToLong: Выполняет операцию FileTimeToLong.</summary>
+    /// <param name="ft">Входные данные: значение параметра ft (System.Runtime.InteropServices.ComTypes.FILETIME).</param>
+    /// <returns>Выходные данные: результирующее значение типа long.</returns>
     private static long FileTimeToLong(System.Runtime.InteropServices.ComTypes.FILETIME ft)
         => ((long)ft.dwHighDateTime << 32) | (uint)ft.dwLowDateTime;
 
@@ -412,22 +424,43 @@ public class ProcessMetricsTracker : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>GlobalMemoryStatusEx: Выполняет операцию GlobalMemoryStatusEx.</summary>
+    /// <param name="lpBuffer">Входные данные: значение параметра lpBuffer (ref MEMORYSTATUSEX).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>GetSystemTimes: Возвращает SystemTimes.</summary>
+    /// <param name="lpIdleTime">Входные данные: значение параметра lpIdleTime (out System.Runtime.InteropServices.ComTypes.FILETIME).</param>
+    /// <param name="lpKernelTime">Входные данные: значение параметра lpKernelTime (out System.Runtime.InteropServices.ComTypes.FILETIME).</param>
+    /// <param name="lpUserTime">Входные данные: значение параметра lpUserTime (out System.Runtime.InteropServices.ComTypes.FILETIME).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool GetSystemTimes(out System.Runtime.InteropServices.ComTypes.FILETIME lpIdleTime, out System.Runtime.InteropServices.ComTypes.FILETIME lpKernelTime, out System.Runtime.InteropServices.ComTypes.FILETIME lpUserTime);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>OpenProcess: Выполняет операцию OpenProcess.</summary>
+    /// <param name="processAccess">Входные данные: значение параметра processAccess (int).</param>
+    /// <param name="bInheritHandle">Входные данные: значение параметра bInheritHandle (bool).</param>
+    /// <param name="processId">Входные данные: значение параметра processId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenProcess(int processAccess, bool bInheritHandle, int processId);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>GetProcessIoCounters: Возвращает ProcessIoCounters.</summary>
+    /// <param name="hProcess">Входные данные: значение параметра hProcess (IntPtr).</param>
+    /// <param name="lpIoCounters">Входные данные: значение параметра lpIoCounters (out IO_COUNTERS).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool GetProcessIoCounters(IntPtr hProcess, out IO_COUNTERS lpIoCounters);
     #endregion
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
         _pollTimer.Dispose();

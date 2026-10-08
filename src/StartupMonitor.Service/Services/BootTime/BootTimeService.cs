@@ -45,6 +45,9 @@ public class BootTimeService
     private DateTime _cacheTime = DateTime.MinValue;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(60);
 
+    /// <summary>BootTimeService: Выполняет операцию BootTimeService.</summary>
+    /// <param name="store">Входные данные: значение параметра store (JsonDataStore).</param>
+    /// <param name="logger">Входные данные: значение параметра logger (ILogger<BootTimeService>).</param>
     public BootTimeService(JsonDataStore store, ILogger<BootTimeService> logger)
     {
         _store = store;
@@ -194,6 +197,9 @@ public class BootTimeService
         }
     }
 
+    /// <summary>LinkOffendersToEntries: Выполняет операцию LinkOffendersToEntries.</summary>
+    /// <param name="offenders">Входные данные: значение параметра offenders (List<BootDegradationEvent>).</param>
+    /// <param name="entries">Входные данные: значение параметра entries (List<StartupEntry>).</param>
     private static void LinkOffendersToEntries(List<BootDegradationEvent> offenders, List<StartupEntry> entries)
     {
         var entriesByPath = new Dictionary<string, StartupEntry>(StringComparer.OrdinalIgnoreCase);

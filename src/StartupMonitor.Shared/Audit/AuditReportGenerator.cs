@@ -19,12 +19,30 @@ public static class AuditReportGenerator
     public static CsvAuditReportExporter CsvExporter => CsvExporterInstance.Value;
     public static JsonAuditReportExporter JsonExporter => JsonExporterInstance.Value;
 
+    /// <summary>GenerateHtml: Выполняет операцию GenerateHtml.</summary>
+    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string GenerateHtml(AuditReport report) => HtmlExporter.ExportToString(report);
+    /// <summary>GenerateCsv: Выполняет операцию GenerateCsv.</summary>
+    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string GenerateCsv(AuditReport report) => CsvExporter.ExportToString(report);
+    /// <summary>GenerateJson: Выполняет операцию GenerateJson.</summary>
+    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string GenerateJson(AuditReport report) => JsonExporter.ExportToString(report);
 
+    /// <summary>GenerateHtmlBytes: Выполняет операцию GenerateHtmlBytes.</summary>
+    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
     public static byte[] GenerateHtmlBytes(AuditReport report) => HtmlExporter.ExportToBytes(report);
+    /// <summary>GenerateCsvBytes: Выполняет операцию GenerateCsvBytes.</summary>
+    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
     public static byte[] GenerateCsvBytes(AuditReport report) => CsvExporter.ExportToBytes(report);
+    /// <summary>GenerateJsonBytes: Выполняет операцию GenerateJsonBytes.</summary>
+    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
     public static byte[] GenerateJsonBytes(AuditReport report) => JsonExporter.ExportToBytes(report);
 
     /// <summary>

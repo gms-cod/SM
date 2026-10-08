@@ -27,6 +27,9 @@ public class NotificationService : IDisposable
     /// <summary>Событие: готов батч сообщений для отправки через pipe.</summary>
     public event EventHandler<List<PipeMessage>>? MessagesBatchReady;
 
+    /// <summary>NotificationService: Выполняет операцию NotificationService.</summary>
+    /// <param name="tracker">Входные данные: значение параметра tracker (InitialScanTracker).</param>
+    /// <param name="remoteNotifications">Входные данные: значение параметра remoteNotifications (RemoteNotificationService?).</param>
     public NotificationService(InitialScanTracker tracker, RemoteNotificationService? remoteNotifications = null)
     {
         _tracker = tracker;
@@ -49,6 +52,8 @@ public class NotificationService : IDisposable
         }
     }
 
+    /// <summary>DispatchRemoteNotification: Выполняет операцию DispatchRemoteNotification.</summary>
+    /// <param name="message">Входные данные: значение параметра message (PipeMessage).</param>
     private void DispatchRemoteNotification(PipeMessage message)
     {
         try
@@ -107,6 +112,7 @@ public class NotificationService : IDisposable
         }
     }
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
         _timer.Dispose();

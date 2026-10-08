@@ -106,6 +106,9 @@ public class ProcessStartupLinker
         return (proc.IsStartupEntry, proc.StartupEntryId, proc.StartupLocation);
     }
 
+    /// <summary>SetStartupInfo: Устанавливает StartupInfo.</summary>
+    /// <param name="proc">Входные данные: значение параметра proc (ProcessInfo).</param>
+    /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
     private static void SetStartupInfo(ProcessInfo proc, StartupEntry entry)
     {
         proc.StartupEntryId = entry.Id;
@@ -154,6 +157,13 @@ public class ProcessStartupLinker
     #region P/Invoke NtQueryInformationProcess для быстрого получения Parent PID
 
     [DllImport("ntdll.dll")]
+    /// <summary>NtQueryInformationProcess: Выполняет операцию NtQueryInformationProcess.</summary>
+    /// <param name="processHandle">Входные данные: значение параметра processHandle (IntPtr).</param>
+    /// <param name="processInformationClass">Входные данные: значение параметра processInformationClass (int).</param>
+    /// <param name="processInformation">Входные данные: значение параметра processInformation (ref PROCESS_BASIC_INFORMATION).</param>
+    /// <param name="processInformationLength">Входные данные: значение параметра processInformationLength (int).</param>
+    /// <param name="returnLength">Входные данные: значение параметра returnLength (out int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern int.</returns>
     private static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -189,15 +199,30 @@ public class ProcessStartupLinker
     #region P/Invoke CreateToolhelp32Snapshot для сбора полного снимка Parent PID всех процессов
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CreateToolhelp32Snapshot: Выполняет операцию CreateToolhelp32Snapshot.</summary>
+    /// <param name="dwFlags">Входные данные: значение параметра dwFlags (uint).</param>
+    /// <param name="th32ProcessID">Входные данные: значение параметра th32ProcessID (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    /// <summary>Process32First: Выполняет операцию Process32First.</summary>
+    /// <param name="hSnapshot">Входные данные: значение параметра hSnapshot (IntPtr).</param>
+    /// <param name="lppe">Входные данные: значение параметра lppe (ref PROCESSENTRY32).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    /// <summary>Process32Next: Выполняет операцию Process32Next.</summary>
+    /// <param name="hSnapshot">Входные данные: значение параметра hSnapshot (IntPtr).</param>
+    /// <param name="lppe">Входные данные: значение параметра lppe (ref PROCESSENTRY32).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]

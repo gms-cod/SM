@@ -43,6 +43,8 @@ public class WmiSubscriptionWatcher : BackgroundService
         _coordinator = coordinator;
     }
 
+    /// <summary>ExecuteAsync: Выполняет операцию ExecuteAsync.</summary>
+    /// <param name="stoppingToken">Входные данные: значение параметра stoppingToken (CancellationToken).</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("WmiSubscriptionWatcher started");

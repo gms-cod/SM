@@ -77,6 +77,9 @@ public class ProcessInspectorService
 
     #region Module Enumeration
 
+    /// <summary>CollectModules: Собирает метрики и информацию Modules.</summary>
+    /// <param name="processId">Входные данные: значение параметра processId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа List<ProcessModuleInfo>.</returns>
     private List<ProcessModuleInfo> CollectModules(int processId)
     {
         var modulesDict = new Dictionary<string, ProcessModuleInfo>(StringComparer.OrdinalIgnoreCase);
@@ -139,6 +142,12 @@ public class ProcessInspectorService
         return list;
     }
 
+    /// <summary>CreateModuleInfo: Выполняет операцию CreateModuleInfo.</summary>
+    /// <param name="moduleName">Входные данные: значение параметра moduleName (string?).</param>
+    /// <param name="exePath">Входные данные: значение параметра exePath (string?).</param>
+    /// <param name="baseAddress">Входные данные: значение параметра baseAddress (IntPtr).</param>
+    /// <param name="moduleSize">Входные данные: значение параметра moduleSize (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа ProcessModuleInfo.</returns>
     private ProcessModuleInfo CreateModuleInfo(string? moduleName, string? exePath, IntPtr baseAddress, uint moduleSize)
     {
         var info = new ProcessModuleInfo
@@ -188,6 +197,9 @@ public class ProcessInspectorService
         return info;
     }
 
+    /// <summary>IsPathInTemp: Проверяет состояние IsPathInTemp.</summary>
+    /// <param name="path">Входные данные: значение параметра path (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool IsPathInTemp(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
@@ -202,6 +214,9 @@ public class ProcessInspectorService
         return false;
     }
 
+    /// <summary>IsSystemPath: Проверяет состояние IsSystemPath.</summary>
+    /// <param name="path">Входные данные: значение параметра path (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool IsSystemPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
@@ -226,6 +241,9 @@ public class ProcessInspectorService
     private const int ObjectNameInformation = 1;
     private const uint FILE_NAME_NORMALIZED = 0x0;
 
+    /// <summary>CollectHandles: Собирает метрики и информацию Handles.</summary>
+    /// <param name="processId">Входные данные: значение параметра processId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа List<ProcessHandleInfo>.</returns>
     private List<ProcessHandleInfo> CollectHandles(int processId)
     {
         var result = new List<ProcessHandleInfo>(128);
@@ -311,6 +329,11 @@ public class ProcessInspectorService
         return result;
     }
 
+    /// <summary>QueryHandleDetails: Выполняет операцию QueryHandleDetails.</summary>
+    /// <param name="hDup">Входные данные: значение параметра hDup (IntPtr).</param>
+    /// <param name="originalHandle">Входные данные: значение параметра originalHandle (IntPtr).</param>
+    /// <param name="grantedAccess">Входные данные: значение параметра grantedAccess (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа ProcessHandleInfo?.</returns>
     private ProcessHandleInfo? QueryHandleDetails(IntPtr hDup, IntPtr originalHandle, uint grantedAccess)
     {
         var info = new ProcessHandleInfo
@@ -371,6 +394,9 @@ public class ProcessInspectorService
         return string.IsNullOrEmpty(info.Name) ? null : info;
     }
 
+    /// <summary>GetObjectTypeName: Возвращает ObjectTypeName.</summary>
+    /// <param name="handle">Входные данные: значение параметра handle (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string GetObjectTypeName(IntPtr handle)
     {
         int length = 0x1000;
@@ -397,6 +423,9 @@ public class ProcessInspectorService
         return string.Empty;
     }
 
+    /// <summary>GetObjectName: Возвращает ObjectName.</summary>
+    /// <param name="handle">Входные данные: значение параметра handle (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string GetObjectName(IntPtr handle)
     {
         int length = 0x2000;
@@ -430,18 +459,37 @@ public class ProcessInspectorService
     private const uint TH32CS_SNAPMODULE32 = 0x00000010;
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CreateToolhelp32Snapshot: Выполняет операцию CreateToolhelp32Snapshot.</summary>
+    /// <param name="dwFlags">Входные данные: значение параметра dwFlags (uint).</param>
+    /// <param name="th32ProcessID">Входные данные: значение параметра th32ProcessID (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    /// <summary>Module32First: Выполняет операцию Module32First.</summary>
+    /// <param name="hSnapshot">Входные данные: значение параметра hSnapshot (IntPtr).</param>
+    /// <param name="lpme">Входные данные: значение параметра lpme (ref MODULEENTRY32).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool Module32First(IntPtr hSnapshot, ref MODULEENTRY32 lpme);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    /// <summary>Module32Next: Выполняет операцию Module32Next.</summary>
+    /// <param name="hSnapshot">Входные данные: значение параметра hSnapshot (IntPtr).</param>
+    /// <param name="lpme">Входные данные: значение параметра lpme (ref MODULEENTRY32).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool Module32Next(IntPtr hSnapshot, ref MODULEENTRY32 lpme);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>OpenProcess: Выполняет операцию OpenProcess.</summary>
+    /// <param name="dwDesiredAccess">Входные данные: значение параметра dwDesiredAccess (uint).</param>
+    /// <param name="bInheritHandle">Входные данные: значение параметра bInheritHandle (bool).</param>
+    /// <param name="dwProcessId">Входные данные: значение параметра dwProcessId (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
 
     [DllImport("kernel32.dll")]
+    /// <summary>GetCurrentProcess: Возвращает CurrentProcess.</summary>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr GetCurrentProcess();
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -457,18 +505,43 @@ public class ProcessInspectorService
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>GetFileType: Возвращает FileType.</summary>
+    /// <param name="hFile">Входные данные: значение параметра hFile (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern uint.</returns>
     private static extern uint GetFileType(IntPtr hFile);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    /// <summary>GetFinalPathNameByHandle: Возвращает FinalPathNameByHandle.</summary>
+    /// <param name="hFile">Входные данные: значение параметра hFile (IntPtr).</param>
+    /// <param name="lpszFilePath">Входные данные: значение параметра lpszFilePath ([Out] StringBuilder).</param>
+    /// <param name="cchFilePath">Входные данные: значение параметра cchFilePath (uint).</param>
+    /// <param name="dwFlags">Входные данные: значение параметра dwFlags (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern uint.</returns>
     private static extern uint GetFinalPathNameByHandle(IntPtr hFile, [Out] StringBuilder lpszFilePath, uint cchFilePath, uint dwFlags);
 
     [DllImport("ntdll.dll")]
+    /// <summary>NtQuerySystemInformation: Выполняет операцию NtQuerySystemInformation.</summary>
+    /// <param name="query">Входные данные: значение параметра query (int).</param>
+    /// <param name="dataPtr">Входные данные: значение параметра dataPtr (IntPtr).</param>
+    /// <param name="size">Входные данные: значение параметра size (uint).</param>
+    /// <param name="returnedSize">Входные данные: значение параметра returnedSize (out uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern uint.</returns>
     private static extern uint NtQuerySystemInformation(int query, IntPtr dataPtr, uint size, out uint returnedSize);
 
     [DllImport("ntdll.dll")]
+    /// <summary>NtQueryObject: Выполняет операцию NtQueryObject.</summary>
+    /// <param name="handle">Входные данные: значение параметра handle (IntPtr).</param>
+    /// <param name="query">Входные данные: значение параметра query (int).</param>
+    /// <param name="dataPtr">Входные данные: значение параметра dataPtr (IntPtr).</param>
+    /// <param name="size">Входные данные: значение параметра size (uint).</param>
+    /// <param name="returnedSize">Входные данные: значение параметра returnedSize (out uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern uint.</returns>
     private static extern uint NtQueryObject(IntPtr handle, int query, IntPtr dataPtr, uint size, out uint returnedSize);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]

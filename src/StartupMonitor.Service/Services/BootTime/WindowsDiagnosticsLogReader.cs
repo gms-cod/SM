@@ -15,6 +15,8 @@ public class WindowsDiagnosticsLogReader
     private const string LogName = "Microsoft-Windows-Diagnostics-Performance/Operational";
     private readonly ILogger _logger;
 
+    /// <summary>WindowsDiagnosticsLogReader: Выполняет операцию WindowsDiagnosticsLogReader.</summary>
+    /// <param name="logger">Входные данные: значение параметра logger (ILogger).</param>
     public WindowsDiagnosticsLogReader(ILogger logger)
     {
         _logger = logger;
@@ -121,6 +123,9 @@ public class WindowsDiagnosticsLogReader
         return result;
     }
 
+    /// <summary>ParseEvent100: Выполняет операцию ParseEvent100.</summary>
+    /// <param name="record">Входные данные: значение параметра record (EventRecord).</param>
+    /// <returns>Выходные данные: результирующее значение типа BootSessionInfo?.</returns>
     private static BootSessionInfo? ParseEvent100(EventRecord record)
     {
         var xml = record.ToXml();
@@ -157,6 +162,9 @@ public class WindowsDiagnosticsLogReader
         return session;
     }
 
+    /// <summary>ParseDegradationEvent: Выполняет операцию ParseDegradationEvent.</summary>
+    /// <param name="record">Входные данные: значение параметра record (EventRecord).</param>
+    /// <returns>Выходные данные: результирующее значение типа BootDegradationEvent?.</returns>
     private static BootDegradationEvent? ParseDegradationEvent(EventRecord record)
     {
         var xml = record.ToXml();
@@ -205,6 +213,10 @@ public class WindowsDiagnosticsLogReader
         };
     }
 
+    /// <summary>ParseInt: Выполняет операцию ParseInt.</summary>
+    /// <param name="dict">Входные данные: значение параметра dict (Dictionary<string, string>).</param>
+    /// <param name="key">Входные данные: значение параметра key (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа int.</returns>
     private static int ParseInt(Dictionary<string, string> dict, string key)
     {
         if (dict.TryGetValue(key, out var val) && int.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
@@ -214,6 +226,10 @@ public class WindowsDiagnosticsLogReader
         return 0;
     }
 
+    /// <summary>ParseLong: Выполняет операцию ParseLong.</summary>
+    /// <param name="dict">Входные данные: значение параметра dict (Dictionary<string, string>).</param>
+    /// <param name="key">Входные данные: значение параметра key (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа long.</returns>
     private static long ParseLong(Dictionary<string, string> dict, string key)
     {
         if (dict.TryGetValue(key, out var val) && long.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))

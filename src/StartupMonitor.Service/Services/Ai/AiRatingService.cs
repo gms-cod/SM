@@ -39,14 +39,22 @@ public class AiRatingService : IDisposable
         if (!string.IsNullOrWhiteSpace(model)) _model = model.Trim();
     }
 
+    /// <summary>UpdateUiLang: Обновляет состояние UiLang.</summary>
+    /// <param name="uiLang">Входные данные: значение параметра uiLang (string).</param>
     public void UpdateUiLang(string uiLang)
     {
         if (!string.IsNullOrWhiteSpace(uiLang) && uiLang != _uiLang)
             _uiLang = uiLang;
     }
 
+    /// <summary>UpdateApiKey: Обновляет состояние ApiKey.</summary>
+    /// <param name="apiKey">Входные данные: значение параметра apiKey (string).</param>
     public void UpdateApiKey(string apiKey) => _apiKey = apiKey;
 
+    /// <summary>UpdateConfig: Обновляет состояние Config.</summary>
+    /// <param name="apiKey">Входные данные: значение параметра apiKey (string).</param>
+    /// <param name="apiUrl">Входные данные: значение параметра apiUrl (string?).</param>
+    /// <param name="model">Входные данные: значение параметра model (string?).</param>
     public void UpdateConfig(string apiKey, string? apiUrl = null, string? model = null)
     {
         _apiKey = apiKey;
@@ -54,6 +62,9 @@ public class AiRatingService : IDisposable
         if (!string.IsNullOrWhiteSpace(model)) _model = model.Trim();
     }
 
+    /// <summary>IsLocalUrl: Проверяет состояние IsLocalUrl.</summary>
+    /// <param name="url">Входные данные: значение параметра url (string?).</param>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool IsLocalUrl(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return false;
@@ -62,8 +73,13 @@ public class AiRatingService : IDisposable
                url.Contains("0.0.0.0", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>GetCached: Возвращает Cached.</summary>
+    /// <param name="entry)">Входные данные: значение параметра entry) (StartupEntry).</param>
+    /// <returns>Выходные данные: результирующее значение типа StartupRating?.</returns>
     public StartupRating? GetCached(StartupEntry entry) => _cache.Get(entry);
 
+    /// <summary>PrefetchAsync: Выполняет операцию PrefetchAsync.</summary>
+    /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
     public async Task PrefetchAsync(StartupEntry entry)
     {
         if (entry.AiRating > 0) return;
@@ -136,6 +152,8 @@ public class AiRatingService : IDisposable
         }
     }
 
+    /// <summary>PrefetchAllAsync: Выполняет операцию PrefetchAllAsync.</summary>
+    /// <param name="entries">Входные данные: значение параметра entries (List<StartupEntry>).</param>
     public async Task PrefetchAllAsync(List<StartupEntry> entries)
     {
         using var _prof = ExecutionProfiler.Measure("Service.Ai.PrefetchAll");
@@ -216,6 +234,9 @@ public class AiRatingService : IDisposable
         }
     }
 
+    /// <summary>FetchRatingAsync: Выполняет операцию FetchRatingAsync.</summary>
+    /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
+    /// <returns>Выходные данные: результирующее значение типа Task<StartupRating?>.</returns>
     private async Task<StartupRating?> FetchRatingAsync(StartupEntry entry)
     {
         using var _prof = ExecutionProfiler.Measure("Service.Ai.FetchRating");
@@ -324,6 +345,9 @@ public class AiRatingService : IDisposable
         return null;
     }
 
+    /// <summary>BuildPrompt: Выполняет операцию BuildPrompt.</summary>
+    /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     internal string BuildPrompt(StartupEntry entry)
     {
         var fileInfo = !string.IsNullOrEmpty(entry.FilePath) && File.Exists(entry.FilePath)
@@ -568,6 +592,10 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
 {{""score"": <integer 1-10>, ""category"": ""<category in English>"", ""risk"": ""<comprehensive and clear human-readable explanation covering all 4 points: what this program is, what the arguments do, whether it is needed at boot, security verdict. 4-8 sentences in English>"", ""recommendation"": ""<actionable recommendation: Allow startup / Recommend disabling for faster boot / Block and remove, with a concise explanation in English>""}}";
     }
 
+    /// <summary>ParseResponse: Выполняет операцию ParseResponse.</summary>
+    /// <param name="json">Входные данные: значение параметра json (string).</param>
+    /// <param name="entryName">Входные данные: значение параметра entryName (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа StartupRating?.</returns>
     internal StartupRating? ParseResponse(string json, string entryName)
     {
         try
@@ -609,5 +637,7 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         }
     }
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
+    /// <param name=")">Входные данные: значение параметра ) ().</param>
     public void Dispose() => _http.Dispose();
 }

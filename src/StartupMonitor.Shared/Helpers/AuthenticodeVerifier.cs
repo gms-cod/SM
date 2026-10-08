@@ -72,6 +72,8 @@ public static class AuthenticodeVerifier
         public uint dwUIContext;
         public IntPtr pSignatureSettings;
 
+        /// <summary>WINTRUST_DATA: Выполняет операцию WINTRUST_DATA.</summary>
+        /// <param name="fileInfo">Входные данные: значение параметра fileInfo (WINTRUST_FILE_INFO).</param>
         public WINTRUST_DATA(WINTRUST_FILE_INFO fileInfo)
         {
             cbStruct = (uint)Marshal.SizeOf<WINTRUST_DATA>();
@@ -91,6 +93,7 @@ public static class AuthenticodeVerifier
             Marshal.StructureToPtr(fileInfo, pFile, false);
         }
 
+        /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
         public void Dispose()
         {
             if (pFile != IntPtr.Zero)
@@ -149,6 +152,9 @@ public static class AuthenticodeVerifier
         }
     }
 
+    /// <summary>PerformVerification: Выполняет операцию PerformVerification.</summary>
+    /// <param name="filePath">Входные данные: значение параметра filePath (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа SignatureVerificationResult.</returns>
     private static SignatureVerificationResult PerformVerification(string filePath)
     {
         var fileInfo = new WINTRUST_FILE_INFO

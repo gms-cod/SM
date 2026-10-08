@@ -11,6 +11,8 @@ public class BlacklistManager
     /// <summary>Ссылка на хранилище конфигурации (содержит список правил).</summary>
     private readonly JsonDataStore _store;
 
+    /// <summary>BlacklistManager: Выполняет операцию BlacklistManager.</summary>
+    /// <param name="store">Входные данные: значение параметра store (JsonDataStore).</param>
     public BlacklistManager(JsonDataStore store)
     {
         _store = store;

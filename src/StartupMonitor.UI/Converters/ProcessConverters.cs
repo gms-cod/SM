@@ -13,6 +13,7 @@ public class CpuUsageToColorConverter : IValueConverter
     private static readonly SolidColorBrush CyanBrush = new((Color)ColorConverter.ConvertFromString("#00D2D3"));
     private static readonly SolidColorBrush MutedBrush = new((Color)ColorConverter.ConvertFromString("#94A3B8"));
 
+    /// <summary>CpuUsageToColorConverter: Выполняет операцию CpuUsageToColorConverter.</summary>
     static CpuUsageToColorConverter()
     {
         RedBrush.Freeze();
@@ -21,6 +22,12 @@ public class CpuUsageToColorConverter : IValueConverter
         MutedBrush.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is double cpu)
@@ -32,6 +39,12 @@ public class CpuUsageToColorConverter : IValueConverter
         return MutedBrush;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw freshNotSupported();
     private static NotSupportedException freshNotSupported() => new();
 }
@@ -42,17 +55,30 @@ public class StartupStatusBackgroundConverter : IValueConverter
     private static readonly SolidColorBrush AutostartBrush = new((Color)ColorConverter.ConvertFromString("#1810B981"));
     private static readonly SolidColorBrush NormalBrush = new((Color)ColorConverter.ConvertFromString("#1064748B"));
 
+    /// <summary>StartupStatusBackgroundConverter: Выполняет операцию StartupStatusBackgroundConverter.</summary>
     static StartupStatusBackgroundConverter()
     {
         AutostartBrush.Freeze();
         NormalBrush.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is true ? AutostartBrush : NormalBrush;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -62,17 +88,30 @@ public class StartupStatusBorderConverter : IValueConverter
     private static readonly SolidColorBrush AutostartBrush = new((Color)ColorConverter.ConvertFromString("#3510B981"));
     private static readonly SolidColorBrush NormalBrush = new((Color)ColorConverter.ConvertFromString("#2064748B"));
 
+    /// <summary>StartupStatusBorderConverter: Выполняет операцию StartupStatusBorderConverter.</summary>
     static StartupStatusBorderConverter()
     {
         AutostartBrush.Freeze();
         NormalBrush.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is true ? AutostartBrush : NormalBrush;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -82,28 +121,53 @@ public class StartupStatusForegroundConverter : IValueConverter
     private static readonly SolidColorBrush AutostartBrush = new((Color)ColorConverter.ConvertFromString("#10B981"));
     private static readonly SolidColorBrush NormalBrush = new((Color)ColorConverter.ConvertFromString("#94A3B8"));
 
+    /// <summary>StartupStatusForegroundConverter: Выполняет операцию StartupStatusForegroundConverter.</summary>
     static StartupStatusForegroundConverter()
     {
         AutostartBrush.Freeze();
         NormalBrush.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is true ? AutostartBrush : NormalBrush;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
 /// <summary>Инвертированный конвертер bool в Visibility (true -> Collapsed, false -> Visible).</summary>
 public class InverseBooleanToVisibilityConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         return value is true ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -114,6 +178,7 @@ public class ThreatLevelToBackgroundConverter : IValueConverter
     private static readonly SolidColorBrush OrangeBg = new((Color)ColorConverter.ConvertFromString("#26F59E0B"));
     private static readonly SolidColorBrush BlueBg = new((Color)ColorConverter.ConvertFromString("#263B82F6"));
 
+    /// <summary>ThreatLevelToBackgroundConverter: Выполняет операцию ThreatLevelToBackgroundConverter.</summary>
     static ThreatLevelToBackgroundConverter()
     {
         RedBg.Freeze();
@@ -121,6 +186,12 @@ public class ThreatLevelToBackgroundConverter : IValueConverter
         BlueBg.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is StartupMonitor.Shared.Models.CliThreatLevel level)
@@ -136,6 +207,12 @@ public class ThreatLevelToBackgroundConverter : IValueConverter
         return Brushes.Transparent;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -146,6 +223,7 @@ public class ThreatLevelToBorderConverter : IValueConverter
     private static readonly SolidColorBrush OrangeBorder = new((Color)ColorConverter.ConvertFromString("#4DF59E0B"));
     private static readonly SolidColorBrush BlueBorder = new((Color)ColorConverter.ConvertFromString("#4D3B82F6"));
 
+    /// <summary>ThreatLevelToBorderConverter: Выполняет операцию ThreatLevelToBorderConverter.</summary>
     static ThreatLevelToBorderConverter()
     {
         RedBorder.Freeze();
@@ -153,6 +231,12 @@ public class ThreatLevelToBorderConverter : IValueConverter
         BlueBorder.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is StartupMonitor.Shared.Models.CliThreatLevel level)
@@ -168,6 +252,12 @@ public class ThreatLevelToBorderConverter : IValueConverter
         return Brushes.Transparent;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -179,6 +269,7 @@ public class ThreatLevelToForegroundConverter : IValueConverter
     private static readonly SolidColorBrush BlueFg = new((Color)ColorConverter.ConvertFromString("#60A5FA"));
     private static readonly SolidColorBrush MutedFg = new((Color)ColorConverter.ConvertFromString("#94A3B8"));
 
+    /// <summary>ThreatLevelToForegroundConverter: Выполняет операцию ThreatLevelToForegroundConverter.</summary>
     static ThreatLevelToForegroundConverter()
     {
         RedFg.Freeze();
@@ -187,6 +278,12 @@ public class ThreatLevelToForegroundConverter : IValueConverter
         MutedFg.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is StartupMonitor.Shared.Models.CliThreatLevel level)
@@ -202,12 +299,24 @@ public class ThreatLevelToForegroundConverter : IValueConverter
         return MutedFg;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
 /// <summary>Конвертер для локализованного отображения источника автозапуска процесса (ProcessInfo).</summary>
 public class ProcessStartupOriginConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not StartupMonitor.Shared.Models.ProcessInfo proc) return string.Empty;
@@ -243,12 +352,24 @@ public class ProcessStartupOriginConverter : IValueConverter
         return loc["OriginBackgroundProcess"];
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
 /// <summary>Конвертер отступа уровня дерева в Thickness (Left indent).</summary>
 public class TreeIndentConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         double indent = 0;
@@ -257,5 +378,11 @@ public class TreeIndentConverter : IValueConverter
         return new System.Windows.Thickness(4.0 + indent, 0, 8.0, 0);
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }

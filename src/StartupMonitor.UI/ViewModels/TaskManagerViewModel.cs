@@ -104,6 +104,8 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     public string SortPublisherIndicator => _sortColumn == "publisher" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
     public string SortStartupIndicator => _sortColumn == "startup" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
 
+    /// <summary>TaskManagerViewModel: Выполняет операцию TaskManagerViewModel.</summary>
+    /// <param name="pipeClient">Входные данные: значение параметра pipeClient (PipeClient).</param>
     public TaskManagerViewModel(PipeClient pipeClient)
     {
         _pipeClient = pipeClient;
@@ -121,6 +123,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         };
     }
 
+    /// <summary>OnPipeClientConnected: Обрабатывает событие OnPipeClientConnected.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object?).</param>
+    /// <param name="e">Входные данные: значение параметра e (EventArgs).</param>
     private async void OnPipeClientConnected(object? sender, EventArgs e)
     {
         if (_isActive)
@@ -183,6 +188,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>OnProcessSnapshotReceived: Обрабатывает событие OnProcessSnapshotReceived.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object?).</param>
+    /// <param name="snapshot">Входные данные: значение параметра snapshot (SystemPerformanceSnapshot).</param>
     private void OnProcessSnapshotReceived(object? sender, SystemPerformanceSnapshot snapshot)
     {
         UpdateSnapshot(snapshot);
@@ -663,6 +671,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         ApplyFilterAndSort();
     }
 
+    /// <summary>UpdateSortIndicators: Обновляет состояние SortIndicators.</summary>
     private void UpdateSortIndicators()
     {
         OnPropertyChanged(nameof(SortNameIndicator));
@@ -678,6 +687,8 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     // ──── Команды фильтрации категорий ────
 
     [RelayCommand]
+    /// <summary>SetFilter: Устанавливает Filter.</summary>
+    /// <param name="filter">Входные данные: значение параметра filter (string).</param>
     private void SetFilter(string filter) => SelectedFilter = filter;
 
     // ──── Команды действий над процессами ────
@@ -941,15 +952,30 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
 
     #region P/Invoke для получения путей процессов из UI
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>OpenProcess: Выполняет операцию OpenProcess.</summary>
+    /// <param name="processAccess">Входные данные: значение параметра processAccess (int).</param>
+    /// <param name="bInheritHandle">Входные данные: значение параметра bInheritHandle (bool).</param>
+    /// <param name="processId">Входные данные: значение параметра processId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenProcess(int processAccess, bool bInheritHandle, int processId);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    /// <summary>QueryFullProcessImageName: Выполняет операцию QueryFullProcessImageName.</summary>
+    /// <param name="hProcess">Входные данные: значение параметра hProcess (IntPtr).</param>
+    /// <param name="flags">Входные данные: значение параметра flags (int).</param>
+    /// <param name="lpExeName">Входные данные: значение параметра lpExeName ([Out] StringBuilder).</param>
+    /// <param name="lpdwSize">Входные данные: значение параметра lpdwSize (ref int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool QueryFullProcessImageName(IntPtr hProcess, int flags, [Out] StringBuilder lpExeName, ref int lpdwSize);
     #endregion
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
         _searchDebounceTimer.Stop();

@@ -15,6 +15,9 @@ public class CsvAuditReportExporter : IAuditReportExporter
     public string FileExtension => "csv";
     public string ContentType => "text/csv; charset=utf-8";
 
+    /// <summary>ExportToString: Экспортирует данные отчета ToString.</summary>
+    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public string ExportToString(AuditReport report)
     {
         var sb = new StringBuilder();
@@ -101,6 +104,9 @@ public class CsvAuditReportExporter : IAuditReportExporter
         return sb.ToString();
     }
 
+    /// <summary>ExportToBytes: Экспортирует данные отчета ToBytes.</summary>
+    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
+    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
     public byte[] ExportToBytes(AuditReport report)
     {
         // Записываем UTF-8 BOM (\uFEFF: 0xEF, 0xBB, 0xBF) перед содержимым для корректного открытия в Excel
@@ -114,6 +120,9 @@ public class CsvAuditReportExporter : IAuditReportExporter
         return result;
     }
 
+    /// <summary>EscapeCsv: Выполняет операцию EscapeCsv.</summary>
+    /// <param name="value">Входные данные: значение параметра value (string?).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string EscapeCsv(string? value)
     {
         if (string.IsNullOrEmpty(value))

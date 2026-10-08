@@ -36,6 +36,7 @@ public class RegistryWatcher : BackgroundService
         @"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run",
     ];
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public override void Dispose()
     {
         foreach (var key in _watchedKeys)

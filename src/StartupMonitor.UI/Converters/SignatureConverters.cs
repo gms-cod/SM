@@ -13,6 +13,12 @@ namespace StartupMonitor.UI.Converters;
 /// </summary>
 public class SignatureStatusToSymbolConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not DigitalSignatureStatus status)
@@ -27,6 +33,12 @@ public class SignatureStatusToSymbolConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -40,6 +52,7 @@ public class SignatureStatusToColorConverter : IValueConverter
     private static readonly SolidColorBrush AmberBrush = new((Color)ColorConverter.ConvertFromString("#F59E0B"));
     private static readonly SolidColorBrush MutedBrush = new((Color)ColorConverter.ConvertFromString("#94A3B8"));
 
+    /// <summary>SignatureStatusToColorConverter: Выполняет операцию SignatureStatusToColorConverter.</summary>
     static SignatureStatusToColorConverter()
     {
         GreenBrush.Freeze();
@@ -48,6 +61,12 @@ public class SignatureStatusToColorConverter : IValueConverter
         MutedBrush.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not DigitalSignatureStatus status)
@@ -62,6 +81,12 @@ public class SignatureStatusToColorConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -75,6 +100,7 @@ public class SignatureStatusToBackgroundConverter : IValueConverter
     private static readonly SolidColorBrush AmberBg = new((Color)ColorConverter.ConvertFromString("#18F59E0B"));
     private static readonly SolidColorBrush MutedBg = new((Color)ColorConverter.ConvertFromString("#1064748B"));
 
+    /// <summary>SignatureStatusToBackgroundConverter: Выполняет операцию SignatureStatusToBackgroundConverter.</summary>
     static SignatureStatusToBackgroundConverter()
     {
         GreenBg.Freeze();
@@ -83,6 +109,12 @@ public class SignatureStatusToBackgroundConverter : IValueConverter
         MutedBg.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not DigitalSignatureStatus status)
@@ -97,6 +129,12 @@ public class SignatureStatusToBackgroundConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -110,6 +148,7 @@ public class SignatureStatusToBorderConverter : IValueConverter
     private static readonly SolidColorBrush AmberBorder = new((Color)ColorConverter.ConvertFromString("#33F59E0B"));
     private static readonly SolidColorBrush MutedBorder = new((Color)ColorConverter.ConvertFromString("#2064748B"));
 
+    /// <summary>SignatureStatusToBorderConverter: Выполняет операцию SignatureStatusToBorderConverter.</summary>
     static SignatureStatusToBorderConverter()
     {
         GreenBorder.Freeze();
@@ -118,6 +157,12 @@ public class SignatureStatusToBorderConverter : IValueConverter
         MutedBorder.Freeze();
     }
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not DigitalSignatureStatus status)
@@ -132,6 +177,12 @@ public class SignatureStatusToBorderConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -140,6 +191,12 @@ public class SignatureStatusToBorderConverter : IValueConverter
 /// </summary>
 public class SignatureStatusToTooltipConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is StartupEntry entry)
@@ -157,6 +214,12 @@ public class SignatureStatusToTooltipConverter : IValueConverter
         return "Статус цифровой подписи не определён";
     }
 
+    /// <summary>FormatTooltip: Выполняет операцию FormatTooltip.</summary>
+    /// <param name="status">Входные данные: значение параметра status (DigitalSignatureStatus).</param>
+    /// <param name="signer">Входные данные: значение параметра signer (string?).</param>
+    /// <param name="issuer">Входные данные: значение параметра issuer (string?).</param>
+    /// <param name="fallback">Входные данные: значение параметра fallback (string?).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string FormatTooltip(DigitalSignatureStatus status, string? signer, string? issuer, string? fallback)
     {
         var name = !string.IsNullOrEmpty(signer) ? signer : (!string.IsNullOrEmpty(fallback) ? fallback : "Не указан");
@@ -193,5 +256,11 @@ public class SignatureStatusToTooltipConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture)">Входные данные: значение параметра culture) (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

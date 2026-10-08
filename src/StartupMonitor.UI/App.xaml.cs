@@ -186,12 +186,23 @@ public partial class App : Application
     }
 
     [DllImport("user32.dll")]
+    /// <summary>FindWindow: Выполняет поиск Window.</summary>
+    /// <param name="lpClassName">Входные данные: значение параметра lpClassName (string?).</param>
+    /// <param name="lpWindowName">Входные данные: значение параметра lpWindowName (string?).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>SetForegroundWindow: Устанавливает ForegroundWindow.</summary>
+    /// <param name="hWnd">Входные данные: значение параметра hWnd (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>ShowWindow: Выполняет операцию ShowWindow.</summary>
+    /// <param name="hWnd">Входные данные: значение параметра hWnd (IntPtr).</param>
+    /// <param name="nCmdShow">Входные данные: значение параметра nCmdShow (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     private const int SW_RESTORE = 9;
     private const int SW_SHOW = 5;
@@ -367,6 +378,8 @@ public partial class App : Application
 
     /// <summary>Определяет, используется ли светлая тема в Windows.</summary>
     private static bool IsWindowsThemeLight() => IsSystemThemeLight();
+    /// <summary>IsSystemThemeLight: Проверяет состояние IsSystemThemeLight.</summary>
+    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
     private static bool IsSystemThemeLight()
     {
         try
@@ -394,7 +407,13 @@ public partial class App : Application
                 brush = new LinearGradientBrush(
                     Color.FromRgb(0x94, 0xA3, 0xB8), // #94A3B8
                     Color.FromRgb(0x47, 0x55, 0x69), // #475569
+                    /// <summary>Point: Выполняет операцию Point.</summary>
+                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
+                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
                     new Point(0, 0),
+                    /// <summary>Point: Выполняет операцию Point.</summary>
+                    /// <param name="1">Входные данные: значение параметра 1 ().</param>
+                    /// <param name="1)">Входные данные: значение параметра 1) ().</param>
                     new Point(1, 1));
             }
             else
@@ -403,7 +422,13 @@ public partial class App : Application
                 brush = new LinearGradientBrush(
                     Color.FromRgb(0x00, 0xD2, 0xD3),
                     Color.FromRgb(0x00, 0x78, 0xD4),
+                    /// <summary>Point: Выполняет операцию Point.</summary>
+                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
+                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
                     new Point(0, 0),
+                    /// <summary>Point: Выполняет операцию Point.</summary>
+                    /// <param name="1">Входные данные: значение параметра 1 ().</param>
+                    /// <param name="1)">Входные данные: значение параметра 1) ().</param>
                     new Point(1, 1));
             }
 

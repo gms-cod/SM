@@ -89,12 +89,21 @@ public static class SnapshotComparator
         return result;
     }
 
+    /// <summary>MakeCompositeKey: Выполняет операцию MakeCompositeKey.</summary>
+    /// <param name="location">Входные данные: значение параметра location (EntryLocation).</param>
+    /// <param name="detail">Входные данные: значение параметра detail (string?).</param>
+    /// <param name="name">Входные данные: значение параметра name (string?).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string MakeCompositeKey(EntryLocation location, string? detail, string? name)
     {
         var normDetail = JsonDataStore.NormalizeLocationDetail(detail ?? string.Empty);
         return $"{location}|{normDetail}|{name?.Trim() ?? string.Empty}".ToLowerInvariant();
     }
 
+    /// <summary>DetectModifications: Выполняет операцию DetectModifications.</summary>
+    /// <param name="current">Входные данные: значение параметра current (StartupEntry).</param>
+    /// <param name="baseline">Входные данные: значение параметра baseline (StartupEntrySnapshotItem).</param>
+    /// <returns>Выходные данные: результирующее значение типа SnapshotModifiedEntryItem.</returns>
     private static SnapshotModifiedEntryItem DetectModifications(StartupEntry current, StartupEntrySnapshotItem baseline)
     {
         var mod = new SnapshotModifiedEntryItem

@@ -10,6 +10,12 @@ namespace StartupMonitor.UI.Converters;
 /// </summary>
 public class RatingToStarsConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         // Конвертируем score (1-10) в количество закрашенных звёзд (1-5)
@@ -21,10 +27,19 @@ public class RatingToStarsConverter : IValueConverter
         return "☆☆☆☆☆";
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 
     // ponytail: score→stars mapping — 1→5★ зелёных (хорошо), 10→1★ красных (плохо)
+    /// <summary>ScoreToStars: Выполняет операцию ScoreToStars.</summary>
+    /// <param name="score">Входные данные: значение параметра score (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа int.</returns>
     public static int ScoreToStars(int score) => score switch
     {
         1 => 5,
@@ -62,6 +77,12 @@ public class RatingToColorConverter : IValueConverter
     private static readonly System.Windows.Media.SolidColorBrush Stars1Light = CreateFrozen(0xDC, 0x26, 0x26);
     private static readonly System.Windows.Media.SolidColorBrush Stars1Dark = CreateFrozen(0xE8, 0x11, 0x23);
 
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         // Если score невалидный — аккуратный серый цвет
@@ -82,6 +103,12 @@ public class RatingToColorConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -93,6 +120,12 @@ public class RatingToColorConverter : IValueConverter
 /// </summary>
 public class RatingToTooltipConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         // Если score невалидный — "No rating"
@@ -102,6 +135,12 @@ public class RatingToTooltipConverter : IValueConverter
         return $"Score: {score}/10";
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }

@@ -10,6 +10,12 @@ namespace StartupMonitor.UI.Converters;
 /// <summary>Конвертер имени издателя для бейджа.</summary>
 public class PublisherBadgeConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         var publisher = value as string;
@@ -20,6 +26,12 @@ public class PublisherBadgeConverter : IValueConverter
         return LocalizationService.Instance["PublisherUnverified"];
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -27,6 +39,12 @@ public class PublisherBadgeConverter : IValueConverter
 /// <summary>Конвертер влияния на запуск (Boot Impact): "Низкое", "Среднее", "Высокое".</summary>
 public class LocationToImpactTextConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not EntryLocation loc) return LocalizationService.Instance["ImpactLow"];
@@ -43,6 +61,12 @@ public class LocationToImpactTextConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -50,6 +74,12 @@ public class LocationToImpactTextConverter : IValueConverter
 /// <summary>Конвертер цвета фона бейджа влияния на запуск.</summary>
 public class LocationToImpactBackgroundConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not EntryLocation loc)
@@ -69,6 +99,12 @@ public class LocationToImpactBackgroundConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -76,6 +112,12 @@ public class LocationToImpactBackgroundConverter : IValueConverter
 /// <summary>Конвертер цвета текста бейджа влияния на запуск.</summary>
 public class LocationToImpactForegroundConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not EntryLocation loc)
@@ -95,6 +137,12 @@ public class LocationToImpactForegroundConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -102,6 +150,12 @@ public class LocationToImpactForegroundConverter : IValueConverter
 /// <summary>Конвертер цвета границы бейджа влияния на запуск.</summary>
 public class LocationToImpactBorderConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not EntryLocation loc)
@@ -121,6 +175,12 @@ public class LocationToImpactBorderConverter : IValueConverter
         };
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -136,6 +196,10 @@ internal static class FrozenBrushCache
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SolidColorBrush> _cache = new(StringComparer.OrdinalIgnoreCase);
     private const int MaxEntries = 512;
 
+    /// <summary>GetOrCreate: Возвращает OrCreate.</summary>
+    /// <param name="key">Входные данные: значение параметра key (string).</param>
+    /// <param name="colorFactory">Входные данные: значение параметра colorFactory (Func<Color>).</param>
+    /// <returns>Выходные данные: результирующее значение типа SolidColorBrush.</returns>
     public static SolidColorBrush GetOrCreate(string key, Func<Color> colorFactory)
     {
         if (_cache.TryGetValue(key, out var cached))
@@ -156,9 +220,21 @@ internal static class FrozenBrushCache
 /// <summary>Конвертер строки цвета (имя / #RRGGBB / #AARRGGBB) в SolidColorBrush с опциональной прозрачностью.</summary>
 public class StringToBrushConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => HexToBrushConverter.ConvertCore(value as string, parameter);
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
@@ -166,9 +242,19 @@ public class StringToBrushConverter : IValueConverter
 /// <summary>Конвертер HEX-строки цвета (#RRGGBB) в SolidColorBrush с опциональной прозрачностью.</summary>
 public class HexToBrushConverter : IValueConverter
 {
+    /// <summary>Convert: Выполняет преобразование данных .</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => ConvertCore(value as string, parameter);
 
+    /// <summary>ConvertCore: Выполняет преобразование данных Core.</summary>
+    /// <param name="hex">Входные данные: значение параметра hex (string?).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     internal static object ConvertCore(string? hex, object? parameter)
     {
         if (!string.IsNullOrWhiteSpace(hex))
@@ -206,6 +292,12 @@ public class HexToBrushConverter : IValueConverter
         return Brushes.Transparent;
     }
 
+    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <param name="value">Входные данные: значение параметра value (object?).</param>
+    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
+    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
+    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
+    /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }

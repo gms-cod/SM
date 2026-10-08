@@ -24,21 +24,33 @@ internal static class PipeSecurityFactory
 
         // SYSTEM — полный контроль (хост-процесс)
         security.AddAccessRule(new PipeAccessRule(
+            /// <summary>SecurityIdentifier: Выполняет операцию SecurityIdentifier.</summary>
+            /// <param name="WellKnownSidType.LocalSystemSid">Входные данные: значение параметра WellKnownSidType.LocalSystemSid ().</param>
+            /// <param name="null">Входные данные: значение параметра null ().</param>
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
             PipeAccessRights.FullControl, AccessControlType.Allow));
 
         // Встроенные администраторы — полный контроль
         security.AddAccessRule(new PipeAccessRule(
+            /// <summary>SecurityIdentifier: Выполняет операцию SecurityIdentifier.</summary>
+            /// <param name="WellKnownSidType.BuiltinAdministratorsSid">Входные данные: значение параметра WellKnownSidType.BuiltinAdministratorsSid ().</param>
+            /// <param name="null">Входные данные: значение параметра null ().</param>
             new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
             PipeAccessRights.FullControl, AccessControlType.Allow));
 
         // Интерактивные пользователи (UI) — чтение/запись
         security.AddAccessRule(new PipeAccessRule(
+            /// <summary>SecurityIdentifier: Выполняет операцию SecurityIdentifier.</summary>
+            /// <param name="WellKnownSidType.InteractiveSid">Входные данные: значение параметра WellKnownSidType.InteractiveSid ().</param>
+            /// <param name="null">Входные данные: значение параметра null ().</param>
             new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
             PipeAccessRights.ReadWrite, AccessControlType.Allow));
 
         // Аутентифицированные пользователи (UI при входе через RDP / Fast User Switching) — чтение/запись
         security.AddAccessRule(new PipeAccessRule(
+            /// <summary>SecurityIdentifier: Выполняет операцию SecurityIdentifier.</summary>
+            /// <param name="WellKnownSidType.AuthenticatedUserSid">Входные данные: значение параметра WellKnownSidType.AuthenticatedUserSid ().</param>
+            /// <param name="null">Входные данные: значение параметра null ().</param>
             new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
             PipeAccessRights.ReadWrite, AccessControlType.Allow));
 

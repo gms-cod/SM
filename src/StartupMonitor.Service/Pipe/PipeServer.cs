@@ -862,6 +862,10 @@ public class PipeServer : BackgroundService
                             _logger.LogInformation("Процесс {Name} (PID {Pid}) приостановлен", suspendPayload.ProcessName, suspendPayload.ProcessId);
                             response.Type = PipeMessageTypes.ProcessActionResponse;
                             response.Payload = JsonSerializer.Serialize(
+                                /// <summary>ProcessActionResultPayload: Выполняет операцию ProcessActionResultPayload.</summary>
+                                /// <param name="true">Входные данные: значение параметра true ().</param>
+                                /// <param name="msg">Входные данные: значение параметра msg ().</param>
+                                /// <param name="suspendPayload.ProcessId">Входные данные: значение параметра suspendPayload.ProcessId ().</param>
                                 new ProcessActionResultPayload(true, msg, suspendPayload.ProcessId),
                                 JsonOptions);
                         }
@@ -869,6 +873,10 @@ public class PipeServer : BackgroundService
                         {
                             response.Type = PipeMessageTypes.Error;
                             response.Payload = JsonSerializer.Serialize(
+                                /// <summary>ProcessActionResultPayload: Выполняет операцию ProcessActionResultPayload.</summary>
+                                /// <param name="false">Входные данные: значение параметра false ().</param>
+                                /// <param name="msg">Входные данные: значение параметра msg ().</param>
+                                /// <param name="suspendPayload.ProcessId">Входные данные: значение параметра suspendPayload.ProcessId ().</param>
                                 new ProcessActionResultPayload(false, msg, suspendPayload.ProcessId),
                                 JsonOptions);
                         }
@@ -885,6 +893,10 @@ public class PipeServer : BackgroundService
                             _logger.LogInformation("Процесс {Name} (PID {Pid}) возобновлен", resumePayload.ProcessName, resumePayload.ProcessId);
                             response.Type = PipeMessageTypes.ProcessActionResponse;
                             response.Payload = JsonSerializer.Serialize(
+                                /// <summary>ProcessActionResultPayload: Выполняет операцию ProcessActionResultPayload.</summary>
+                                /// <param name="true">Входные данные: значение параметра true ().</param>
+                                /// <param name="msg">Входные данные: значение параметра msg ().</param>
+                                /// <param name="resumePayload.ProcessId">Входные данные: значение параметра resumePayload.ProcessId ().</param>
                                 new ProcessActionResultPayload(true, msg, resumePayload.ProcessId),
                                 JsonOptions);
                         }
@@ -892,6 +904,10 @@ public class PipeServer : BackgroundService
                         {
                             response.Type = PipeMessageTypes.Error;
                             response.Payload = JsonSerializer.Serialize(
+                                /// <summary>ProcessActionResultPayload: Выполняет операцию ProcessActionResultPayload.</summary>
+                                /// <param name="false">Входные данные: значение параметра false ().</param>
+                                /// <param name="msg">Входные данные: значение параметра msg ().</param>
+                                /// <param name="resumePayload.ProcessId">Входные данные: значение параметра resumePayload.ProcessId ().</param>
                                 new ProcessActionResultPayload(false, msg, resumePayload.ProcessId),
                                 JsonOptions);
                         }

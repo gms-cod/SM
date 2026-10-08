@@ -201,12 +201,16 @@ public static class ExecutionProfiler
         private readonly string? _operationName;
         private readonly long _startTimestamp;
 
+        /// <summary>Scope: Выполняет операцию Scope.</summary>
+        /// <param name="operationName">Входные данные: значение параметра operationName (string).</param>
+        /// <param name="startTimestamp">Входные данные: значение параметра startTimestamp (long).</param>
         internal Scope(string operationName, long startTimestamp)
         {
             _operationName = operationName;
             _startTimestamp = startTimestamp;
         }
 
+        /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
         public void Dispose()
         {
             var name = _operationName;

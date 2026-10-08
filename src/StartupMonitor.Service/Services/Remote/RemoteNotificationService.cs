@@ -356,6 +356,10 @@ public class RemoteNotificationService : IDisposable
         return (false, $"Telegram: {tgMsg}; Discord: {dcMsg}");
     }
 
+    /// <summary>SendTelegramAsync: Выполняет операцию SendTelegramAsync.</summary>
+    /// <param name="token">Входные данные: значение параметра token (string).</param>
+    /// <param name="chatId">Входные данные: значение параметра chatId (string).</param>
+    /// <param name="html">Входные данные: значение параметра html (string).</param>
     private async Task SendTelegramAsync(string token, string chatId, string html)
     {
         try
@@ -382,6 +386,9 @@ public class RemoteNotificationService : IDisposable
         }
     }
 
+    /// <summary>SendDiscordAsync: Выполняет операцию SendDiscordAsync.</summary>
+    /// <param name="webhookUrl">Входные данные: значение параметра webhookUrl (string).</param>
+    /// <param name="payload">Входные данные: значение параметра payload (DiscordPayload).</param>
     private async Task SendDiscordAsync(string webhookUrl, DiscordPayload payload)
     {
         try
@@ -400,6 +407,9 @@ public class RemoteNotificationService : IDisposable
         }
     }
 
+    /// <summary>EscapeHtml: Выполняет операцию EscapeHtml.</summary>
+    /// <param name="text">Входные данные: значение параметра text (string?).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string EscapeHtml(string? text)
     {
         if (string.IsNullOrEmpty(text)) return string.Empty;
@@ -409,6 +419,7 @@ public class RemoteNotificationService : IDisposable
             .Replace(">", "&gt;");
     }
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
         if (_disposeClient)

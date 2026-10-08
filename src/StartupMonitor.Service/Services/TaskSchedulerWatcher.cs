@@ -42,6 +42,7 @@ public class TaskSchedulerWatcher : BackgroundService
         _coordinator = coordinator;
     }
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public override void Dispose()
     {
         try { _taskService?.Dispose(); } catch { }

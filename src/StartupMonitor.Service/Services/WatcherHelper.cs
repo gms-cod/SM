@@ -114,6 +114,9 @@ public static class WatcherHelper
                     {
                         Type = PipeMessageTypes.ActionNotice,
                         Payload = System.Text.Json.JsonSerializer.Serialize(
+                            /// <summary>ActionNoticePayload: Выполняет операцию ActionNoticePayload.</summary>
+                            /// <param name="""">Входные данные: значение параметра "" (entry.Name ??).</param>
+                            /// <param name=""removedAgain")">Входные данные: значение параметра "removedAgain") ().</param>
                             new ActionNoticePayload(entry.Name ?? "", "removedAgain"))
                     });
                 }
@@ -167,6 +170,9 @@ public static class WatcherHelper
             {
                 Type = PipeMessageTypes.ActionNotice,
                 Payload = System.Text.Json.JsonSerializer.Serialize(
+                    /// <summary>ActionNoticePayload: Выполняет операцию ActionNoticePayload.</summary>
+                    /// <param name="""">Входные данные: значение параметра "" (entry.Name ??).</param>
+                    /// <param name=""lockdownBlocked")">Входные данные: значение параметра "lockdownBlocked") ().</param>
                     new ActionNoticePayload(entry.Name ?? "", "lockdownBlocked"))
             });
 
@@ -291,6 +297,9 @@ public static class WatcherHelper
             {
                 Type = PipeMessageTypes.ActionNotice,
                 Payload = System.Text.Json.JsonSerializer.Serialize(
+                    /// <summary>ActionNoticePayload: Выполняет операцию ActionNoticePayload.</summary>
+                    /// <param name="""">Входные данные: значение параметра "" (existing.Name ??).</param>
+                    /// <param name=""autoDisabled")">Входные данные: значение параметра "autoDisabled") ().</param>
                     new ActionNoticePayload(existing.Name ?? "", "autoDisabled"))
             });
             notifications.Enqueue(new PipeMessage

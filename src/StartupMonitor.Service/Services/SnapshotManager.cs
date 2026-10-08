@@ -12,6 +12,9 @@ public class SnapshotManager
     private readonly JsonDataStore _store;
     private readonly ILogger<SnapshotManager> _logger;
 
+    /// <summary>SnapshotManager: Выполняет операцию SnapshotManager.</summary>
+    /// <param name="store">Входные данные: значение параметра store (JsonDataStore).</param>
+    /// <param name="logger">Входные данные: значение параметра logger (ILogger<SnapshotManager>).</param>
     public SnapshotManager(JsonDataStore store, ILogger<SnapshotManager> logger)
     {
         _store = store;

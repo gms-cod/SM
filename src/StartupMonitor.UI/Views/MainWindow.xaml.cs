@@ -261,6 +261,8 @@ public partial class MainWindow
         var capturedEntry = entry;
         _ = Dispatcher.BeginInvoke(
             DispatcherPriority.Background,
+            /// <summary>Action: Выполняет операцию Action.</summary>
+            /// <param name="(">Входные данные: значение параметра ( ().</param>
             new Action(() =>
             {
                 var detailWindow = new Dialogs.EntryDetailWindow(capturedEntry, _viewModel)

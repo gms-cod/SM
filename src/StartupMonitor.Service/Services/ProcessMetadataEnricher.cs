@@ -38,6 +38,7 @@ public class ProcessMetadataEnricher : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _workerTask;
 
+    /// <summary>ProcessMetadataEnricher: Выполняет операцию ProcessMetadataEnricher.</summary>
     public ProcessMetadataEnricher()
     {
         _workerTask = Task.Run(ProcessEnrichmentLoopAsync);
@@ -232,6 +233,9 @@ public class ProcessMetadataEnricher : IDisposable
         }
     }
 
+    /// <summary>TryGetCompanyName: Выполняет операцию TryGetCompanyName.</summary>
+    /// <param name="filePath">Входные данные: значение параметра filePath (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string TryGetCompanyName(string filePath)
     {
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return string.Empty;
@@ -243,6 +247,9 @@ public class ProcessMetadataEnricher : IDisposable
         catch { return string.Empty; }
     }
 
+    /// <summary>TryGetProcessPath: Выполняет операцию TryGetProcessPath.</summary>
+    /// <param name="pid">Входные данные: значение параметра pid (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     public static string TryGetProcessPath(int pid)
     {
         IntPtr hProcess = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, pid);
@@ -257,6 +264,9 @@ public class ProcessMetadataEnricher : IDisposable
         }
     }
 
+    /// <summary>GetProcessPathFromHandle: Возвращает ProcessPathFromHandle.</summary>
+    /// <param name="hProcess">Входные данные: значение параметра hProcess (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string GetProcessPathFromHandle(IntPtr hProcess)
     {
         var sb = new StringBuilder(1024);
@@ -285,6 +295,9 @@ public class ProcessMetadataEnricher : IDisposable
         int processInformationLength,
         out int returnLength);
 
+    /// <summary>TryGetProcessCommandLine: Выполняет операцию TryGetProcessCommandLine.</summary>
+    /// <param name="hProcess">Входные данные: значение параметра hProcess (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string TryGetProcessCommandLine(IntPtr hProcess)
     {
         if (hProcess == IntPtr.Zero) return string.Empty;
@@ -317,15 +330,30 @@ public class ProcessMetadataEnricher : IDisposable
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>OpenProcess: Выполняет операцию OpenProcess.</summary>
+    /// <param name="processAccess">Входные данные: значение параметра processAccess (int).</param>
+    /// <param name="bInheritHandle">Входные данные: значение параметра bInheritHandle (bool).</param>
+    /// <param name="processId">Входные данные: значение параметра processId (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenProcess(int processAccess, bool bInheritHandle, int processId);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    /// <summary>CloseHandle: Выполняет операцию CloseHandle.</summary>
+    /// <param name="hObject">Входные данные: значение параметра hObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    /// <summary>QueryFullProcessImageName: Выполняет операцию QueryFullProcessImageName.</summary>
+    /// <param name="hProcess">Входные данные: значение параметра hProcess (IntPtr).</param>
+    /// <param name="flags">Входные данные: значение параметра flags (int).</param>
+    /// <param name="lpExeName">Входные данные: значение параметра lpExeName ([Out] StringBuilder).</param>
+    /// <param name="lpdwSize">Входные данные: значение параметра lpdwSize (ref int).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool QueryFullProcessImageName(IntPtr hProcess, int flags, [Out] StringBuilder lpExeName, ref int lpdwSize);
     #endregion
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
         _cts.Cancel();

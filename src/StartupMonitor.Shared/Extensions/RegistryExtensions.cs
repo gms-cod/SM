@@ -15,6 +15,8 @@ public static class RegistryExtensions
         (@"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run", null, EntryLocation.RegistryPolicies, @"HKLM\...\Policies\Run"),
     ];
 
+    /// <summary>ScanHklmRunKeys: Выполняет операцию ScanHklmRunKeys.</summary>
+    /// <returns>Выходные данные: результирующее значение типа List<StartupEntry>.</returns>
     public static List<StartupEntry> ScanHklmRunKeys()
     {
         var entries = new List<StartupEntry>();
@@ -44,6 +46,8 @@ public static class RegistryExtensions
         return entries;
     }
 
+    /// <summary>ScanHkcuRunKeys: Выполняет операцию ScanHkcuRunKeys.</summary>
+    /// <returns>Выходные данные: результирующее значение типа List<StartupEntry>.</returns>
     public static List<StartupEntry> ScanHkcuRunKeys()
     {
         var entries = new List<StartupEntry>();
@@ -79,6 +83,9 @@ public static class RegistryExtensions
         return entries;
     }
 
+    /// <summary>ParsePath: Выполняет операцию ParsePath.</summary>
+    /// <param name="commandLine">Входные данные: значение параметра commandLine (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string ParsePath(string commandLine)
     {
         if (string.IsNullOrWhiteSpace(commandLine)) return string.Empty;
@@ -94,6 +101,9 @@ public static class RegistryExtensions
         return spaceIdx > 0 ? trimmed[..spaceIdx] : trimmed;
     }
 
+    /// <summary>GetFilePublisher: Возвращает FilePublisher.</summary>
+    /// <param name="filePath">Входные данные: значение параметра filePath (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string GetFilePublisher(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))

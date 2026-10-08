@@ -32,6 +32,8 @@ public class DelayedStartupManager : IHostedService
         _notifications = notifications;
     }
 
+    /// <summary>StartAsync: Выполняет операцию StartAsync.</summary>
+    /// <param name="cancellationToken">Входные данные: значение параметра cancellationToken (CancellationToken).</param>
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Инициализация менеджера отложенного запуска (Delayed Startup)");
@@ -39,6 +41,8 @@ public class DelayedStartupManager : IHostedService
         return Task.CompletedTask;
     }
 
+    /// <summary>StopAsync: Выполняет операцию StopAsync.</summary>
+    /// <param name="cancellationToken">Входные данные: значение параметра cancellationToken (CancellationToken).</param>
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Остановка менеджера отложенного запуска");
@@ -217,6 +221,8 @@ public class DelayedStartupManager : IHostedService
         }
     }
 
+    /// <summary>ScheduleEntry: Выполняет операцию ScheduleEntry.</summary>
+    /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
     private void ScheduleEntry(StartupEntry entry)
     {
         CancelScheduled(entry.Id);
@@ -285,6 +291,8 @@ public class DelayedStartupManager : IHostedService
         });
     }
 
+    /// <summary>CancelScheduled: Выполняет операцию CancelScheduled.</summary>
+    /// <param name="entryId">Входные данные: значение параметра entryId (string).</param>
     private void CancelScheduled(string entryId)
     {
         if (_scheduledTasks.TryRemove(entryId, out var cts))
@@ -298,6 +306,7 @@ public class DelayedStartupManager : IHostedService
         }
     }
 
+    /// <summary>CancelAllScheduled: Выполняет операцию CancelAllScheduled.</summary>
     private void CancelAllScheduled()
     {
         foreach (var key in _scheduledTasks.Keys.ToList())

@@ -110,6 +110,9 @@ public sealed class SystemComputerInfo
 
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
+    /// <summary>GlobalMemoryStatusEx: Выполняет операцию GlobalMemoryStatusEx.</summary>
+    /// <param name="lpBuffer">Входные данные: значение параметра lpBuffer (ref MEMORYSTATUSEX).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
     #endregion

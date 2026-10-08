@@ -11,6 +11,11 @@ namespace StartupMonitor.Service.Services;
 public static class ServiceProcessHelper
 {
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    /// <summary>OpenSCManager: Выполняет операцию OpenSCManager.</summary>
+    /// <param name="lpMachineName">Входные данные: значение параметра lpMachineName (string?).</param>
+    /// <param name="lpDatabaseName">Входные данные: значение параметра lpDatabaseName (string?).</param>
+    /// <param name="dwDesiredAccess">Входные данные: значение параметра dwDesiredAccess (uint).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern IntPtr.</returns>
     private static extern IntPtr OpenSCManager(string? lpMachineName, string? lpDatabaseName, uint dwDesiredAccess);
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -27,6 +32,9 @@ public static class ServiceProcessHelper
         string? pszGroupName);
 
     [DllImport("advapi32.dll", SetLastError = true)]
+    /// <summary>CloseServiceHandle: Выполняет операцию CloseServiceHandle.</summary>
+    /// <param name="hSCObject">Входные данные: значение параметра hSCObject (IntPtr).</param>
+    /// <returns>Выходные данные: результирующее значение типа extern bool.</returns>
     private static extern bool CloseServiceHandle(IntPtr hSCObject);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]

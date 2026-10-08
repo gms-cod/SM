@@ -207,6 +207,11 @@ public sealed class TrayNotificationAggregator : IDisposable
         return TrayNotificationKind.Info;
     }
 
+    /// <summary>FormatCategoryTitle: Выполняет операцию FormatCategoryTitle.</summary>
+    /// <param name="kind">Входные данные: значение параметра kind (TrayNotificationKind).</param>
+    /// <param name="count">Входные данные: значение параметра count (int).</param>
+    /// <param name="loc">Входные данные: значение параметра loc (LocalizationService).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string FormatCategoryTitle(TrayNotificationKind kind, int count, LocalizationService loc) =>
         kind switch
         {
@@ -223,12 +228,17 @@ public sealed class TrayNotificationAggregator : IDisposable
             _ => $"{loc.AppName} ({count})"
         };
 
+    /// <summary>Truncate: Выполняет операцию Truncate.</summary>
+    /// <param name="s">Входные данные: значение параметра s (string).</param>
+    /// <param name="max">Входные данные: значение параметра max (int).</param>
+    /// <returns>Выходные данные: результирующее значение типа string.</returns>
     private static string Truncate(string s, int max)
     {
         if (string.IsNullOrEmpty(s) || s.Length <= max) return s;
         return s.Substring(0, max - 1) + "…";
     }
 
+    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
         _timer.Stop();

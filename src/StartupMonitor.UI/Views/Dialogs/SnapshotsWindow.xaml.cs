@@ -14,6 +14,9 @@ public partial class SnapshotsWindow
     private readonly MainViewModel _vm;
     private SnapshotComparisonResult? _currentDiff;
 
+    /// <summary>SnapshotsWindow: Выполняет операцию SnapshotsWindow.</summary>
+    /// <param name="pipeClient">Входные данные: значение параметра pipeClient (PipeClient).</param>
+    /// <param name="viewModel">Входные данные: значение параметра viewModel (MainViewModel).</param>
     public SnapshotsWindow(PipeClient pipeClient, MainViewModel viewModel)
     {
         InitializeComponent();
@@ -23,6 +26,7 @@ public partial class SnapshotsWindow
         Loaded += async (_, _) => await LoadSnapshotsAsync();
     }
 
+    /// <summary>LoadSnapshotsAsync: Загружает данные SnapshotsAsync.</summary>
     private async Task LoadSnapshotsAsync()
     {
         try
@@ -37,6 +41,9 @@ public partial class SnapshotsWindow
         }
     }
 
+    /// <summary>OnCreateSnapshotClick: Обрабатывает событие OnCreateSnapshotClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private async void OnCreateSnapshotClick(object sender, RoutedEventArgs e)
     {
         var name = TxtSnapshotName.Text.Trim();
@@ -73,6 +80,9 @@ public partial class SnapshotsWindow
         }
     }
 
+    /// <summary>OnCompareSnapshotClick: Обрабатывает событие OnCompareSnapshotClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private async void OnCompareSnapshotClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: BaselineSnapshot snapshot })
@@ -81,6 +91,8 @@ public partial class SnapshotsWindow
         }
     }
 
+    /// <summary>CompareSnapshotInternalAsync: Выполняет операцию CompareSnapshotInternalAsync.</summary>
+    /// <param name="snapshotId">Входные данные: значение параметра snapshotId (string).</param>
     private async Task CompareSnapshotInternalAsync(string snapshotId)
     {
         try
@@ -102,6 +114,8 @@ public partial class SnapshotsWindow
         }
     }
 
+    /// <summary>DisplayDiffResults: Выполняет операцию DisplayDiffResults.</summary>
+    /// <param name="diff">Входные данные: значение параметра diff (SnapshotComparisonResult).</param>
     private void DisplayDiffResults(SnapshotComparisonResult diff)
     {
         TxtDiffHeader.Text = $"Сравнение со снимком «{diff.SnapshotName}»:";
@@ -121,6 +135,9 @@ public partial class SnapshotsWindow
         BtnApplyFilter.IsEnabled = diff.HasDifferences;
     }
 
+    /// <summary>OnDeleteSnapshotClick: Обрабатывает событие OnDeleteSnapshotClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private async void OnDeleteSnapshotClick(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: BaselineSnapshot snapshot })
@@ -139,6 +156,9 @@ public partial class SnapshotsWindow
         }
     }
 
+    /// <summary>OnApplyFilterToMainClick: Обрабатывает событие OnApplyFilterToMainClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnApplyFilterToMainClick(object sender, RoutedEventArgs e)
     {
         if (_currentDiff != null)
@@ -148,6 +168,9 @@ public partial class SnapshotsWindow
         }
     }
 
+    /// <summary>OnCloseClick: Обрабатывает событие OnCloseClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCloseClick(object sender, RoutedEventArgs e)
     {
         Close();

@@ -26,6 +26,9 @@ public partial class ProcessModulesWindow
 
     public string WindowTitle => $"{_targetProcess.ProcessName} (PID: {_targetProcess.Pid}) — {LocalizationService.Instance.ProcessModulesTitle}";
 
+    /// <summary>ProcessModulesWindow: Выполняет операцию ProcessModulesWindow.</summary>
+    /// <param name="targetProcess">Входные данные: значение параметра targetProcess (ProcessInfo).</param>
+    /// <param name="pipeClient">Входные данные: значение параметра pipeClient (PipeClient).</param>
     public ProcessModulesWindow(ProcessInfo targetProcess, PipeClient pipeClient)
     {
         InitializeComponent();
@@ -39,6 +42,7 @@ public partial class ProcessModulesWindow
         Loaded += async (_, _) => await LoadDataAsync();
     }
 
+    /// <summary>LoadDataAsync: Загружает данные DataAsync.</summary>
     private async Task LoadDataAsync()
     {
         using var _prof = ExecutionProfiler.Measure("UI.Modules.LoadData");
@@ -78,6 +82,7 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>ApplyFilter: Выполняет операцию ApplyFilter.</summary>
     private void ApplyFilter()
     {
         var filter = TxtSearch.Text?.Trim() ?? string.Empty;
@@ -114,16 +119,25 @@ public partial class ProcessModulesWindow
         PanelEmptyHandles.Visibility = (handleList.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    /// <summary>OnSearchTextChanged: Обрабатывает событие OnSearchTextChanged.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (TextChangedEventArgs).</param>
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
     {
         ApplyFilter();
     }
 
+    /// <summary>OnRefreshClick: Обрабатывает событие OnRefreshClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private async void OnRefreshClick(object sender, RoutedEventArgs e)
     {
         await LoadDataAsync();
     }
 
+    /// <summary>OnOpenLocationClick: Обрабатывает событие OnOpenLocationClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnOpenLocationClick(object sender, RoutedEventArgs e)
     {
         if (GridModules.SelectedItem is ProcessModuleInfo module && !string.IsNullOrEmpty(module.FilePath) && File.Exists(module.FilePath))
@@ -139,6 +153,9 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>OnCopyPathClick: Обрабатывает событие OnCopyPathClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCopyPathClick(object sender, RoutedEventArgs e)
     {
         if (GridModules.SelectedItem is ProcessModuleInfo module && !string.IsNullOrEmpty(module.FilePath))
@@ -148,6 +165,9 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>OnCopyNameClick: Обрабатывает событие OnCopyNameClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCopyNameClick(object sender, RoutedEventArgs e)
     {
         if (GridModules.SelectedItem is ProcessModuleInfo module && !string.IsNullOrEmpty(module.ModuleName))
@@ -157,6 +177,9 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>OnCheckKasperskyClick: Обрабатывает событие OnCheckKasperskyClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCheckKasperskyClick(object sender, RoutedEventArgs e)
     {
         if (GridModules.SelectedItem is ProcessModuleInfo module && !string.IsNullOrEmpty(module.FilePath))
@@ -173,6 +196,9 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>OnCheckVirusTotalClick: Обрабатывает событие OnCheckVirusTotalClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCheckVirusTotalClick(object sender, RoutedEventArgs e)
     {
         if (GridModules.SelectedItem is ProcessModuleInfo module && !string.IsNullOrEmpty(module.FilePath))
@@ -189,6 +215,9 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>OnCopyHandleNameClick: Обрабатывает событие OnCopyHandleNameClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCopyHandleNameClick(object sender, RoutedEventArgs e)
     {
         if (GridHandles.SelectedItem is ProcessHandleInfo handle && !string.IsNullOrEmpty(handle.Name))
@@ -198,11 +227,17 @@ public partial class ProcessModulesWindow
         }
     }
 
+    /// <summary>OnCloseClick: Обрабатывает событие OnCloseClick.</summary>
+    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
+    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
     private void OnCloseClick(object sender, RoutedEventArgs e)
     {
         Close();
     }
 
+    /// <summary>GetFileSha256: Возвращает FileSha256.</summary>
+    /// <param name="path">Входные данные: значение параметра path (string).</param>
+    /// <returns>Выходные данные: результирующее значение типа string?.</returns>
     private static string? GetFileSha256(string path)
     {
         if (!File.Exists(path)) return null;
