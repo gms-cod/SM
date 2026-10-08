@@ -67,7 +67,7 @@ For every feature or bugfix, execute the following cycle without manual stopping
 
 ---
 
-## Статус проекта (Текущая версия: v1.2.1)
+## Статус проекта (Текущая версия: v1.2.2)
 
 ### Архитектура и хранение данных
 - **Архитектура**: Разделение на службу Windows (`StartupMonitor.Service`, запуск от `NT AUTHORITY\SYSTEM`), интерфейс пользователя (`StartupMonitor.UI`, WPF .NET 8 self-contained win-x64) и общую библиотеку (`StartupMonitor.Shared`).
