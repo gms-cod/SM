@@ -1,0 +1,1582 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="StatusLoaded" xml:space="preserve">
+    <value>Loaded: {0} entries</value>
+  </data>
+  <data name="CtxToggleOff" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="ServiceNotStarted" xml:space="preserve">
+    <value>Service did not start in {0}ms</value>
+  </data>
+  <data name="PipeClientConnected" xml:space="preserve">
+    <value>UI client connected</value>
+  </data>
+  <data name="LocKeyboardHook" xml:space="preserve">
+    <value>Keyboard Hook</value>
+  </data>
+  <data name="LocAppxStartupTask" xml:space="preserve">
+    <value>AppX StartupTask</value>
+  </data>
+  <data name="LocActiveSetup" xml:space="preserve">
+    <value>Active Setup</value>
+  </data>
+  <data name="LocDrivers32" xml:space="preserve">
+    <value>Codecs (Drivers32)</value>
+  </data>
+  <data name="StatusScanning" xml:space="preserve">
+    <value>Scanning system...</value>
+  </data>
+  <data name="BlacklistTitle" xml:space="preserve">
+    <value>Blacklist</value>
+  </data>
+  <data name="TrayShowHide" xml:space="preserve">
+    <value>Show / Hide</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="TrayLabel" xml:space="preserve">
+    <value>Tray</value>
+  </data>
+  <data name="CardTotal" xml:space="preserve">
+    <value>Total entries</value>
+  </data>
+  <data name="CardBlocked" xml:space="preserve">
+    <value>Blocked</value>
+  </data>
+  <data name="StatusError" xml:space="preserve">
+    <value>Error: {0}</value>
+  </data>
+  <data name="LocIFEO" xml:space="preserve">
+    <value>IFEO</value>
+  </data>
+  <data name="ToggleEnable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="LocStartupFolder" xml:space="preserve">
+    <value>Startup folder</value>
+  </data>
+  <data name="UnknownMessageType" xml:space="preserve">
+    <value>Unknown message type: {0}</value>
+  </data>
+  <data name="CtxBlock" xml:space="preserve">
+    <value>Block</value>
+  </data>
+  <data name="PipeClientError" xml:space="preserve">
+    <value>PipeServer error while client connecting</value>
+  </data>
+  <data name="StrictModeDescription" xml:space="preserve">
+    <value>Immediately removes any new autorun entry from the system, terminates its process, saves a backup and displays a notification.</value>
+  </data>
+  <data name="NavLogs" xml:space="preserve">
+    <value>Logs</value>
+  </data>
+  <data name="LogsTitle" xml:space="preserve">
+    <value>Logs</value>
+  </data>
+  <data name="LogsSubtitle" xml:space="preserve">
+    <value>Application and service logs</value>
+  </data>
+  <data name="LogSearchPlaceholder" xml:space="preserve">
+    <value>Search in logs...</value>
+  </data>
+  <data name="AutoBlockLabel" xml:space="preserve">
+    <value>Auto-block on remove</value>
+  </data>
+  <data name="AutoBlockToggle" xml:space="preserve">
+    <value>Automatically add removed entries to blacklist</value>
+  </data>
+  <data name="SilentModeLabel" xml:space="preserve">
+    <value>Silent mode</value>
+  </data>
+  <data name="SilentModeToggle" xml:space="preserve">
+    <value>Suppress all notifications</value>
+  </data>
+  <data name="KillOnDisableLabel" xml:space="preserve">
+    <value>Process termination</value>
+  </data>
+  <data name="KillOnDisableToggle" xml:space="preserve">
+    <value>Kill process when entry is disabled</value>
+  </data>
+  <data name="KillOnDisableDescription" xml:space="preserve">
+    <value>When disabled, terminate the running process; when off, the entry is only removed from autostart</value>
+  </data>
+  <data name="ActionNotifTitle" xml:space="preserve">
+    <value>StartupMonitor</value>
+  </data>
+  <data name="ActionKilled" xml:space="preserve">
+    <value>Process terminated: {0}</value>
+  </data>
+  <data name="ActionDisabled" xml:space="preserve">
+    <value>Disabled: {0}</value>
+  </data>
+  <data name="ActionDisabledKilled" xml:space="preserve">
+    <value>Disabled, process terminated: {0}</value>
+  </data>
+  <data name="ActionAutoDisabled" xml:space="preserve">
+    <value>Auto-disabled: {0}</value>
+  </data>
+  <data name="ActionAutoDisabledKilled" xml:space="preserve">
+    <value>Auto-disabled, process terminated: {0}</value>
+  </data>
+  <data name="ActionDisabledKillSkipped" xml:space="preserve">
+    <value>Disabled: {0} — process not terminated: process termination is disabled in settings</value>
+  </data>
+  <data name="ActionAutoDisabledKillSkipped" xml:space="preserve">
+    <value>Auto-disabled: {0} — process not terminated: process termination is disabled in settings</value>
+  </data>
+  <data name="ActionRemoved" xml:space="preserve">
+    <value>Removed from system: {0}</value>
+  </data>
+  <data name="ActionRestored" xml:space="preserve">
+    <value>Restored: {0}</value>
+  </data>
+  <data name="ActionRemovedAgain" xml:space="preserve">
+    <value>Program {0} registered itself in startup again — removed</value>
+  </data>
+  <data name="ActionPerformed" xml:space="preserve">
+    <value>Action performed: {0}</value>
+  </data>
+  <data name="CleanStaleButton" xml:space="preserve">
+    <value>Clean up stale entries</value>
+  </data>
+  <data name="FilterRegistry" xml:space="preserve">
+    <value>Registry</value>
+  </data>
+  <data name="StatusServiceNotFound" xml:space="preserve">
+    <value>Service not found: {0}</value>
+  </data>
+  <data name="LocComObject" xml:space="preserve">
+    <value>COM Object</value>
+  </data>
+  <data name="PipeServerStopped" xml:space="preserve">
+    <value>Server stopped</value>
+  </data>
+  <data name="StatusStartingService" xml:space="preserve">
+    <value>Starting service...</value>
+  </data>
+  <data name="PipeServerStarted" xml:space="preserve">
+    <value>PipeServer started</value>
+  </data>
+  <data name="LocWinlogon" xml:space="preserve">
+    <value>Winlogon</value>
+  </data>
+  <data name="LocAppInit" xml:space="preserve">
+    <value>AppInit DLL</value>
+  </data>
+  <data name="LocUnknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="LocGpoStartup" xml:space="preserve">
+    <value>GPO Startup Script</value>
+  </data>
+  <data name="FilterServices" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="LocContextMenuHandler" xml:space="preserve">
+    <value>Context Menu Handler</value>
+  </data>
+  <data name="LocWmi" xml:space="preserve">
+    <value>WMI Event</value>
+  </data>
+  <data name="RulePlaceholder" xml:space="preserve">
+    <value>Path, mask, publisher or SHA256...</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="ColumnRating" xml:space="preserve">
+    <value>Rating</value>
+  </data>
+  <data name="ColumnStatus" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="ScanRegistry" xml:space="preserve">
+    <value>Scanning registry...</value>
+  </data>
+  <data name="LanguageLabel" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="FilterTasks" xml:space="preserve">
+    <value>Scheduler</value>
+  </data>
+  <data name="ServiceScCreateFailed" xml:space="preserve">
+    <value>sc create exited with code {0}</value>
+  </data>
+  <data name="SectionTitle" xml:space="preserve">
+    <value>Startup programs</value>
+  </data>
+  <data name="NotifTitle" xml:space="preserve">
+    <value>New startup entry</value>
+  </data>
+  <data name="BlacklistNotifTitle" xml:space="preserve">
+    <value>Program blocked</value>
+  </data>
+  <data name="BlacklistNotifText" xml:space="preserve">
+    <value>{0} removed from startup (blacklist)</value>
+  </data>
+  <data name="ActionNotifyRemove" xml:space="preserve">
+    <value>Notify and remove</value>
+  </data>
+  <data name="Subtitle" xml:space="preserve">
+    <value>Real-time startup monitoring</value>
+  </data>
+  <data name="StatusConnectionFailed" xml:space="preserve">
+    <value>Failed to connect to service</value>
+  </data>
+  <data name="ColumnDate" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="StrictModeLabel" xml:space="preserve">
+    <value>Protection Mode</value>
+  </data>
+  <data name="ServiceRegistrationFailed" xml:space="preserve">
+    <value>Failed to register service</value>
+  </data>
+  <data name="MatchTypePath" xml:space="preserve">
+    <value>Path</value>
+  </data>
+  <data name="CtxOpenFileLocation" xml:space="preserve">
+    <value>Open file location</value>
+  </data>
+<data name="ScanTaskScheduler" xml:space="preserve">
+    <value>Scanning Task Scheduler...</value>
+  </data>
+  <data name="StatusServiceTimeout" xml:space="preserve">
+    <value>Service startup timeout</value>
+  </data>
+  <data name="ToggleUnblock" xml:space="preserve">
+    <value>Unblock</value>
+  </data>
+  <data name="LangEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="LangRussian" xml:space="preserve">
+    <value>Russian</value>
+  </data>
+  <data name="LocNetworkProvider" xml:space="preserve">
+    <value>Network Provider</value>
+  </data>
+  <data name="TaskSchedulerError" xml:space="preserve">
+    <value>Failed to connect to Task Scheduler, TaskSchedulerWatcher stopped</value>
+  </data>
+  <data name="LocPrintMonitor" xml:space="preserve">
+    <value>Print Monitor</value>
+  </data>
+  <data name="ServiceStartFailed" xml:space="preserve">
+    <value>Failed to start service</value>
+  </data>
+  <data name="LocBrowserPlugin" xml:space="preserve">
+    <value>Browser Plugin</value>
+  </data>
+  <data name="ServiceNotFound" xml:space="preserve">
+    <value>Service not found: {0}</value>
+  </data>
+  <data name="NotifText" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="LocProtocol" xml:space="preserve">
+    <value>Protocol</value>
+  </data>
+  <data name="ThemeLabel" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="MatchTypeSHA256" xml:space="preserve">
+    <value>SHA256</value>
+  </data>
+  <data name="LocGpoLogon" xml:space="preserve">
+    <value>GPO Logon Script</value>
+  </data>
+  <data name="StatusScanTimeout" xml:space="preserve">
+    <value>Scan timeout</value>
+  </data>
+  <data name="LocDriver" xml:space="preserve">
+    <value>Driver</value>
+  </data>
+  <data name="CardEnabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="CtxToggleOn" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="AddRuleTitle" xml:space="preserve">
+    <value>Add rule</value>
+  </data>
+  <data name="AddRuleButton" xml:space="preserve">
+    <value>+ Add</value>
+  </data>
+  <data name="FilterFolder" xml:space="preserve">
+    <value>Folders</value>
+  </data>
+  <data name="TaskSchedulerCrash" xml:space="preserve">
+    <value>TaskSchedulerWatcher crashed</value>
+  </data>
+  <data name="PipeClientDisconnected" xml:space="preserve">
+    <value>UI client disconnected</value>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>Search by name, path, publisher...</value>
+  </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>Clear search</value>
+  </data>
+  <data name="MatchTypePathWildcard" xml:space="preserve">
+    <value>Path mask</value>
+  </data>
+  <data name="NavBlacklist" xml:space="preserve">
+    <value>Blacklist</value>
+  </data>
+  <data name="LocBootExecute" xml:space="preserve">
+    <value>Boot Execute</value>
+  </data>
+  <data name="LocRegistryRun" xml:space="preserve">
+    <value>Registry: Run</value>
+  </data>
+  <data name="LocTaskScheduler" xml:space="preserve">
+    <value>Task Scheduler</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="StatusStarting" xml:space="preserve">
+    <value>Starting...</value>
+  </data>
+  <data name="FilterAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="StatusBlockedShort" xml:space="preserve">
+    <value>Blocked</value>
+  </data>
+  <data name="MinimizeToTrayToggle" xml:space="preserve">
+    <value>Minimize to tray</value>
+  </data>
+  <data name="LocRegistryRunOnce" xml:space="preserve">
+    <value>Registry: RunOnce</value>
+  </data>
+  <data name="LocRegistryRunServices" xml:space="preserve">
+    <value>Registry: RunServices</value>
+  </data>
+  <data name="DeleteRuleTooltip" xml:space="preserve">
+    <value>Delete rule</value>
+  </data>
+  <data name="ScanServices" xml:space="preserve">
+    <value>Scanning services...</value>
+  </data>
+  <data name="StrictModeToggle" xml:space="preserve">
+    <value>Block any new autorun entries</value>
+  </data>
+  <data name="MatchTypePublisher" xml:space="preserve">
+    <value>Publisher</value>
+  </data>
+  <data name="LocRegistryPolicies" xml:space="preserve">
+    <value>Registry: Policies</value>
+  </data>
+  <data name="BlacklistSubtitle" xml:space="preserve">
+    <value>Programs prohibited from auto-starting</value>
+  </data>
+  <data name="NotifyToggle" xml:space="preserve">
+    <value>Notify about new entries</value>
+  </data>
+  <data name="StatusConnecting" xml:space="preserve">
+    <value>Connecting...</value>
+  </data>
+  <data name="CtxCopyPath" xml:space="preserve">
+    <value>Copy path</value>
+  </data>
+  <data name="LocBHO" xml:space="preserve">
+    <value>BHO</value>
+  </data>
+  <data name="LocService" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="ScanStartupFolder" xml:space="preserve">
+    <value>Scanning startup folders...</value>
+  </data>
+  <data name="ActionNotifyOnly" xml:space="preserve">
+    <value>Notify only</value>
+  </data>
+  <data name="NotificationsLabel" xml:space="preserve">
+    <value>Notifications</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="ScanTimeoutMessage" xml:space="preserve">
+    <value>Scan completion timeout (60s)</value>
+  </data>
+  <data name="StatusEnabledShort" xml:space="preserve">
+    <value />
+  </data>
+  <data name="LocAppPaths" xml:space="preserve">
+    <value>AppPaths</value>
+  </data>
+  <data name="RefreshTooltip" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="LocLsa" xml:space="preserve">
+    <value>LSA Notification</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="PipeServerError" xml:space="preserve">
+    <value>Error handling PipeServer client</value>
+  </data>
+  <data name="ToggleDisable" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="StatusDisabledShort" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="GeneralSection" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="ColumnName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="AppName" xml:space="preserve">
+    <value>Startup Monitor</value>
+  </data>
+  <data name="NavHistory" xml:space="preserve">
+    <value>History</value>
+  </data>
+  <data name="HistoryTitle" xml:space="preserve">
+    <value>Change history</value>
+  </data>
+  <data name="HistorySubtitle" xml:space="preserve">
+    <value>Log of startup entry changes</value>
+  </data>
+  <data name="NavRemoved" xml:space="preserve">
+    <value>Removed</value>
+  </data>
+  <data name="RemovedTitle" xml:space="preserve">
+    <value>Removed entries</value>
+  </data>
+  <data name="RemovedSubtitle" xml:space="preserve">
+    <value>Entries removed from system (backups available for restore)</value>
+  </data>
+  <data name="RemovedEmpty" xml:space="preserve">
+    <value>No removed entries</value>
+  </data>
+  <data name="RemovedRestoreButton" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="CtxRemoveFromSystem" xml:space="preserve">
+    <value>Remove from system</value>
+  </data>
+  <data name="RemoveConfirmTitle" xml:space="preserve">
+    <value>Remove from system</value>
+  </data>
+  <data name="RemoveConfirmMessage" xml:space="preserve">
+    <value>Remove "{0}" from system?\n\nYes — remove and add to blacklist (won't be detected again)\nNo — remove only\nCancel — abort</value>
+  </data>
+  <data name="RemoveWithBlock" xml:space="preserve">
+    <value>Yes, add to blacklist</value>
+  </data>
+  <data name="RemoveWithoutBlock" xml:space="preserve">
+    <value>No, remove only</value>
+  </data>
+  <data name="AiSection" xml:space="preserve">
+    <value>AI Rating</value>
+  </data>
+  <data name="AiEnableLabel" xml:space="preserve">
+    <value>AI Rating</value>
+  </data>
+  <data name="AiEnableToggle" xml:space="preserve">
+    <value>Enable AI Security Analysis</value>
+  </data>
+  <data name="AiEnableDescription" xml:space="preserve">
+    <value>Analyze startup entries using OpenAI-compatible AI (Groq, Ollama, OpenRouter, DeepSeek)</value>
+  </data>
+  <data name="AiApiUrlLabel" xml:space="preserve">
+    <value>API URL</value>
+  </data>
+  <data name="AiApiUrlDescription" xml:space="preserve">
+    <value>OpenAI-compatible endpoint (Groq, OpenRouter, Ollama http://localhost:11434/v1/chat/completions)</value>
+  </data>
+  <data name="AiModelLabel" xml:space="preserve">
+    <value>AI Model</value>
+  </data>
+  <data name="AiModelDescription" xml:space="preserve">
+    <value>Model identifier (default: openai/gpt-oss-120b for Groq; deepseek-chat, llama3, etc.)</value>
+  </data>
+  <data name="AiApiKeyLabel" xml:space="preserve">
+    <value>API Key</value>
+  </data>
+  <data name="AiApiKeyDescription" xml:space="preserve">
+    <value>Provider API key (not required for local Ollama; Groq: https://console.groq.com/keys)</value>
+  </data>
+  <data name="AiTestConnectionButton" xml:space="preserve">
+    <value>Test AI</value>
+  </data>
+  <data name="AiTestingStatus" xml:space="preserve">
+    <value>Testing AI connection...</value>
+  </data>
+  <data name="NavExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="FilterRecent" xml:space="preserve">
+    <value>Last 24h</value>
+  </data>
+  <data name="FilterOther" xml:space="preserve">
+    <value>Other</value>
+  </data>
+  <data name="ColumnType" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="StartWithWindowsLabel" xml:space="preserve">
+    <value>Startup</value>
+  </data>
+  <data name="StartWithWindowsToggle" xml:space="preserve">
+    <value>Launch Startup Monitor when I sign in to Windows</value>
+  </data>
+  <data name="ColumnCircl" xml:space="preserve">
+    <value>CIRCL</value>
+  </data>
+  <data name="StatusConnected" xml:space="preserve">
+    <value>Service connected</value>
+  </data>
+  <data name="StatusDisconnected" xml:space="preserve">
+    <value>Service disconnected</value>
+  </data>
+  <data name="TrayLockdownMode" xml:space="preserve">
+    <value>Protection Mode (Lockdown)</value>
+  </data>
+  <data name="CpuThrottleLabel" xml:space="preserve">
+    <value>Scan CPU Throttling</value>
+  </data>
+  <data name="CpuThrottleToggle" xml:space="preserve">
+    <value>Pause registry scan under high CPU load</value>
+  </data>
+  <data name="CpuThresholdLabel" xml:space="preserve">
+    <value>CPU load threshold:</value>
+  </data>
+  <data name="CpuThrottleDescription" xml:space="preserve">
+    <value>If external CPU load exceeds the threshold, background registry scanning is skipped to prevent system slowdown.</value>
+  </data>
+  <data name="CurrentCpuUsageFormat" xml:space="preserve">
+    <value>CPU Load: {0}% (external: {1}%)</value>
+  </data>
+  <data name="ActionLockdownBlocked" xml:space="preserve">
+    <value>New entry '{0}' was blocked and removed by startup protection mode.</value>
+  </data>
+  <data name="BadgeStable" xml:space="preserve">
+    <value>Stable</value>
+  </data>
+  <data name="SystemHealthSecure" xml:space="preserve">
+    <value>Secure</value>
+  </data>
+  <data name="SystemHealthPrefix" xml:space="preserve">
+    <value>Current system health is </value>
+  </data>
+  <data name="TableHeaderStartupApps" xml:space="preserve">
+    <value>Startup Applications</value>
+  </data>
+  <data name="ColumnIcon" xml:space="preserve">
+    <value>Icon</value>
+  </data>
+  <data name="ColumnPublisher" xml:space="preserve">
+    <value>Publisher</value>
+  </data>
+  <data name="ColumnBootImpact" xml:space="preserve">
+    <value>Boot Impact</value>
+  </data>
+  <data name="ColumnSecurity" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="ColumnActions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="ActionMore" xml:space="preserve">
+    <value>More</value>
+  </data>
+  <data name="ActionBlock" xml:space="preserve">
+    <value>Block</value>
+  </data>
+  <data name="StatusOn" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="StatusOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="StatusCheckingService" xml:space="preserve">
+    <value>Checking service status...</value>
+  </data>
+  <data name="StatusRegisteringService" xml:space="preserve">
+    <value>Registering service in Windows autostart...</value>
+  </data>
+  <data name="StatusConfiguringAutoStart" xml:space="preserve">
+    <value>Configuring service automatic startup...</value>
+  </data>
+  <data name="StatusUpdatingServicePath" xml:space="preserve">
+    <value>Updating service path in the system...</value>
+  </data>
+  <data name="StatusStartingServiceProcess" xml:space="preserve">
+    <value>Starting StartupMonitor background service...</value>
+  </data>
+  <data name="StatusWaitingServiceReady" xml:space="preserve">
+    <value>Waiting for service to start ({0} s)...</value>
+  </data>
+  <data name="StatusConnectingAttempt" xml:space="preserve">
+    <value>Connecting to service (attempt {0} of {1})...</value>
+  </data>
+  <data name="StatusLoadingEntries" xml:space="preserve">
+    <value>Service ready. Loading autostart entries...</value>
+  </data>
+  <data name="BtnRetry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="BtnExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="NavTaskManager" xml:space="preserve">
+    <value>Processes</value>
+  </data>
+  <data name="TaskManagerTitle" xml:space="preserve">
+    <value>Task Manager</value>
+  </data>
+  <data name="TaskManagerSubtitle" xml:space="preserve">
+    <value>Real-time process monitoring, system resource usage and autostart origins</value>
+  </data>
+  <data name="CardCpu" xml:space="preserve">
+    <value>CPU</value>
+  </data>
+  <data name="CardRam" xml:space="preserve">
+    <value>Memory</value>
+  </data>
+  <data name="CardDisk" xml:space="preserve">
+    <value>Disk</value>
+  </data>
+  <data name="CardProcesses" xml:space="preserve">
+    <value>Processes</value>
+  </data>
+  <data name="ColProcessName" xml:space="preserve">
+    <value>Process Name</value>
+  </data>
+  <data name="ColPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColCpu" xml:space="preserve">
+    <value>CPU</value>
+  </data>
+  <data name="ColRam" xml:space="preserve">
+    <value>Memory</value>
+  </data>
+  <data name="ColDisk" xml:space="preserve">
+    <value>Disk</value>
+  </data>
+  <data name="ColNetwork" xml:space="preserve">
+    <value>Network</value>
+  </data>
+  <data name="ColPublisher" xml:space="preserve">
+    <value>Publisher</value>
+  </data>
+  <data name="ColStartupOrigin" xml:space="preserve">
+    <value>Startup Origin</value>
+  </data>
+  <data name="ColActions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="FilterApps" xml:space="preserve">
+    <value>Apps</value>
+  </data>
+  <data name="FilterBackground" xml:space="preserve">
+    <value>Background</value>
+  </data>
+  <data name="FilterAutostart" xml:space="preserve">
+    <value>Autostart</value>
+  </data>
+  <data name="ActionKillProcess" xml:space="preserve">
+    <value>End Task</value>
+  </data>
+  <data name="ActionSuspendProcess" xml:space="preserve">
+    <value>Suspend Process</value>
+  </data>
+  <data name="ActionResumeProcess" xml:space="preserve">
+    <value>Resume Process</value>
+  </data>
+  <data name="ActionBlockProcess" xml:space="preserve">
+    <value>Block in Blacklist</value>
+  </data>
+  <data name="ActionLocateStartup" xml:space="preserve">
+    <value>Locate in Startup</value>
+  </data>
+  <data name="ActionOpenFileLocation" xml:space="preserve">
+    <value>Open File Location</value>
+  </data>
+  <data name="BadgeSuspended" xml:space="preserve">
+    <value>⏸ Suspended</value>
+  </data>
+  <data name="BtnExportReport" xml:space="preserve">
+    <value>Export Report</value>
+  </data>
+  <data name="TooltipExportReport" xml:space="preserve">
+    <value>Export system security audit report (HTML, CSV, JSON)</value>
+  </data>
+  <data name="ExportReportDialogTitle" xml:space="preserve">
+    <value>Export Security Audit Report</value>
+  </data>
+  <data name="ExportReportFilter" xml:space="preserve">
+    <value>Interactive HTML Report (*.html)|*.html|CSV Spreadsheet (*.csv)|*.csv|JSON Data (*.json)|*.json</value>
+  </data>
+  <data name="ExportReportSuccess" xml:space="preserve">
+    <value>Audit report successfully saved:\n{0}</value>
+  </data>
+  <data name="ExportReportError" xml:space="preserve">
+    <value>Failed to export report:\n{0}</value>
+  </data>
+  <data name="RemoteNotificationsSection" xml:space="preserve">
+    <value>Remote Notifications (Telegram / Discord)</value>
+  </data>
+  <data name="RemoteNotificationsDescription" xml:space="preserve">
+    <value>Instant push alerts to your smartphone on new startup entries, CLI threats, and blocked items</value>
+  </data>
+  <data name="TelegramSection" xml:space="preserve">
+    <value>Telegram Bot</value>
+  </data>
+  <data name="TelegramEnableToggle" xml:space="preserve">
+    <value>Telegram Notifications</value>
+  </data>
+  <data name="TelegramBotTokenLabel" xml:space="preserve">
+    <value>Bot Token</value>
+  </data>
+  <data name="TelegramBotTokenDescription" xml:space="preserve">
+    <value>Telegram Bot Token from @BotFather (e.g. 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)</value>
+  </data>
+  <data name="TelegramChatIdLabel" xml:space="preserve">
+    <value>Chat ID</value>
+  </data>
+  <data name="TelegramChatIdDescription" xml:space="preserve">
+    <value>Your Telegram Chat or Channel ID (obtainable via @userinfobot)</value>
+  </data>
+  <data name="TestTelegramButton" xml:space="preserve">
+    <value>Test Telegram</value>
+  </data>
+  <data name="DiscordSection" xml:space="preserve">
+    <value>Discord Webhook</value>
+  </data>
+  <data name="DiscordEnableToggle" xml:space="preserve">
+    <value>Discord Notifications</value>
+  </data>
+  <data name="DiscordWebhookUrlLabel" xml:space="preserve">
+    <value>Webhook URL</value>
+  </data>
+  <data name="DiscordWebhookUrlDescription" xml:space="preserve">
+    <value>Discord Channel Webhook URL (Channel Settings → Integrations → Webhooks → New Webhook)</value>
+  </data>
+  <data name="TestDiscordButton" xml:space="preserve">
+    <value>Test Discord</value>
+  </data>
+  <data name="RemoteEventsSection" xml:space="preserve">
+    <value>Events to Notify</value>
+  </data>
+  <data name="RemoteNotifyNewEntryToggle" xml:space="preserve">
+    <value>New Startup Entries</value>
+  </data>
+  <data name="RemoteNotifyThreatToggle" xml:space="preserve">
+    <value>Suspicious Commands (CLI Threats)</value>
+  </data>
+  <data name="RemoteNotifyBlockedToggle" xml:space="preserve">
+    <value>Blacklist &amp; Lockdown Blocks</value>
+  </data>
+  <data name="TestingRemoteNotificationStatus" xml:space="preserve">
+    <value>Sending test notification...</value>
+  </data>
+  <data name="StatusDelayedShort" xml:space="preserve">
+    <value>Delayed</value>
+  </data>
+  <data name="CtxDelayedStartup" xml:space="preserve">
+    <value>Delay Startup at Logon</value>
+  </data>
+  <data name="CtxCancelDelay" xml:space="preserve">
+    <value>Cancel Delay (Enable Immediately)</value>
+  </data>
+  <data name="CtxLaunchNow" xml:space="preserve">
+    <value>Launch Now (Test)</value>
+  </data>
+  <data name="CtxChangeDelay" xml:space="preserve">
+    <value>Change Delay</value>
+  </data>
+  <data name="SecondsShort" xml:space="preserve">
+    <value>s</value>
+  </data>
+  <data name="SnapshotsTitle" xml:space="preserve">
+    <value>Startup Baseline Snapshots</value>
+  </data>
+  <data name="SnapshotsSubtitle" xml:space="preserve">
+    <value>Save baseline state and compare changes ("Before vs After")</value>
+  </data>
+  <data name="SnapshotsBtn" xml:space="preserve">
+    <value>Snapshots</value>
+  </data>
+  <data name="CreateSnapshotBtn" xml:space="preserve">
+    <value>Create Snapshot</value>
+  </data>
+  <data name="SnapshotNamePrompt" xml:space="preserve">
+    <value>Snapshot name:</value>
+  </data>
+  <data name="SnapshotDescPrompt" xml:space="preserve">
+    <value>Description / comment:</value>
+  </data>
+  <data name="SnapshotCreatedSuccess" xml:space="preserve">
+    <value>Baseline snapshot created successfully</value>
+  </data>
+  <data name="CompareSnapshotBtn" xml:space="preserve">
+    <value>Compare with Current</value>
+  </data>
+  <data name="DeleteSnapshotBtn" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="SnapshotDeleteConfirm" xml:space="preserve">
+    <value>Delete this baseline snapshot?</value>
+  </data>
+  <data name="SnapshotDiffTitle" xml:space="preserve">
+    <value>Comparison with snapshot: {0}</value>
+  </data>
+  <data name="SnapshotDiffAdded" xml:space="preserve">
+    <value>New Entries</value>
+  </data>
+  <data name="SnapshotDiffRemoved" xml:space="preserve">
+    <value>Removed Entries</value>
+  </data>
+  <data name="SnapshotDiffModified" xml:space="preserve">
+    <value>Modified Entries</value>
+  </data>
+  <data name="SnapshotDiffUnchanged" xml:space="preserve">
+    <value>Unchanged</value>
+  </data>
+  <data name="SnapshotApplyFilter" xml:space="preserve">
+    <value>Show differences in table</value>
+  </data>
+  <data name="SnapshotResetFilter" xml:space="preserve">
+    <value>Reset Comparison</value>
+  </data>
+  <data name="SnapshotActiveComparison" xml:space="preserve">
+    <value>Comparing with snapshot: {0} (+{1} new, ~{2} modified)</value>
+  </data>
+  <data name="SnapshotNoSnapshots" xml:space="preserve">
+    <value>No system snapshots yet. Create a baseline snapshot to record the current state of startup entries and easily detect newly registered or modified programs.</value>
+  </data>
+  <data name="SnapshotBadgeNew" xml:space="preserve">
+    <value>+ New</value>
+  </data>
+  <data name="SnapshotBadgeModified" xml:space="preserve">
+    <value>~ Modified</value>
+  </data>
+  <data name="NavBootTime" xml:space="preserve">
+    <value>Boot Time</value>
+  </data>
+  <data name="BootTimeTitle" xml:space="preserve">
+    <value>Windows Boot Time Analyzer</value>
+  </data>
+  <data name="BootTimeSubtitle" xml:space="preserve">
+    <value>Diagnose system startup speed and identify programs slowing down boot</value>
+  </data>
+  <data name="BootTimeRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="BootTimeNoData" xml:space="preserve">
+    <value>Windows diagnostics log data is unavailable. Make sure the Microsoft-Windows-Diagnostics-Performance/Operational log is enabled.</value>
+  </data>
+  <data name="BootTimeOverall" xml:space="preserve">
+    <value>Overall Time</value>
+  </data>
+  <data name="BootTimeToDesktop" xml:space="preserve">
+    <value>To Desktop</value>
+  </data>
+  <data name="BootTimePostBoot" xml:space="preserve">
+    <value>Background Phase</value>
+  </data>
+  <data name="BootTimeAppsCount" xml:space="preserve">
+    <value>Startup Apps</value>
+  </data>
+  <data name="BootTimeOffendersTitle" xml:space="preserve">
+    <value>Boot Slowdown Offenders</value>
+  </data>
+  <data name="BootTimeHistoryTitle" xml:space="preserve">
+    <value>Boot History</value>
+  </data>
+  <data name="BootTimeColCategory" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="BootTimeColName" xml:space="preserve">
+    <value>Program / Path</value>
+  </data>
+  <data name="BootTimeColPublisher" xml:space="preserve">
+    <value>Publisher</value>
+  </data>
+  <data name="BootTimeColTotalTime" xml:space="preserve">
+    <value>Total Time</value>
+  </data>
+  <data name="BootTimeColDelay" xml:space="preserve">
+    <value>Degradation</value>
+  </data>
+  <data name="BootTimeHistColDate" xml:space="preserve">
+    <value>Date / Time</value>
+  </data>
+  <data name="BootTimeHistColTotal" xml:space="preserve">
+    <value>Total Time</value>
+  </data>
+  <data name="BootTimeHistColDesktop" xml:space="preserve">
+    <value>To Desktop</value>
+  </data>
+  <data name="BootTimeHistColPost" xml:space="preserve">
+    <value>Background</value>
+  </data>
+  <data name="BootTimeHistColApps" xml:space="preserve">
+    <value>Apps</value>
+  </data>
+  <data name="BootTimeHistColRating" xml:space="preserve">
+    <value>Rating</value>
+  </data>
+  <data name="BootTimeFaster" xml:space="preserve">
+    <value>⚡ {0} faster than previous</value>
+  </data>
+  <data name="BootTimeSlower" xml:space="preserve">
+    <value>⚠️ {0} slower than previous</value>
+  </data>
+  <data name="TmKillConfirmMsg" xml:space="preserve">
+    <value>Do you really want to force terminate process "{0}" (PID {1})?</value>
+  </data>
+  <data name="TmKillConfirmTitle" xml:space="preserve">
+    <value>Terminate Process</value>
+  </data>
+  <data name="TmProcessKilled" xml:space="preserve">
+    <value>Process terminated</value>
+  </data>
+  <data name="TmKillFailed" xml:space="preserve">
+    <value>Failed to terminate process</value>
+  </data>
+  <data name="TmError" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="TmBlockConfirmMsg" xml:space="preserve">
+    <value>Do you really want to block "{0}" in the Blacklist?\n\nFile: {1}\n\nThe process will be terminated immediately and its startup entry will be blocked.</value>
+  </data>
+  <data name="TmBlockConfirmTitle" xml:space="preserve">
+    <value>Block Process</value>
+  </data>
+  <data name="TmProcessBlocked" xml:space="preserve">
+    <value>Process blocked</value>
+  </data>
+  <data name="TmBlockFailed" xml:space="preserve">
+    <value>Failed to block process</value>
+  </data>
+  <data name="TmProcessSuspended" xml:space="preserve">
+    <value>Process suspended</value>
+  </data>
+  <data name="TmSuspendFailed" xml:space="preserve">
+    <value>Failed to suspend process</value>
+  </data>
+  <data name="TmProcessResumed" xml:space="preserve">
+    <value>Process resumed</value>
+  </data>
+  <data name="TmResumeFailed" xml:space="preserve">
+    <value>Failed to resume process</value>
+  </data>
+  <data name="TmNoStartupMatch" xml:space="preserve">
+    <value>This process is not associated with any known startup entry.</value>
+  </data>
+  <data name="TmInfo" xml:space="preserve">
+    <value>Information</value>
+  </data>
+  <data name="TmNoProcessSelected" xml:space="preserve">
+    <value>No process selected.</value>
+  </data>
+  <data name="TmCantFindExePath" xml:space="preserve">
+    <value>Could not determine the executable file location for process "{0}" (PID {1}).\n\nThis may be a system, protected Windows kernel component or internal service.</value>
+  </data>
+  <data name="TmExeNotFound" xml:space="preserve">
+    <value>Executable file not found at:\n{0}</value>
+  </data>
+  <data name="TmOpenLocationFailed" xml:space="preserve">
+    <value>Failed to open file location: {0}</value>
+  </data>
+  <data name="LocShellExtension" xml:space="preserve">
+    <value>Shell Extension</value>
+  </data>
+  <data name="LocLocationLabel" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="OriginRegistryRun" xml:space="preserve">
+    <value>Registry (Run)</value>
+  </data>
+  <data name="OriginRegistryRunOnce" xml:space="preserve">
+    <value>Registry (RunOnce)</value>
+  </data>
+  <data name="OriginRegistryRunServices" xml:space="preserve">
+    <value>Registry (RunServices)</value>
+  </data>
+  <data name="OriginRegistryPolicies" xml:space="preserve">
+    <value>Group Policy</value>
+  </data>
+  <data name="OriginStartupFolder" xml:space="preserve">
+    <value>Startup Folder</value>
+  </data>
+  <data name="OriginService" xml:space="preserve">
+    <value>Windows Service</value>
+  </data>
+  <data name="OriginDriver" xml:space="preserve">
+    <value>Windows Driver</value>
+  </data>
+  <data name="OriginTaskScheduler" xml:space="preserve">
+    <value>Task Scheduler</value>
+  </data>
+  <data name="OriginWinlogon" xml:space="preserve">
+    <value>Winlogon</value>
+  </data>
+  <data name="OriginActiveSetup" xml:space="preserve">
+    <value>Active Setup</value>
+  </data>
+  <data name="OriginAppx" xml:space="preserve">
+    <value>UWP / AppX</value>
+  </data>
+  <data name="OriginAutostart" xml:space="preserve">
+    <value>Autostart</value>
+  </data>
+  <data name="OriginManualExplorer" xml:space="preserve">
+    <value>Manual (Explorer)</value>
+  </data>
+  <data name="OriginParentPrefix" xml:space="preserve">
+    <value>Parent: {0}</value>
+  </data>
+  <data name="OriginBackgroundProcess" xml:space="preserve">
+    <value>Background</value>
+  </data>
+  <data name="DetailMainInfo" xml:space="preserve">
+    <value>General Info</value>
+  </data>
+  <data name="DetailPath" xml:space="preserve">
+    <value>Path:</value>
+  </data>
+  <data name="DetailCommand" xml:space="preserve">
+    <value>Command:</value>
+  </data>
+  <data name="DetailDetected" xml:space="preserve">
+    <value>Detected:</value>
+  </data>
+  <data name="DetailDelay" xml:space="preserve">
+    <value>Delay:</value>
+  </data>
+  <data name="DetailHash" xml:space="preserve">
+    <value>Hash</value>
+  </data>
+  <data name="DetailRefreshAi" xml:space="preserve">
+    <value>Refresh AI Rating</value>
+  </data>
+  <data name="DetailDelay30s" xml:space="preserve">
+    <value>Delay (30s)</value>
+  </data>
+  <data name="TooltipPath" xml:space="preserve">
+    <value>Path: {0}</value>
+  </data>
+  <data name="TooltipCommand" xml:space="preserve">
+    <value>Command: {0}</value>
+  </data>
+  <data name="TooltipPublisher" xml:space="preserve">
+    <value>Publisher: {0}</value>
+  </data>
+  <data name="TooltipLocation" xml:space="preserve">
+    <value>Location: {0}</value>
+  </data>
+  <data name="TooltipStatus" xml:space="preserve">
+    <value>Status: {0}</value>
+  </data>
+  <data name="TooltipAiRating" xml:space="preserve">
+    <value>AI Rating:</value>
+  </data>
+  <data name="TooltipAiCategory" xml:space="preserve">
+    <value>  Category: {0}</value>
+  </data>
+  <data name="TooltipAiRecommendation" xml:space="preserve">
+    <value>  Recommendation: {0}</value>
+  </data>
+  <data name="TooltipAiRisk" xml:space="preserve">
+    <value>  Risk: {0}</value>
+  </data>
+  <data name="PublisherUnverified" xml:space="preserve">
+    <value>Unverified</value>
+  </data>
+  <data name="ImpactLow" xml:space="preserve">
+    <value>Low</value>
+  </data>
+  <data name="ImpactMedium" xml:space="preserve">
+    <value>Medium</value>
+  </data>
+  <data name="ImpactHigh" xml:space="preserve">
+    <value>High</value>
+  </data>
+  <data name="PipeAiTestNoResult" xml:space="preserve">
+    <value>Service did not return AI test result</value>
+  </data>
+  <data name="PipeRemoteTestNoResult" xml:space="preserve">
+    <value>Service did not return remote notifications test result</value>
+  </data>
+  <data name="PipeDelaySetError" xml:space="preserve">
+    <value>Failed to set delayed startup</value>
+  </data>
+  <data name="PipeDelayCancelError" xml:space="preserve">
+    <value>Failed to cancel delayed startup</value>
+  </data>
+  <data name="PipeLaunchSuccess" xml:space="preserve">
+    <value>Program launched successfully</value>
+  </data>
+  <data name="PipeLaunchError" xml:space="preserve">
+    <value>Failed to launch delayed program</value>
+  </data>
+  <data name="PipeSnapshotParseError" xml:space="preserve">
+    <value>Snapshot parse error: {0}</value>
+  </data>
+  <data name="PipeSnapshotCreateError" xml:space="preserve">
+    <value>Failed to create snapshot</value>
+  </data>
+  <data name="PipeCompareParseError" xml:space="preserve">
+    <value>Comparison results parse error: {0}</value>
+  </data>
+  <data name="PipeCompareError" xml:space="preserve">
+    <value>Failed to compare with snapshot</value>
+  </data>
+  <data name="CpuExternalFormat" xml:space="preserve">
+    <value>external: {0}%</value>
+  </data>
+  <data name="SnapshotNewTooltip" xml:space="preserve">
+    <value>This entry appeared in the system after the baseline snapshot was created</value>
+  </data>
+  <data name="SnapshotModifiedTooltip" xml:space="preserve">
+    <value>Entry parameters changed since snapshot: {0}</value>
+  </data>
+  <data name="NotifDelayedStartup" xml:space="preserve">
+    <value>Delayed Startup</value>
+  </data>
+  <data name="NotifTestLaunch" xml:space="preserve">
+    <value>Test Launch</value>
+  </data>
+  <data name="SnapSavedSnapshots" xml:space="preserve">
+    <value>Saved baseline snapshots:</value>
+  </data>
+  <data name="SnapColName" xml:space="preserve">
+    <value>Snapshot Name</value>
+  </data>
+  <data name="SnapColDate" xml:space="preserve">
+    <value>Date / Time</value>
+  </data>
+  <data name="SnapColEntries" xml:space="preserve">
+    <value>Entries</value>
+  </data>
+  <data name="SnapColMachine" xml:space="preserve">
+    <value>Computer / OS</value>
+  </data>
+  <data name="SnapColDesc" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="SnapBtnCompare" xml:space="preserve">
+    <value>🔍 Compare</value>
+  </data>
+  <data name="SnapCompareTooltip" xml:space="preserve">
+    <value>Perform a differential comparison with the current startup state</value>
+  </data>
+  <data name="SnapDeleteTooltip" xml:space="preserve">
+    <value>Delete this baseline snapshot</value>
+  </data>
+  <data name="SnapResultsHeader" xml:space="preserve">
+    <value>Comparison results:</value>
+  </data>
+  <data name="SnapColLocation" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="SnapColCommandLine" xml:space="preserve">
+    <value>Command Line / Path</value>
+  </data>
+  <data name="SnapColChangedParams" xml:space="preserve">
+    <value>Changed Parameters</value>
+  </data>
+  <data name="SnapColCurrentState" xml:space="preserve">
+    <value>Current State</value>
+  </data>
+  <data name="SnapColBaselineState" xml:space="preserve">
+    <value>Snapshot State</value>
+  </data>
+  <data name="SnapBtnClose" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="BtnPauseMonitoring" xml:space="preserve">
+    <value>Pause</value>
+  </data>
+  <data name="BtnResumeMonitoring" xml:space="preserve">
+    <value>Resume</value>
+  </data>
+  <data name="TooltipPauseMonitoring" xml:space="preserve">
+    <value>Pause global system startup monitoring and watchdog services</value>
+  </data>
+  <data name="TooltipResumeMonitoring" xml:space="preserve">
+    <value>Resume active system startup monitoring and background scanning</value>
+  </data>
+  <data name="TrayPauseMonitoring" xml:space="preserve">
+    <value>Pause Monitoring</value>
+  </data>
+  <data name="TrayResumeMonitoring" xml:space="preserve">
+    <value>Resume Monitoring</value>
+  </data>
+  <data name="TrayMonitoringPausedStatus" xml:space="preserve">
+    <value>Monitoring Paused</value>
+  </data>
+  <data name="StatusServiceActive" xml:space="preserve">
+    <value>Service active (v{0}, PID: {1})</value>
+  </data>
+  <data name="StatusServicePaused" xml:space="preserve">
+    <value>Service paused (v{0}, PID: {1})</value>
+  </data>
+  <data name="StatusServiceStopped" xml:space="preserve">
+    <value>Service disconnected</value>
+  </data>
+  <data name="SystemHealthPaused" xml:space="preserve">
+    <value>Monitoring Paused</value>
+  </data>
+  <data name="BootColCategory" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="BootColApp" xml:space="preserve">
+    <value>Application</value>
+  </data>
+  <data name="BootColPublisher" xml:space="preserve">
+    <value>Publisher</value>
+  </data>
+  <data name="BootColTotalTime" xml:space="preserve">
+    <value>Total Time</value>
+  </data>
+  <data name="BootColDelay" xml:space="preserve">
+    <value>Startup Delay</value>
+  </data>
+  <data name="BootColSessionDate" xml:space="preserve">
+    <value>Session Date</value>
+  </data>
+  <data name="BootColDesktopPhase" xml:space="preserve">
+    <value>To Desktop</value>
+  </data>
+  <data name="BootColPostPhase" xml:space="preserve">
+    <value>Background</value>
+  </data>
+  <data name="BootColAppsCount" xml:space="preserve">
+    <value>Apps</value>
+  </data>
+  <data name="BootColRating" xml:space="preserve">
+    <value>Rating</value>
+  </data>
+  <data name="ViewModeList" xml:space="preserve">
+    <value>List</value>
+  </data>
+  <data name="ViewModeTree" xml:space="preserve">
+    <value>Tree</value>
+  </data>
+  <data name="TooltipViewModeList" xml:space="preserve">
+    <value>Display processes as a flat list</value>
+  </data>
+  <data name="TooltipViewModeTree" xml:space="preserve">
+    <value>Hierarchical process tree (parent and child branches)</value>
+  </data>
+  <data name="SystemDangerTitle" xml:space="preserve">
+    <value>Warning: Critical System Component</value>
+  </data>
+  <data name="SystemDangerMessage" xml:space="preserve">
+    <value>Caution! The entry "{0}" is a critical Windows system component.
+
+Disabling, blocking, or removing it may cause system instability or a total system crash (BSoD).
+
+Do you really want to proceed?</value>
+  </data>
+  <data name="ErrCannotBlockSystemProcess" xml:space="preserve">
+    <value>Blocking a Windows system process is prohibited to ensure operating system stability.</value>
+  </data>
+  <data name="ActionProcessConnections" xml:space="preserve">
+    <value>Network Connections...</value>
+  </data>
+  <data name="ProcessConnectionsTitle" xml:space="preserve">
+    <value>Process Network Connections</value>
+  </data>
+  <data name="AuthenticodeSection" xml:space="preserve">
+    <value>Authenticode Digital Signature Verification</value>
+  </data>
+  <data name="AuthenticodeDescription" xml:space="preserve">
+    <value>Hardware and cryptographic integrity verification of executables (PE/EXE/DLL) using native Win32 WinVerifyTrust API (WINTRUST_ACTION_GENERIC_VERIFY_V2) and Windows certificate trust chains (X509 Root CA). Detects tampered files, exploits, and malware masquerading.</value>
+  </data>
+  <data name="AuthenticodeEngineStatus" xml:space="preserve">
+    <value>Engine Status: Active (WinVerifyTrust v2 + X509 Root CA)</value>
+  </data>
+  <data name="AuthenticodeCacheNotice" xml:space="preserve">
+    <value>Smart Caching: Results are cached by file path, size, and last modified timestamp, maintaining 0% CPU overhead.</value>
+  </data>
+  <data name="AuthenticodeLegendTitle" xml:space="preserve">
+    <value>Digital Signature Visual Status Indicators:</value>
+  </data>
+  <data name="AuthenticodeLegendValid" xml:space="preserve">
+    <value>Valid: Signature is authentic, trusted certificate chain verified, file unmodified.</value>
+  </data>
+  <data name="AuthenticodeLegendTampered" xml:space="preserve">
+    <value>Tampered / Corrupted: Hash digest mismatch (0x80096010), file modified or injected.</value>
+  </data>
+  <data name="AuthenticodeLegendUntrusted" xml:space="preserve">
+    <value>Expired / Untrusted Root: Certificate expired, self-signed, or revoked.</value>
+  </data>
+  <data name="AuthenticodeLegendUnsigned" xml:space="preserve">
+    <value>Unsigned: Executable has no vendor digital signature.</value>
+  </data>
+  <data name="AuthenticodeAiIntegration" xml:space="preserve">
+    <value>AI Integration: Authenticode verification results are passed to the AI rating engine to detect malicious impersonation of system binaries.</value>
+  </data>
+  <data name="AutoGuardsSection" xml:space="preserve">
+    <value>Automatic Security Policies (Auto-Guards)</value>
+  </data>
+  <data name="AutoGuardsDescription" xml:space="preserve">
+    <value>Proactive audit and neutralization of suspicious startup entries</value>
+  </data>
+  <data name="AutoGuardsModeLabel" xml:space="preserve">
+    <value>Action Mode:</value>
+  </data>
+  <data name="AutoGuardsModeAudit" xml:space="preserve">
+    <value>Audit only (log event and show notification)</value>
+  </data>
+  <data name="AutoGuardsModeEnforce" xml:space="preserve">
+    <value>Active Protection (terminate process and isolate to backup)</value>
+  </data>
+  <data name="AutoGuardsRulesLabel" xml:space="preserve">
+    <value>Security Guard Policies:</value>
+  </data>
+  <data name="GuardDangerousCliLabel" xml:space="preserve">
+    <value>Dangerous CLI Commands</value>
+  </data>
+  <data name="GuardDangerousCliToggle" xml:space="preserve">
+    <value>Block Base64, IEX downloaders, and extension masking</value>
+  </data>
+  <data name="GuardDangerousCliDescription" xml:space="preserve">
+    <value>Detects obfuscated PowerShell commands, living-off-the-land downloaders, and masked files</value>
+  </data>
+  <data name="GuardTempPathLabel" xml:space="preserve">
+    <value>Temp / Public Directories</value>
+  </data>
+  <data name="GuardTempPathToggle" xml:space="preserve">
+    <value>Block execution from %TEMP%, %WINDIR%\Temp, Users\Public</value>
+  </data>
+  <data name="GuardTempPathDescription" xml:space="preserve">
+    <value>Prevents malware droppers from establishing autostart out of temporary or staging folders</value>
+  </data>
+  <data name="GuardScriptsLabel" xml:space="preserve">
+    <value>Scripts &amp; Interpreters</value>
+  </data>
+  <data name="GuardScriptsToggle" xml:space="preserve">
+    <value>Block scripts (.bat, .vbs, .js, .ps1, mshta, cscript, wscript)</value>
+  </data>
+  <data name="GuardScriptsDescription" xml:space="preserve">
+    <value>Blocks non-binary script files and WMI active scripts from startup persistence</value>
+  </data>
+  <data name="GuardUnsignedLabel" xml:space="preserve">
+    <value>Authenticode Signature</value>
+  </data>
+  <data name="GuardUnsignedToggle" xml:space="preserve">
+    <value>Block unsigned or untrusted executable binaries</value>
+  </data>
+  <data name="GuardUnsignedDescription" xml:space="preserve">
+    <value>Ensures only cryptographically verified binaries with valid digital signatures can autostart</value>
+  </data>
+  <data name="GuardNewServicesLabel" xml:space="preserve">
+    <value>Windows Services</value>
+  </data>
+  <data name="GuardNewServicesToggle" xml:space="preserve">
+    <value>Block registration of new non-system services and drivers</value>
+  </data>
+  <data name="GuardNewServicesDescription" xml:space="preserve">
+    <value>Prevents unauthorized third-party background services and kernel drivers from installing</value>
+  </data>
+  <data name="GuardSystemProtectedNotice" xml:space="preserve">
+    <value>Core Windows components (kernel, svchost, system services, Task Scheduler system tasks) and StartupMonitor own processes are unconditionally protected.</value>
+  </data>
+  <data name="ActionPolicyBlocked" xml:space="preserve">
+    <value>Entry "{0}" was blocked and neutralized by an Auto-Guard security policy.</value>
+  </data>
+  <data name="TrayMixedTitle" xml:space="preserve">
+    <value>Notifications ({0})</value>
+  </data>
+  <data name="TrayAndMore" xml:space="preserve">
+    <value>...and {0} more</value>
+  </data>
+  <data name="TmProcessTitle" xml:space="preserve">
+    <value>Process Actions</value>
+  </data>
+  <data name="SysInfoBtn" xml:space="preserve">
+    <value>About PC</value>
+  </data>
+  <data name="SysInfoTooltip" xml:space="preserve">
+    <value>Hardware specifications: processor, RAM, disk drives, OS</value>
+  </data>
+  <data name="SysInfoTitle" xml:space="preserve">
+    <value>Computer &amp; System Information</value>
+  </data>
+  <data name="SysInfoSubtitle" xml:space="preserve">
+    <value>Hardware overview, disk storage status, and operating system build</value>
+  </data>
+  <data name="SysInfoCardHardware" xml:space="preserve">
+    <value>Hardware Specifications</value>
+  </data>
+  <data name="SysInfoCardOs" xml:space="preserve">
+    <value>Operating System</value>
+  </data>
+  <data name="SysInfoCardDisks" xml:space="preserve">
+    <value>Storage Drives</value>
+  </data>
+  <data name="SysInfoCpu" xml:space="preserve">
+    <value>Processor</value>
+  </data>
+  <data name="SysInfoCores" xml:space="preserve">
+    <value>Logical Cores</value>
+  </data>
+  <data name="SysInfoRam" xml:space="preserve">
+    <value>Installed RAM</value>
+  </data>
+  <data name="SysInfoOsName" xml:space="preserve">
+    <value>Windows Edition</value>
+  </data>
+  <data name="SysInfoBuild" xml:space="preserve">
+    <value>Version &amp; Build</value>
+  </data>
+  <data name="SysInfoMachine" xml:space="preserve">
+    <value>Computer Name</value>
+  </data>
+  <data name="SysInfoUser" xml:space="preserve">
+    <value>Current User</value>
+  </data>
+  <data name="SysInfoUptime" xml:space="preserve">
+    <value>System Uptime</value>
+  </data>
+  <data name="SysInfoCopyBtn" xml:space="preserve">
+    <value>Copy Specs</value>
+  </data>
+  <data name="SysInfoCopiedToast" xml:space="preserve">
+    <value>Computer specifications copied to clipboard</value>
+  </data>
+  <data name="SysInfoRefreshBtn" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+</root>

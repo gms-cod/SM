@@ -1,0 +1,72 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+.DS_Store
+
+## Build
+Release/
+Debug/
+*.wixpdb
+*.wixobj
+
+## Logs
+logs/
+
+## Test artifacts
+ui_*.txt
+ov_*.txt
+
+## Build output
+SMon/
+
+## Config
+startup-monitor.json
+startup-monitor.json.bak
+startup-ratings.json
+startup-entries.txt
+startup-entries.json
+blacklist.json
+removed-entries.json
+settings.json
+history.jsonl
+*.migrated
+*.corrupt
+smon-cfg-backup/
+
+## WPF temp
+*_wpftmp.csproj
+
+## IDE
+.vs/
+*.csproj.user
+
+SMon2/
+
+## Рабочие конфиги (бэкап) — содержат AiApiKey
+cfg/
+startup-entries.backup.json
+ui-settings.json
+
+## Inno Setup инсталляторы (бинарники)
+installers/*.exe
+
+## opencode (локальное состояние)
+.opencode/
+
+## Конфликтные копии синхронизаторов (Syncthing, Яндекс.Диск)
+*.sync-conflict-*
+* (*).*
+.stversions/
+.stfolder/
+.stignore
+
+# Root utilities
+/*.exe
+!/SMon2/*.exe
+
+## Удалённые и мусорные файлы
+delete/

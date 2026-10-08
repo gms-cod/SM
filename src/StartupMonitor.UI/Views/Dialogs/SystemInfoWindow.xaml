@@ -1,0 +1,278 @@
+<ui:FluentWindow
+    x:Class="StartupMonitor.UI.Views.Dialogs.SystemInfoWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:services="clr-namespace:StartupMonitor.UI.Services"
+    xmlns:models="clr-namespace:StartupMonitor.Shared.Models;assembly=StartupMonitor.Shared"
+    Title="{Binding SysInfoTitle, Source={x:Static services:LocalizationService.Instance}}"
+    WindowStartupLocation="CenterOwner"
+    Background="{DynamicResource WindowBackgroundBrush}"
+    ExtendsContentIntoTitleBar="True"
+    ShowInTaskbar="False"
+    Width="820" Height="640"
+    MinHeight="500" MinWidth="680">
+
+    <Grid Margin="18,0,18,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar -->
+        <ui:TitleBar Grid.Row="0" Title="{Binding SysInfoTitle, Source={x:Static services:LocalizationService.Instance}}"
+                     ShowMinimize="False" ShowMaximize="True" ShowClose="True" />
+
+        <!-- Шапка окна с кнопками действий -->
+        <Grid Grid.Row="1" Margin="4,4,4,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Path Data="{StaticResource IconDesktop}" Width="20" Height="20"
+                          Fill="#00D2D3" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBlock Text="{Binding SysInfoTitle, Source={x:Static services:LocalizationService.Instance}}"
+                               FontSize="19" FontWeight="Bold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Text="{Binding SysInfoSubtitle, Source={x:Static services:LocalizationService.Instance}}"
+                           FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="30,2,0,0" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                           Content="{Binding SysInfoRefreshBtn, Source={x:Static services:LocalizationService.Instance}}"
+                           Click="OnRefreshClick" Margin="0,0,8,0" Padding="12,6" />
+
+                <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Copy24}"
+                           Content="{Binding SysInfoCopyBtn, Source={x:Static services:LocalizationService.Instance}}"
+                           Click="OnCopyClick" Padding="14,6" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Скроллируемое содержимое карточек -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+            <StackPanel Margin="4,0,4,0">
+
+                <!-- 1. Карточка процессора и оперативной памяти -->
+                <Border Style="{StaticResource FluentGlassCard}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconDeveloperBoard}" Width="16" Height="16"
+                                      Fill="#00D2D3" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding SysInfoCardHardware, Source={x:Static services:LocalizationService.Instance}}"
+                                           FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
+                            <Border HorizontalAlignment="Right" Style="{StaticResource BadgeBluePill}">
+                                <TextBlock Text="HARDWARE" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource BadgeBlueTextBrush}" />
+                            </Border>
+                        </Grid>
+
+                        <!-- Процессор -->
+                        <Grid Margin="0,4,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoCpu, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.CpuName, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Логические ядра -->
+                        <Grid Margin="0,4,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoCores, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Info.LogicalCores, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                <TextBlock Text=" потоков" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" Margin="4,1,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Оперативная память с полосой использования -->
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoRam, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Top" Margin="0,4,0,0" />
+                            <StackPanel Grid.Column="1">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <TextBlock Text="{Binding Info.RamUsedGb, RelativeSource={RelativeSource AncestorType=Window}, StringFormat={}{0:F1}}"
+                                               FontSize="13" FontWeight="Bold" Foreground="#10B981" />
+                                    <TextBlock Text=" / " FontSize="13" Foreground="{DynamicResource SubtleTextBrush}" />
+                                    <TextBlock Text="{Binding Info.RamTotalGb, RelativeSource={RelativeSource AncestorType=Window}, StringFormat={}{0:F1} ГБ}"
+                                               FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="{Binding Info.RamUsedPercent, RelativeSource={RelativeSource AncestorType=Window}, StringFormat=' ({0}% занято, '}"
+                                               FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" Margin="6,1,0,0" />
+                                    <TextBlock Text="{Binding Info.RamAvailableGb, RelativeSource={RelativeSource AncestorType=Window}, StringFormat='свободно {0:F1} ГБ)'}"
+                                               FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" Margin="0,1,0,0" />
+                                </StackPanel>
+                                <Border CornerRadius="3" ClipToBounds="True" Height="6">
+                                    <ProgressBar Value="{Binding Info.RamUsedPercent, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 Maximum="100" Foreground="#10B981" Background="{ui:ThemeResource ControlFillColorSecondaryBrush}" BorderThickness="0" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 2. Карточка накопителей (жесткие диски и SSD) -->
+                <Border Style="{StaticResource FluentGlassCard}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconHardDrive}" Width="16" Height="16"
+                                      Fill="#F59E0B" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding SysInfoCardDisks, Source={x:Static services:LocalizationService.Instance}}"
+                                           FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
+                            <Border HorizontalAlignment="Right" Style="{StaticResource BadgeOrangePill}">
+                                <TextBlock Text="STORAGE" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource BadgeOrangeTextBrush}" />
+                            </Border>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding Info.Disks, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:SystemDiskInfo}">
+                                    <Border Margin="0,0,0,8" Padding="10,8" Background="#15FFFFFF" BorderBrush="{DynamicResource TableRowBorderBrush}" BorderThickness="1" CornerRadius="8">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Имя диска и метка -->
+                                            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Bold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0,0,6,0" />
+                                                <TextBlock Text="{Binding Label}" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,6,0" />
+                                                <Border Background="#25FFFFFF" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Format}" FontSize="10.5" Foreground="{DynamicResource SubtleTextBrush}" />
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Свободно / всего -->
+                                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FreeGb, StringFormat={}{0:F1}}" FontSize="12.5" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text=" ГБ свободно из " FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" />
+                                                <TextBlock Text="{Binding TotalGb, StringFormat='{}{0:F1} ГБ'}" FontSize="12.5" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                                <TextBlock Text="{Binding UsedPercent, StringFormat=' ({0}%)'}" FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" />
+                                            </StackPanel>
+
+                                            <!-- Полоса заполненности -->
+                                            <Border Grid.Row="1" Grid.ColumnSpan="2" CornerRadius="2.5" ClipToBounds="True" Height="5" Margin="0,6,0,0">
+                                                <ProgressBar Value="{Binding UsedPercent}"
+                                                             Maximum="100" BorderThickness="0"
+                                                             Foreground="#00D2D3" Background="{ui:ThemeResource ControlFillColorSecondaryBrush}" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. Карточка операционной системы и компьютера -->
+                <Border Style="{StaticResource FluentGlassCard}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconSettings}" Width="16" Height="16"
+                                      Fill="#60A5FA" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding SysInfoCardOs, Source={x:Static services:LocalizationService.Instance}}"
+                                           FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
+                            <Border HorizontalAlignment="Right" Style="{StaticResource BadgeGreenPill}">
+                                <TextBlock Text="SYSTEM" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource BadgeGreenTextBrush}" />
+                            </Border>
+                        </Grid>
+
+                        <Grid Margin="0,4,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoOsName, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.OsName, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Grid Margin="0,4,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoBuild, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Info.OsDisplayVersion, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding Info.OsBuild, RelativeSource={RelativeSource AncestorType=Window}, StringFormat='(Сборка {0})'}"
+                                           FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" Margin="0,0,8,0" />
+                                <Border Background="#25FFFFFF" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Info.Architecture, RelativeSource={RelativeSource AncestorType=Window}}"
+                                               FontSize="11" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,4,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoMachine, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Info.MachineName, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                <TextBlock Text="{Binding Info.UserName, RelativeSource={RelativeSource AncestorType=Window}, StringFormat=' (пользователь: {0})'}"
+                                           FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoUptime, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.UptimeDisplay, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="#00D2D3" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Подвал окна -->
+        <Border Grid.Row="3" Margin="0,10,0,0" Padding="0,8,0,0" BorderBrush="{DynamicResource TableRowBorderBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <TextBlock x:Name="TxtStatus" Text="{Binding SysInfoTooltip, Source={x:Static services:LocalizationService.Instance}}"
+                           FontSize="12" Foreground="{DynamicResource SubtleTextBrush}" VerticalAlignment="Center" />
+                <ui:Button Appearance="Secondary" Content="{Binding BtnClose, Source={x:Static services:LocalizationService.Instance}}" HorizontalAlignment="Right" Click="OnCloseClick" Padding="20,6" />
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

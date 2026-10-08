@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.17763</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>StartupMonitor.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- Тесты не должны триггерить публикацию в SMon2 из UI.csproj -->
+    <ExcludePublishToSMon>true</ExcludePublishToSMon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.8.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StartupMonitor.Shared\StartupMonitor.Shared.csproj" />
+    <ProjectReference Include="..\..\src\StartupMonitor.Service\StartupMonitor.Service.csproj" />
+    <ProjectReference Include="..\..\src\StartupMonitor.UI\StartupMonitor.UI.csproj"
+                      AdditionalProperties="ExcludePublishToSMon=true" />
+  </ItemGroup>
+
+</Project>

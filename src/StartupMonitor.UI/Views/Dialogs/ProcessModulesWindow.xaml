@@ -1,0 +1,328 @@
+<ui:FluentWindow
+    x:Class="StartupMonitor.UI.Views.Dialogs.ProcessModulesWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:services="clr-namespace:StartupMonitor.UI.Services"
+    Title="Загруженные модули и дескрипторы"
+    WindowStartupLocation="CenterOwner"
+    Background="{ui:ThemeResource ApplicationBackgroundBrush}"
+    ExtendsContentIntoTitleBar="True"
+    ShowInTaskbar="False"
+    Width="1050" Height="680"
+    MinHeight="480" MinWidth="800">
+
+    <Grid Margin="16,0,16,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar -->
+        <ui:TitleBar Grid.Row="0" Title="{Binding WindowTitle, RelativeSource={RelativeSource AncestorType=Window}}" ShowMinimize="False" ShowMaximize="True" ShowClose="True" />
+
+        <!-- Инфо-карточка процесса -->
+        <ui:Card Grid.Row="1" Margin="0,4,0,12" Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Иконка модуля/куба -->
+                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="Cube24" FontSize="20" Foreground="#00D2D3" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <!-- Данные процесса -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="TxtProcessName" Text="ProcessName.exe" FontSize="16" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0,0,8,0" />
+                        <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtProcessPid" Text="PID: 1234" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtExecutablePath" Text="C:\Path\to\Process.exe" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <!-- Статистика модулей и дескрипторов -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding PmTotalModules, Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TxtTotalModulesCount" Text="0" FontSize="14" FontWeight="Bold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding PmSignedModules, Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TxtSignedModulesCount" Text="0" FontSize="14" FontWeight="Bold" Foreground="#107C41" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,6" Margin="0,0,8,0">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding PmUnsignedOrTemp, Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TxtUnsignedModulesCount" Text="0" FontSize="14" FontWeight="Bold" Foreground="#D83B01" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,6">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding PmTotalHandles, Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TxtHandlesCount" Text="0" FontSize="14" FontWeight="Bold" Foreground="#0078D4" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ui:Card>
+
+        <!-- Тулбар поиска и обновления -->
+        <Grid Grid.Row="2" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Поиск -->
+            <ui:TextBox x:Name="TxtSearch" Grid.Column="0"
+                        PlaceholderText="{Binding PmSearchPlaceholder, Source={StaticResource Loc}}"
+                        TextChanged="OnSearchTextChanged" Margin="0,0,10,0" />
+
+            <!-- Кнопка обновления -->
+            <ui:Button x:Name="BtnRefresh" Grid.Column="1" Appearance="Secondary"
+                       Icon="{ui:SymbolIcon ArrowClockwise24}"
+                       Content="{Binding BtnRefreshText, Source={StaticResource Loc}, FallbackValue='Обновить'}"
+                       Click="OnRefreshClick" />
+        </Grid>
+
+        <!-- Вкладки: Модули (DLL) и Дескрипторы (Handles) -->
+        <TabControl Grid.Row="3" Background="Transparent" BorderThickness="0" Margin="0" Padding="0">
+            <!-- Вкладка 1: Модули (DLL) -->
+            <TabItem Header="{Binding PmTabModules, Source={StaticResource Loc}}" FontSize="13">
+                <Grid Margin="0,8,0,0">
+                    <DataGrid x:Name="GridModules"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              GridLinesVisibility="None"
+                              HeadersVisibility="Column"
+                              RowHeight="36"
+                              Background="Transparent"
+                              BorderThickness="1"
+                              BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}">
+                        <DataGrid.Columns>
+                            <!-- Имя модуля -->
+                            <DataGridTemplateColumn Header="{Binding PmColModuleName, Source={StaticResource Loc}}" Width="180" SortMemberPath="ModuleName">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0">
+                                            <ui:SymbolIcon Symbol="Cube20" FontSize="14" Foreground="#00D2D3" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding ModuleName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <Border Visibility="{Binding IsTempPath, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                    Background="#FDE7E9" CornerRadius="4" Padding="4,1" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                    ToolTip="Внимание: библиотека загружена из временного каталога (Temp/AppData)">
+                                                <TextBlock Text="TEMP" FontSize="9" FontWeight="Bold" Foreground="#A80000" />
+                                            </Border>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Базовый адрес -->
+                            <DataGridTextColumn Header="{Binding PmColBaseAddress, Source={StaticResource Loc}}" Binding="{Binding BaseAddress}" Width="150" FontFamily="Consolas" FontSize="11" />
+
+                            <!-- Размер -->
+                            <DataGridTextColumn Header="{Binding PmColSize, Source={StaticResource Loc}}" Binding="{Binding DisplaySize}" Width="85" />
+
+                            <!-- Цифровая подпись -->
+                            <DataGridTemplateColumn Header="{Binding PmColSignature, Source={StaticResource Loc}}" Width="130" SortMemberPath="IsSigned">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSigned}" Value="True">
+                                                            <Setter Property="Background" Value="#E6F4EA" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsSigned}" Value="False">
+                                                            <Setter Property="Background" Value="#FFF4CE" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon FontSize="12" Margin="0,0,4,0" VerticalAlignment="Center">
+                                                    <ui:SymbolIcon.Style>
+                                                        <Style TargetType="ui:SymbolIcon">
+                                                            <Setter Property="Symbol" Value="Shield20" />
+                                                            <Setter Property="Foreground" Value="#797775" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsSigned}" Value="True">
+                                                                    <Setter Property="Symbol" Value="ShieldCheckmark20" />
+                                                                    <Setter Property="Foreground" Value="#137333" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsSigned}" Value="False">
+                                                                    <Setter Property="Symbol" Value="ShieldDismiss20" />
+                                                                    <Setter Property="Foreground" Value="#795548" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:SymbolIcon.Style>
+                                                </ui:SymbolIcon>
+                                                    <TextBlock FontSize="11" FontWeight="Medium" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="Не проверена" />
+                                                                <Setter Property="Foreground" Value="#797775" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsSigned}" Value="True">
+                                                                        <Setter Property="Text" Value="Подписана" />
+                                                                        <Setter Property="Foreground" Value="#137333" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsSigned}" Value="False">
+                                                                        <Setter Property="Text" Value="Без подписи" />
+                                                                        <Setter Property="Foreground" Value="#795548" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Издатель / Подписант -->
+                            <DataGridTemplateColumn Header="{Binding PmColPublisher, Source={StaticResource Loc}}" Width="170" SortMemberPath="SignerName">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding SignerName, TargetNullValue={Binding CompanyName, FallbackValue='—'}}"
+                                                   TextTrimming="CharacterEllipsis" Margin="6,0" VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Путь к файлу -->
+                            <DataGridTextColumn Header="{Binding PmColPath, Source={StaticResource Loc}}" Binding="{Binding FilePath}" Width="*" />
+
+                            <!-- Описание -->
+                            <DataGridTextColumn Header="{Binding PmColDescription, Source={StaticResource Loc}}" Binding="{Binding FileDescription}" Width="160" />
+                        </DataGrid.Columns>
+
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{Binding PmCtxOpenLocation, Source={StaticResource Loc}}" Click="OnOpenLocationClick">
+                                    <MenuItem.Icon>
+                                        <ui:SymbolIcon Symbol="FolderOpen24" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding PmCtxCopyPath, Source={StaticResource Loc}}" Click="OnCopyPathClick">
+                                    <MenuItem.Icon>
+                                        <ui:SymbolIcon Symbol="Copy24" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding PmCtxCopyName, Source={StaticResource Loc}}" Click="OnCopyNameClick">
+                                    <MenuItem.Icon>
+                                        <ui:SymbolIcon Symbol="DocumentCopy24" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="{Binding PmCtxCheckKaspersky, Source={StaticResource Loc}}" Click="OnCheckKasperskyClick">
+                                    <MenuItem.Icon>
+                                        <ui:SymbolIcon Symbol="ShieldSearch24" Foreground="#107C41" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{Binding PmCtxCheckVirusTotal, Source={StaticResource Loc}}" Click="OnCheckVirusTotalClick">
+                                    <MenuItem.Icon>
+                                        <ui:SymbolIcon Symbol="GlobeSearch24" Foreground="#0078D4" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                    </DataGrid>
+
+                    <!-- Заглушка, если ничего не найдено -->
+                    <StackPanel x:Name="PanelEmptyModules" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                        <ui:SymbolIcon Symbol="CubeOff24" FontSize="48" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                        <TextBlock Text="{Binding PmEmptyModules, Source={StaticResource Loc}}" FontSize="15" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка 2: Дескрипторы (Handles) -->
+            <TabItem Header="{Binding PmTabHandles, Source={StaticResource Loc}}" FontSize="13">
+                <Grid Margin="0,8,0,0">
+                    <DataGrid x:Name="GridHandles"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              GridLinesVisibility="None"
+                              HeadersVisibility="Column"
+                              RowHeight="34"
+                              Background="Transparent"
+                              BorderThickness="1"
+                              BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}">
+                        <DataGrid.Columns>
+                            <!-- Тип объекта -->
+                            <DataGridTemplateColumn Header="{Binding PmColHandleType, Source={StaticResource Loc}}" Width="110" SortMemberPath="HandleType">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0">
+                                            <TextBlock Text="{Binding HandleType}" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <!-- Значение дескриптора -->
+                            <DataGridTextColumn Header="{Binding PmColHandleValue, Source={StaticResource Loc}}" Binding="{Binding HandleValue}" Width="120" FontFamily="Consolas" FontSize="11" />
+
+                            <!-- Имя или путь к ресурсу -->
+                            <DataGridTextColumn Header="{Binding PmColHandleName, Source={StaticResource Loc}}" Binding="{Binding Name}" Width="*" />
+
+                            <!-- Маска доступа -->
+                            <DataGridTextColumn Header="Access" Binding="{Binding AccessString}" Width="100" FontFamily="Consolas" FontSize="11" />
+                        </DataGrid.Columns>
+
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{Binding CtxCopyPath, Source={StaticResource Loc}, FallbackValue='Копировать'}" Click="OnCopyHandleNameClick">
+                                    <MenuItem.Icon>
+                                        <ui:SymbolIcon Symbol="Copy24" FontSize="16" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                    </DataGrid>
+
+                    <!-- Заглушка, если дескрипторов нет -->
+                    <StackPanel x:Name="PanelEmptyHandles" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                        <ui:SymbolIcon Symbol="DocumentDismiss24" FontSize="48" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                        <TextBlock Text="{Binding PmEmptyHandles, Source={StaticResource Loc}}" FontSize="15" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Нижняя панель со статусом и кнопкой закрытия -->
+        <Grid Grid.Row="4" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="TxtStatus" Grid.Column="0" Text="Готово" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+            <ui:Button Grid.Column="1" Appearance="Primary" Content="{Binding BtnClose, Source={StaticResource Loc}, FallbackValue='Закрыть'}" Click="OnCloseClick" MinWidth="90" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>
