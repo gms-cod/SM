@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Version = "",
     [switch]$Bump
 )
@@ -61,6 +61,7 @@ Write-Host "Сборка инсталлятора через Inno Setup..." -For
 $setupFile = Join-Path $repoRoot "installers\StartupMonitorSetup-$targetVer.exe"
 if (Test-Path $setupFile) {
     Write-Host "Установщик успешно собран: $setupFile" -ForegroundColor Green
+& (Join-Path $repoRoot "scripts\sign-binaries.ps1") -Files @($setupFile)
 } else {
     throw "Файл установщика не найден после компиляции!"
 }

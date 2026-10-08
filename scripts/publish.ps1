@@ -31,6 +31,7 @@ dotnet publish (Join-Path $root "src\StartupMonitor.UI\StartupMonitor.UI.csproj"
     -p:ExcludePublishToSMon=true `
     --nologo
 
+& (Join-Path $PSScriptRoot "sign-binaries.ps1") -Files @((Join-Path $root "SMon2\StartupMonitor.Service.exe"), (Join-Path $root "SMon2\StartupMonitor.UI.exe"))
 Write-Host "4. Копирование иконок в SMon2..." -ForegroundColor Cyan
 Copy-Item (Join-Path $root "assets\icon.svg") (Join-Path $root "SMon2\icon.svg") -Force -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $root "assets\app.ico") (Join-Path $root "SMon2\app.ico") -Force -ErrorAction SilentlyContinue
