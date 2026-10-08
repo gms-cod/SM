@@ -67,7 +67,7 @@ For every feature or bugfix, execute the following cycle without manual stopping
 
 ---
 
-## Статус проекта (Текущая версия: v1.2.0)
+## Статус проекта (Текущая версия: v1.2.1)
 
 ### Архитектура и хранение данных
 - **Архитектура**: Разделение на службу Windows (`StartupMonitor.Service`, запуск от `NT AUTHORITY\SYSTEM`), интерфейс пользователя (`StartupMonitor.UI`, WPF .NET 8 self-contained win-x64) и общую библиотеку (`StartupMonitor.Shared`).
@@ -160,6 +160,11 @@ For every feature or bugfix, execute the following cycle without manual stopping
       - В `MainWindow.xaml` исправлены кисти переключателя режима «Список / Дерево» на `ui:ThemeResource`.
       - В `App.xaml.cs` удалён дублирующий фоновый таймер профайлера.
     - **Тесты**: Все 729 модульных тестов успешно проходят со 100% результатом.
+34. **Интеграция легитимной цифровой подписи Authenticode и доверия Windows**:
+    - Сгенерирован 3072-битный RSA сертификат `Startup Monitor Authenticode` с EKU Code Signing (`1.3.6.1.5.5.7.3.3`) и импортирован в доверенное корневое хранилище сертификатов (`Cert:\LocalMachine\Root`).
+    - Экспортирован открытый сертификат `installers/StartupMonitor-Root.cer` для переноса доверия.
+    - Разработан скрипт `scripts/sign-binaries.ps1` для пакетной подписи исполняемых файлов через `signtool.exe` из Windows SDK с алгоритмом дайджеста SHA-256 и штампом времени RFC 3161 (`http://timestamp.digicert.com`).
+    - Все собранные бинарники службы, UI и инсталлятор `Setup.exe` подписываются автоматически со статусом `Valid / Signature verified`.
 
 ### Дорожная карта (Планы)
 - `docs/ROADMAP.md`:

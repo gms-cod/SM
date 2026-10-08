@@ -14,7 +14,7 @@
 ; Результат: ..\installers\StartupMonitorSetup-<версия>.exe
 
 #define MyAppName "Startup Monitor"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.1"
 #define MyAppPublisher "Startup Monitor"
 #define MyAppExeName "StartupMonitor.UI.exe"
 #define MyServiceExeName "StartupMonitor.Service.exe"
