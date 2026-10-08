@@ -51,9 +51,6 @@ cfg/
 startup-entries.backup.json
 ui-settings.json
 
-## Inno Setup инсталляторы (бинарники)
-installers/*.exe
-
 ## opencode (локальное состояние)
 .opencode/
 
