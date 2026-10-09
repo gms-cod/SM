@@ -37,7 +37,7 @@ public sealed class GitHubUpdateService : IDisposable
 
     /// <summary>Текущая версия сборки.</summary>
     public static Version CurrentVersion =>
-        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 2, 2);
+        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 2, 3);
 
     /// <summary>Строковое представление текущей версии (например "1.2.2").</summary>
     public static string CurrentVersionString =>
@@ -134,6 +134,22 @@ public sealed class GitHubUpdateService : IDisposable
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, GitHubApiLatestReleaseUrl);
             using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogInformation("No releases found on GitHub (404 Not Found). Current version {Current} is considered latest.", CurrentVersionString);
+                return new UpdateCheckResult
+                {
+                    Success = true,
+                    UpdateInfo = new UpdateInfo
+                    {
+                        Version = CurrentVersionString,
+                        CurrentVersion = CurrentVersionString,
+                        IsUpdateAvailable = false,
+                        Title = "No releases found on GitHub"
+                    }
+                };
+            }
 
             if (!response.IsSuccessStatusCode)
             {
