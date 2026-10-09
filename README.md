@@ -237,8 +237,8 @@ Startup Monitor полностью автономен и выполняет мо
 
 ```powershell
 # 1. Клонирование репозитория
-git clone https://github.com/gms-cod/Startup-Monitor.git
-cd Startup-Monitor
+git clone https://github.com/gms-cod/SM.git
+cd SM
 
 # 2. Восстановление зависимостей и компиляция
 dotnet build StartupMonitor.sln -c Release

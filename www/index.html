@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="meta.title">Startup Monitor — контроль автозапуска Windows</title>
+<meta name="description" content="Startup Monitor: мониторинг автозапуска, AI-анализ и ускорение загрузки Windows." data-i18n="meta.description">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="stylesheet" href="styles.css">
+<script>
+try{var t=localStorage.getItem('sm-theme')||'dark',l=localStorage.getItem('sm-lang')||'ru';document.documentElement.dataset.theme=t;document.documentElement.lang=l;}catch(e){}
+</script>
+<script defer src="app.js"></script>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<header class="header">
+<div class="header-inner container">
+<a class="brand" href="#overview">
+<img src="assets/logo.svg" alt="Startup Monitor" width="36" height="36">
+<span class="brand-text"><strong>Startup Monitor</strong><small data-i18n="header.subtitle">Контроль автозапуска Windows</small></span>
+</a>
+<button id="navToggle" class="burger" aria-expanded="false" aria-controls="nav" aria-label="Меню">☰</button>
+<nav id="nav" class="nav" aria-label="Основная навигация">
+<a href="#overview" data-i18n="nav.overview">Обзор</a>
+<a href="#features" data-i18n="nav.features">Возможности</a>
+<a href="#how" data-i18n="nav.how">Как работает</a>
+<a href="#download" data-i18n="nav.download">Загрузка</a>
+</nav>
+<div class="header-controls">
+<div class="lang" role="group" aria-label="Language">
+<button type="button" data-lang="ru" class="is-active">RU</button><span aria-hidden="true">|</span><button type="button" data-lang="en">EN</button>
+</div>
+<button id="themeToggle" type="button" data-i18n="header.theme">Тема</button>
+<a class="btn btn-primary" href="#download" data-i18n="header.download">Скачать</a>
+</div>
+</div>
+</header>
+<main class="container">
+<section id="overview" class="hero reveal">
+<div class="hero-badges">
+<span data-i18n="hero.badge.version">v1.2.2</span>
+<span data-i18n="hero.badge.windows">Windows 10/11 x64</span>
+<span data-i18n="hero.badge.dotnet">.NET 8</span>
+<span data-i18n="hero.badge.license">MIT</span>
+</div>
+<h1 data-i18n="hero.title">Узнайте, что тормозит запуск Windows</h1>
+<p class="lead" data-i18n="hero.subtitle">Startup Monitor показывает все точки автозапуска, оценивает риск каждой записи с помощью AI и помогает безопасно ускорить загрузку.</p>
+<div class="hero-cta">
+<a class="btn btn-primary" href="#download" data-i18n="hero.cta.download">Скачать бесплатно</a>
+<a class="btn" href="https://github.com/gms-cod/SM" data-i18n="hero.cta.source">Исходники</a>
+</div>
+<div class="kpi">
+<div class="kpi-card"><strong data-i18n="kpi.points.value">20+</strong><span data-i18n="kpi.points.label">точек автозапуска под контролем</span></div>
+<div class="kpi-card"><strong data-i18n="kpi.cpu.value">0% CPU</strong><span data-i18n="kpi.cpu.label">в фоне: замеры без нагрузки</span></div>
+<div class="kpi-card"><strong data-i18n="kpi.ai.value">AI 1–10</strong><span data-i18n="kpi.ai.label">скоринг риска записей</span></div>
+<div class="kpi-card"><strong data-i18n="kpi.uptime.value">24/7</strong><span data-i18n="kpi.uptime.label">сторожа и трейсинг загрузки</span></div>
+</div>
+<div class="shot" aria-label="MainWindow">
+<p class="shot-title" data-i18n="shot.title">MainWindow: дерево автозапуска, 60 FPS</p>
+<div class="shot-table" role="table" aria-label="Пример таблицы автозапуска">
+<div class="shot-row shot-head" role="row"><span role="columnheader" data-i18n="shot.col.name">Программа</span><span role="columnheader" data-i18n="shot.col.status">Статус</span><span role="columnheader" data-i18n="shot.col.impact">Влияние</span></div>
+<div class="shot-row" role="row"><span role="cell" data-i18n="shot.r1.name">OneDrive</span><span role="cell" data-i18n="shot.r1.state">Включено</span><span role="cell" data-i18n="shot.r1.impact">Высокое</span></div>
+<div class="shot-row" role="row"><span role="cell" data-i18n="shot.r2.name">Steam Client</span><span role="cell" data-i18n="shot.r2.state">Отложен · 30 с</span><span role="cell" data-i18n="shot.r2.impact">Среднее</span></div>
+<div class="shot-row" role="row"><span role="cell" data-i18n="shot.r3.name">Unknown Updater</span><span role="cell" data-i18n="shot.r3.state">Заблокировано</span><span role="cell" data-i18n="shot.r3.impact">Риск 9/10</span></div>
+</div>
+<p class="shot-note" data-i18n="shot.note">Скриншоты главного окна MainWindow появятся здесь позже</p>
+</div>
+</section>
+<section id="features" class="reveal">
+<h2 data-i18n="features.title">Возможности</h2>
+<p data-i18n="features.subtitle">Всё для анализа и чистки автозапуска — от реестра до сети и AI-скоринга.</p>
+<div class="cards">
+<article><h3 data-i18n="features.monitor.title">Мониторинг автозапуска</h3><p data-i18n="features.monitor.desc">20+ точек: реестр Run, планировщик заданий, службы, WMI, папки автозагрузки.</p></article>
+<article><h3 data-i18n="features.ai.title">AI-анализ Groq</h3><p data-i18n="features.ai.desc">Скоринг риска 1–10 через Groq openai/gpt-oss-120b с объяснением каждой записи.</p></article>
+<article><h3 data-i18n="features.opentip.title">Kaspersky OpenTIP</h3><p data-i18n="features.opentip.desc">Проверка репутации файлов и хешей по облачной базе Kaspersky OpenTIP.</p></article>
+<article><h3 data-i18n="features.authenticode.title">Проверка Authenticode</h3><p data-i18n="features.authenticode.desc">Валидация цифровой подписи и SHA256-хеша каждого исполняемого файла.</p></article>
+<article><h3 data-i18n="features.guards.title">Auto-Guards</h3><p data-i18n="features.guards.desc">Сторожа блокируют новые записи автозапуска и предупреждают о вторжениях.</p></article>
+<article><h3 data-i18n="features.tree.title">Дерево 60 FPS</h3><p data-i18n="features.tree.desc">Виртуализированное дерево тысяч записей без лагов: плавный скролл 60 FPS.</p></article>
+<article><h3 data-i18n="features.sockets.title">Сокеты TCP/UDP</h3><p data-i18n="features.sockets.desc">Живые сетевые соединения процессов: кто, куда и по какому протоколу.</p></article>
+<article><h3 data-i18n="features.boot.title">Boot Tracer</h3><p data-i18n="features.boot.desc">Трейсинг загрузки по EventID 100–110: точное время каждого этапа старта.</p></article>
+<article><h3 data-i18n="features.snapshot.title">Снимки «Было — Стало»</h3><p data-i18n="features.snapshot.desc">Снапшоты состояния и наглядный дифф: что изменилось после установки программ.</p></article>
+<article><h3 data-i18n="features.delayed.title">Отложенный старт</h3><p data-i18n="features.delayed.desc">Delayed Start 15–120 с: тяжёлые программы стартуют после загрузки системы.</p></article>
+<article><h3 data-i18n="features.reports.title">Отчёты HTML/CSV/JSON</h3><p data-i18n="features.reports.desc">Экспорт результатов анализа в HTML, CSV и JSON для аудита и архива.</p></article>
+<article><h3 data-i18n="features.notify.title">Telegram + Discord</h3><p data-i18n="features.notify.desc">Мгновенные уведомления о новых записях в Telegram и Discord.</p></article>
+</div>
+</section>
+<section id="how" class="reveal">
+<h2 data-i18n="how.title">Как работает</h2>
+<p data-i18n="how.subtitle">Три безопасных действия вместо слепого удаления.</p>
+<ol class="steps">
+<li><h3 data-i18n="how.step1.title">1. Отключить</h3><p data-i18n="how.step1.desc">Временно выключите запись и проверьте, что система стала быстрее.</p></li>
+<li><h3 data-i18n="how.step2.title">2. Заблокировать</h3><p data-i18n="how.step2.desc">Поставьте сторожа Auto-Guard, чтобы программа не прописалась обратно.</p></li>
+<li><h3 data-i18n="how.step3.title">3. Удалить</h3><p data-i18n="how.step3.desc">Удалите запись навсегда, когда убедились, что она не нужна.</p></li>
+</ol>
+</section>
+<section id="download" class="reveal">
+<h2 data-i18n="dl.title">Загрузка</h2>
+<p data-i18n="dl.subtitle">Выберите удобный вариант установки.</p>
+<div class="cards">
+<article><h3 data-i18n="dl.installer.title">Инсталлятор</h3><p data-i18n="dl.installer.desc">Установщик Windows с подписью Authenticode и проверкой SHA256-хеша.</p><a class="btn btn-primary" href="https://github.com/gms-cod/Startup-Monitor/releases/latest/download/StartupMonitorSetup-1.2.2.exe" data-i18n="dl.installer.cta">Скачать установщик</a></article>
+<article><h3 data-i18n="dl.portable.title">Portable SMon2</h3><p data-i18n="dl.portable.desc">Портативная версия без установки: распаковал и запустил.</p><a class="btn" href="https://github.com/gms-cod/Startup-Monitor/releases" data-i18n="dl.portable.cta">Скачать portable</a></article>
+</div>
+<p><code>/VERYSILENT</code> — <span data-i18n="dl.silent">ключ тихой установки без диалогов</span> · <a href="https://github.com/gms-cod/Startup-Monitor/releases/download/v1.2.2/StartupMonitorSetup-1.2.2.exe.sha256" data-i18n="dl.sha">SHA-256 контрольная сумма</a></p>
+<p data-i18n="dl.reqs">Требования: Windows 10 1809+ x64, self-contained — .NET ставить не нужно.</p>
+</section>
+</main>
+<footer>
+<p data-i18n="footer.license">Распространяется под лицензией MIT.</p>
+<p data-i18n="footer.icons">Иконки — Fluent icons.</p>
+<p data-i18n="footer.rights">© 2026 Startup Monitor.</p>
+</footer>
+</body>
+</html>

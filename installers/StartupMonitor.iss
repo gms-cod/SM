@@ -8,7 +8,7 @@
 
 #define MyAppName "Startup Monitor"
 #define MyAppPublisher "GMS"
-#define MyAppURL "https://github.com/gms-cod/Startup-Monitor"
+#define MyAppURL "https://github.com/gms-cod/SM"
 #define MyAppExeName "StartupMonitor.UI.exe"
 #define MyServiceExeName "StartupMonitor.Service.exe"
 #define MyServiceName "StartupMonitor"

@@ -1,30 +1,30 @@
 @echo off
 chcp 65001 >nul
-title Синхронизация Startup Monitor с GitHub
+title Синхронизация Startup Monitor с GitHub (gms-cod/SM)
 
 echo ============================================================
-echo      Синхронизация Startup Monitor с GitHub
+echo      Синхронизация Startup Monitor с GitHub: gms-cod/SM
 echo ============================================================
 echo.
-echo Внимание:
-echo 1. Убедитесь, что репозиторий создан на GitHub:
-echo    https://github.com/new  (имя: Startup-Monitor, Public)
+echo Репозиторий: https://github.com/gms-cod/SM
 echo.
-echo 2. Отправка ветки main и релизного тега v1.2.3...
+echo Отправка ветки main и тегов в GitHub...
 echo.
 
-git push -u origin main --tags
+git push -u origin main --tags --force
 
 echo.
 if %ERRORLEVEL% EQU 0 (
     echo ============================================================
-    echo [УСПЕХ] Синхронизация завершена!
-    echo GitHub Actions запустит сборку инсталлятора и создание релиза.
+    echo [УСПЕХ] Синхронизация успешно завершена!
+    echo.
+    echo GitHub Actions сейчас соберет инсталлятор и создаст релиз:
+    echo https://github.com/gms-cod/SM/actions
+    echo https://github.com/gms-cod/SM/releases
     echo ============================================================
 ) else (
     echo ============================================================
-    echo [ОШИБКА] Не удалось выполнить push.
-    echo Если репозиторий еще не создан, создайте его на https://github.com/new
+    echo [ОШИБКА] Произошла ошибка при отправке.
     echo ============================================================
 )
 

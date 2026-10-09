@@ -19,7 +19,7 @@ namespace StartupMonitor.Service.Services.Update;
 /// </summary>
 public sealed class GitHubUpdateService : IDisposable
 {
-    private const string GitHubApiLatestReleaseUrl = "https://api.github.com/repos/gms-cod/Startup-Monitor/releases/latest";
+    private const string GitHubApiLatestReleaseUrl = "https://api.github.com/repos/gms-cod/SM/releases/latest";
     private static readonly TimeSpan DefaultCheckInterval = TimeSpan.FromHours(12);
 
     private readonly JsonDataStore _store;

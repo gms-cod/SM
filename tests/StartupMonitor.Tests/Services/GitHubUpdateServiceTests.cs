@@ -112,7 +112,7 @@ public class GitHubUpdateServiceTests
             Title = "Startup Monitor 1.3.0 Release",
             Changelog = "- Added auto-updates\n- Performance enhancements",
             ReleaseDate = new DateTime(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc),
-            DownloadUrl = "https://github.com/gms-cod/Startup-Monitor/releases/download/v1.3.0/Setup.exe",
+            DownloadUrl = "https://github.com/gms-cod/SM/releases/download/v1.3.0/Setup.exe",
             FileName = "StartupMonitorSetup-1.3.0.exe",
             Sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             SizeBytes = 12345678,
