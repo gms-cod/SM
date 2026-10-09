@@ -1,0 +1,158 @@
+name: Build & Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish to GitHub Releases?'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Installer & Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK 8.0
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+        shell: pwsh
+
+      - name: Run Unit Tests
+        run: dotnet test tests/StartupMonitor.Tests/StartupMonitor.Tests.csproj -c Release -m:1 --nologo
+
+      - name: Publish Binaries to SMon2
+        run: |
+          New-Item -ItemType Directory -Path SMon2 -Force | Out-Null
+          
+          Write-Host "Publishing StartupMonitor.Service..." -ForegroundColor Cyan
+          dotnet publish src/StartupMonitor.Service/StartupMonitor.Service.csproj `
+            -o SMon2 `
+            -c Release `
+            -r win-x64 `
+            --self-contained `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=embedded `
+            -p:ExcludePublishToSMon=true `
+            --nologo
+            
+          Write-Host "Publishing StartupMonitor.UI..." -ForegroundColor Cyan
+          dotnet publish src/StartupMonitor.UI/StartupMonitor.UI.csproj `
+            -o SMon2 `
+            -c Release `
+            -r win-x64 `
+            --self-contained `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=embedded `
+            -p:ExcludePublishToSMon=true `
+            --nologo
+            
+          Copy-Item assets/icon.svg SMon2/icon.svg -Force
+          Copy-Item assets/app.ico SMon2/app.ico -Force
+        shell: pwsh
+
+      - name: Build Installer (Inno Setup)
+        id: build_installer
+        run: |
+          [xml]$propsXml = Get-Content Directory.Build.props
+          $version = $propsXml.Project.PropertyGroup.Version
+          if (-not $version) { $version = "1.2.2" }
+          
+          # Найти ISCC.exe
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $candidates = @(
+              "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+              "C:\Program Files\Inno Setup 6\ISCC.exe",
+              "C:\Program Files\Inno Setup 7\ISCC.exe"
+            )
+            foreach ($cand in $candidates) {
+              if (Test-Path $cand) { $iscc = $cand; break }
+            }
+          }
+          
+          if (-not $iscc) {
+            throw "ISCC.exe not found on runner!"
+          }
+          
+          Write-Host "Using Inno Setup Compiler: $iscc" -ForegroundColor Green
+          & $iscc "/DMyAppVersion=$version" installers/StartupMonitor.iss
+          
+          $installerPath = "installers/StartupMonitorSetup-$version.exe"
+          if (-not (Test-Path $installerPath)) {
+            throw "Installer file not found at $installerPath!"
+          }
+          
+          $hash = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $shaFile = "$installerPath.sha256"
+          "$hash *StartupMonitorSetup-$version.exe" | Set-Content -Path $shaFile -Encoding utf8
+          
+          Write-Host "Built: $installerPath" -ForegroundColor Green
+          Write-Host "SHA-256: $hash" -ForegroundColor Cyan
+          
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "installer=$installerPath" >> $env:GITHUB_OUTPUT
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Upload Installer Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: StartupMonitor-Installer-v${{ steps.build_installer.outputs.version }}
+          path: |
+            installers/StartupMonitorSetup-*.exe
+            installers/*.sha256
+          if-no-files-found: error
+
+      - name: Publish to GitHub Releases
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.build_installer.outputs.version) }}
+          name: Startup Monitor v${{ steps.build_installer.outputs.version }}
+          body: |
+            ## Startup Monitor v${{ steps.build_installer.outputs.version }}
+
+            ### 📦 Установка:
+            - Запустите **`StartupMonitorSetup-${{ steps.build_installer.outputs.version }}.exe`** от имени администратора.
+            - Поддерживается тихий режим установки: `/SILENT /NORESTART /SUPPRESSMSGBOXES`.
+
+            ### 🔒 Контрольная сумма (SHA-256):
+            ```text
+            SHA-256: ${{ steps.build_installer.outputs.sha256 }}
+            ```
+          files: |
+            installers/StartupMonitorSetup-*.exe
+            installers/*.sha256
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

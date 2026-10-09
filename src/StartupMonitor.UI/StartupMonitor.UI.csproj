@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.17763</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>StartupMonitor.UI</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
+    <SupportedCultures>ru;en</SupportedCultures>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.0" />
+    <PackageReference Include="SharpVectors.Reloaded" Version="1.1.0" />
+    <PackageReference Include="WPF-UI" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="StartupMonitor.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StartupMonitor.Shared\StartupMonitor.Shared.csproj" />
+    <Content Include="..\..\assets\icon.svg" Link="icon.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\app.ico" Link="app.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="PublishToSMon" AfterTargets="Build" Condition="'$(ExcludePublishToSMon)'!='true' AND !$(MSBuildProjectFile.Contains('_wpftmp'))">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;Stop-Service -Name 'StartupMonitor' -Force -ErrorAction SilentlyContinue; Stop-Process -Name 'StartupMonitor.Service','StartupMonitor.UI' -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; dotnet publish '$(MSBuildProjectDirectory)\..\StartupMonitor.Service\StartupMonitor.Service.csproj' -o '$(MSBuildProjectDirectory)\..\..\SMon2' -c $(Configuration) -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:ExcludePublishToSMon=true -p:IntermediateOutputPath='obj\pub_svc\'; dotnet publish '$(MSBuildProjectFullPath)' -o '$(MSBuildProjectDirectory)\..\..\SMon2' -c $(Configuration) -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -p:ExcludePublishToSMon=true -p:IntermediateOutputPath='obj\pub_ui\'; Copy-Item '$(MSBuildProjectDirectory)\..\..\assets\icon.svg' '$(MSBuildProjectDirectory)\..\..\SMon2\icon.svg' -Force -ErrorAction SilentlyContinue; Copy-Item '$(MSBuildProjectDirectory)\..\..\assets\app.ico' '$(MSBuildProjectDirectory)\..\..\SMon2\app.ico' -Force -ErrorAction SilentlyContinue; if (Test-Path 'C:\Program Files\StartupMonitor') { Copy-Item '$(MSBuildProjectDirectory)\..\..\SMon2\StartupMonitor*.exe' 'C:\Program Files\StartupMonitor\' -Force -ErrorAction SilentlyContinue; Copy-Item '$(MSBuildProjectDirectory)\..\..\SMon2\icon.svg' 'C:\Program Files\StartupMonitor\' -Force -ErrorAction SilentlyContinue; Copy-Item '$(MSBuildProjectDirectory)\..\..\SMon2\app.ico' 'C:\Program Files\StartupMonitor\' -Force -ErrorAction SilentlyContinue; Get-ChildItem 'C:\Program Files\StartupMonitor' -File | Unblock-File -ErrorAction SilentlyContinue }; Get-ChildItem '$(MSBuildProjectDirectory)\..\..\SMon2' -Recurse -File | Unblock-File -ErrorAction SilentlyContinue; exit 0&quot;" />
+  </Target>
+
+</Project>
