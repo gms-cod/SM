@@ -1579,4 +1579,61 @@
   <data name="SysInfoRefreshBtn" xml:space="preserve">
     <value>Обновить</value>
   </data>
+  <data name="UpdateSectionTitle" xml:space="preserve">
+    <value>Обновление программы</value>
+  </data>
+  <data name="UpdateSectionDescription" xml:space="preserve">
+    <value>Проверка новых версий на GitHub, автоматическая фоновая загрузка и тихая установка</value>
+  </data>
+  <data name="AutoCheckUpdatesLabel" xml:space="preserve">
+    <value>Автопроверка</value>
+  </data>
+  <data name="AutoCheckUpdatesToggle" xml:space="preserve">
+    <value>Проверять обновления автоматически</value>
+  </data>
+  <data name="UpdateCheckActionLabel" xml:space="preserve">
+    <value>Наличие</value>
+  </data>
+  <data name="CheckUpdatesButton" xml:space="preserve">
+    <value>Проверить обновления</value>
+  </data>
+  <data name="UpdateInfoLabel" xml:space="preserve">
+    <value>Версия и статус</value>
+  </data>
+  <data name="CheckingForUpdatesText" xml:space="preserve">
+    <value>Проверка наличия обновлений...</value>
+  </data>
+  <data name="UpdateLatestVersionInstalledText" xml:space="preserve">
+    <value>У вас установлена последняя версия программы.</value>
+  </data>
+  <data name="UpdateCheckFailedText" xml:space="preserve">
+    <value>Не удалось проверить обновления.</value>
+  </data>
+  <data name="UpdateAvailableFormat" xml:space="preserve">
+    <value>Доступна новая версия: v{0}</value>
+  </data>
+  <data name="UpdateDialogTitle" xml:space="preserve">
+    <value>Доступно обновление</value>
+  </data>
+  <data name="UpdateDialogSubtitle" xml:space="preserve">
+    <value>Выпущена новая версия Startup Monitor</value>
+  </data>
+  <data name="UpdateNowButton" xml:space="preserve">
+    <value>Обновить сейчас</value>
+  </data>
+  <data name="RemindLaterButton" xml:space="preserve">
+    <value>Напомнить позже</value>
+  </data>
+  <data name="SkipVersionButton" xml:space="preserve">
+    <value>Пропустить эту версию</value>
+  </data>
+  <data name="InstallAndRestartButton" xml:space="preserve">
+    <value>Установить и перезапустить</value>
+  </data>
+  <data name="DownloadProgressStatusFormat" xml:space="preserve">
+    <value>Загружено {0} из {1} ({2}%) • {3}</value>
+  </data>
+  <data name="UpdateChangelogLabel" xml:space="preserve">
+    <value>Список изменений в этой версии</value>
+  </data>
 </root>

@@ -990,6 +990,124 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Включена ли автоматическая проверка обновлений на GitHub.</summary>
+    [ObservableProperty]
+    private bool _autoCheckUpdates = true;
+
+    partial void OnAutoCheckUpdatesChanged(bool value)
+    {
+        SaveSetting("autoCheckUpdates", value);
+        _ = _pipeClient.SetUpdateSettingsAsync(new UpdateSettingsPayload(value, AutoDownloadUpdates, SkippedUpdateVersion));
+    }
+
+    /// <summary>Включено ли автоматическое скачивание обновлений в фоне.</summary>
+    [ObservableProperty]
+    private bool _autoDownloadUpdates;
+
+    partial void OnAutoDownloadUpdatesChanged(bool value)
+    {
+        SaveSetting("autoDownloadUpdates", value);
+        _ = _pipeClient.SetUpdateSettingsAsync(new UpdateSettingsPayload(AutoCheckUpdates, value, SkippedUpdateVersion));
+    }
+
+    /// <summary>Пропущенная пользователем версия обновления.</summary>
+    [ObservableProperty]
+    private string? _skippedUpdateVersion;
+
+    /// <summary>Признак выполнения проверки обновлений.</summary>
+    [ObservableProperty]
+    private bool _isCheckingUpdates;
+
+    /// <summary>Статусное сообщение о проверке/наличии обновления.</summary>
+    [ObservableProperty]
+    private string _updateStatusMessage = string.Empty;
+
+    /// <summary>Сведения о текущей версии и последней проверке.</summary>
+    [ObservableProperty]
+    private string _currentVersionAndLastCheckText = string.Empty;
+
+    /// <summary>Диалоговое окно обновления (если уже открыто).</summary>
+    private Views.Dialogs.UpdateAvailableWindow? _activeUpdateDialog;
+
+    /// <summary>Обновляет отображение текущей версии и времени последней проверки.</summary>
+    public void RefreshCurrentVersionAndLastCheck()
+    {
+        var curVer = typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.2.2";
+        var lastCheck = LoadSetting("lastUpdateCheckTime", string.Empty);
+        CurrentVersionAndLastCheckText = string.IsNullOrWhiteSpace(lastCheck)
+            ? $"v{curVer}"
+            : $"v{curVer} • {lastCheck}";
+    }
+
+    /// <summary>Запуск ручной проверки наличия обновлений на GitHub.</summary>
+    [RelayCommand]
+    public async Task CheckForUpdatesAsync()
+    {
+        if (IsCheckingUpdates) return;
+        IsCheckingUpdates = true;
+        UpdateStatusMessage = LocalizationService.Instance.CheckingForUpdatesText;
+
+        try
+        {
+            var res = await _pipeClient.CheckForUpdatesAsync();
+            if (res == null || !res.Success)
+            {
+                UpdateStatusMessage = res?.ErrorMessage ?? LocalizationService.Instance.UpdateCheckFailedText;
+                return;
+            }
+
+            var nowStr = DateTime.Now.ToString("dd.MM.yyyy HH:mm");
+            SaveSetting("lastUpdateCheckTime", nowStr);
+            RefreshCurrentVersionAndLastCheck();
+
+            if (res.UpdateInfo != null && res.UpdateInfo.IsUpdateAvailable)
+            {
+                UpdateStatusMessage = string.Format(LocalizationService.Instance.UpdateAvailableFormat, res.UpdateInfo.Version);
+                ShowUpdateAvailableDialog(res.UpdateInfo);
+            }
+            else
+            {
+                UpdateStatusMessage = LocalizationService.Instance.UpdateLatestVersionInstalledText;
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusMessage = ex.Message;
+        }
+        finally
+        {
+            IsCheckingUpdates = false;
+        }
+    }
+
+    /// <summary>Отображает модальное окно с информацией о новой версии.</summary>
+    public void ShowUpdateAvailableDialog(UpdateInfo updateInfo)
+    {
+        if (System.Windows.Application.Current == null) return;
+
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (_activeUpdateDialog != null && _activeUpdateDialog.IsLoaded)
+            {
+                _activeUpdateDialog.Activate();
+                return;
+            }
+
+            _activeUpdateDialog = new Views.Dialogs.UpdateAvailableWindow(updateInfo, _pipeClient, skippedVersion =>
+            {
+                SkippedUpdateVersion = skippedVersion;
+                SaveSetting("skippedUpdateVersion", skippedVersion);
+                _ = _pipeClient.SetUpdateSettingsAsync(new UpdateSettingsPayload(AutoCheckUpdates, AutoDownloadUpdates, skippedVersion));
+            })
+            {
+                Owner = System.Windows.Application.Current.MainWindow
+            };
+
+            _activeUpdateDialog.Closed += (_, _) => _activeUpdateDialog = null;
+            _activeUpdateDialog.Show();
+        });
+    }
+
     [ObservableProperty]
     private string _currentFilter = "all";
 
@@ -1167,6 +1285,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _guardBlockScripts = LoadSetting("guardBlockScripts", false);
         _guardBlockUnsigned = LoadSetting("guardBlockUnsigned", false);
         _guardBlockNewServices = LoadSetting("guardBlockNewServices", false);
+        _autoCheckUpdates = LoadSetting("autoCheckUpdates", true);
+        _autoDownloadUpdates = LoadSetting("autoDownloadUpdates", false);
+        _skippedUpdateVersion = LoadSetting("skippedUpdateVersion", (string?)null);
+        RefreshCurrentVersionAndLastCheck();
 
         // Проверяем реестр на дубликаты и гарантируем единую каноническую точку автозапуска UI
         Services.AutostartService.EnsureSingleAutostartEntry(_startWithWindows);
@@ -1176,6 +1298,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ = _pipeClient.SetCpuThrottleAsync(_cpuThrottleEnabled, _cpuThrottleThreshold);
         _ = _pipeClient.SetAiConfigAsync(_aiApiKey, _aiApiUrl, _aiModel);
         _ = _pipeClient.SetKasperskyConfigAsync(_kasperskyEnabled, _kasperskyApiKey, _kasperskyApiUrl);
+        _ = _pipeClient.SetUpdateSettingsAsync(new UpdateSettingsPayload(_autoCheckUpdates, _autoDownloadUpdates, _skippedUpdateVersion));
         SyncRemoteNotifications();
         SyncAutoGuardConfig();
 
@@ -1303,17 +1426,37 @@ public partial class MainViewModel : ObservableObject, IDisposable
             catch { }
         }
 
-        // Уведомление о выполненных действиях (отключено, процесс завершён, удалено, восстановлено)
+        // Уведомление о выполненных действиях (отключено, процесс завершён, удалено, восстановлено, доступно обновление)
         foreach (var m in batch.Where(m => m.Type == PipeMessageTypes.ActionNotice))
         {
             try
             {
                 var p = System.Text.Json.JsonSerializer.Deserialize<ActionNoticePayload>(m.Payload);
                 if (p == null) continue;
-                NotificationRequested?.Invoke(
-                    LocalizationService.Instance.ActionNotifTitle,
-                    LocalizationService.Instance.GetActionNotifText(p.Action, p.Name ?? ""),
-                    string.Empty);
+
+                if (p.Action == "update_available")
+                {
+                    NotificationRequested?.Invoke(
+                        LocalizationService.Instance.UpdateDialogTitle,
+                        p.Name ?? "Доступна новая версия Startup Monitor",
+                        string.Empty);
+
+                    _ = System.Windows.Application.Current?.Dispatcher?.InvokeAsync(async () =>
+                    {
+                        var res = await _pipeClient.CheckForUpdatesAsync();
+                        if (res?.UpdateInfo != null && res.UpdateInfo.IsUpdateAvailable)
+                        {
+                            ShowUpdateAvailableDialog(res.UpdateInfo);
+                        }
+                    });
+                }
+                else
+                {
+                    NotificationRequested?.Invoke(
+                        LocalizationService.Instance.ActionNotifTitle,
+                        LocalizationService.Instance.GetActionNotifText(p.Action, p.Name ?? ""),
+                        string.Empty);
+                }
             }
             catch { }
         }

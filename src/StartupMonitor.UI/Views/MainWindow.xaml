@@ -1476,6 +1476,60 @@
                         </Grid>
                     </StackPanel>
                 </ui:Card>
+
+                <!-- Карточка автоматического обновления (Auto-Update) -->
+                <ui:Card Margin="0 16 0 24">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0 0 0 8">
+                            <ui:SymbolIcon Symbol="ArrowSync24" FontSize="20" Foreground="{ui:ThemeResource SystemAccentColorPrimaryBrush}" VerticalAlignment="Center" Margin="0 0 10 0" />
+                            <TextBlock Text="{Binding UpdateSectionTitle, Source={StaticResource Loc}}" FontSize="18" FontWeight="600" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding UpdateSectionDescription, Source={StaticResource Loc}}" FontSize="12"
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0 0 0 16" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Тумблер автопроверки -->
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding AutoCheckUpdatesLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="0" Grid.Column="1">
+                                <ui:ToggleSwitch IsChecked="{Binding AutoCheckUpdates, Mode=TwoWay}"
+                                                 Content="{Binding AutoCheckUpdatesToggle, Source={StaticResource Loc}}" />
+                            </StackPanel>
+
+                            <!-- Кнопка проверки и статус -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding UpdateCheckActionLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 14 0 0" />
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0 14 0 0" VerticalAlignment="Center">
+                                <ui:Button Content="{Binding CheckUpdatesButton, Source={StaticResource Loc}}"
+                                           Command="{Binding CheckForUpdatesCommand}"
+                                           Appearance="Primary"
+                                           IsEnabled="{Binding IsCheckingUpdates, Converter={StaticResource InverseBoolConverter}}"
+                                           Margin="0 0 16 0" />
+                                <ui:ProgressRing Width="20" Height="20" IsIndeterminate="True" Margin="0 0 12 0"
+                                                 Visibility="{Binding IsCheckingUpdates, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding UpdateStatusMessage}"
+                                           VerticalAlignment="Center"
+                                           FontWeight="500"
+                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
+
+                            <!-- Сведения о версии и последней проверке -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding UpdateInfoLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 12 0 0" />
+                            <StackPanel Grid.Row="2" Grid.Column="1" Margin="0 12 0 0">
+                                <TextBlock Text="{Binding CurrentVersionAndLastCheckText}" FontSize="12"
+                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </ui:Card>
             </StackPanel>
         </ScrollViewer>
 

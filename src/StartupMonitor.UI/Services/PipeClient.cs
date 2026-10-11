@@ -42,6 +42,9 @@ public class PipeClient : IDisposable
     /// <summary>Событие получения среза метрик процессов для Диспетчера задач.</summary>
     public event EventHandler<SystemPerformanceSnapshot>? ProcessSnapshotReceived;
 
+    /// <summary>Событие обновления прогресса загрузки дистрибутива обновления.</summary>
+    public event EventHandler<UpdateProgressInfo>? UpdateProgressReceived;
+
     /// <summary>Флаг подключения к основному каналу.</summary>
     public bool IsConnected => _pipe?.IsConnected ?? false;
 
@@ -134,6 +137,16 @@ public class PipeClient : IDisposable
                                     var snapshot = JsonSerializer.Deserialize<SystemPerformanceSnapshot>(msg.Payload, JsonOptions);
                                     if (snapshot != null)
                                         ProcessSnapshotReceived?.Invoke(this, snapshot);
+                                }
+                                catch { }
+                            }
+                            else if (msg.Type == PipeMessageTypes.DownloadUpdateProgress && !string.IsNullOrEmpty(msg.Payload))
+                            {
+                                try
+                                {
+                                    var prog = JsonSerializer.Deserialize<UpdateProgressInfo>(msg.Payload, JsonOptions);
+                                    if (prog != null)
+                                        UpdateProgressReceived?.Invoke(this, prog);
                                 }
                                 catch { }
                             }
@@ -1032,6 +1045,72 @@ public class PipeClient : IDisposable
             Success = false,
             ErrorMessage = response?.Payload ?? "Служба не вернула ответ на запрос модулей процесса."
         };
+    }
+
+    /// <summary>Запрашивает проверку наличия обновлений на GitHub через службу.</summary>
+    public async Task<UpdateCheckResult?> CheckForUpdatesAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.CheckForUpdates });
+        if (response?.Type == PipeMessageTypes.CheckForUpdatesResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<UpdateCheckResult>(response.Payload, JsonOptions);
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>Отправляет команду на скачивание пакета обновления.</summary>
+    public async Task<bool> DownloadUpdateAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.DownloadUpdate });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Отправляет команду на установку скачанного обновления.</summary>
+    public async Task<(bool Success, string Message)> InstallUpdateAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.InstallUpdate });
+        if (response?.Type == PipeMessageTypes.InstallUpdateResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(response.Payload);
+                var success = doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
+                var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
+                return (success, msg);
+            }
+            catch { }
+        }
+        return (false, response?.Payload ?? "Ошибка при запуске обновления.");
+    }
+
+    /// <summary>Запрашивает статус процесса загрузки обновления.</summary>
+    public async Task<UpdateProgressInfo?> GetUpdateStatusAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetUpdateStatus });
+        if (response?.Type == PipeMessageTypes.UpdateStatusResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<UpdateProgressInfo>(response.Payload, JsonOptions);
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>Сохраняет настройки параметров автообновления.</summary>
+    public async Task<bool> SetUpdateSettingsAsync(UpdateSettingsPayload settings)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetUpdateSettings,
+            Payload = JsonSerializer.Serialize(settings, JsonOptions)
+        });
+        return response?.Type == PipeMessageTypes.Success;
     }
 
     /// <summary>Освобождает все ресурсы: каналы, читатели, писатели, токены отмены.</summary>

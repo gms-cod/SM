@@ -860,6 +860,26 @@ public class LocalizationService : INotifyPropertyChanged
     public string SysInfoCopiedToast => this["SysInfoCopiedToast"];
     public string SysInfoRefreshBtn => this["SysInfoRefreshBtn"];
 
+    public string UpdateSectionTitle => this["UpdateSectionTitle"];
+    public string UpdateSectionDescription => this["UpdateSectionDescription"];
+    public string AutoCheckUpdatesLabel => this["AutoCheckUpdatesLabel"];
+    public string AutoCheckUpdatesToggle => this["AutoCheckUpdatesToggle"];
+    public string UpdateCheckActionLabel => this["UpdateCheckActionLabel"];
+    public string CheckUpdatesButton => this["CheckUpdatesButton"];
+    public string UpdateInfoLabel => this["UpdateInfoLabel"];
+    public string CheckingForUpdatesText => this["CheckingForUpdatesText"];
+    public string UpdateLatestVersionInstalledText => this["UpdateLatestVersionInstalledText"];
+    public string UpdateCheckFailedText => this["UpdateCheckFailedText"];
+    public string UpdateAvailableFormat => this["UpdateAvailableFormat"];
+    public string UpdateDialogTitle => this["UpdateDialogTitle"];
+    public string UpdateDialogSubtitle => this["UpdateDialogSubtitle"];
+    public string UpdateNowButton => this["UpdateNowButton"];
+    public string RemindLaterButton => this["RemindLaterButton"];
+    public string SkipVersionButton => this["SkipVersionButton"];
+    public string InstallAndRestartButton => this["InstallAndRestartButton"];
+    public string DownloadProgressStatusFormat => this["DownloadProgressStatusFormat"];
+    public string UpdateChangelogLabel => this["UpdateChangelogLabel"];
+
     /// <summary>Переключает язык интерфейса и оповещает подписчиков через INotifyPropertyChanged.</summary>
     /// <param name="cultureCode">Код культуры (например, "ru", "en").</param>
     public void ChangeLanguage(string cultureCode)

@@ -212,7 +212,7 @@ public class EntryOperationsAnalysisTests
     [InlineData(EntryLocation.RegistryRunOnce)]
     public void RemoveFromSystem_Registry_CommonKeys_Success(EntryLocation loc)
     {
-        // RegistryRun и RegistryRunOnce всегда существуют в HKCU.
+        Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\RunOnce")?.Dispose();
         var uniqueName = "NonExistent_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
         var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
@@ -641,6 +641,7 @@ public class EntryOperationsAnalysisTests
     [InlineData(EntryLocation.RegistryRunOnce)]
     public void DisableRegistry_RemovesValue(EntryLocation loc)
     {
+        Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\RunOnce")?.Dispose();
         var uniqueName = "DisableTest_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
         var (success, error) = EntryOperations.DisableRegistry(entry);

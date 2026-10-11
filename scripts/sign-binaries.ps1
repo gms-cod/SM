@@ -21,7 +21,8 @@ foreach ($path in $signtoolPaths) {
 }
 
 if (-not $signtool) {
-    throw "signtool.exe not found in Windows Kits!"
+    Write-Warning "signtool.exe not found in Windows Kits. Skipping signing."
+    return
 }
 
 # 2. Find Certificate
@@ -31,7 +32,8 @@ if (-not $cert) {
 }
 
 if (-not $cert) {
-    throw "Code Signing certificate for Startup Monitor not found!"
+    Write-Warning "Code Signing certificate for Startup Monitor not found. Skipping signing."
+    return
 }
 
 Write-Host "Found Certificate: $($cert.Subject) [SHA1: $($cert.Thumbprint)]" -ForegroundColor Green

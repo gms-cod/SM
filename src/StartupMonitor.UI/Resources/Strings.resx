@@ -1579,4 +1579,61 @@ Do you really want to proceed?</value>
   <data name="SysInfoRefreshBtn" xml:space="preserve">
     <value>Refresh</value>
   </data>
+  <data name="UpdateSectionTitle" xml:space="preserve">
+    <value>Application Update</value>
+  </data>
+  <data name="UpdateSectionDescription" xml:space="preserve">
+    <value>Check for new versions on GitHub, background downloading, and silent installation</value>
+  </data>
+  <data name="AutoCheckUpdatesLabel" xml:space="preserve">
+    <value>Auto-check</value>
+  </data>
+  <data name="AutoCheckUpdatesToggle" xml:space="preserve">
+    <value>Check for updates automatically</value>
+  </data>
+  <data name="UpdateCheckActionLabel" xml:space="preserve">
+    <value>Availability</value>
+  </data>
+  <data name="CheckUpdatesButton" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
+  <data name="UpdateInfoLabel" xml:space="preserve">
+    <value>Version &amp; Status</value>
+  </data>
+  <data name="CheckingForUpdatesText" xml:space="preserve">
+    <value>Checking for updates...</value>
+  </data>
+  <data name="UpdateLatestVersionInstalledText" xml:space="preserve">
+    <value>You have the latest version installed.</value>
+  </data>
+  <data name="UpdateCheckFailedText" xml:space="preserve">
+    <value>Failed to check for updates.</value>
+  </data>
+  <data name="UpdateAvailableFormat" xml:space="preserve">
+    <value>New version available: v{0}</value>
+  </data>
+  <data name="UpdateDialogTitle" xml:space="preserve">
+    <value>Update Available</value>
+  </data>
+  <data name="UpdateDialogSubtitle" xml:space="preserve">
+    <value>A new version of Startup Monitor is available</value>
+  </data>
+  <data name="UpdateNowButton" xml:space="preserve">
+    <value>Update Now</value>
+  </data>
+  <data name="RemindLaterButton" xml:space="preserve">
+    <value>Remind Later</value>
+  </data>
+  <data name="SkipVersionButton" xml:space="preserve">
+    <value>Skip This Version</value>
+  </data>
+  <data name="InstallAndRestartButton" xml:space="preserve">
+    <value>Install &amp; Restart</value>
+  </data>
+  <data name="DownloadProgressStatusFormat" xml:space="preserve">
+    <value>Downloaded {0} of {1} ({2}%) • {3}</value>
+  </data>
+  <data name="UpdateChangelogLabel" xml:space="preserve">
+    <value>What's New in this Release</value>
+  </data>
 </root>

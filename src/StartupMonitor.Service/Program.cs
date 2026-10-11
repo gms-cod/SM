@@ -108,6 +108,7 @@ try
             services.AddSingleton<StartupMonitor.Service.Services.VirusScan.KasperskyScanService>();
             services.AddSingleton<SnapshotManager>();
             services.AddSingleton<StartupMonitor.Service.Services.BootTime.BootTimeService>();
+            services.AddSingleton<StartupMonitor.Service.Services.Update.GitHubUpdateService>();
             services.AddHostedService<WmiSubscriptionWatcher>();
             services.AddHostedService<PipeServer>();
             services.AddHostedService<EventPipeServer>();

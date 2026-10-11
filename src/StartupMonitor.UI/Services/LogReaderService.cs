@@ -108,7 +108,7 @@ public static class LogReaderService
             DateTime ts;
             if (DateTimeOffset.TryParse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dto))
             {
-                ts = dto.LocalDateTime;
+                ts = dto.DateTime;
             }
             else if (!DateTime.TryParse(match.Groups[1].Value, out ts))
             {

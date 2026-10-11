@@ -419,6 +419,60 @@ public class RemoteNotificationService : IDisposable
             .Replace(">", "&gt;");
     }
 
+    /// <summary>Уведомляет о доступности новой версии Startup Monitor.</summary>
+    public async Task NotifyUpdateAvailableAsync(string version, string title, string downloadUrl)
+    {
+        var settings = _store.Load().Settings;
+        var host = Environment.MachineName;
+        var now = DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss");
+
+        var tasks = new List<Task>();
+
+        if (settings.TelegramEnabled && !string.IsNullOrWhiteSpace(settings.TelegramBotToken) && !string.IsNullOrWhiteSpace(settings.TelegramChatId))
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("🚀 <b>Доступно обновление Startup Monitor!</b>");
+            sb.AppendLine();
+            sb.AppendLine($"📦 <b>Новая версия:</b> v{EscapeHtml(version)}");
+            sb.AppendLine($"📌 <b>Релиз:</b> {EscapeHtml(title)}");
+            sb.AppendLine($"🖥️ <b>Компьютер:</b> <code>{EscapeHtml(host)}</code>");
+            sb.AppendLine($"🕒 <b>Время:</b> {EscapeHtml(now)}");
+            if (!string.IsNullOrWhiteSpace(downloadUrl))
+            {
+                sb.AppendLine();
+                sb.AppendLine($"📥 <a href=\"{EscapeHtml(downloadUrl)}\">Скачать установщик</a>");
+            }
+
+            tasks.Add(SendTelegramAsync(settings.TelegramBotToken, settings.TelegramChatId, sb.ToString()));
+        }
+
+        if (settings.DiscordWebhookEnabled && !string.IsNullOrWhiteSpace(settings.DiscordWebhookUrl))
+        {
+            var embed = new DiscordEmbed(
+                Title: $"🚀 Доступно обновление Startup Monitor v{version}",
+                Description: string.IsNullOrWhiteSpace(title) ? "Опубликована новая версия приложения" : title,
+                Color: 0x3B82F6, // Blue
+                Fields: new List<DiscordField>
+                {
+                    new("Новая версия", $"v{version}", true),
+                    new("Компьютер", host, true),
+                    new("Время", now, true),
+                    new("Ссылка", string.IsNullOrWhiteSpace(downloadUrl) ? "N/A" : downloadUrl, false)
+                },
+                Footer: new DiscordFooter("Startup Monitor Remote Guardian"),
+                Timestamp: DateTime.UtcNow.ToString("o")
+            );
+
+            var payload = new DiscordPayload("Startup Monitor", null, new List<DiscordEmbed> { embed });
+            tasks.Add(SendDiscordAsync(settings.DiscordWebhookUrl, payload));
+        }
+
+        if (tasks.Count > 0)
+        {
+            await Task.WhenAll(tasks);
+        }
+    }
+
     /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {

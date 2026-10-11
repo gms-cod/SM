@@ -58,6 +58,8 @@ public class PipeServer : BackgroundService
     private readonly MonitoringStateCoordinator _coordinator;
     // Сервис инспекции загруженных модулей и дескрипторов процессов
     private readonly ProcessInspectorService _processInspector = new();
+    // Сервис самообновления приложения
+    private readonly StartupMonitor.Service.Services.Update.GitHubUpdateService _updateService;
     // Токен отмены для фоновых задач
     private readonly CancellationTokenSource _cts = new();
     // Счётчик записей при последнем GetAllEntries (для логирования изменений)
@@ -100,7 +102,8 @@ public class PipeServer : BackgroundService
         StartupMonitor.Service.Services.Delayed.DelayedStartupManager delayedStartup,
         SnapshotManager snapshotManager,
         StartupMonitor.Service.Services.BootTime.BootTimeService bootTimeService,
-        MonitoringStateCoordinator coordinator)
+        MonitoringStateCoordinator coordinator,
+        StartupMonitor.Service.Services.Update.GitHubUpdateService updateService)
     {
         _store = store;
         _scanTracker = scanTracker;
@@ -123,6 +126,7 @@ public class PipeServer : BackgroundService
         _snapshotManager = snapshotManager;
         _bootTimeService = bootTimeService;
         _coordinator = coordinator;
+        _updateService = updateService;
 
         if (cfg?.Entries != null)
         {
@@ -157,6 +161,7 @@ public class PipeServer : BackgroundService
         _ = BackgroundCleanupLoop(stoppingToken);
         _ = BackgroundHashScanLoop(stoppingToken);
         _ = BackgroundRatingLoop(stoppingToken);
+        _updateService.StartBackgroundCheck();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -1227,6 +1232,57 @@ public class PipeServer : BackgroundService
                         response.Type = PipeMessageTypes.Error;
                         response.Payload = "Запись не найдена";
                     }
+                    break;
+
+                case PipeMessageTypes.CheckForUpdates:
+                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None);
+                    response.Type = PipeMessageTypes.CheckForUpdatesResponse;
+                    response.Payload = JsonSerializer.Serialize(updateCheckRes, JsonOptions);
+                    break;
+
+                case PipeMessageTypes.DownloadUpdate:
+                    _ = Task.Run(async () =>
+                    {
+                        await _updateService.DownloadUpdateAsync(progress =>
+                        {
+                            _notifications.Enqueue(new PipeMessage
+                            {
+                                Type = PipeMessageTypes.DownloadUpdateProgress,
+                                Payload = JsonSerializer.Serialize(progress, JsonOptions)
+                            });
+                        }, CancellationToken.None);
+                    });
+                    response.Type = PipeMessageTypes.Success;
+                    break;
+
+                case PipeMessageTypes.InstallUpdate:
+                    var (instOk, instMsg) = _updateService.InstallUpdate();
+                    response.Type = PipeMessageTypes.InstallUpdateResponse;
+                    response.Payload = JsonSerializer.Serialize(new { success = instOk, message = instMsg }, JsonOptions);
+                    break;
+
+                case PipeMessageTypes.GetUpdateStatus:
+                    var updateStatus = _updateService.GetProgress();
+                    response.Type = PipeMessageTypes.UpdateStatusResponse;
+                    response.Payload = JsonSerializer.Serialize(updateStatus, JsonOptions);
+                    break;
+
+                case PipeMessageTypes.SetUpdateSettings:
+                    var updateSettings = JsonSerializer.Deserialize<UpdateSettingsPayload>(message.Payload, JsonOptions);
+                    if (updateSettings != null)
+                    {
+                        var cfg = _store.Load();
+                        cfg.Settings.AutoCheckUpdates = updateSettings.AutoCheckUpdates;
+                        cfg.Settings.AutoDownloadUpdates = updateSettings.AutoDownloadUpdates;
+                        if (updateSettings.SkippedUpdateVersion != null)
+                        {
+                            cfg.Settings.SkippedUpdateVersion = updateSettings.SkippedUpdateVersion;
+                        }
+                        _store.Save(cfg);
+                        _logger.LogInformation("Update settings saved: AutoCheck={AutoCheck}, AutoDownload={AutoDownload}, Skipped={Skipped}",
+                            updateSettings.AutoCheckUpdates, updateSettings.AutoDownloadUpdates, updateSettings.SkippedUpdateVersion);
+                    }
+                    response.Type = PipeMessageTypes.Success;
                     break;
 
                 default:

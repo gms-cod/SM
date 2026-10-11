@@ -169,6 +169,24 @@ public static class PipeMessageTypes
     public const string GetProcessModules = "GetProcessModules";
     /// <summary>Ответ службы со списком загруженных модулей и дескрипторов процесса.</summary>
     public const string ProcessModulesResponse = "ProcessModulesResponse";
+    /// <summary>Запрос проверки обновлений на GitHub.</summary>
+    public const string CheckForUpdates = "CheckForUpdates";
+    /// <summary>Ответ службы с результатом проверки обновлений.</summary>
+    public const string CheckForUpdatesResponse = "CheckForUpdatesResponse";
+    /// <summary>Команда скачивания пакета обновления.</summary>
+    public const string DownloadUpdate = "DownloadUpdate";
+    /// <summary>Событие прогресса загрузки обновления (рассылается клиентам).</summary>
+    public const string DownloadUpdateProgress = "DownloadUpdateProgress";
+    /// <summary>Команда тихой установки скачанного обновления.</summary>
+    public const string InstallUpdate = "InstallUpdate";
+    /// <summary>Ответ на команду установки обновления.</summary>
+    public const string InstallUpdateResponse = "InstallUpdateResponse";
+    /// <summary>Запрос текущего статуса обновления и загруженного файла.</summary>
+    public const string GetUpdateStatus = "GetUpdateStatus";
+    /// <summary>Ответ службы со статусом обновления.</summary>
+    public const string UpdateStatusResponse = "UpdateStatusResponse";
+    /// <summary>Установка настроек автообновления.</summary>
+    public const string SetUpdateSettings = "SetUpdateSettings";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>

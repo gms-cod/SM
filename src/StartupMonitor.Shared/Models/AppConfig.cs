@@ -160,6 +160,22 @@ public class AppSettings
     /// <summary>Политика: блокировать регистрацию новых несистемных служб Windows.</summary>
     [JsonPropertyName("guard_block_new_services")]
     public bool GuardBlockNewServices { get; set; } = false;
+
+    /// <summary>Автоматически проверять наличие обновлений на GitHub.</summary>
+    [JsonPropertyName("auto_check_updates")]
+    public bool AutoCheckUpdates { get; set; } = true;
+
+    /// <summary>Автоматически скачивать обновления в фоне при обнаружении.</summary>
+    [JsonPropertyName("auto_download_updates")]
+    public bool AutoDownloadUpdates { get; set; } = false;
+
+    /// <summary>Время последней проверки обновлений (UTC).</summary>
+    [JsonPropertyName("last_update_check_utc")]
+    public DateTime? LastUpdateCheckUtc { get; set; }
+
+    /// <summary>Пропущенная версия обновления (пользователь выбрал "Пропустить эту версию").</summary>
+    [JsonPropertyName("skipped_update_version")]
+    public string? SkippedUpdateVersion { get; set; }
 }
 
 /// <summary>Запись истории изменений: добавление, удаление, блокировка и т.д.</summary>
