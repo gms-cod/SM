@@ -54,8 +54,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; Только бинарники и иконки. Конфиги и логи НЕ включаем — они создаются службой/UI
 ; и сохраняются при обновлениях.
-Source: "..\SMon2\StartupMonitor.Service.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\SMon2\StartupMonitor.UI.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\SMon2\StartupMonitor.Service.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
+Source: "..\SMon2\StartupMonitor.UI.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
 Source: "..\SMon2\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\SMon2\icon.svg"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -111,10 +111,90 @@ begin
   Result := True;
 end;
 
+// Проверяет, остановлена ли служба StartupMonitor (состояние STOPPED или служба отсутствует).
+function IsServiceStopped(): Boolean;
+var
+  ResultCode: Integer;
+  TmpFile: String;
+  OutText: AnsiString;
+begin
+  Result := True;
+  TmpFile := ExpandConstant('{tmp}\sm_svcquery.txt');
+  try
+    if Exec(ExpandConstant('{sys}\cmd.exe'),
+      '/c sc query StartupMonitor > "' + TmpFile + '" 2>&1',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      if FileExists(TmpFile) and LoadStringFromFile(TmpFile, OutText) then
+      begin
+        // 1060 / "не существует" — службы нет, считать остановленной
+        if (Pos('STOPPED', String(OutText)) > 0) or (Pos('1060', String(OutText)) > 0) or
+           (Pos('does not exist', String(OutText)) > 0) or
+           (Pos('не существует', String(OutText)) > 0) then
+        begin
+          Result := True;
+          Exit;
+        end;
+        // RUNNING / STOP_PENDING — ещё не остановлена
+        Result := False;
+      end;
+    end;
+  except
+  end;
+end;
+
+// Проверяет, завершены ли процессы UI и Service.
+function AreAppProcessesGone(): Boolean;
+var
+  ResultCode: Integer;
+  TmpFile: String;
+  OutText: AnsiString;
+begin
+  Result := True;
+  TmpFile := ExpandConstant('{tmp}\sm_tasklist.txt');
+  try
+    if Exec(ExpandConstant('{sys}\cmd.exe'),
+      '/c tasklist /FI "IMAGENAME eq StartupMonitor.UI.exe" /FI "IMAGENAME eq StartupMonitor.Service.exe" /FO CSV /NH > "' + TmpFile + '" 2>&1',
+      '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      if FileExists(TmpFile) and LoadStringFromFile(TmpFile, OutText) then
+      begin
+        if (Pos('StartupMonitor.UI.exe', String(OutText)) > 0) or
+           (Pos('StartupMonitor.Service.exe', String(OutText)) > 0) then
+          Result := False;
+      end;
+    end;
+  except
+  end;
+end;
+
+// Ожидает фактической остановки службы и завершения процессов (до ~20 с),
+// повторяя taskkill каждую секунду. Гарантирует освобождение exe перед копированием.
+procedure WaitForStop();
+var
+  I: Integer;
+  ResultCode: Integer;
+begin
+  for I := 1 to 20 do
+  begin
+    if IsServiceStopped() and AreAppProcessesGone() then
+    begin
+      Log(Format('WaitForStop: service stopped and processes exited after %d sec', [I - 1]));
+      Exit;
+    end;
+    Sleep(1000);
+    // Повторный контрольный выстрел каждую итерацию
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM StartupMonitor.UI.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM StartupMonitor.Service.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+  Log('WaitForStop: timeout reached, proceeding with installation anyway');
+end;
+
 // Повторно гарантируем закрытие перед копированием новых файлов
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   StopAppProcesses();
+  WaitForStop();
   Result := '';
 end;
 
@@ -193,7 +273,7 @@ begin
   begin
     // Чистая установка: регистрируем службу с автозапуском start=auto
     Log('ConfigureAndStartService: Service not installed. Running sc create...');
-    Cmd := 'create StartupMonitor binPath= "\"C:\Program Files\StartupMonitor\StartupMonitor.Service.exe\" --windows-service" start= auto';
+    Cmd := 'create StartupMonitor binPath= "\"' + SvcExe + '\" --windows-service" start= auto';
     Exec(ExpandConstant('{sys}\sc.exe'), Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Log('sc create exit code=' + IntToStr(ResultCode));
 
@@ -209,7 +289,7 @@ begin
   begin
     // Обновление программы: актуализируем путь к службе и режим автозапуска
     Log('ConfigureAndStartService: Service already installed. Running sc config...');
-    Cmd := 'config StartupMonitor binPath= "\"C:\Program Files\StartupMonitor\StartupMonitor.Service.exe\" --windows-service" start= auto';
+    Cmd := 'config StartupMonitor binPath= "\"' + SvcExe + '\" --windows-service" start= auto';
     Exec(ExpandConstant('{sys}\sc.exe'), Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Log('sc config exit code=' + IntToStr(ResultCode));
   end;
@@ -259,12 +339,34 @@ begin
   Exec(AppDir + '\StartupMonitor.UI.exe', '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
 end;
 
+// Удаляет остаточные *.tmp файлы в каталоге установки (обрывки прошлых обновлений/загрузок).
+procedure CleanupTmpFiles();
+var
+  FindRec: TFindRec;
+  AppDir: String;
+begin
+  AppDir := GetAppDir();
+  if FindFirst(AppDir + '\*.tmp', FindRec) then
+  try
+    repeat
+      if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
+      begin
+        Log('CleanupTmpFiles: deleting ' + AppDir + '\' + FindRec.Name);
+        DeleteFile(AppDir + '\' + FindRec.Name);
+      end;
+    until not FindNext(FindRec);
+  finally
+    FindClose(FindRec);
+  end;
+end;
+
 // Действия после копирования файлов (настройка автозапуска службы и UI)
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
     Log('CurStepChanged: ssPostInstall - configuring service and UI autostart');
+    CleanupTmpFiles();
     ConfigureAndStartService();
     ConfigureUiAutostart();
     LaunchUiProcess();

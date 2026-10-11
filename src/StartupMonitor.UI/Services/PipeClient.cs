@@ -1050,7 +1050,13 @@ public class PipeClient : IDisposable
     /// <summary>Запрашивает проверку наличия обновлений на GitHub через службу.</summary>
     public async Task<UpdateCheckResult?> CheckForUpdatesAsync()
     {
-        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.CheckForUpdates });
+        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.2.4";
+        var req = new CheckForUpdatesRequest(uiVersion);
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CheckForUpdates,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        });
         if (response?.Type == PipeMessageTypes.CheckForUpdatesResponse && !string.IsNullOrWhiteSpace(response.Payload))
         {
             try

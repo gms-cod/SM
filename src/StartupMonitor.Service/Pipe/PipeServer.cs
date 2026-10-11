@@ -1235,7 +1235,17 @@ public class PipeServer : BackgroundService
                     break;
 
                 case PipeMessageTypes.CheckForUpdates:
-                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None);
+                    string? clientVer = null;
+                    if (!string.IsNullOrWhiteSpace(message.Payload))
+                    {
+                        try
+                        {
+                            var updateReq = JsonSerializer.Deserialize<CheckForUpdatesRequest>(message.Payload, JsonOptions);
+                            clientVer = updateReq?.ClientVersion;
+                        }
+                        catch { }
+                    }
+                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None, clientVer);
                     response.Type = PipeMessageTypes.CheckForUpdatesResponse;
                     response.Payload = JsonSerializer.Serialize(updateCheckRes, JsonOptions);
                     break;
