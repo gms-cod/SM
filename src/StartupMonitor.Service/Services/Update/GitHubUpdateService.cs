@@ -37,7 +37,7 @@ public sealed class GitHubUpdateService : IDisposable
 
     /// <summary>Текущая версия сборки.</summary>
     public static Version CurrentVersion =>
-        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 2, 3);
+        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 2, 4);
 
     /// <summary>Строковое представление текущей версии (например "1.2.2").</summary>
     public static string CurrentVersionString =>
