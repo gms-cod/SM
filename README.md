@@ -52,7 +52,7 @@
 ## 🚀 Установка и быстрый старт
 
 ### Способ 1: Готовый инсталлятор с цифровой подписью (Рекомендуется)
-1. Скачайте актуальный файл установщика из папки [`installers/StartupMonitorSetup-1.2.2.exe`](installers/StartupMonitorSetup-1.2.2.exe) или раздела [Releases на GitHub](https://github.com/gms-cod/Startup-Monitor/releases).
+1. Скачайте актуальный файл установщика **`StartupMonitorSetup-1.3.1.exe`** из раздела [**Releases на GitHub**](https://github.com/gms-cod/Startup-Monitor/releases/latest).
 2. Запустите установщик. Все исполняемые файлы и инсталлятор подписаны сертификатом разработчика **Authenticode (SHA256, RFC 3161)**.
 3. Мастер установки автоматически:
    - Установит бинарники в `C:\Program Files\StartupMonitor\`;
@@ -63,7 +63,7 @@
 > [!TIP]
 > **Тихая установка (Silent Install)**:  
 > Для автоматического развертывания в корпоративной сети или через скрипты запустите инсталлятор с параметрами:  
-> `StartupMonitorSetup-1.2.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+> `StartupMonitorSetup-1.3.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
 
 ### Способ 2: Портативный запуск (Portable / SMon2)
 1. Скопируйте директорию `SMon2` в удобное место на диске. Программа полностью автономна (self-contained .NET 8 x64, установка среды .NET на компьютере не требуется).
@@ -243,7 +243,7 @@ cd SM
 # 2. Восстановление зависимостей и компиляция
 dotnet build StartupMonitor.sln -c Release
 
-# 3. Запуск модульных тестов (729 тестов xUnit)
+# 3. Запуск модульных тестов (880 тестов xUnit)
 dotnet test tests/StartupMonitor.Tests -c Release
 
 # 4. Сборка автономного портативного пакета в SMon2/

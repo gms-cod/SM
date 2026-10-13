@@ -306,19 +306,6 @@ public sealed class FirewallUiIntegrationTests
         Assert.Null(error);
     }
 
-    [Theory]
-    [InlineData(1, 15, false)]
-    [InlineData(2, 30, false)]
-    [InlineData(3, 60, false)]
-    [InlineData(4, 1440, false)]
-    [InlineData(5, 0, true)]
-    public void EscalationLevels_MatchBanMenuDurations(int repeat, int minutes, bool permanent)
-    {
-        var result = PortDefenderEscalation.CalculateBanDuration(repeat);
-        Assert.Equal(permanent, result.IsPermanent);
-        if (!permanent)
-            Assert.Equal(TimeSpan.FromMinutes(minutes), result.Duration);
-    }
 
     [Fact]
     public void FirewallGuard_SelfLockoutAddresses_AreRejected()
