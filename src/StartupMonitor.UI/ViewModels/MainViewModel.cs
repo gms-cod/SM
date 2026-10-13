@@ -1060,7 +1060,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             SaveSetting("lastUpdateCheckTime", nowStr);
             RefreshCurrentVersionAndLastCheck();
 
-            if (res.UpdateInfo != null && res.UpdateInfo.IsUpdateAvailable)
+            if (res.UpdateInfo != null && IsUpdateEffectivelyAvailable(res.UpdateInfo))
             {
                 UpdateStatusMessage = string.Format(LocalizationService.Instance.UpdateAvailableFormat, res.UpdateInfo.Version);
                 ShowUpdateAvailableDialog(res.UpdateInfo);
@@ -1078,6 +1078,51 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             IsCheckingUpdates = false;
         }
+    }
+
+    /// <summary>
+    /// Локальная переоценка доступности обновления для UI-клиента.
+    /// Возвращает true, если служба сообщила обновление для себя/клиента
+    /// ЛИБО если версия UI-клиента старее удалённой (защита от рассинхрона версий службы и UI).
+    /// </summary>
+    private static bool IsUpdateEffectivelyAvailable(UpdateInfo? info)
+    {
+        if (info == null) return false;
+        if (info.IsUpdateAvailable || info.IsUpdateAvailableForClient) return true;
+        var uiVer = typeof(MainViewModel).Assembly.GetName().Version;
+        Version? remoteVer = null;
+        if (info.Version != null)
+        {
+            try { remoteVer = ParseRemoteSemVer(CleanRemoteVersionTag(info.Version)); } catch { }
+        }
+        bool uiIsStale = uiVer != null && remoteVer != null && remoteVer > new Version(uiVer.Major, uiVer.Minor, Math.Max(0, uiVer.Build));
+        return uiIsStale;
+    }
+
+    /// <summary>Очищает тег версии (убирает префикс 'v' и суффиксы типа '-beta'). Локальная копия логики службы.</summary>
+    private static string CleanRemoteVersionTag(string rawTag)
+    {
+        if (string.IsNullOrWhiteSpace(rawTag)) return "0.0.0";
+        var cleaned = rawTag.Trim().TrimStart('v', 'V');
+        var dashIndex = cleaned.IndexOf('-');
+        return dashIndex > 0 ? cleaned[..dashIndex] : cleaned;
+    }
+
+    /// <summary>Парсит SemVer-строку в <see cref="Version"/>. Локальная копия логики службы.</summary>
+    private static Version ParseRemoteSemVer(string versionStr)
+    {
+        if (Version.TryParse(versionStr, out var v))
+        {
+            var build = v.Build < 0 ? 0 : v.Build;
+            var rev = v.Revision < 0 ? -1 : v.Revision;
+            return rev >= 0 ? new Version(v.Major, v.Minor, build, rev) : new Version(v.Major, v.Minor, build);
+        }
+
+        var parts = versionStr.Split('.');
+        if (parts.Length == 1 && int.TryParse(parts[0], out var major))
+            return new Version(major, 0, 0);
+
+        return new Version(0, 0, 0);
     }
 
     /// <summary>Отображает модальное окно с информацией о новой версии.</summary>
@@ -1444,7 +1489,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     _ = System.Windows.Application.Current?.Dispatcher?.InvokeAsync(async () =>
                     {
                         var res = await _pipeClient.CheckForUpdatesAsync();
-                        if (res?.UpdateInfo != null && res.UpdateInfo.IsUpdateAvailable)
+                        if (res?.UpdateInfo != null && IsUpdateEffectivelyAvailable(res.UpdateInfo))
                         {
                             ShowUpdateAvailableDialog(res.UpdateInfo);
                         }

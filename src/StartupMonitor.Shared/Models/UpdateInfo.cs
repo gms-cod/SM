@@ -44,6 +44,18 @@ public class UpdateInfo
     /// <summary>Текущая установленная версия приложения.</summary>
     [JsonPropertyName("current_version")]
     public string CurrentVersion { get; set; } = string.Empty;
+
+    /// <summary>Версия службы (Service), сообщившей результат проверки.</summary>
+    [JsonPropertyName("service_version")]
+    public string ServiceVersion { get; set; } = string.Empty;
+
+    /// <summary>Версия UI-клиента, переданная в запросе проверки (может отсутствовать у старых клиентов).</summary>
+    [JsonPropertyName("client_version")]
+    public string? ClientVersion { get; set; }
+
+    /// <summary>Признак: доступно ли обновление для UI-клиента (remote &gt; clientVersion).</summary>
+    [JsonPropertyName("is_update_available_for_client")]
+    public bool IsUpdateAvailableForClient { get; set; }
 }
 
 /// <summary>Результат проверки обновлений.</summary>

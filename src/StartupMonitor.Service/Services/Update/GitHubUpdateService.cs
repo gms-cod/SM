@@ -37,7 +37,7 @@ public sealed class GitHubUpdateService : IDisposable
 
     /// <summary>Текущая версия сборки.</summary>
     public static Version CurrentVersion =>
-        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 2, 3);
+        Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 2, 4);
 
     /// <summary>Строковое представление текущей версии (например "1.2.2").</summary>
     public static string CurrentVersionString =>
@@ -128,7 +128,16 @@ public sealed class GitHubUpdateService : IDisposable
     /// <summary>
     /// Проверяет наличие нового релиза на GitHub.
     /// </summary>
-    public async Task<UpdateCheckResult> CheckForUpdatesAsync(bool isManual, CancellationToken ct)
+    public Task<UpdateCheckResult> CheckForUpdatesAsync(bool isManual, CancellationToken ct)
+        => CheckForUpdatesAsync(isManual, ct, clientVersionString: null);
+
+    /// <summary>
+    /// Проверяет наличие нового релиза на GitHub с раздельной оценкой для службы и UI-клиента.
+    /// </summary>
+    /// <param name="isManual">Признак ручной проверки (зарезервировано для телеметрии).</param>
+    /// <param name="ct">Токен отмены.</param>
+    /// <param name="clientVersionString">Версия UI-клиента (например "1.2.4"), null — не оценивать.</param>
+    public async Task<UpdateCheckResult> CheckForUpdatesAsync(bool isManual, CancellationToken ct, string? clientVersionString)
     {
         try
         {
@@ -145,7 +154,10 @@ public sealed class GitHubUpdateService : IDisposable
                     {
                         Version = CurrentVersionString,
                         CurrentVersion = CurrentVersionString,
+                        ServiceVersion = CurrentVersionString,
+                        ClientVersion = clientVersionString,
                         IsUpdateAvailable = false,
+                        IsUpdateAvailableForClient = false,
                         Title = "No releases found on GitHub"
                     }
                 };
@@ -172,7 +184,14 @@ public sealed class GitHubUpdateService : IDisposable
             // Парсим версию релиза
             var cleanTag = CleanVersionTag(tagName);
             var remoteVersion = ParseSemVer(cleanTag);
-            var isAvailable = remoteVersion > CurrentVersion;
+            var serviceAvailable = remoteVersion > CurrentVersion;
+            Version? clientVer = null;
+            if (!string.IsNullOrWhiteSpace(clientVersionString))
+            {
+                try { clientVer = ParseSemVer(CleanVersionTag(clientVersionString)); } catch { clientVer = null; }
+            }
+            var clientAvailable = clientVer != null && remoteVersion > clientVer;
+            var isAvailable = serviceAvailable || clientAvailable;
 
             // Извлекаем SHA-256 хэш (из текста релиза или .sha256 ассета)
             var sha256 = ExtractSha256Checksum(body, root);
@@ -188,7 +207,10 @@ public sealed class GitHubUpdateService : IDisposable
                 Sha256 = sha256,
                 SizeBytes = sizeBytes,
                 IsUpdateAvailable = isAvailable,
-                CurrentVersion = CurrentVersionString
+                CurrentVersion = CurrentVersionString,
+                ServiceVersion = CurrentVersionString,
+                ClientVersion = clientVersionString,
+                IsUpdateAvailableForClient = clientAvailable
             };
 
             lock (_lock)

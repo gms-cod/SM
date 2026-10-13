@@ -165,5 +165,54 @@ public class GitHubUpdateServiceTests
         Assert.Null(progress.DownloadedFilePath);
         Assert.Null(progress.ErrorMessage);
     }
-}
+    [Fact]
+    public void UpdateAvailable_WhenServiceIsCurrent_ButClientIsOlder_IsAvailableForClient()
+    {
+        var remote = GitHubUpdateService.ParseSemVer("1.2.4");
+        var serviceVer = GitHubUpdateService.ParseSemVer("1.2.4");
+        var clientVer = GitHubUpdateService.ParseSemVer("1.2.3");
 
+        var serviceAvailable = remote > serviceVer;
+        var clientAvailable = remote > clientVer;
+        var effectivelyAvailable = serviceAvailable || clientAvailable;
+
+        Assert.False(serviceAvailable);
+        Assert.True(clientAvailable);
+        Assert.True(effectivelyAvailable);
+    }
+
+    [Fact]
+    public void UpdateInfo_DtoSerialization_SupportsClientAndServiceVersion()
+    {
+        var info = new UpdateInfo
+        {
+            Version = "1.2.4",
+            CurrentVersion = "1.2.4",
+            ServiceVersion = "1.2.4",
+            ClientVersion = "1.2.3",
+            IsUpdateAvailable = true,
+            IsUpdateAvailableForClient = true,
+            Title = "Startup Monitor v1.2.4"
+        };
+
+        var json = JsonSerializer.Serialize(info);
+        var restored = JsonSerializer.Deserialize<UpdateInfo>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal("1.2.4", restored.ServiceVersion);
+        Assert.Equal("1.2.3", restored.ClientVersion);
+        Assert.True(restored.IsUpdateAvailable);
+        Assert.True(restored.IsUpdateAvailableForClient);
+    }
+
+    [Fact]
+    public void CheckForUpdatesRequest_SerializationRoundTrip()
+    {
+        var req = new CheckForUpdatesRequest("1.2.3");
+        var json = JsonSerializer.Serialize(req);
+        var restored = JsonSerializer.Deserialize<CheckForUpdatesRequest>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal("1.2.3", restored.ClientVersion);
+    }
+}
