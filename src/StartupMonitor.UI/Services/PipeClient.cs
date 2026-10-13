@@ -1057,7 +1057,7 @@ public class PipeClient : IDisposable
     /// <summary>Запрашивает проверку наличия обновлений на GitHub через службу.</summary>
     public async Task<UpdateCheckResult?> CheckForUpdatesAsync()
     {
-        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.2.4";
+        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.3.1";
         var req = new CheckForUpdatesRequest(uiVersion);
         var response = await SendAsync(new PipeMessage
         {
@@ -1291,6 +1291,26 @@ public class PipeClient : IDisposable
     {
         var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.ClearAllBans }, ct);
         return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает штатную остановку фоновой службы (мягкое завершение хоста).</summary>
+    /// <param name="timeoutMs">Таймаут ожидания ответа от службы в миллисекундах.</param>
+    /// <returns>True, если служба подтвердила остановку (Success).</returns>
+    public async Task<bool> RequestServiceShutdownAsync(int timeoutMs = 3000)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(timeoutMs);
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ShutdownService
+            }, cts.Token);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Освобождает все ресурсы: каналы, читатели, писатели, токены отмены.</summary>

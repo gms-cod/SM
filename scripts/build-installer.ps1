@@ -13,7 +13,7 @@ $propsFile = Join-Path $repoRoot "Directory.Build.props"
 [xml]$propsXml = Get-Content $propsFile
 $version = $propsXml.Project.PropertyGroup.Version
 if (-not $version) {
-    $version = "1.2.2"
+    $version = "1.3.1"
 }
 Write-Host "Версия продукта: $version" -ForegroundColor Green
 

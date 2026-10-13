@@ -191,10 +191,6 @@ public static class EntryOperations
             var fullPath = BuildPayloadPath(entry, subKey);
             // Сериализуем бэкап в DisablePayload для последующего восстановления
             entry.DisablePayload = JsonSerializer.Serialize(
-                /// <summary>RegistryPayload: Выполняет операцию RegistryPayload.</summary>
-                /// <param name="fullPath">Входные данные: значение параметра fullPath ().</param>
-                /// <param name="valueName">Входные данные: значение параметра valueName ().</param>
-                /// <param name="existing">Входные данные: значение параметра existing ().</param>
                 new RegistryPayload(fullPath, valueName, existing),
                 JsonOptions);
         }
@@ -1130,7 +1126,46 @@ public static class EntryOperations
         var before = entries.Count;
         var scanTime = scanTimestamp ?? DateTime.UtcNow;
         logger?.LogInformation("CleanupStaleEntries: начало — {Count} записей, снимок системы — {ScanCount}, скан от {ScanTime:O}",
-            before, scanResults.Count, scanTime);
+            before, scanResults?.Count ?? 0, scanTime);
+
+        // Fail-closed guard: пустой снимок при непустой БД почти наверняка означает
+        // упавший/неполный скан (AccessDenied, выгрузка куста, недоступность WMI/COM),
+        // а не одновременное удаление всех программ. Без этого одно падение скана
+        // вытирает всю БД, что далее выглядит как «все угрозы новые».
+        if (scanResults == null)
+        {
+            logger?.LogWarning("CleanupStaleEntries: снимок системы отсутствует (null) — пропуск очистки (fail-closed)");
+            swAll.Stop();
+            logger?.LogInformation("CleanupStaleEntries: завершено (fail-closed, null-снимок) — было {Before}, пропущено {Skipped}, удалено 0, осталось {After} [{Elapsed}ms]",
+                before, before, entries.Count, swAll.ElapsedMilliseconds);
+            return;
+        }
+        if (scanResults.Count == 0)
+        {
+            logger?.LogWarning("CleanupStaleEntries: пустой снимок системы — возможно, сканирование завершилось с ошибкой");
+            // Если известны упавшие секции и ВСЕ записи относятся к ним —
+            // удалять нечего, выходим без изменений.
+            if (failedLocations != null && failedLocations.Count > 0
+                && entries.Count > 0 && entries.All(e => failedLocations.Contains(e.Location)))
+            {
+                swAll.Stop();
+                logger?.LogInformation("CleanupStaleEntries: завершено (fail-closed, пустой снимок) — было {Before}, пропущено {Skipped}, удалено 0, осталось {After} [{Elapsed}ms]",
+                    before, before, entries.Count, swAll.ElapsedMilliseconds);
+                return;
+            }
+            // Иначе (legacy-вызовы без failedLocations / частичное покрытие) —
+            // продолжаем как раньше: поштучные пропуски failed-секций и
+            // scannedLocations-гард ниже сохраняют защиту без ломки поведения.
+        }
+
+        // Локации, реально представленные в снимке. Секция, молча упавшая без записи
+        // в failedLocations (перехват catch{} в сканере), оставит свою Location
+        // отсутствующей здесь — такие записи трогать нельзя.
+        // Активен только при непустом снимке, чтобы пустой скан обрабатывался
+        // веткой fail-closed выше.
+        HashSet<EntryLocation>? scannedLocations = scanResults.Count > 0
+            ? new HashSet<EntryLocation>(scanResults.Select(s => s.Location))
+            : null;
 
         var results = new List<(StartupEntry e, bool valid)>(entries.Count);
         var skipped = 0;
@@ -1158,6 +1193,15 @@ public static class EntryOperations
 
             // Секция сканирования упала — снимок неполный, запись не трогаем
             if (failedLocations != null && failedLocations.Contains(entry.Location))
+            {
+                skipped++;
+                results.Add((entry, true));
+                continue;
+            }
+
+            // Локация отсутствует в снимке целиком (секция не сканировалась или
+            // молча упала без записи в failedLocations) — запись не трогаем
+            if (scannedLocations != null && !scannedLocations.Contains(entry.Location))
             {
                 skipped++;
                 results.Add((entry, true));

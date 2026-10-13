@@ -92,6 +92,14 @@ public sealed class ProcessPortDefenderService : IDisposable
             {
                 IsGloballyEnabled = _config.IsGloballyEnabled,
                 DefaultBanDurationMinutes = _config.DefaultBanDurationMinutes,
+                TrustPrivateNetworks = _config.TrustPrivateNetworks,
+                WhitelistIps = [.. _config.WhitelistIps],
+                ProtectedPorts = [.. _config.ProtectedPorts],
+                MaxAttempts = _config.MaxAttempts,
+                WindowUnit = _config.WindowUnit,
+                WindowSeconds = _config.WindowSeconds,
+                BanDurationMinutes = _config.BanDurationMinutes,
+                AutoEscalate = _config.AutoEscalate,
                 Rules = _config.Rules.Select(r => new PortDefenderRuleConfig
                 {
                     LocalPort = r.LocalPort,
@@ -257,6 +265,18 @@ public sealed class ProcessPortDefenderService : IDisposable
             if (!FirewallGuard.IsBlockableAddress(remoteIp, out _))
                 continue;
 
+            // P0: Честная проверка TrustPrivateNetworks из конфигурации.
+            // Если TrustPrivateNetworks == true, ЛЮБЫЕ адреса RFC 1918
+            // (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, APIPA 169.254.0.0/16,
+            // link-local IPv6) НИ ПРИ КАКИХ ОБСТОЯТЕЛЬСТВАХ НЕ БАНЯТСЯ.
+            if (cfg.TrustPrivateNetworks && ProcessNetworkSocket.CheckIsPrivateAddress(remoteIp))
+                continue;
+
+            // P0: Глобальный белый список (_config.WhitelistIps) имеет приоритет
+            // над любыми правилами детекта.
+            if (IsIpWhitelisted(remoteIp, cfg.WhitelistIps))
+                continue;
+
             // Уже забаненный IP не обрабатываем повторно
             if (_activeBans.ContainsKey(remoteIp))
                 continue;
@@ -313,6 +333,32 @@ public sealed class ProcessPortDefenderService : IDisposable
     {
         try
         {
+            // P0 defense-in-depth: повторная проверка перед фактической блокировкой,
+            // т.к. конфигурация могла измениться между детектом и баном.
+            PortDefenderConfigDto cfgSnapshot;
+            lock (_sync)
+            {
+                cfgSnapshot = _config;
+            }
+
+            if (cfgSnapshot.TrustPrivateNetworks && ProcessNetworkSocket.CheckIsPrivateAddress(ip))
+            {
+                _logger.LogDebug("PortDefender: Бан IP {Ip} пропущен (частная сеть, TrustPrivateNetworks=true).", ip);
+                return;
+            }
+
+            if (IsIpWhitelisted(ip, cfgSnapshot.WhitelistIps))
+            {
+                _logger.LogDebug("PortDefender: Бан IP {Ip} пропущен (глобальный WhitelistIps).", ip);
+                return;
+            }
+
+            if (IsIpWhitelisted(ip, rule.WhitelistIps))
+            {
+                _logger.LogDebug("PortDefender: Бан IP {Ip} пропущен (whitelist правила, порт {Port}).", ip, rule.LocalPort);
+                return;
+            }
+
             var now = DateTime.UtcNow;
 
             // Вычисляем RepeatCount (эскалация)
@@ -599,15 +645,42 @@ public sealed class ProcessPortDefenderService : IDisposable
                 if (loaded != null)
                 {
                     var now = DateTime.UtcNow;
+                    bool fileChanged = false;
                     foreach (var b in loaded)
                     {
-                        // Не восстанавливаем просроченные баны
+                        // P0: Просроченные баны НЕ просто пропускаем — их необходимо
+                        // УДАЛИТЬ из правила брандмауэра, иначе после перезагрузки
+                        // остаются вечные 'зомби'-правила в Windows Firewall.
                         if (b.ExpiresAtUtc.HasValue && b.ExpiresAtUtc.Value <= now)
+                        {
+                            fileChanged = true;
+                            try
+                            {
+                                var res = _firewall.UnblockIp(new UnblockIpRequest
+                                {
+                                    Ip = b.Ip,
+                                    Direction = FirewallDirection.Both
+                                });
+                                _logger.LogInformation(
+                                    "PortDefender: Просроченный бан IP {Ip} (истёк {ExpiresUtc:u}) удалён из firewall при старте. Результат: {Result}",
+                                    b.Ip, b.ExpiresAtUtc, res.Success ? "Успешно" : res.Message);
+                            }
+                            catch (Exception exUnblock)
+                            {
+                                _logger.LogWarning(exUnblock,
+                                    "PortDefender: Не удалось удалить просроченный бан IP {Ip} из firewall при старте", b.Ip);
+                            }
                             continue;
+                        }
 
                         _activeBans[b.Ip] = b;
                         _repeatHistory[b.Ip] = (b.RepeatCount, b.BanStartedUtc);
                     }
+
+                    // Перезаписываем файл без просроченных записей, чтобы зомби-баны
+                    // не воскресали при следующем старте.
+                    if (fileChanged)
+                        SaveActiveBansToFile();
                 }
             }
         }

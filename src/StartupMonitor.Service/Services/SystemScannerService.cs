@@ -164,9 +164,18 @@ public class SystemScannerService
         ScanHiveRegistry(Registry.CurrentUser, "HKCU", allowWow64: false, results);
         foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
         {
-            using var userKey = Registry.Users.OpenSubKey(sid);
-            if (userKey == null) continue;
-            ScanHiveRegistry(userKey, $@"HKCU\{name}", allowWow64: false, results);
+            try
+            {
+                using var userKey = Registry.Users.OpenSubKey(sid);
+                if (userKey == null) continue;
+                ScanHiveRegistry(userKey, $@"HKCU\{name}", allowWow64: false, results);
+            }
+            catch
+            {
+                // Чужой SID с приватным ACL или выгрузка куста при logoff (TOCTOU) —
+                // пропускаем профиль, не роняя весь ScanAll
+                continue;
+            }
         }
     }
 
@@ -179,20 +188,35 @@ public class SystemScannerService
             if (!allowWow64 && keyPath.Contains("Wow6432Node", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            using var key = baseKey.OpenSubKey(keyPath);
-            if (key == null) continue;
-
-            var detailPrefix = $@"{hivePrefix}\{keyPath}";
-
-            foreach (var valueName in key.GetValueNames())
+            try
             {
-                var raw = key.GetValue(valueName);
-                if (raw is not string value || string.IsNullOrWhiteSpace(value)) continue;
-                // Значения, не похожие на команду (числа, "yes", CLSID) — не автозапуск
-                if (!WatcherHelper.LooksLikeCommand(value)) continue;
+                using var key = baseKey.OpenSubKey(keyPath);
+                if (key == null) continue;
 
-                var entry = MakeRegistryEntry(valueName, value, location, detailPrefix, keyPath);
-                results.Add(entry);
+                var detailPrefix = $@"{hivePrefix}\{keyPath}";
+
+                string[] valueNames;
+                try { valueNames = key.GetValueNames(); }
+                catch { continue; }
+
+                foreach (var valueName in valueNames)
+                {
+                    string? value;
+                    try { value = key.GetValue(valueName) as string; }
+                    catch { continue; }
+                    if (string.IsNullOrWhiteSpace(value)) continue;
+                    // Значения, не похожие на команду (числа, "yes", CLSID) — не автозапуск
+                    if (!WatcherHelper.LooksLikeCommand(value)) continue;
+
+                    var entry = MakeRegistryEntry(valueName, value, location, detailPrefix, keyPath);
+                    results.Add(entry);
+                }
+            }
+            catch
+            {
+                // Запрещённый ключ (AccessDenied) или выгрузка куста между открытием и чтением —
+                // пропускаем точку, не роняя весь ScanAll
+                continue;
             }
         }
     }
@@ -589,7 +613,12 @@ public class SystemScannerService
     /// <summary>Сканирует одну папку автозапуска, добавляя файлы в результаты.</summary>
     private static void ScanFolder(string folder, List<StartupEntry> results, HashSet<string> scanned)
     {
-        foreach (var file in Directory.GetFiles(folder))
+        string[] files;
+        try { files = Directory.GetFiles(folder); }
+        catch (UnauthorizedAccessException) { return; }
+        catch (IOException) { return; }
+
+        foreach (var file in files)
         {
             // Отключённые нами файлы (*.lnk.disabled) — не новые записи
             if (file.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase)) continue;

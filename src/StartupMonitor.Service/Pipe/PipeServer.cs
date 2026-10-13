@@ -67,6 +67,8 @@ public class PipeServer : BackgroundService
     private readonly WindowsFirewallService _firewallService;
     // Служба Port Defender
     private readonly ProcessPortDefenderService? _portDefenderService;
+    // Управление жизненным циклом хоста (для штатной остановки по запросу UI)
+    private readonly IHostApplicationLifetime _lifetime;
     // Токен отмены для фоновых задач
     private readonly CancellationTokenSource _cts = new();
     // Счётчик записей при последнем GetAllEntries (для логирования изменений)
@@ -112,7 +114,8 @@ public class PipeServer : BackgroundService
         MonitoringStateCoordinator coordinator,
         StartupMonitor.Service.Services.Update.GitHubUpdateService updateService,
         WindowsFirewallService firewallService,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        IHostApplicationLifetime lifetime)
     {
         _store = store;
         _scanTracker = scanTracker;
@@ -138,6 +141,7 @@ public class PipeServer : BackgroundService
         _updateService = updateService;
         _firewallService = firewallService ?? throw new ArgumentNullException(nameof(firewallService));
         _portDefenderService = serviceProvider.GetService<ProcessPortDefenderService>();
+        _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
 
         if (cfg?.Entries != null)
         {
@@ -1514,6 +1518,17 @@ public class PipeServer : BackgroundService
                         response.Type = PipeMessageTypes.FirewallOperationResponse;
                         response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
                     }
+                    break;
+
+                case PipeMessageTypes.ShutdownService:
+                    _logger.LogInformation("Получен запрос на остановку службы от UI (ShutdownService)");
+                    response.Type = PipeMessageTypes.Success;
+                    // Небольшая задержка, чтобы ответ успел уйти клиенту до остановки хоста.
+                    _ = Task.Run(async () =>
+                    {
+                        try { await Task.Delay(200); } catch { }
+                        try { _lifetime.StopApplication(); } catch { }
+                    });
                     break;
 
                 default:

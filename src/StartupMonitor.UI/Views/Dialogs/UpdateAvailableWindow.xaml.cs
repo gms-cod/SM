@@ -29,7 +29,7 @@ public partial class UpdateAvailableWindow : FluentWindow
     {
         TxtNewVersion.Text = $"Startup Monitor v{_updateInfo.Version}";
         var dateStr = _updateInfo.ReleaseDate.ToString("dd.MM.yyyy");
-        var currentVer = string.IsNullOrEmpty(_updateInfo.CurrentVersion) ? "1.2.2" : _updateInfo.CurrentVersion;
+        var currentVer = string.IsNullOrEmpty(_updateInfo.CurrentVersion) ? "1.3.1" : _updateInfo.CurrentVersion;
         TxtSubtitle.Text = $"Опубликовано: {dateStr} • Текущая версия: v{currentVer}";
 
         TxtChangelog.Text = string.IsNullOrWhiteSpace(_updateInfo.Changelog)

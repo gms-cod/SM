@@ -214,6 +214,8 @@ public static class PipeMessageTypes
     public const string ClearAllBans = "ClearAllBans";
     /// <summary>Событие: заблокирована сетевая атака через Port Defender.</summary>
     public const string PortDefenderAttackBlocked = "PortDefenderAttackBlocked";
+    /// <summary>Запрос штатной остановки фоновой службы (инициируется UI при выходе).</summary>
+    public const string ShutdownService = "ShutdownService";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Media;
 using Hardcodet.Wpf.TaskbarNotification;
 using SharpVectors.Converters;
+using StartupMonitor.Shared;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.UI.Services;
 using Wpf.Ui.Appearance;
@@ -280,7 +281,22 @@ public partial class App : Application
         menu.Items.Add(new System.Windows.Controls.Separator());
 
         var exit = new System.Windows.Controls.MenuItem { Header = loc.TrayExit };
-        exit.Click += (_, _) => Current.Shutdown();
+        exit.Click += async (_, _) =>
+        {
+            // Мягкая остановка службы через pipe, затем гарантированная через SCM/kill.
+            try
+            {
+                using var pipeClient = new PipeClient();
+                await pipeClient.ConnectAsync();
+                await pipeClient.RequestServiceShutdownAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"OnExit: мягкая остановка службы не удалась: {ex.Message}");
+            }
+            try { ServiceManager.StopService(); } catch (Exception ex) { Log($"OnExit: StopService не удался: {ex.Message}"); }
+            Current.Shutdown();
+        };
         menu.Items.Add(exit);
 
         return menu;
@@ -365,6 +381,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         Log($"OnExit: приложение завершается, код {e.ApplicationExitCode}");
+        try { ServiceManager.StopService(); } catch (Exception ex) { Log($"OnExit: защитный StopService не удался: {ex.Message}"); }
         _trayAggregator?.Dispose();
         _trayAggregator = null;
         _trayIcon?.Dispose();
@@ -407,13 +424,7 @@ public partial class App : Application
                 brush = new LinearGradientBrush(
                     Color.FromRgb(0x94, 0xA3, 0xB8), // #94A3B8
                     Color.FromRgb(0x47, 0x55, 0x69), // #475569
-                    /// <summary>Point: Выполняет операцию Point.</summary>
-                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
-                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
                     new Point(0, 0),
-                    /// <summary>Point: Выполняет операцию Point.</summary>
-                    /// <param name="1">Входные данные: значение параметра 1 ().</param>
-                    /// <param name="1)">Входные данные: значение параметра 1) ().</param>
                     new Point(1, 1));
             }
             else
@@ -422,13 +433,7 @@ public partial class App : Application
                 brush = new LinearGradientBrush(
                     Color.FromRgb(0x00, 0xD2, 0xD3),
                     Color.FromRgb(0x00, 0x78, 0xD4),
-                    /// <summary>Point: Выполняет операцию Point.</summary>
-                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
-                    /// <param name="0">Входные данные: значение параметра 0 ().</param>
                     new Point(0, 0),
-                    /// <summary>Point: Выполняет операцию Point.</summary>
-                    /// <param name="1">Входные данные: значение параметра 1 ().</param>
-                    /// <param name="1)">Входные данные: значение параметра 1) ().</param>
                     new Point(1, 1));
             }
 

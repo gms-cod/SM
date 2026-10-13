@@ -20,4 +20,12 @@ public class PipeClientTests
         var exception = Record.Exception(() => client.Dispose());
         Assert.Null(exception);
     }
+
+    [Fact]
+    public async Task RequestServiceShutdownAsync_WhenDisconnected_ReturnsFalse()
+    {
+        using var client = new PipeClient();
+        var result = await client.RequestServiceShutdownAsync(100);
+        Assert.False(result);
+    }
 }

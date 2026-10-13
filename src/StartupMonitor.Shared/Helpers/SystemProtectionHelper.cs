@@ -20,7 +20,7 @@ public static class SystemProtectionHelper
         "svchost", "lsass", "csrss", "smss", "wininit", "winlogon", "services",
         "system", "registry", "memory compression", "explorer", "dwm", "sihost",
         "taskhostw", "conhost", "dllhost", "rundll32", "wmiprvse", "msmpeng",
-        "trustedinstaller", "fontdrvhost", "sihost", "ctfmon",
+        "trustedinstaller", "fontdrvhost", "ctfmon",
         "startupmonitor.service", "startupmonitor.ui"
     };
 
