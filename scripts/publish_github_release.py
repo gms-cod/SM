@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-DEFAULT_VERSION = "1.3.1"
+DEFAULT_VERSION = "1.3.2"
 DEFAULT_REPOS = ("gms-cod/SM", "gms-cod/Startup-Monitor")
 DEFAULT_RELEASE_NAME_TEMPLATE = "Startup Monitor v{version} \u2014 Windows Firewall & Port Defender"
 API_URL = "https://api.github.com"

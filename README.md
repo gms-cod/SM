@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.3.1-00D2D3?style=for-the-badge&logo=windows&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.3.2-00D2D3?style=for-the-badge&logo=windows&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white)
 ![Framework](https://img.shields.io/badge/.NET-8.0%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 ![Authenticode](https://img.shields.io/badge/code%20signing-SHA256%20Authenticode-success?style=for-the-badge&logo=hackthebox&logoColor=white)
@@ -52,7 +52,7 @@
 ## 🚀 Установка и быстрый старт
 
 ### Способ 1: Готовый инсталлятор с цифровой подписью (Рекомендуется)
-1. Скачайте актуальный файл установщика **`StartupMonitorSetup-1.3.1.exe`** из раздела [**Releases на GitHub**](https://github.com/gms-cod/Startup-Monitor/releases/latest).
+1. Скачайте актуальный файл установщика **`StartupMonitorSetup-1.3.2.exe`** из раздела [**Releases на GitHub**](https://github.com/gms-cod/Startup-Monitor/releases/latest).
 2. Запустите установщик. Все исполняемые файлы и инсталлятор подписаны сертификатом разработчика **Authenticode (SHA256, RFC 3161)**.
 3. Мастер установки автоматически:
    - Установит бинарники в `C:\Program Files\StartupMonitor\`;
@@ -63,7 +63,7 @@
 > [!TIP]
 > **Тихая установка (Silent Install)**:  
 > Для автоматического развертывания в корпоративной сети или через скрипты запустите инсталлятор с параметрами:  
-> `StartupMonitorSetup-1.3.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+> `StartupMonitorSetup-1.3.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
 
 ### Способ 2: Портативный запуск (Portable / SMon2)
 1. Скопируйте директорию `SMon2` в удобное место на диске. Программа полностью автономна (self-contained .NET 8 x64, установка среды .NET на компьютере не требуется).
