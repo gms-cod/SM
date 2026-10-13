@@ -20,6 +20,7 @@ namespace StartupMonitor.Service.Services.Update;
 public sealed class GitHubUpdateService : IDisposable
 {
     private const string GitHubApiLatestReleaseUrl = "https://api.github.com/repos/gms-cod/SM/releases/latest";
+    private const string GitHubApiFallbackReleaseUrl = "https://api.github.com/repos/gms-cod/Startup-Monitor/releases/latest";
     private static readonly TimeSpan DefaultCheckInterval = TimeSpan.FromHours(12);
 
     private readonly JsonDataStore _store;
@@ -141,11 +142,31 @@ public sealed class GitHubUpdateService : IDisposable
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, GitHubApiLatestReleaseUrl);
-            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            // Основной URL + резервный (если основной вернул 404).
+            string[] releaseUrls = [GitHubApiLatestReleaseUrl, GitHubApiFallbackReleaseUrl];
+            HttpResponseMessage? response = null;
+            for (var i = 0; i < releaseUrls.Length; i++)
             {
+                var url = releaseUrls[i];
+                var isLast = i == releaseUrls.Length - 1;
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                var resp = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
+                if (resp.StatusCode == System.Net.HttpStatusCode.NotFound && !isLast)
+                {
+                    _logger.LogWarning("No releases at {Url} (404 Not Found). Trying fallback {Fallback}...",
+                        url, releaseUrls[i + 1]);
+                    resp.Dispose();
+                    continue;
+                }
+
+                response = resp;
+                break;
+            }
+
+            if (response == null)
+            {
+                // Оба URL вернули 404 — релизов нет.
                 _logger.LogInformation("No releases found on GitHub (404 Not Found). Current version {Current} is considered latest.", CurrentVersionString);
                 return new UpdateCheckResult
                 {
@@ -163,74 +184,98 @@ public sealed class GitHubUpdateService : IDisposable
                 };
             }
 
-            if (!response.IsSuccessStatusCode)
+            using (response)
             {
-                var error = $"GitHub API returned {(int)response.StatusCode} {response.ReasonPhrase}";
-                _logger.LogWarning("Update check failed: {Error}", error);
-                return new UpdateCheckResult { Success = false, ErrorMessage = error };
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    _logger.LogInformation("No releases found on GitHub (404 Not Found). Current version {Current} is considered latest.", CurrentVersionString);
+                    return new UpdateCheckResult
+                    {
+                        Success = true,
+                        UpdateInfo = new UpdateInfo
+                        {
+                            Version = CurrentVersionString,
+                            CurrentVersion = CurrentVersionString,
+                            ServiceVersion = CurrentVersionString,
+                            ClientVersion = clientVersionString,
+                            IsUpdateAvailable = false,
+                            IsUpdateAvailableForClient = false,
+                            Title = "No releases found on GitHub"
+                        }
+                    };
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = $"GitHub API returned {(int)response.StatusCode} {response.ReasonPhrase}";
+                    _logger.LogWarning("Update check failed: {Error}", error);
+                    return new UpdateCheckResult { Success = false, ErrorMessage = error };
+                }
+
+                var jsonStream = await response.Content.ReadAsStreamAsync(ct);
+                using var doc = await JsonDocument.ParseAsync(jsonStream, cancellationToken: ct);
+                var root = doc.RootElement;
+
+                var tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
+                var title = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? tagName : tagName;
+                var body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
+                var publishedAt = root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
+
+                var (downloadUrl, fileName, sizeBytes) = FindInstallerAsset(root);
+
+                // Парсим версию релиза. Сравнение через CompareVersions: недостающие
+                // компоненты (Build/Revision = -1) трактуются как 0, поэтому
+                // 1.2.4 == 1.2.4.0, а 1.3.0 > 1.2.4.0 (и наоборот) определяется корректно.
+                var cleanTag = CleanVersionTag(tagName);
+                var remoteVersion = ParseSemVer(cleanTag);
+                var serviceAvailable = IsNewerVersion(remoteVersion, CurrentVersion);
+                Version? clientVer = null;
+                if (!string.IsNullOrWhiteSpace(clientVersionString))
+                {
+                    try { clientVer = ParseSemVer(CleanVersionTag(clientVersionString)); } catch { clientVer = null; }
+                }
+                var clientAvailable = clientVer != null && IsNewerVersion(remoteVersion, clientVer);
+                var isAvailable = serviceAvailable || clientAvailable;
+
+                // Извлекаем SHA-256 хэш (из текста релиза или .sha256 ассета)
+                var sha256 = ExtractSha256Checksum(body, root);
+
+                var updateInfo = new UpdateInfo
+                {
+                    Version = cleanTag,
+                    Title = title,
+                    Changelog = body,
+                    ReleaseDate = publishedAt,
+                    DownloadUrl = downloadUrl,
+                    FileName = fileName,
+                    Sha256 = sha256,
+                    SizeBytes = sizeBytes,
+                    IsUpdateAvailable = isAvailable,
+                    CurrentVersion = CurrentVersionString,
+                    ServiceVersion = CurrentVersionString,
+                    ClientVersion = clientVersionString,
+                    IsUpdateAvailableForClient = clientAvailable
+                };
+
+                lock (_lock)
+                {
+                    _latestUpdateInfo = updateInfo;
+                }
+
+                // Обновляем метку времени последней проверки в настройках
+                var cfg = _store.Load();
+                cfg.Settings.LastUpdateCheckUtc = DateTime.UtcNow;
+                _store.Save(cfg);
+
+                _logger.LogInformation("Update check completed. Remote: v{Remote}, Current: v{Current}, Available: {Available}",
+                    cleanTag, CurrentVersionString, isAvailable);
+
+                return new UpdateCheckResult
+                {
+                    Success = true,
+                    UpdateInfo = updateInfo
+                };
             }
-
-            var jsonStream = await response.Content.ReadAsStreamAsync(ct);
-            using var doc = await JsonDocument.ParseAsync(jsonStream, cancellationToken: ct);
-            var root = doc.RootElement;
-
-            var tagName = root.TryGetProperty("tag_name", out var tagProp) ? tagProp.GetString() ?? "" : "";
-            var title = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? tagName : tagName;
-            var body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
-            var publishedAt = root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
-
-            var (downloadUrl, fileName, sizeBytes) = FindInstallerAsset(root);
-
-            // Парсим версию релиза
-            var cleanTag = CleanVersionTag(tagName);
-            var remoteVersion = ParseSemVer(cleanTag);
-            var serviceAvailable = remoteVersion > CurrentVersion;
-            Version? clientVer = null;
-            if (!string.IsNullOrWhiteSpace(clientVersionString))
-            {
-                try { clientVer = ParseSemVer(CleanVersionTag(clientVersionString)); } catch { clientVer = null; }
-            }
-            var clientAvailable = clientVer != null && remoteVersion > clientVer;
-            var isAvailable = serviceAvailable || clientAvailable;
-
-            // Извлекаем SHA-256 хэш (из текста релиза или .sha256 ассета)
-            var sha256 = ExtractSha256Checksum(body, root);
-
-            var updateInfo = new UpdateInfo
-            {
-                Version = cleanTag,
-                Title = title,
-                Changelog = body,
-                ReleaseDate = publishedAt,
-                DownloadUrl = downloadUrl,
-                FileName = fileName,
-                Sha256 = sha256,
-                SizeBytes = sizeBytes,
-                IsUpdateAvailable = isAvailable,
-                CurrentVersion = CurrentVersionString,
-                ServiceVersion = CurrentVersionString,
-                ClientVersion = clientVersionString,
-                IsUpdateAvailableForClient = clientAvailable
-            };
-
-            lock (_lock)
-            {
-                _latestUpdateInfo = updateInfo;
-            }
-
-            // Обновляем метку времени последней проверки в настройках
-            var cfg = _store.Load();
-            cfg.Settings.LastUpdateCheckUtc = DateTime.UtcNow;
-            _store.Save(cfg);
-
-            _logger.LogInformation("Update check completed. Remote: v{Remote}, Current: v{Current}, Available: {Available}",
-                cleanTag, CurrentVersionString, isAvailable);
-
-            return new UpdateCheckResult
-            {
-                Success = true,
-                UpdateInfo = updateInfo
-            };
         }
         catch (OperationCanceledException)
         {
@@ -476,6 +521,31 @@ public sealed class GitHubUpdateService : IDisposable
 
         return new Version(0, 0, 0);
     }
+
+    /// <summary>
+    /// Корректное сравнение версий с нормализацией: недостающие Build/Revision (-1)
+    /// трактуются как 0. Поэтому 1.2.4 == 1.2.4.0, 1.3.0 &gt; 1.2.4.0 и т.д.
+    /// Стандартный оператор Version.op_GreaterThan считает -1 &lt; 0 и даёт
+    /// ложное неравенство для пар 3- vs 4-компонентных версий.
+    /// </summary>
+    public static int CompareVersions(Version a, Version b)
+    {
+        var c = a.Major.CompareTo(b.Major);
+        if (c != 0) return c;
+        c = a.Minor.CompareTo(b.Minor);
+        if (c != 0) return c;
+        var aBuild = a.Build < 0 ? 0 : a.Build;
+        var bBuild = b.Build < 0 ? 0 : b.Build;
+        c = aBuild.CompareTo(bBuild);
+        if (c != 0) return c;
+        var aRev = a.Revision < 0 ? 0 : a.Revision;
+        var bRev = b.Revision < 0 ? 0 : b.Revision;
+        return aRev.CompareTo(bRev);
+    }
+
+    /// <summary>True, если remote строго новее current (с нормализацией 3/4 компонентов).</summary>
+    public static bool IsNewerVersion(Version remote, Version current)
+        => CompareVersions(remote, current) > 0;
 
     public static (string DownloadUrl, string FileName, long SizeBytes) FindInstallerAsset(JsonElement releaseRoot)
     {
