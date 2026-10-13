@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using StartupMonitor.Service.Pipe;
 using StartupMonitor.Service.Services;
+using StartupMonitor.Service.Services.Firewall;
 using StartupMonitor.Service.Services.VirusScan;
 using StartupMonitor.Shared;
 using StartupMonitor.Shared.Diagnostics;
@@ -93,6 +94,10 @@ try
             services.AddSingleton<StartupMonitor.Service.Services.Remote.RemoteNotificationService>();
             services.AddSingleton<NotificationService>();
             services.AddSingleton<BlacklistManager>();
+            services.AddSingleton<WindowsFirewallService>();
+            services.AddSingleton<ProcessNetworkTracker>();
+            services.AddSingleton<ProcessPortDefenderService>();
+            services.AddHostedService<AutoUnbanWorker>();
             services.AddSingleton<HashLookupService>();
             services.AddSingleton<SystemScannerService>();
             services.AddSingleton<ProcessStartupLinker>();

@@ -1,0 +1,899 @@
+using System.Runtime.InteropServices;
+using StartupMonitor.Shared.Diagnostics;
+using StartupMonitor.Shared.Models.Firewall;
+
+namespace StartupMonitor.Service.Services;
+
+/// <summary>
+/// Управление стандартным брандмауэром Windows (Windows Advanced Firewall)
+/// через late-bound COM <c>HNetCfg.FwPolicy2</c> / <c>HNetCfg.FWRule</c>.
+///
+/// Архитектурные решения:
+/// <list type="bullet">
+/// <item>Late binding (<c>Type.GetTypeFromProgID</c> + <c>dynamic</c>) — без COM-reference,
+///   совместимо с .NET 8 single-file/self-contained публикацией.</item>
+/// <item>COM-объекты живут только внутри одной операции и всегда освобождаются
+///   через <c>Marshal.ReleaseComObject</c> (утечек RCW нет).</item>
+/// <item>Агрегированные правила <c>StartupMonitor_Blocked_IPs_In/Out</c>: O(1) правил
+///   вместо O(N) на каждый IP — минимальный оверхед файрвола.</item>
+/// <item>Thread-safe: мутации под <c>lock</c> (read-modify-write CSV списка IP).</item>
+/// <item>Служба работает от SYSTEM — полные права на WFP/брандмауэр без UAC.</item>
+/// </list>
+/// </summary>
+/// <remarks>
+/// Профили: Domain=1, Private=2, Public=4. Все управляемые правила ставятся на
+/// <c>Profiles = 0x7FFFFFFF (ALL)</c>, чтобы защита не зависела от текущей сети.
+/// Если файрвол выключен для профиля — правила всё равно создаются (persist),
+/// но трафик не фильтруется; <see cref="GetStatus"/> это явно показывает.
+/// </remarks>
+public sealed class WindowsFirewallService
+{
+    // --- Имена и константы -------------------------------------------------
+
+    /// <summary>Префикс всех управляемых правил (для List/RemoveAll/IsManaged).</summary>
+    public const string RulePrefix = "StartupMonitor_";
+
+    /// <summary>Группа правил (отображается в wf.msc).</summary>
+    public const string RuleGroup = "StartupMonitor";
+
+    /// <summary>Агрегированное правило блокировки IP: входящие.</summary>
+    public const string AggregatedRuleNameIn = "StartupMonitor_Blocked_IPs_In";
+
+    /// <summary>Агрегированное правило блокировки IP: исходящие.</summary>
+    public const string AggregatedRuleNameOut = "StartupMonitor_Blocked_IPs_Out";
+
+    private const string PolicyProgId = "HNetCfg.FwPolicy2";
+    private const string RuleProgId = "HNetCfg.FWRule";
+
+    // NET_FW_RULE_DIRECTION
+    private const int DirIn = 1;
+    private const int DirOut = 2;
+
+    // NET_FW_ACTION
+    private const int ActionBlock = 0;
+    private const int ActionAllow = 1;
+
+    // NET_FW_IP_PROTOCOL
+    private const int ProtoAny = 256;
+    private const int ProtoTcp = 6;
+    private const int ProtoUdp = 17;
+
+    // NET_FW_PROFILE_TYPE (CurrentProfileTypes bitmask)
+    private const int ProfileDomain = 1;
+    private const int ProfilePrivate = 2;
+    private const int ProfilePublic = 4;
+
+    // INetFwRule.Profiles = ALL
+    private const int ProfilesAll = 0x7FFFFFFF;
+
+    // HRESULT сервиса брандмауэра выключен / нет доступа
+    private const int HResultServiceDisabled = unchecked((int)0x80070422);
+    private const int HResultAccessDenied = unchecked((int)0x80070005);
+    private const int HResultFirewallServiceDown = unchecked((int)0x8007042C);
+
+    private readonly object _sync = new();
+    private static readonly Serilog.ILogger Log =
+        Serilog.Log.ForContext<WindowsFirewallService>();
+
+    // --- Публичный API: статус --------------------------------------------
+
+    /// <summary>Возвращает сводный статус брандмауэра и управляемых правил.</summary>
+    public FirewallStatusDto GetStatus()
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.GetStatus");
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            int current = 0;
+            try { current = (int)policy.CurrentProfileTypes; } catch { current = 0; }
+
+            bool d = IsEnabledSafe(policy, ProfileDomain);
+            bool p = IsEnabledSafe(policy, ProfilePrivate);
+            bool pub = IsEnabledSafe(policy, ProfilePublic);
+
+            int managed = 0, blockedIps = 0;
+            foreach (var dto in EnumerateRules(rules))
+            {
+                if (dto.IsManaged) managed++;
+                if (dto.Name == AggregatedRuleNameIn || dto.Name == AggregatedRuleNameOut)
+                    blockedIps += CountAddresses(dto.RemoteAddresses);
+            }
+
+            return new FirewallStatusDto
+            {
+                Available = true,
+                Enabled = d || p || pub,
+                CurrentProfiles = current,
+                DomainEnabled = d,
+                PrivateEnabled = p,
+                PublicEnabled = pub,
+                ManagedRulesCount = managed,
+                BlockedIpsCount = blockedIps,
+            };
+        }
+        catch (Exception ex) when (IsFirewallDown(ex))
+        {
+            Log.Warning(ex, "Служба брандмауэра Windows недоступна");
+            return new FirewallStatusDto { Available = false };
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    // --- Публичный API: IP --------------------------------------------------
+
+    /// <summary>Блокирует удалённый IP/подсеть (Inbound/Outbound/Both).</summary>
+    /// <param name="request">IP, направление, режим агрегации.</param>
+    public FirewallOperationResult BlockIp(BlockIpRequest request)
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.BlockIp");
+        var ip = (request.Ip ?? string.Empty).Trim();
+        if (!FirewallGuard.IsBlockableAddress(ip, out var err))
+            return FirewallOperationResult.Fail(err ?? "Недопустимый IP-адрес.");
+
+        var normalized = NormalizeAddress(ip);
+        lock (_sync)
+        {
+            try
+            {
+                if (request.Aggregated)
+                {
+                    var touched = new List<string>(2);
+                    if (request.Direction is FirewallDirection.Inbound or FirewallDirection.Both)
+                        touched.Add(AddIpToAggregated(normalized, DirIn, AggregatedRuleNameIn,
+                            $"Агрегированная блокировка входящих (StartupMonitor). Причина: {request.Reason ?? "—"}"));
+                    if (request.Direction is FirewallDirection.Outbound or FirewallDirection.Both)
+                        touched.Add(AddIpToAggregated(normalized, DirOut, AggregatedRuleNameOut,
+                            $"Агрегированная блокировка исходящих (StartupMonitor). Причина: {request.Reason ?? "—"}"));
+                    Log.Information("Firewall: IP {Ip} заблокирован ({Dir}) в {Rules}", normalized, request.Direction, string.Join(",", touched));
+                    return FirewallOperationResult.Ok($"IP {normalized} заблокирован.", string.Join("+", touched), created: true);
+                }
+
+                // Одиночные правила: StartupMonitor_Block_IP_{sanit}_In/Out
+                var created = new List<string>(2);
+                if (request.Direction is FirewallDirection.Inbound or FirewallDirection.Both)
+                    created.Add(UpsertSingleIpRule(normalized, DirIn, request.Reason));
+                if (request.Direction is FirewallDirection.Outbound or FirewallDirection.Both)
+                    created.Add(UpsertSingleIpRule(normalized, DirOut, request.Reason));
+                return FirewallOperationResult.Ok($"IP {normalized} заблокирован (отдельные правила).", string.Join("+", created), created: true);
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                Log.Warning(ex, "Firewall недоступен при блокировке {Ip}", normalized);
+                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "BlockIp({Ip}) не выполнен", normalized);
+                return FirewallOperationResult.Fail($"Не удалось заблокировать {normalized}: {FriendlyError(ex)}");
+            }
+        }
+    }
+
+    /// <summary>Разблокирует IP: убирает из агрегированных и удаляет одиночные правила.</summary>
+    public FirewallOperationResult UnblockIp(UnblockIpRequest request)
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.UnblockIp");
+        var ip = (request.Ip ?? string.Empty).Trim();
+        var normalized = NormalizeAddress(ip);
+        lock (_sync)
+        {
+            try
+            {
+                bool removedAny = false;
+                if (request.Direction is FirewallDirection.Inbound or FirewallDirection.Both)
+                    removedAny |= RemoveIpFromAggregated(normalized, AggregatedRuleNameIn);
+                if (request.Direction is FirewallDirection.Outbound or FirewallDirection.Both)
+                    removedAny |= RemoveIpFromAggregated(normalized, AggregatedRuleNameOut);
+
+                removedAny |= RemoveSingleIpRules(normalized, request.Direction);
+
+                return removedAny
+                    ? FirewallOperationResult.Ok($"IP {normalized} разблокирован.")
+                    : FirewallOperationResult.Fail($"IP {normalized} не найден в правилах StartupMonitor.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "UnblockIp({Ip}) не выполнен", normalized);
+                return FirewallOperationResult.Fail($"Не удалось разблокировать {normalized}: {FriendlyError(ex)}");
+            }
+        }
+    }
+
+    /// <summary>Проверяет статус блокировки IP по всем правилам (включая чужие BLOCK-правила).</summary>
+    public FirewallBlockStatus IsIpBlocked(string ip)
+    {
+        var normalized = NormalizeAddress((ip ?? string.Empty).Trim());
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            bool inBlocked = false, outBlocked = false;
+            foreach (var dto in EnumerateRules(rules))
+            {
+                if (!dto.Enabled || dto.Action != FirewallAction.Block) continue;
+                if (!AddressListContains(dto.RemoteAddresses, normalized)) continue;
+                if (dto.Direction == FirewallDirection.Inbound) inBlocked = true;
+                if (dto.Direction == FirewallDirection.Outbound) outBlocked = true;
+            }
+
+            return (inBlocked, outBlocked) switch
+            {
+                (true, true) => FirewallBlockStatus.BlockedBoth,
+                (true, false) => FirewallBlockStatus.BlockedInbound,
+                (false, true) => FirewallBlockStatus.BlockedOutbound,
+                _ => FirewallBlockStatus.Allowed,
+            };
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    /// <summary>Возвращает все заблокированные IP из агрегированных правил.</summary>
+    public IReadOnlyList<string> GetBlockedIps()
+    {
+        var result = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            foreach (var name in new[] { AggregatedRuleNameIn, AggregatedRuleNameOut })
+            {
+                dynamic? rule = FindRule(rules, name);
+                if (rule is null) continue;
+                try
+                {
+                    string addrs = string.Empty;
+                    try { addrs = (string)rule.RemoteAddresses ?? string.Empty; } catch { }
+                    foreach (var a in SplitAddresses(addrs))
+                        result.Add(a);
+                }
+                finally { Release(rule); }
+            }
+
+            return result.ToList();
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    // --- Публичный API: порты -----------------------------------------------
+
+    /// <summary>
+    /// Блокирует порт TCP/UDP: для всей системы или конкретного EXE (ApplicationName).
+    /// </summary>
+    public FirewallOperationResult BlockPort(BlockPortRequest request)
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.BlockPort");
+        if (!FirewallGuard.IsValidPort(request.Port))
+            return FirewallOperationResult.Fail($"Некорректный порт: {request.Port} (1–65535).");
+        if (request.Protocol is not (FirewallProtocol.Tcp or FirewallProtocol.Udp))
+            return FirewallOperationResult.Fail("Протокол должен быть TCP или UDP.");
+        var app = NormalizeAppPath(request.ApplicationPath);
+
+        lock (_sync)
+        {
+            try
+            {
+                var names = new List<string>(2);
+                if (request.Direction is FirewallDirection.Inbound or FirewallDirection.Both)
+                    names.Add(UpsertPortRule(request.Port, request.Protocol, DirIn, app, request.Reason));
+                if (request.Direction is FirewallDirection.Outbound or FirewallDirection.Both)
+                    names.Add(UpsertPortRule(request.Port, request.Protocol, DirOut, app, request.Reason));
+
+                Log.Information("Firewall: порт {Proto}/{Port} {Dir} заблокирован (app: {App})",
+                    request.Protocol, request.Port, request.Direction, app ?? "*");
+                return FirewallOperationResult.Ok(
+                    $"Порт {request.Protocol}/{request.Port} заблокирован.", string.Join("+", names), created: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "BlockPort({Proto}/{Port}) не выполнен", request.Protocol, request.Port);
+                return FirewallOperationResult.Fail($"Не удалось заблокировать порт: {FriendlyError(ex)}");
+            }
+        }
+    }
+
+    /// <summary>Снимает блокировку порта (удаляет управляемые правила; чужие не трогает).</summary>
+    public FirewallOperationResult UnblockPort(UnblockPortRequest request)
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.UnblockPort");
+        var app = NormalizeAppPath(request.ApplicationPath);
+        lock (_sync)
+        {
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+
+                int removed = 0;
+                foreach (var wantDir in WantedDirs(request.Direction))
+                {
+                    var name = PortRuleName(request.Port, request.Protocol, wantDir, app);
+                    if (RemoveRuleByName(rules, name)) removed++;
+                }
+
+                return removed > 0
+                    ? FirewallOperationResult.Ok($"Порт {request.Protocol}/{request.Port} разблокирован (удалено правил: {removed}).")
+                    : FirewallOperationResult.Fail("Управляемое правило для порта не найдено.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "UnblockPort({Proto}/{Port}) не выполнен", request.Protocol, request.Port);
+                return FirewallOperationResult.Fail($"Не удалось разблокировать порт: {FriendlyError(ex)}");
+            }
+            finally
+            {
+                Release(rulesObj);
+                Release(policyObj);
+            }
+        }
+    }
+
+    /// <summary>Проверяет, перекрыт ли порт управляемым BLOCK-правилом.</summary>
+    public bool IsPortBlocked(int port, FirewallProtocol protocol, FirewallDirection direction, string? applicationPath = null)
+    {
+        var app = NormalizeAppPath(applicationPath);
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            foreach (var wantDir in WantedDirs(direction))
+            {
+                var name = PortRuleName(port, protocol, wantDir, app);
+                dynamic? rule = FindRule(rules, name);
+                if (rule is null) continue;
+                try
+                {
+                    bool enabled = false, blocked = false;
+                    try { enabled = (bool)rule.Enabled; } catch { }
+                    try { blocked = (int)rule.Action == ActionBlock; } catch { }
+                    if (enabled && blocked) return true;
+                }
+                finally { Release(rule); }
+            }
+
+            return false;
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    // --- Публичный API: инвентаризация ---------------------------------------
+
+    /// <summary>Возвращает все управляемые правила StartupMonitor (префикс имени).</summary>
+    public IReadOnlyList<FirewallRuleDto> ListManagedRules()
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+            List<FirewallRuleDto> all = EnumerateRules((object)rules);
+            return all.Where(r => r.IsManaged).ToList();
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    /// <summary>Удаляет ВСЕ управляемые правила StartupMonitor. Возвращает число удалённых.</summary>
+    public int RemoveAllManagedRules()
+    {
+        lock (_sync)
+        {
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+
+                List<FirewallRuleDto> all = EnumerateRules((object)rules);
+                var names = all.Where(r => r.IsManaged).Select(r => r.Name).ToList();
+                int removed = 0;
+                foreach (var n in names)
+                {
+                    if (RemoveRuleByName(rules, n)) removed++;
+                }
+
+                Log.Information("Firewall: удалено управляемых правил: {Count}", removed);
+                return removed;
+            }
+            finally
+            {
+                Release(rulesObj);
+                Release(policyObj);
+            }
+        }
+    }
+
+    // --- Внутренняя логика: агрегированные IP --------------------------------
+
+    private string AddIpToAggregated(string normalizedIp, int direction, string ruleName, string description)
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        dynamic? rule = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            rule = FindRule(rules, ruleName);
+            if (rule is null)
+            {
+                rule = CreateRuleObject();
+                rule.Name = ruleName;
+                rule.Description = description;
+                rule.Grouping = RuleGroup;
+                rule.Direction = direction;
+                rule.Action = ActionBlock;
+                rule.Enabled = true;
+                rule.Profiles = ProfilesAll;
+                rule.Protocol = ProtoAny;
+                rule.RemoteAddresses = normalizedIp;
+                rules.Add(rule);
+                return ruleName;
+            }
+
+            var set = new HashSet<string>(SplitAddresses(SafeGet(rule, "RemoteAddresses") ?? "*"), StringComparer.OrdinalIgnoreCase);
+            set.Remove("*");
+            if (set.Add(normalizedIp))
+            {
+                rule.RemoteAddresses = string.Join(",", set.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+                rule.Enabled = true;
+            }
+
+            return ruleName;
+        }
+        finally
+        {
+            Release(rule);
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    private bool RemoveIpFromAggregated(string normalizedIp, string ruleName)
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        dynamic? rule = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            rule = FindRule(rules, ruleName);
+            if (rule is null) return false;
+
+            var set = new HashSet<string>(SplitAddresses(SafeGet(rule, "RemoteAddresses") ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+            if (!set.Remove(normalizedIp)) return false;
+
+            if (set.Count == 0)
+            {
+                Release(rule);
+                rule = null;
+                RemoveRuleByName(rules, ruleName); // пустое правило не храним
+            }
+            else
+            {
+                rule.RemoteAddresses = string.Join(",", set.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+            }
+
+            return true;
+        }
+        finally
+        {
+            Release(rule);
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    private string UpsertSingleIpRule(string normalizedIp, int direction, string? reason)
+    {
+        var name = SingleIpRuleName(normalizedIp, direction);
+        object? policyObj = null;
+        object? rulesObj = null;
+        dynamic? rule = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            rule = FindRule(rules, name);
+            if (rule is not null)
+            {
+                rule.Enabled = true;
+                return name;
+            }
+
+            Release(rule);
+            rule = CreateRuleObject();
+            rule.Name = name;
+            rule.Description = $"Блокировка IP {normalizedIp} (StartupMonitor). {reason ?? string.Empty}".Trim();
+            rule.Grouping = RuleGroup;
+            rule.Direction = direction;
+            rule.Action = ActionBlock;
+            rule.Enabled = true;
+            rule.Profiles = ProfilesAll;
+            rule.Protocol = ProtoAny;
+            rule.RemoteAddresses = normalizedIp;
+            rules.Add(rule);
+            return name;
+        }
+        finally
+        {
+            Release(rule);
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    private bool RemoveSingleIpRules(string normalizedIp, FirewallDirection direction)
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            bool removed = false;
+            foreach (var d in WantedDirs(direction))
+                removed |= RemoveRuleByName(rules, SingleIpRuleName(normalizedIp, d));
+            return removed;
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    // --- Внутренняя логика: порты --------------------------------------------
+
+    private string UpsertPortRule(int port, FirewallProtocol protocol, int direction, string? appPath, string? reason)
+    {
+        var name = PortRuleName(port, protocol, direction, appPath);
+        object? policyObj = null;
+        object? rulesObj = null;
+        dynamic? rule = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            rule = FindRule(rules, name);
+            if (rule is not null)
+            {
+                rule.Enabled = true;
+                return name;
+            }
+
+            Release(rule);
+            rule = CreateRuleObject();
+            rule.Name = name;
+            rule.Description = $"Блокировка порта {(int)protocol}/{port} {(direction == DirIn ? "In" : "Out")} (StartupMonitor). {reason ?? string.Empty}".Trim();
+            rule.Grouping = RuleGroup;
+            rule.Direction = direction;
+            rule.Action = ActionBlock;
+            rule.Enabled = true;
+            rule.Profiles = ProfilesAll;
+            rule.Protocol = (int)protocol;
+            rule.LocalPorts = port.ToString();
+            if (!string.IsNullOrEmpty(appPath))
+                rule.ApplicationName = appPath;
+            rules.Add(rule);
+            return name;
+        }
+        finally
+        {
+            Release(rule);
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    // --- COM-инфраструктура ----------------------------------------------------
+
+    private static dynamic CreatePolicy(out object? raw)
+    {
+        var type = Type.GetTypeFromProgID(PolicyProgId, throwOnError: false);
+        if (type is null)
+            throw new FirewallNotAvailableException("COM-класс HNetCfg.FwPolicy2 не зарегистрирован (повреждён брандмауэр Windows?).");
+
+        object? instance;
+        try { instance = Activator.CreateInstance(type); }
+        catch (COMException ex) { throw new FirewallNotAvailableException("Не удалось создать INetFwPolicy2.", ex); }
+
+        if (instance is null)
+            throw new FirewallNotAvailableException("Activator.CreateInstance(HNetCfg.FwPolicy2) вернул null.");
+
+        raw = instance;
+        return (dynamic)instance;
+    }
+
+    private static dynamic CreateRuleObject()
+    {
+        var type = Type.GetTypeFromProgID(RuleProgId, throwOnError: false);
+        if (type is null)
+            throw new FirewallNotAvailableException("COM-класс HNetCfg.FWRule не зарегистрирован.");
+        return (dynamic)(Activator.CreateInstance(type)
+            ?? throw new FirewallNotAvailableException("Не удалось создать INetFwRule."));
+    }
+
+    /// <summary>Поиск правила по имени с корректным освобождением неподошедших RCW.</summary>
+    private static dynamic? FindRule(dynamic rules, string name)
+    {
+        System.Collections.IEnumerator? enumerator = null;
+        try
+        {
+            enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
+            while (true)
+            {
+                bool moved;
+                try { moved = enumerator.MoveNext(); }
+                catch { break; }
+                if (!moved) break;
+
+                dynamic current = enumerator.Current;
+                string? currentName = null;
+                try { currentName = (string)current.Name; }
+                catch { Release(current); continue; }
+
+                if (string.Equals(currentName, name, StringComparison.OrdinalIgnoreCase))
+                    return current; // владение RCW переходит вызывающему коду
+
+                Release(current);
+            }
+
+            return null;
+        }
+        finally
+        {
+            Release(enumerator);
+        }
+    }
+
+    private static bool RemoveRuleByName(dynamic rules, string name)
+    {
+        try
+        {
+            rules.Remove(name);
+            return true;
+        }
+        catch
+        {
+            return false; // правило отсутствует — не ошибка
+        }
+    }
+
+    private static List<FirewallRuleDto> EnumerateRules(dynamic rules)
+    {
+        var list = new List<FirewallRuleDto>();
+        System.Collections.IEnumerator? enumerator = null;
+        try
+        {
+            enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
+            while (true)
+            {
+                bool moved;
+                try { moved = enumerator.MoveNext(); }
+                catch { break; }
+                if (!moved) break;
+
+                dynamic r = enumerator.Current;
+                try { list.Add(ReadRule(r)); }
+                catch { /* битое правило — пропускаем */ }
+                finally { Release(r); }
+            }
+        }
+        finally
+        {
+            Release(enumerator);
+        }
+
+        return list;
+    }
+
+    private static FirewallRuleDto ReadRule(dynamic r)
+    {
+        string name = SafeGet(r, "Name") ?? string.Empty;
+        int dir = SafeGetInt(r, "Direction", DirIn);
+        int action = SafeGetInt(r, "Action", ActionBlock);
+        int proto = SafeGetInt(r, "Protocol", ProtoAny);
+        int profilesMask = SafeGetInt(r, "Profiles", ProfilesAll) & 7;
+        if (profilesMask == 0) profilesMask = 7;
+
+        return new FirewallRuleDto
+        {
+            Name = name,
+            Description = SafeGet(r, "Description") ?? string.Empty,
+            Direction = dir == DirOut ? FirewallDirection.Outbound : FirewallDirection.Inbound,
+            Action = action == ActionAllow ? FirewallAction.Allow : FirewallAction.Block,
+            Protocol = proto switch
+            {
+                ProtoTcp => FirewallProtocol.Tcp,
+                ProtoUdp => FirewallProtocol.Udp,
+                _ => FirewallProtocol.Any,
+            },
+            LocalPorts = SafeGet(r, "LocalPorts") ?? string.Empty,
+            RemoteAddresses = SafeGet(r, "RemoteAddresses") ?? string.Empty,
+            ApplicationPath = SafeGet(r, "ApplicationName"),
+            Enabled = SafeGetBool(r, "Enabled", true),
+            Profiles = (FirewallProfile)profilesMask,
+            IsManaged = name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase),
+        };
+    }
+
+    private static string? SafeGet(dynamic rule, string property)
+    {
+        try
+        {
+            object? v = rule.GetType().InvokeMember(property,
+                System.Reflection.BindingFlags.GetProperty, null, rule, null);
+            return v?.ToString();
+        }
+        catch { return null; }
+    }
+
+    private static int SafeGetInt(dynamic rule, string property, int fallback)
+    {
+        try
+        {
+            object? v = rule.GetType().InvokeMember(property,
+                System.Reflection.BindingFlags.GetProperty, null, rule, null);
+            return v is null ? fallback : Convert.ToInt32(v);
+        }
+        catch { return fallback; }
+    }
+
+    private static bool SafeGetBool(dynamic rule, string property, bool fallback)
+    {
+        try
+        {
+            object? v = rule.GetType().InvokeMember(property,
+                System.Reflection.BindingFlags.GetProperty, null, rule, null);
+            return v is null ? fallback : Convert.ToBoolean(v);
+        }
+        catch { return fallback; }
+    }
+
+    private static bool IsEnabledSafe(dynamic policy, int profile)
+    {
+        try { return (bool)policy.FirewallEnabled[profile]; }
+        catch { return false; }
+    }
+
+    /// <summary>Освобождение одного COM RCW. Не-COM объекты игнорируются.</summary>
+    private static void Release(object? comObject)
+    {
+        if (comObject is null) return;
+        try
+        {
+            if (Marshal.IsComObject(comObject))
+                Marshal.ReleaseComObject(comObject);
+        }
+        catch { /* повторное освобождение — игнорируем */ }
+    }
+
+    // --- Утилиты -----------------------------------------------------------------
+
+    private static bool IsFirewallDown(Exception ex) =>
+        ex is FirewallNotAvailableException ||
+        (ex is COMException c &&
+         c.HResult is HResultServiceDisabled or HResultFirewallServiceDown or HResultAccessDenied);
+
+    private static string FriendlyError(Exception ex) => ex switch
+    {
+        COMException c when c.HResult == HResultServiceDisabled => "служба брандмауэра отключена (MpsSvc).",
+        COMException c when c.HResult == HResultAccessDenied => "отказано в доступе (служба должна работать от SYSTEM).",
+        COMException c => $"COM 0x{c.HResult:X8}: {c.Message}",
+        _ => ex.Message,
+    };
+
+    private static string NormalizeAddress(string ip)
+    {
+        var parts = ip.Split('/', 2);
+        if (parts.Length == 2 && System.Net.IPAddress.TryParse(parts[0].Trim(), out var baseIp))
+            return $"{baseIp}/{parts[1].Trim()}";
+        return parts[0].Trim();
+    }
+
+    private static IEnumerable<string> SplitAddresses(string csv) =>
+        csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(s => s is not "*" && s.Length > 0)
+            .Select(s => s.Trim());
+
+    private static int CountAddresses(string csv) => SplitAddresses(csv).Count();
+
+    private static bool AddressListContains(string csv, string normalizedIp) =>
+        SplitAddresses(csv).Any(a =>
+            string.Equals(a, normalizedIp, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(a, "*", StringComparison.Ordinal));
+
+    private static string SanitizeIp(string ip) =>
+        ip.Replace(":", "_").Replace("/", "_").Replace(".", "_").Replace("*", "any");
+
+    private static string SingleIpRuleName(string normalizedIp, int direction) =>
+        $"{RulePrefix}Block_IP_{SanitizeIp(normalizedIp)}_{(direction == DirOut ? "Out" : "In")}";
+
+    private static string? NormalizeAppPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+        var p = path.Trim().Trim('"');
+        if (!Path.IsPathRooted(p))
+            Log.Warning("Firewall: ApplicationName '{Path}' не абсолютный — правило может не сработать", p);
+        else if (!File.Exists(p))
+            Log.Warning("Firewall: файл '{Path}' не найден — правило создаётся впрок", p);
+        return p;
+    }
+
+    private static string PortRuleName(int port, FirewallProtocol protocol, int direction, string? appPath)
+    {
+        var scope = string.IsNullOrEmpty(appPath)
+            ? "System"
+            : $"App_{Path.GetFileNameWithoutExtension(appPath)}";
+        return $"{RulePrefix}Block_Port_{protocol}_{port}_{(direction == DirOut ? "Out" : "In")}_{scope}";
+    }
+
+    private static IEnumerable<int> WantedDirs(FirewallDirection direction)
+    {
+        if (direction is FirewallDirection.Inbound or FirewallDirection.Both) yield return DirIn;
+        if (direction is FirewallDirection.Outbound or FirewallDirection.Both) yield return DirOut;
+    }
+}
+
+/// <summary>Брандмауэр Windows недоступен (COM-класс не зарегистрирован / MpsSvc остановлена).</summary>
+public sealed class FirewallNotAvailableException : Exception
+{
+    /// <summary>FirewallNotAvailableException: создаёт исключение.</summary>
+    public FirewallNotAvailableException(string message) : base(message) { }
+    /// <summary>FirewallNotAvailableException: создаёт исключение с вложенным.</summary>
+    public FirewallNotAvailableException(string message, Exception inner) : base(message, inner) { }
+}

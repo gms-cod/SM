@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Shared.Models;
 
@@ -176,6 +177,14 @@ public class AppSettings
     /// <summary>Пропущенная версия обновления (пользователь выбрал "Пропустить эту версию").</summary>
     [JsonPropertyName("skipped_update_version")]
     public string? SkippedUpdateVersion { get; set; }
+
+    /// <summary>Конфигурация службы защиты портов (Port Defender).</summary>
+    [JsonPropertyName("port_defender")]
+    public PortDefenderConfigDto PortDefender { get; set; } = new();
+
+    /// <summary>Список активных банов Port Defender.</summary>
+    [JsonPropertyName("active_bans")]
+    public List<ActiveBanDto> ActiveBans { get; set; } = new();
 }
 
 /// <summary>Запись истории изменений: добавление, удаление, блокировка и т.д.</summary>

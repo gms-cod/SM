@@ -22,6 +22,9 @@ public class JsonDataStore
     private readonly JsonSerializerOptions _historyOptions;
     /// <summary>Кэш загруженного конфига (чтобы не перечитывать секции каждый раз).</summary>
     private AppConfig? _cache;
+    /// <summary>Базовая директория файлов конфигурации и данных.</summary>
+    public string BaseDirectory => _dir;
+
     /// <summary>Объект блокировки для потокобезопасного доступа.</summary>
     private readonly object _lock = new();
     /// <summary>Хеши уже записанного содержимого — чтобы не писать неизменённые секции</summary>
