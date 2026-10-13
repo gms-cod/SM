@@ -33,3 +33,7 @@ $RECYCLE.BIN/
 
 # OpenCode / AI cache (optional)
 .opencode/
+
+# Python caches
+__pycache__/
+*.pyc
