@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models;
+using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models.Snapshot;
 
@@ -164,11 +165,13 @@ public class PipeClient : IDisposable
 
     /// <summary>Отправляет запрос службе и ожидает ответ с таймаутом.</summary>
     /// <param name="request">Сообщение-запрос.</param>
+    /// <param name="ct">Токен отмены операции.</param>
     /// <returns>Ответ службы или null при таймауте/разрыве.</returns>
-    public async Task<PipeMessage?> SendAsync(PipeMessage request)
+    public async Task<PipeMessage?> SendAsync(PipeMessage request, CancellationToken ct = default)
     {
         using var _prof = ExecutionProfiler.Measure("UI.Pipe.Send." + request.Type);
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
         try
         {
             await _sendLock.WaitAsync(timeoutCts.Token);
@@ -183,11 +186,12 @@ public class PipeClient : IDisposable
                 return null;
 
             var json = JsonSerializer.Serialize(request, JsonOptions);
-            await _writer.WriteLineAsync(json);
-            await _writer.FlushAsync();
+            await _writer.WriteLineAsync(json.AsMemory(), ct);
+            await _writer.FlushAsync(ct);
 
             // Таймаут: если сервис завис, не ждём вечно — рвём соединение и переподключаемся
-            using var responseCts = new CancellationTokenSource(ResponseTimeout);
+            using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            responseCts.CancelAfter(ResponseTimeout);
             string? response;
             try
             {
@@ -195,8 +199,11 @@ public class PipeClient : IDisposable
             }
             catch (OperationCanceledException)
             {
-                try { _pipe?.Dispose(); } catch { }
-                Disconnected?.Invoke(this, EventArgs.Empty);
+                if (!ct.IsCancellationRequested)
+                {
+                    try { _pipe?.Dispose(); } catch { }
+                    Disconnected?.Invoke(this, EventArgs.Empty);
+                }
                 return null;
             }
             if (response == null) return null;
@@ -1050,7 +1057,13 @@ public class PipeClient : IDisposable
     /// <summary>Запрашивает проверку наличия обновлений на GitHub через службу.</summary>
     public async Task<UpdateCheckResult?> CheckForUpdatesAsync()
     {
-        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.CheckForUpdates });
+        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.2.4";
+        var req = new CheckForUpdatesRequest(uiVersion);
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CheckForUpdates,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        });
         if (response?.Type == PipeMessageTypes.CheckForUpdatesResponse && !string.IsNullOrWhiteSpace(response.Payload))
         {
             try
@@ -1110,6 +1123,173 @@ public class PipeClient : IDisposable
             Type = PipeMessageTypes.SetUpdateSettings,
             Payload = JsonSerializer.Serialize(settings, JsonOptions)
         });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает актуальный статус брандмауэра Windows и управляемых правил.</summary>
+    public async Task<FirewallStatusDto?> GetFirewallStatusAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallStatus }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<FirewallStatusDto>(response.Payload, JsonOptions);
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>Отправляет запрос на блокировку IP-адреса в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> BlockIpAsync(BlockIpRequest request, CancellationToken ct = default)
+    {
+        if (request == null)
+            return FirewallOperationResult.Fail("Запрос блокировки IP не может быть null.");
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.BlockIp,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось заблокировать IP-адрес.");
+    }
+
+    /// <summary>Отправляет запрос на разблокировку IP-адреса в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> UnblockIpAsync(string ip, FirewallDirection direction = FirewallDirection.Both, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(ip))
+            return FirewallOperationResult.Fail("IP-адрес не указан.");
+
+        var req = new UnblockIpRequest { Ip = ip.Trim(), Direction = direction };
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.UnblockIp,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось разблокировать IP-адрес.");
+    }
+
+    /// <summary>Отправляет запрос на блокировку порта в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> BlockPortAsync(BlockPortRequest request, CancellationToken ct = default)
+    {
+        if (request == null)
+            return FirewallOperationResult.Fail("Запрос блокировки порта не может быть null.");
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.BlockPort,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось заблокировать порт.");
+    }
+
+    /// <summary>Отправляет запрос на разблокировку порта в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> UnblockPortAsync(int port, FirewallProtocol protocol = FirewallProtocol.Tcp, FirewallDirection direction = FirewallDirection.Inbound, string? appPath = null, CancellationToken ct = default)
+    {
+        var req = new UnblockPortRequest
+        {
+            Port = port,
+            Protocol = protocol,
+            Direction = direction,
+            ApplicationPath = appPath
+        };
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.UnblockPort,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось разблокировать порт.");
+    }
+
+    /// <summary>Запрашивает актуальную конфигурацию правил защиты Port Defender.</summary>
+    public async Task<PortDefenderConfigDto?> GetPortDefenderConfigAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetPortDefenderConfig }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<PortDefenderConfigDto>(response.Payload, JsonOptions);
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>Отправляет новую конфигурацию правил защиты Port Defender.</summary>
+    public async Task<bool> SetPortDefenderConfigAsync(PortDefenderConfigDto config, CancellationToken ct = default)
+    {
+        if (config == null) return false;
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetPortDefenderConfig,
+            Payload = JsonSerializer.Serialize(config, JsonOptions)
+        }, ct);
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает список текущих активных блокировок службы Port Defender.</summary>
+    public async Task<List<ActiveBanDto>> GetActiveBansAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetActiveBans }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var bans = JsonSerializer.Deserialize<List<ActiveBanDto>>(response.Payload, JsonOptions);
+                if (bans != null) return bans;
+            }
+            catch { }
+        }
+        return new List<ActiveBanDto>();
+    }
+
+    /// <summary>Отправляет команду на снятие всех активных блокировок Port Defender.</summary>
+    public async Task<bool> ClearAllBansAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.ClearAllBans }, ct);
         return response?.Type == PipeMessageTypes.Success;
     }
 

@@ -10,7 +10,10 @@ using StartupMonitor.Service.Services.VirusScan;
 using StartupMonitor.Service.Services.ProcessInspector;
 using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared.Models;
+using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.Shared.Diagnostics;
+using StartupMonitor.Service.Services.Firewall;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace StartupMonitor.Service.Pipe;
 
@@ -60,6 +63,10 @@ public class PipeServer : BackgroundService
     private readonly ProcessInspectorService _processInspector = new();
     // Сервис самообновления приложения
     private readonly StartupMonitor.Service.Services.Update.GitHubUpdateService _updateService;
+    // Служба Windows Firewall
+    private readonly WindowsFirewallService _firewallService;
+    // Служба Port Defender
+    private readonly ProcessPortDefenderService? _portDefenderService;
     // Токен отмены для фоновых задач
     private readonly CancellationTokenSource _cts = new();
     // Счётчик записей при последнем GetAllEntries (для логирования изменений)
@@ -103,7 +110,9 @@ public class PipeServer : BackgroundService
         SnapshotManager snapshotManager,
         StartupMonitor.Service.Services.BootTime.BootTimeService bootTimeService,
         MonitoringStateCoordinator coordinator,
-        StartupMonitor.Service.Services.Update.GitHubUpdateService updateService)
+        StartupMonitor.Service.Services.Update.GitHubUpdateService updateService,
+        WindowsFirewallService firewallService,
+        IServiceProvider serviceProvider)
     {
         _store = store;
         _scanTracker = scanTracker;
@@ -127,6 +136,8 @@ public class PipeServer : BackgroundService
         _bootTimeService = bootTimeService;
         _coordinator = coordinator;
         _updateService = updateService;
+        _firewallService = firewallService ?? throw new ArgumentNullException(nameof(firewallService));
+        _portDefenderService = serviceProvider.GetService<ProcessPortDefenderService>();
 
         if (cfg?.Entries != null)
         {
@@ -1235,7 +1246,17 @@ public class PipeServer : BackgroundService
                     break;
 
                 case PipeMessageTypes.CheckForUpdates:
-                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None);
+                    string? clientVer = null;
+                    if (!string.IsNullOrWhiteSpace(message.Payload))
+                    {
+                        try
+                        {
+                            var updateReq = JsonSerializer.Deserialize<CheckForUpdatesRequest>(message.Payload, JsonOptions);
+                            clientVer = updateReq?.ClientVersion;
+                        }
+                        catch { }
+                    }
+                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None, clientVer);
                     response.Type = PipeMessageTypes.CheckForUpdatesResponse;
                     response.Payload = JsonSerializer.Serialize(updateCheckRes, JsonOptions);
                     break;
@@ -1283,6 +1304,216 @@ public class PipeServer : BackgroundService
                             updateSettings.AutoCheckUpdates, updateSettings.AutoDownloadUpdates, updateSettings.SkippedUpdateVersion);
                     }
                     response.Type = PipeMessageTypes.Success;
+                    break;
+
+                case PipeMessageTypes.GetFirewallStatus:
+                    try
+                    {
+                        var status = _firewallService.GetStatus();
+                        response.Type = PipeMessageTypes.GetFirewallStatusResponse;
+                        response.Payload = JsonSerializer.Serialize(status, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail($"Ошибка получения статуса брандмауэра: {ex.Message}"), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.BlockIp:
+                    try
+                    {
+                        var blockIpReq = JsonSerializer.Deserialize<BlockIpRequest>(message.Payload, JsonOptions);
+                        if (blockIpReq == null)
+                        {
+                            var p = JsonSerializer.Deserialize<BlockIpPayload>(message.Payload, JsonOptions);
+                            if (p != null)
+                                blockIpReq = new BlockIpRequest { Ip = p.Ip, Direction = p.Direction, Aggregated = p.Aggregated, Reason = p.Reason, BanDurationMinutes = p.BanDurationMinutes };
+                        }
+                        if (blockIpReq == null || string.IsNullOrWhiteSpace(blockIpReq.Ip))
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Не указан IP-адрес для блокировки."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.BlockIp(blockIpReq);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.UnblockIp:
+                    try
+                    {
+                        var unblockIpReq = JsonSerializer.Deserialize<UnblockIpRequest>(message.Payload, JsonOptions);
+                        if (unblockIpReq == null)
+                        {
+                            var p = JsonSerializer.Deserialize<UnblockIpPayload>(message.Payload, JsonOptions);
+                            if (p != null)
+                                unblockIpReq = new UnblockIpRequest { Ip = p.Ip, Direction = p.Direction };
+                        }
+                        if (unblockIpReq == null || string.IsNullOrWhiteSpace(unblockIpReq.Ip))
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Не указан IP-адрес для разблокировки."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.UnblockIp(unblockIpReq);
+                        _portDefenderService?.UnbanIp(unblockIpReq.Ip);
+
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.BlockPort:
+                    try
+                    {
+                        var blockPortReq = JsonSerializer.Deserialize<BlockPortRequest>(message.Payload, JsonOptions);
+                        if (blockPortReq == null)
+                        {
+                            var p = JsonSerializer.Deserialize<BlockPortPayload>(message.Payload, JsonOptions);
+                            if (p != null)
+                                blockPortReq = new BlockPortRequest { Port = p.Port, Protocol = p.Protocol, Direction = p.Direction, ApplicationPath = p.ApplicationPath, Reason = p.Reason };
+                        }
+                        if (blockPortReq == null || blockPortReq.Port <= 0)
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректный номер порта для блокировки."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.BlockPort(blockPortReq);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.UnblockPort:
+                    try
+                    {
+                        var unblockPortReq = JsonSerializer.Deserialize<UnblockPortRequest>(message.Payload, JsonOptions);
+                        if (unblockPortReq == null)
+                        {
+                            var p = JsonSerializer.Deserialize<UnblockPortPayload>(message.Payload, JsonOptions);
+                            if (p != null)
+                                unblockPortReq = new UnblockPortRequest { Port = p.Port, Protocol = p.Protocol, Direction = p.Direction, ApplicationPath = p.ApplicationPath };
+                        }
+                        if (unblockPortReq == null || unblockPortReq.Port <= 0)
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректный номер порта для разблокировки."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.UnblockPort(unblockPortReq);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.GetPortDefenderConfig:
+                    try
+                    {
+                        var defenderCurrentConfig = _portDefenderService?.GetConfig() ?? _store.Load().Settings.PortDefender ?? new PortDefenderConfigDto();
+                        response.Type = PipeMessageTypes.GetPortDefenderConfig;
+                        response.Payload = JsonSerializer.Serialize(defenderCurrentConfig, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.SetPortDefenderConfig:
+                    try
+                    {
+                        var defenderConfig = JsonSerializer.Deserialize<PortDefenderConfigDto>(message.Payload, JsonOptions);
+                        if (defenderConfig != null)
+                        {
+                            if (_portDefenderService != null)
+                            {
+                                _portDefenderService.SaveConfig(defenderConfig);
+                            }
+                            else
+                            {
+                                var cfg = _store.Load();
+                                cfg.Settings.PortDefender = defenderConfig;
+                                _store.Save(cfg);
+                            }
+                            response.Type = PipeMessageTypes.Success;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Ok("Конфигурация Port Defender успешно сохранена."), JsonOptions);
+                        }
+                        else
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректная конфигурация PortDefenderConfigDto."), JsonOptions);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.GetActiveBans:
+                    try
+                    {
+                        var bans = _portDefenderService?.GetActiveBans() ?? new List<ActiveBanDto>();
+                        response.Type = PipeMessageTypes.ActiveBansResponse;
+                        response.Payload = JsonSerializer.Serialize(bans, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.ClearAllBans:
+                    try
+                    {
+                        if (_portDefenderService != null)
+                        {
+                            int cleared = _portDefenderService.ClearAllBans();
+                            response.Type = PipeMessageTypes.Success;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Ok($"Снято банов: {cleared}"), JsonOptions);
+                        }
+                        else
+                        {
+                            response.Type = PipeMessageTypes.Success;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Ok("Служба Port Defender не активна."), JsonOptions);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
                     break;
 
                 default:

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Shared.Models;
 
@@ -187,6 +188,32 @@ public static class PipeMessageTypes
     public const string UpdateStatusResponse = "UpdateStatusResponse";
     /// <summary>Установка настроек автообновления.</summary>
     public const string SetUpdateSettings = "SetUpdateSettings";
+    /// <summary>Запрос статуса брандмауэра Windows.</summary>
+    public const string GetFirewallStatus = "GetFirewallStatus";
+    /// <summary>Ответ со статусом брандмауэра Windows.</summary>
+    public const string GetFirewallStatusResponse = "GetFirewallStatusResponse";
+    /// <summary>Запрос блокировки IP-адреса.</summary>
+    public const string BlockIp = "BlockIp";
+    /// <summary>Запрос разблокировки IP-адреса.</summary>
+    public const string UnblockIp = "UnblockIp";
+    /// <summary>Запрос блокировки порта.</summary>
+    public const string BlockPort = "BlockPort";
+    /// <summary>Запрос разблокировки порта.</summary>
+    public const string UnblockPort = "UnblockPort";
+    /// <summary>Ответ на операцию брандмауэра.</summary>
+    public const string FirewallOperationResponse = "FirewallOperationResponse";
+    /// <summary>Запрос конфигурации Port Defender.</summary>
+    public const string GetPortDefenderConfig = "GetPortDefenderConfig";
+    /// <summary>Сохранение конфигурации Port Defender.</summary>
+    public const string SetPortDefenderConfig = "SetPortDefenderConfig";
+    /// <summary>Запрос списка активных блокировок Port Defender.</summary>
+    public const string GetActiveBans = "GetActiveBans";
+    /// <summary>Ответ со списком активных блокировок Port Defender.</summary>
+    public const string ActiveBansResponse = "ActiveBansResponse";
+    /// <summary>Снятие всех активных блокировок Port Defender.</summary>
+    public const string ClearAllBans = "ClearAllBans";
+    /// <summary>Событие: заблокирована сетевая атака через Port Defender.</summary>
+    public const string PortDefenderAttackBlocked = "PortDefenderAttackBlocked";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>
@@ -317,6 +344,20 @@ public record AutoGuardConfigPayload(
     bool BlockNewServices
 );
 
+/// <summary>Запрос проверки обновлений. Клиент передаёт свою версию UI для раздельной оценки.</summary>
+public sealed class CheckForUpdatesRequest
+{
+    /// <summary>Версия UI-клиента (например "1.2.4"). Null — старый клиент без поддержки.</summary>
+    [JsonPropertyName("clientVersion")]
+    public string? ClientVersion { get; set; }
+
+    /// <summary>CheckForUpdatesRequest: Выполняет операцию CheckForUpdatesRequest.</summary>
+    public CheckForUpdatesRequest() { }
+    /// <summary>CheckForUpdatesRequest: Выполняет операцию CheckForUpdatesRequest.</summary>
+    /// <param name="clientVersion">Входные данные: значение параметра clientVersion (string?).</param>
+    public CheckForUpdatesRequest(string? clientVersion) { ClientVersion = clientVersion; }
+}
+
 /// <summary>Запрос дельты записей автозапуска. Клиент передаёт последнюю известную ревизию.</summary>
 public sealed class EntriesRevisionRequest
 {
@@ -359,4 +400,39 @@ public sealed class EntriesDeltaResponse
         Entries = entries;
     }
 }
+
+/// <summary>Полезная нагрузка запроса блокировки IP-адреса.</summary>
+public record BlockIpPayload(
+    string Ip,
+    FirewallDirection Direction = FirewallDirection.Both,
+    bool Aggregated = true,
+    int? BanDurationMinutes = null,
+    string? Reason = null
+);
+
+/// <summary>Полезная нагрузка запроса разблокировки IP-адреса.</summary>
+public record UnblockIpPayload(
+    string Ip,
+    FirewallDirection Direction = FirewallDirection.Both
+);
+
+/// <summary>Полезная нагрузка запроса блокировки порта.</summary>
+public record BlockPortPayload(
+    int Port,
+    FirewallProtocol Protocol = FirewallProtocol.Tcp,
+    FirewallDirection Direction = FirewallDirection.Inbound,
+    string? ApplicationPath = null,
+    string? Reason = null
+);
+
+/// <summary>Полезная нагрузка запроса разблокировки порта.</summary>
+public record UnblockPortPayload(
+    int Port,
+    FirewallProtocol Protocol = FirewallProtocol.Tcp,
+    FirewallDirection Direction = FirewallDirection.Inbound,
+    string? ApplicationPath = null
+);
+
+/// <summary>Полезная нагрузка ответа со списком активных банов Port Defender.</summary>
+public record ActiveBansPayload(List<ActiveBanDto> Bans);
 
