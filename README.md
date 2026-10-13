@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.2-00D2D3?style=for-the-badge&logo=windows&logoColor=white)
+![Version](https://img.shields.io/badge/version-1.3.1-00D2D3?style=for-the-badge&logo=windows&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white)
 ![Framework](https://img.shields.io/badge/.NET-8.0%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 ![Authenticode](https://img.shields.io/badge/code%20signing-SHA256%20Authenticode-success?style=for-the-badge&logo=hackthebox&logoColor=white)

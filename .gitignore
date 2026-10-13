@@ -37,3 +37,6 @@ $RECYCLE.BIN/
 # Python caches
 __pycache__/
 *.pyc
+
+# Local deleted / clean up folder
+delete/
