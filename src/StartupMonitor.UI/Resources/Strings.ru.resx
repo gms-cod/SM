@@ -1636,4 +1636,121 @@
   <data name="UpdateChangelogLabel" xml:space="preserve">
     <value>Список изменений в этой версии</value>
   </data>
+  <data name="FwStatusAllowed" xml:space="preserve">
+    <value>Разрешено</value>
+  </data>
+  <data name="FwStatusBlocked" xml:space="preserve">
+    <value>Заблокирован</value>
+  </data>
+  <data name="FwStatusBlockedInbound" xml:space="preserve">
+    <value>Заблокирован (входящий)</value>
+  </data>
+  <data name="FwStatusBlockedOutbound" xml:space="preserve">
+    <value>Заблокирован (исходящий)</value>
+  </data>
+  <data name="FwStatusBlockedBoth" xml:space="preserve">
+    <value>Заблокирован (оба направления)</value>
+  </data>
+  <data name="FwStatusBanned" xml:space="preserve">
+    <value>В бане</value>
+  </data>
+  <data name="FwStatusProtected" xml:space="preserve">
+    <value>Защищён Defender</value>
+  </data>
+  <data name="BlockIp" xml:space="preserve">
+    <value>Заблокировать IP</value>
+  </data>
+  <data name="UnblockIp" xml:space="preserve">
+    <value>Разблокировать IP</value>
+  </data>
+  <data name="BanDuration15m" xml:space="preserve">
+    <value>Бан на 15 минут</value>
+  </data>
+  <data name="BanDuration1h" xml:space="preserve">
+    <value>Бан на 1 час</value>
+  </data>
+  <data name="BanDuration24h" xml:space="preserve">
+    <value>Бан на 24 часа</value>
+  </data>
+  <data name="BanPermanent" xml:space="preserve">
+    <value>Бан навсегда</value>
+  </data>
+  <data name="BlockIpTooltip" xml:space="preserve">
+    <value>Заблокировать удалённый IP в брандмауэре Windows</value>
+  </data>
+  <data name="UnblockIpTooltip" xml:space="preserve">
+    <value>Снять блокировку IP</value>
+  </data>
+  <data name="BanDurationTooltip" xml:space="preserve">
+    <value>Выберите длительность бана</value>
+  </data>
+  <data name="PortDefenderTitle" xml:space="preserve">
+    <value>Port Defender</value>
+  </data>
+  <data name="PortDefenderSubtitle" xml:space="preserve">
+    <value>Автоматическая защита от флуда портов и перебора</value>
+  </data>
+  <data name="PortDefenderEnabledToggle" xml:space="preserve">
+    <value>Включить защиту Port Defender</value>
+  </data>
+  <data name="PortDefenderProtectedPortsLabel" xml:space="preserve">
+    <value>Защищаемые порты</value>
+  </data>
+  <data name="PortDefenderProtectedPortsTooltip" xml:space="preserve">
+    <value>Список локальных портов через запятую (например, 3389, 22, 443)</value>
+  </data>
+  <data name="PortDefenderThresholdLabel" xml:space="preserve">
+    <value>Порог (подключений)</value>
+  </data>
+  <data name="PortDefenderThresholdTooltip" xml:space="preserve">
+    <value>Число подключений в окне времени для срабатывания бана</value>
+  </data>
+  <data name="PortDefenderWindowLabel" xml:space="preserve">
+    <value>Временное окно</value>
+  </data>
+  <data name="PortDefenderWindowTooltip" xml:space="preserve">
+    <value>Скользящее окно детекта флуда (секунда / минута / час)</value>
+  </data>
+  <data name="PortDefenderBanDurationLabel" xml:space="preserve">
+    <value>Длительность бана</value>
+  </data>
+  <data name="PortDefenderBanDurationTooltip" xml:space="preserve">
+    <value>Базовый срок бана; растёт при рецидивах</value>
+  </data>
+  <data name="PortDefenderAutoEscalateToggle" xml:space="preserve">
+    <value>Автоэскалация бана при повторных атаках</value>
+  </data>
+  <data name="PortDefenderTrustPrivateToggle" xml:space="preserve">
+    <value>Доверять частным сетям (не банить локальные адреса)</value>
+  </data>
+  <data name="PortDefenderWhitelistLabel" xml:space="preserve">
+    <value>Белый список (доверенные IP / подсети)</value>
+  </data>
+  <data name="PortDefenderWhitelistTooltip" xml:space="preserve">
+    <value>IP и подсети, которые никогда не банятся (например, 192.168.1.100, 10.0.0.0/8)</value>
+  </data>
+  <data name="PortDefenderRulesTitle" xml:space="preserve">
+    <value>Правила по портам</value>
+  </data>
+  <data name="PortDefenderActiveBansTitle" xml:space="preserve">
+    <value>Активные баны</value>
+  </data>
+  <data name="PortDefenderUnbanAllButton" xml:space="preserve">
+    <value>Разбанить все</value>
+  </data>
+  <data name="PortDefenderSaveButton" xml:space="preserve">
+    <value>Сохранить</value>
+  </data>
+  <data name="PortDefenderCloseButton" xml:space="preserve">
+    <value>Закрыть</value>
+  </data>
+  <data name="PortDefenderBanStatusFormat" xml:space="preserve">
+    <value>В бане до {0} (рецидив x{1})</value>
+  </data>
+  <data name="PortDefenderBanPermanentFormat" xml:space="preserve">
+    <value>В бане навсегда (рецидив x{0})</value>
+  </data>
+  <data name="FwSocketCountFormat" xml:space="preserve">
+    <value>Соединений: {0} (установлено: {1}, прослушивается: {2})</value>
+  </data>
 </root>

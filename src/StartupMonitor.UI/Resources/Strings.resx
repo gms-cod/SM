@@ -1636,4 +1636,121 @@ Do you really want to proceed?</value>
   <data name="UpdateChangelogLabel" xml:space="preserve">
     <value>What's New in this Release</value>
   </data>
+  <data name="FwStatusAllowed" xml:space="preserve">
+    <value>Allowed</value>
+  </data>
+  <data name="FwStatusBlocked" xml:space="preserve">
+    <value>Blocked</value>
+  </data>
+  <data name="FwStatusBlockedInbound" xml:space="preserve">
+    <value>Blocked (inbound)</value>
+  </data>
+  <data name="FwStatusBlockedOutbound" xml:space="preserve">
+    <value>Blocked (outbound)</value>
+  </data>
+  <data name="FwStatusBlockedBoth" xml:space="preserve">
+    <value>Blocked (both)</value>
+  </data>
+  <data name="FwStatusBanned" xml:space="preserve">
+    <value>Banned</value>
+  </data>
+  <data name="FwStatusProtected" xml:space="preserve">
+    <value>Protected by Defender</value>
+  </data>
+  <data name="BlockIp" xml:space="preserve">
+    <value>Block IP</value>
+  </data>
+  <data name="UnblockIp" xml:space="preserve">
+    <value>Unblock IP</value>
+  </data>
+  <data name="BanDuration15m" xml:space="preserve">
+    <value>Ban for 15 minutes</value>
+  </data>
+  <data name="BanDuration1h" xml:space="preserve">
+    <value>Ban for 1 hour</value>
+  </data>
+  <data name="BanDuration24h" xml:space="preserve">
+    <value>Ban for 24 hours</value>
+  </data>
+  <data name="BanPermanent" xml:space="preserve">
+    <value>Ban permanently</value>
+  </data>
+  <data name="BlockIpTooltip" xml:space="preserve">
+    <value>Block remote IP in Windows Firewall</value>
+  </data>
+  <data name="UnblockIpTooltip" xml:space="preserve">
+    <value>Remove IP block</value>
+  </data>
+  <data name="BanDurationTooltip" xml:space="preserve">
+    <value>Select ban duration</value>
+  </data>
+  <data name="PortDefenderTitle" xml:space="preserve">
+    <value>Port Defender</value>
+  </data>
+  <data name="PortDefenderSubtitle" xml:space="preserve">
+    <value>Automatic protection against port floods and brute-force</value>
+  </data>
+  <data name="PortDefenderEnabledToggle" xml:space="preserve">
+    <value>Enable Port Defender protection</value>
+  </data>
+  <data name="PortDefenderProtectedPortsLabel" xml:space="preserve">
+    <value>Protected ports</value>
+  </data>
+  <data name="PortDefenderProtectedPortsTooltip" xml:space="preserve">
+    <value>Comma-separated list of local ports to guard (e.g. 3389, 22, 443)</value>
+  </data>
+  <data name="PortDefenderThresholdLabel" xml:space="preserve">
+    <value>Threshold (connections)</value>
+  </data>
+  <data name="PortDefenderThresholdTooltip" xml:space="preserve">
+    <value>Number of connections in time window triggering a ban</value>
+  </data>
+  <data name="PortDefenderWindowLabel" xml:space="preserve">
+    <value>Time window</value>
+  </data>
+  <data name="PortDefenderWindowTooltip" xml:space="preserve">
+    <value>Sliding window for flood detection (second / minute / hour)</value>
+  </data>
+  <data name="PortDefenderBanDurationLabel" xml:space="preserve">
+    <value>Ban duration</value>
+  </data>
+  <data name="PortDefenderBanDurationTooltip" xml:space="preserve">
+    <value>Base ban duration; escalates on repeat offenses</value>
+  </data>
+  <data name="PortDefenderAutoEscalateToggle" xml:space="preserve">
+    <value>Auto-escalate ban on repeat offenses</value>
+  </data>
+  <data name="PortDefenderTrustPrivateToggle" xml:space="preserve">
+    <value>Trust private networks (do not ban local addresses)</value>
+  </data>
+  <data name="PortDefenderWhitelistLabel" xml:space="preserve">
+    <value>Whitelist (trusted IPs / subnets)</value>
+  </data>
+  <data name="PortDefenderWhitelistTooltip" xml:space="preserve">
+    <value>IPs and subnets that are never banned (e.g. 192.168.1.100, 10.0.0.0/8)</value>
+  </data>
+  <data name="PortDefenderRulesTitle" xml:space="preserve">
+    <value>Per-port rules</value>
+  </data>
+  <data name="PortDefenderActiveBansTitle" xml:space="preserve">
+    <value>Active bans</value>
+  </data>
+  <data name="PortDefenderUnbanAllButton" xml:space="preserve">
+    <value>Unban all</value>
+  </data>
+  <data name="PortDefenderSaveButton" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="PortDefenderCloseButton" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="PortDefenderBanStatusFormat" xml:space="preserve">
+    <value>Banned until {0} (repeat x{1})</value>
+  </data>
+  <data name="PortDefenderBanPermanentFormat" xml:space="preserve">
+    <value>Banned permanently (repeat x{0})</value>
+  </data>
+  <data name="FwSocketCountFormat" xml:space="preserve">
+    <value>Connections: {0} (established: {1}, listening: {2})</value>
+  </data>
 </root>

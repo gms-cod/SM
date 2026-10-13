@@ -17,6 +17,7 @@
             <RowDefinition Height="36" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -73,8 +74,44 @@
             </Grid>
         </ui:Card>
 
+        <!-- Защитная карточка Port Defender -->
+        <ui:Card Grid.Row="2" Margin="0,0,0,12" Padding="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Иконка щита -->
+                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon x:Name="DefenderShieldIcon" Symbol="Shield24" FontSize="20" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <!-- Статус защиты -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center" Margin="0,0,8,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="Shield24" FontSize="12" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <TextBlock x:Name="TxtDefenderBadge" Text="Port Defender" FontSize="11" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock x:Name="TxtDefenderStatus" Text="Port Defender: Защита портов активна" FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock x:Name="TxtDefenderDetails" Text="Активных банов: 0" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <!-- Действия защиты -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button x:Name="BtnConfigureDefender" Appearance="Secondary" Content="Настроить Defender" Click="OnConfigureDefenderClick" Margin="0,0,8,0" />
+                    <ui:Button x:Name="BtnClearBans" Appearance="Secondary" Content="Сбросить баны" Click="OnClearBansClick" />
+                </StackPanel>
+            </Grid>
+        </ui:Card>
+
         <!-- Тулбар действий и поиска -->
-        <Grid Grid.Row="2" Margin="0,0,0,8">
+        <Grid Grid.Row="3" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -94,7 +131,7 @@
         </Grid>
 
         <!-- Таблица сетевых соединений -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="4">
             <DataGrid x:Name="GridConnections"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
@@ -114,6 +151,17 @@
                         <Separator />
                         <MenuItem Header="Открыть Whois (IPInfo.io)" Click="OnOpenWhoisClick" />
                         <MenuItem Header="Проверить в VirusTotal" Click="OnOpenVirusTotalClick" />
+                        <Separator />
+                        <MenuItem Header="Заблокировать удалённый IP">
+                            <MenuItem Header="На 15 минут" Click="OnBlockIp15mClick" />
+                            <MenuItem Header="На 1 час" Click="OnBlockIp1hClick" />
+                            <MenuItem Header="На 24 часа" Click="OnBlockIp24hClick" />
+                            <MenuItem Header="Навсегда" Click="OnBlockIpForeverClick" />
+                        </MenuItem>
+                        <MenuItem Header="Разблокировать IP" Click="OnUnblockIpClick" />
+                        <Separator />
+                        <MenuItem Header="Заблокировать локальный порт для этого процесса" Click="OnBlockPortClick" />
+                        <MenuItem Header="Настроить Port Defender для порта..." Click="OnConfigureDefenderForPortClick" />
                     </ContextMenu>
                 </DataGrid.ContextMenu>
 
@@ -249,6 +297,55 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
+
+                    <!-- Статус брандмауэра -->
+                    <DataGridTemplateColumn Header="Брандмауэр" Width="150">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#20107C41" />
+                                            <Setter Property="BorderBrush" Value="#40107C41" />
+                                            <Setter Property="BorderThickness" Value="1" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FirewallBadge}" Value="🛡️ Защищён Defender">
+                                                    <Setter Property="Background" Value="#200078D4" />
+                                                    <Setter Property="BorderBrush" Value="#400078D4" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FirewallBadge}" Value="🔴 В бане">
+                                                    <Setter Property="Background" Value="#20D83B01" />
+                                                    <Setter Property="BorderBrush" Value="#40D83B01" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding FirewallBadge}" Value="⛔ Заблокирован">
+                                                    <Setter Property="Background" Value="#20606060" />
+                                                    <Setter Property="BorderBrush" Value="#40606060" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding FirewallBadge}" FontSize="11" FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#107C41" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding FirewallBadge}" Value="🛡️ Защищён Defender">
+                                                        <Setter Property="Foreground" Value="#0078D4" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding FirewallBadge}" Value="🔴 В бане">
+                                                        <Setter Property="Foreground" Value="#D83B01" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding FirewallBadge}" Value="⛔ Заблокирован">
+                                                        <Setter Property="Foreground" Value="#606060" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
 
@@ -261,7 +358,7 @@
         </Grid>
 
         <!-- Нижняя панель закрытия -->
-        <Grid Grid.Row="4" Margin="0,12,0,0">
+        <Grid Grid.Row="5" Margin="0,12,0,0">
             <TextBlock x:Name="TxtStatus" Text="Готово" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
             <ui:Button Appearance="Secondary" Content="Закрыть" HorizontalAlignment="Right" Click="OnCloseClick" />
         </Grid>

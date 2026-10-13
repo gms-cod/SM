@@ -880,6 +880,92 @@ public class LocalizationService : INotifyPropertyChanged
     public string DownloadProgressStatusFormat => this["DownloadProgressStatusFormat"];
     public string UpdateChangelogLabel => this["UpdateChangelogLabel"];
 
+    // ──── Firewall / Port Defender ────
+    /// <summary>Статус брандмауэра «Разрешено».</summary>
+    public string FwStatusAllowed => this["FwStatusAllowed"];
+    /// <summary>Статус брандмауэра «Заблокирован».</summary>
+    public string FwStatusBlocked => this["FwStatusBlocked"];
+    /// <summary>Статус «Заблокирован (входящий)».</summary>
+    public string FwStatusBlockedInbound => this["FwStatusBlockedInbound"];
+    /// <summary>Статус «Заблокирован (исходящий)».</summary>
+    public string FwStatusBlockedOutbound => this["FwStatusBlockedOutbound"];
+    /// <summary>Статус «Заблокирован (оба направления)».</summary>
+    public string FwStatusBlockedBoth => this["FwStatusBlockedBoth"];
+    /// <summary>Статус «В бане» (активный бан Port Defender).</summary>
+    public string FwStatusBanned => this["FwStatusBanned"];
+    /// <summary>Статус «Защищён Defender» (доверенный/частный адрес под защитой).</summary>
+    public string FwStatusProtected => this["FwStatusProtected"];
+    /// <summary>Пункт меню «Заблокировать IP».</summary>
+    public string BlockIp => this["BlockIp"];
+    /// <summary>Пункт меню «Разблокировать IP».</summary>
+    public string UnblockIp => this["UnblockIp"];
+    /// <summary>Длительность бана 15 минут.</summary>
+    public string BanDuration15m => this["BanDuration15m"];
+    /// <summary>Длительность бана 1 час.</summary>
+    public string BanDuration1h => this["BanDuration1h"];
+    /// <summary>Длительность бана 24 часа.</summary>
+    public string BanDuration24h => this["BanDuration24h"];
+    /// <summary>Перманентный бан.</summary>
+    public string BanPermanent => this["BanPermanent"];
+    /// <summary>Подсказка блокировки IP.</summary>
+    public string BlockIpTooltip => this["BlockIpTooltip"];
+    /// <summary>Подсказка разблокировки IP.</summary>
+    public string UnblockIpTooltip => this["UnblockIpTooltip"];
+    /// <summary>Подсказка выбора длительности бана.</summary>
+    public string BanDurationTooltip => this["BanDurationTooltip"];
+    /// <summary>Заголовок окна Port Defender.</summary>
+    public string PortDefenderTitle => this["PortDefenderTitle"];
+    /// <summary>Подзаголовок окна Port Defender.</summary>
+    public string PortDefenderSubtitle => this["PortDefenderSubtitle"];
+    /// <summary>Переключатель включения Port Defender.</summary>
+    public string PortDefenderEnabledToggle => this["PortDefenderEnabledToggle"];
+    /// <summary>Метка защищаемых портов.</summary>
+    public string PortDefenderProtectedPortsLabel => this["PortDefenderProtectedPortsLabel"];
+    /// <summary>Подсказка защищаемых портов.</summary>
+    public string PortDefenderProtectedPortsTooltip => this["PortDefenderProtectedPortsTooltip"];
+    /// <summary>Метка порога срабатывания.</summary>
+    public string PortDefenderThresholdLabel => this["PortDefenderThresholdLabel"];
+    /// <summary>Подсказка порога срабатывания.</summary>
+    public string PortDefenderThresholdTooltip => this["PortDefenderThresholdTooltip"];
+    /// <summary>Метка временного окна.</summary>
+    public string PortDefenderWindowLabel => this["PortDefenderWindowLabel"];
+    /// <summary>Подсказка временного окна.</summary>
+    public string PortDefenderWindowTooltip => this["PortDefenderWindowTooltip"];
+    /// <summary>Метка длительности бана.</summary>
+    public string PortDefenderBanDurationLabel => this["PortDefenderBanDurationLabel"];
+    /// <summary>Подсказка длительности бана.</summary>
+    public string PortDefenderBanDurationTooltip => this["PortDefenderBanDurationTooltip"];
+    /// <summary>Переключатель автоэскалации.</summary>
+    public string PortDefenderAutoEscalateToggle => this["PortDefenderAutoEscalateToggle"];
+    /// <summary>Переключатель доверия частным сетям.</summary>
+    public string PortDefenderTrustPrivateToggle => this["PortDefenderTrustPrivateToggle"];
+    /// <summary>Метка белого списка.</summary>
+    public string PortDefenderWhitelistLabel => this["PortDefenderWhitelistLabel"];
+    /// <summary>Подсказка белого списка.</summary>
+    public string PortDefenderWhitelistTooltip => this["PortDefenderWhitelistTooltip"];
+    /// <summary>Заголовок правил по портам.</summary>
+    public string PortDefenderRulesTitle => this["PortDefenderRulesTitle"];
+    /// <summary>Заголовок активных банов.</summary>
+    public string PortDefenderActiveBansTitle => this["PortDefenderActiveBansTitle"];
+    /// <summary>Кнопка «Разбанить все».</summary>
+    public string PortDefenderUnbanAllButton => this["PortDefenderUnbanAllButton"];
+    /// <summary>Кнопка «Сохранить».</summary>
+    public string PortDefenderSaveButton => this["PortDefenderSaveButton"];
+    /// <summary>Кнопка «Закрыть».</summary>
+    public string PortDefenderCloseButton => this["PortDefenderCloseButton"];
+
+    /// <summary>Формирует строку счётчика сокетов «Соединений: N (... )».</summary>
+    public string GetFwSocketCount(int total, int established, int listening) =>
+        string.Format(CultureInfo.CurrentUICulture, this["FwSocketCountFormat"], total, established, listening);
+
+    /// <summary>Формирует строку временного бана «В бане до ...».</summary>
+    public string GetPortDefenderBanStatus(string expiresText, int repeatCount) =>
+        string.Format(CultureInfo.CurrentUICulture, this["PortDefenderBanStatusFormat"], expiresText, repeatCount);
+
+    /// <summary>Формирует строку перманентного бана.</summary>
+    public string GetPortDefenderBanPermanent(int repeatCount) =>
+        string.Format(CultureInfo.CurrentUICulture, this["PortDefenderBanPermanentFormat"], repeatCount);
+
     /// <summary>Переключает язык интерфейса и оповещает подписчиков через INotifyPropertyChanged.</summary>
     /// <param name="cultureCode">Код культуры (например, "ru", "en").</param>
     public void ChangeLanguage(string cultureCode)
