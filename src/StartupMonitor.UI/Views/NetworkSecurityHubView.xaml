@@ -1,0 +1,386 @@
+<UserControl
+    x:Class="StartupMonitor.UI.Views.NetworkSecurityHubView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Background="{ui:ThemeResource ApplicationBackgroundBrush}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ===== Верхняя карточка: статус брандмауэра + профили + режим фильтрации ===== -->
+        <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Иконка щита -->
+                <Border Grid.RowSpan="2" Grid.Column="0" Width="44" Height="44" CornerRadius="10"
+                        Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        Margin="0,0,14,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon x:Name="FirewallShieldIcon" Symbol="Shield24" FontSize="22"
+                                   Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <!-- Статус + профили -->
+                <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="FirewallStateBadge" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0"
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <TextBlock x:Name="TxtFirewallState" Text="Брандмауэр: неизвестно"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock x:Name="TxtFirewallDetails" Text="Статус загружается…"
+                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                    <!-- Индикаторы профилей -->
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Border x:Name="ProfileDomainBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <TextBlock x:Name="TxtProfileDomain" Text="Доменный: —" FontSize="11"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                        <Border x:Name="ProfilePrivateBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <TextBlock x:Name="TxtProfilePrivate" Text="Частный: —" FontSize="11"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                        <Border x:Name="ProfilePublicBadge" CornerRadius="4" Padding="8,3"
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <TextBlock x:Name="TxtProfilePublic" Text="Публичный: —" FontSize="11"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Кнопка обновления статуса -->
+                <ui:Button x:Name="BtnRefreshStatus" Grid.Row="0" Grid.Column="2" Appearance="Secondary"
+                           Content="Обновить статус" Click="OnRefreshStatusClick"
+                           VerticalAlignment="Center" Margin="12,0,0,0" />
+
+                <!-- Переключатели режима фильтрации -->
+                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
+                    <TextBlock Text="Режим фильтрации" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode" Content="Обычный"
+                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <RadioButton x:Name="RbModeWhitelist" GroupName="FilteringMode"
+                                     Content="Белый список (блокировать исходящие по умолчанию)"
+                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <RadioButton x:Name="RbModeKillswitch" GroupName="FilteringMode"
+                                     Content="Экстренный Killswitch (блокировать всю сеть)"
+                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center"
+                                     Foreground="#D83B01" FontWeight="SemiBold" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </ui:Card>
+
+        <!-- ===== Вкладки ===== -->
+        <TabControl Grid.Row="1" x:Name="MainTabs">
+
+            <!-- Вкладка 1: Правила брандмауэра -->
+            <TabItem Header="Правила брандмауэра">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Поиск + фильтры -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="3*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox x:Name="TxtRuleSearch" Grid.Column="0"
+                                    PlaceholderText="Поиск по имени, порту, IP, процессу…"
+                                    TextChanged="OnRuleSearchTextChanged" Margin="0,0,12,0" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Фильтр:" FontSize="12"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="Все" IsChecked="True"
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="Входящие"
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="Исходящие"
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="Блокирующие"
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="FilterManaged" GroupName="RuleFilter" Content="StartupMonitor"
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Кнопки действий -->
+                    <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                        <ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="Создать правило"
+                                   Click="OnCreateRuleClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="Редактировать"
+                                   Click="OnEditRuleClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="Удалить"
+                                   Click="OnDeleteRuleClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="Обновить"
+                                   Click="OnRefreshRulesClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="Анти-телеметрия (1 клик)"
+                                   Click="OnAntiTelemetryClick" Margin="0,0,0,4"
+                                   ToolTip="Создаёт исходящие блокирующие правила для известных телеметрических адресов Microsoft" />
+                    </WrapPanel>
+
+                    <!-- Таблица правил -->
+                    <Grid Grid.Row="2">
+                        <DataGrid x:Name="GridRules"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  BorderThickness="1"
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                  RowHeight="34"
+                                  MouseDoubleClick="OnRuleGridDoubleClick">
+                            <DataGrid.Columns>
+                                <!-- Включение -->
+                                <DataGridTemplateColumn Header="Вкл" Width="52">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}"
+                                                      Checked="OnRuleToggleChecked"
+                                                      Unchecked="OnRuleToggleChecked"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Действие -->
+                                <DataGridTemplateColumn Header="Действие" Width="110">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#20107C41" />
+                                                        <Setter Property="BorderBrush" Value="#40107C41" />
+                                                        <Setter Property="BorderThickness" Value="1" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Action}" Value="Block">
+                                                                <Setter Property="Background" Value="#20D83B01" />
+                                                                <Setter Property="BorderBrush" Value="#40D83B01" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock FontSize="11" FontWeight="SemiBold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="Allow" />
+                                                            <Setter Property="Foreground" Value="#107C41" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Action}" Value="Block">
+                                                                    <Setter Property="Text" Value="Block" />
+                                                                    <Setter Property="Foreground" Value="#D83B01" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Направление -->
+                                <DataGridTemplateColumn Header="Напр." Width="80">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                    CornerRadius="4" Padding="6,2"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="In" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Direction}" Value="Outbound">
+                                                                    <Setter Property="Text" Value="Out" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Direction}" Value="Both">
+                                                                    <Setter Property="Text" Value="In+Out" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="2*" />
+                                <DataGridTextColumn Header="Программа" Binding="{Binding ShortProgram}" Width="1.5*" />
+                                <DataGridTextColumn Header="Протокол" Binding="{Binding ProtocolDisplay}" Width="80" />
+                                <DataGridTextColumn Header="Локальные порты" Binding="{Binding LocalPorts}" Width="110" />
+                                <DataGridTextColumn Header="Удалённые адреса" Binding="{Binding RemoteAddresses}" Width="1.5*" />
+                                <DataGridTextColumn Header="Профили" Binding="{Binding ProfilesDisplay}" Width="130" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel x:Name="PanelRulesEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                            <ui:SymbolIcon Symbol="Shield24" FontSize="32"
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+                            <TextBlock Text="Правила не найдены" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Измените поисковый запрос или фильтр" FontSize="12"
+                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка 2: Port Defender -->
+            <TabItem Header="Port Defender">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8"
+                                    Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    Margin="0,0,12,0" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="Shield24" FontSize="20"
+                                               Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtDefenderState" Text="Port Defender: статус загружается…"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                <TextBlock x:Name="TxtDefenderDetails" Text="—" FontSize="12"
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:Button x:Name="BtnConfigureDefender" Appearance="Primary"
+                                           Content="Настроить Port Defender"
+                                           Click="OnConfigureDefenderClick" Margin="0,0,8,0" />
+                                <ui:Button x:Name="BtnRefreshDefender" Appearance="Secondary"
+                                           Content="Обновить" Click="OnRefreshDefenderClick" />
+                            </StackPanel>
+                        </Grid>
+                    </ui:Card>
+
+                    <ui:Card Grid.Row="1" Padding="14">
+                        <StackPanel>
+                            <TextBlock Text="Защищаемые локальные порты" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                            <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="14"
+                                       FontFamily="Consolas, Segoe UI"
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ui:Card>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка 3: Журнал атак и банов -->
+            <TabItem Header="Журнал атак и банов">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <ui:Button x:Name="BtnRefreshBans" Appearance="Secondary" Content="Обновить"
+                                   Click="OnRefreshBansClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnUnblockIp" Appearance="Secondary" Content="Разблокировать выбранный IP"
+                                   Click="OnUnblockIpClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnClearBans" Appearance="Danger" Content="Сбросить все баны"
+                                   Click="OnClearBansClick" Margin="0,0,0,4" />
+                        <TextBlock x:Name="TxtBansCount" Text="Активных банов: 0" FontSize="12"
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center" Margin="12,0,0,4" />
+                    </WrapPanel>
+
+                    <Grid Grid.Row="1">
+                        <DataGrid x:Name="GridBans"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  BorderThickness="1"
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                  RowHeight="34">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="130" />
+                                <DataGridTextColumn Header="Порт" Binding="{Binding TargetPort}" Width="70" />
+                                <DataGridTextColumn Header="Процесс" Binding="{Binding TargetProcess}" Width="1.5*" />
+                                <DataGridTextColumn Header="Попыток" Binding="{Binding AttackRate}" Width="80" />
+                                <DataGridTextColumn Header="Причина" Binding="{Binding Reason}" Width="2*" />
+                                <DataGridTextColumn Header="Осталось" Binding="{Binding RemainingText}" Width="110" />
+                                <DataGridTextColumn Header="Повторы" Binding="{Binding RepeatCount}" Width="80" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel x:Name="PanelBansEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                            <ui:SymbolIcon Symbol="Shield24" FontSize="32"
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+                            <TextBlock Text="Активных банов нет" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Port Defender не зафиксировал атак" FontSize="12"
+                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- ===== Статусная строка ===== -->
+        <Grid Grid.Row="2" Margin="0,8,0,0">
+            <TextBlock x:Name="TxtStatus" Text="Готово" FontSize="12"
+                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1753,4 +1753,40 @@
   <data name="FwSocketCountFormat" xml:space="preserve">
     <value>Соединений: {0} (установлено: {1}, прослушивается: {2})</value>
   </data>
+  <data name="NavFirewall" xml:space="preserve">
+    <value>Сетевой экран</value>
+  </data>
+  <data name="FirewallHubTitle" xml:space="preserve">
+    <value>Центр сетевой безопасности</value>
+  </data>
+  <data name="RuleActionAllow" xml:space="preserve">
+    <value>Разрешить</value>
+  </data>
+  <data name="RuleActionBlock" xml:space="preserve">
+    <value>Блокировать</value>
+  </data>
+  <data name="RuleDirIn" xml:space="preserve">
+    <value>Входящее</value>
+  </data>
+  <data name="RuleDirOut" xml:space="preserve">
+    <value>Исходящее</value>
+  </data>
+  <data name="FilteringModeNormal" xml:space="preserve">
+    <value>Обычный</value>
+  </data>
+  <data name="FilteringModeWhitelist" xml:space="preserve">
+    <value>Белый список</value>
+  </data>
+  <data name="FilteringModeKillswitch" xml:space="preserve">
+    <value>Killswitch</value>
+  </data>
+  <data name="BtnCreateRule" xml:space="preserve">
+    <value>Создать правило</value>
+  </data>
+  <data name="BtnEditRule" xml:space="preserve">
+    <value>Редактировать</value>
+  </data>
+  <data name="BtnDeleteRule" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
 </root>

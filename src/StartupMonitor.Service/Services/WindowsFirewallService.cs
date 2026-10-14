@@ -42,6 +42,12 @@ public sealed class WindowsFirewallService
     /// <summary>Агрегированное правило блокировки IP: исходящие.</summary>
     public const string AggregatedRuleNameOut = "StartupMonitor_Blocked_IPs_Out";
 
+    /// <summary>Killswitch: блокировка всего трафика (входящие).</summary>
+    public const string KillswitchRuleNameIn = "StartupMonitor_Killswitch_BlockAll_In";
+
+    /// <summary>Killswitch: блокировка всего трафика (исходящие).</summary>
+    public const string KillswitchRuleNameOut = "StartupMonitor_Killswitch_BlockAll_Out";
+
     private const string PolicyProgId = "HNetCfg.FwPolicy2";
     private const string RuleProgId = "HNetCfg.FWRule";
 
@@ -445,6 +451,482 @@ public sealed class WindowsFirewallService
         }
     }
 
+    // --- Публичный API: ядро управления правилами ------------------------------
+
+    /// <summary>
+    /// Перечисляет ВСЕ правила COM-политики (включая чужие).
+    /// Каждое COM-свойство читается через SafeGet (может бросать при Any-протоколе),
+    /// все RCW освобождаются через <c>Marshal.ReleaseComObject</c> (Zero-Crash).
+    /// </summary>
+    public IReadOnlyList<FirewallRuleDto> GetAllRules()
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+            return EnumerateRules((object)rules);
+        }
+        catch (Exception ex) when (IsFirewallDown(ex))
+        {
+            Log.Warning(ex, "Firewall недоступен при перечислении правил");
+            return Array.Empty<FirewallRuleDto>();
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    /// <summary>
+    /// Создаёт или обновляет произвольное правило <c>HNetCfg.FWRule</c>.
+    /// При <c>Direction.Both</c> создаются/обновляются два правила In+Out.
+    /// </summary>
+    public FirewallOperationResult CreateOrUpdateRule(FirewallRuleDto rule)
+    {
+        if (rule is null)
+            return FirewallOperationResult.Fail("Пустое правило.");
+        if (string.IsNullOrWhiteSpace(rule.Name))
+            return FirewallOperationResult.Fail("Пустое имя правила.");
+
+        lock (_sync)
+        {
+            try
+            {
+                var targets = rule.Direction == FirewallDirection.Both
+                    ? new[] { FirewallDirection.Inbound, FirewallDirection.Outbound }
+                    : new[] { rule.Direction is FirewallDirection.Outbound ? FirewallDirection.Outbound : FirewallDirection.Inbound };
+
+                var written = new List<string>(targets.Length);
+                foreach (var dir in targets)
+                {
+                    var name = targets.Length == 1 ? rule.Name.Trim() : rule.Name.Trim() + (dir == FirewallDirection.Outbound ? "_Out" : "_In");
+                    written.Add(UpsertGenericRule(rule, name, dir == FirewallDirection.Outbound ? DirOut : DirIn));
+                }
+
+                Log.Information("Firewall: правило {Name} создано/обновлено ({Dir})", rule.Name, rule.Direction);
+                return FirewallOperationResult.Ok($"Правило {rule.Name} сохранено.", string.Join("+", written), created: true);
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).", rule.Name);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "CreateOrUpdateRule({Name}) не выполнен", rule.Name);
+                return FirewallOperationResult.Fail($"Не удалось сохранить правило {rule.Name}: {FriendlyError(ex)}", rule.Name);
+            }
+        }
+    }
+
+    /// <summary>Удаляет правило по имени (Both удаляет In+Out варианты).</summary>
+    public FirewallOperationResult DeleteRule(string ruleName, FirewallDirection direction = FirewallDirection.Both)
+    {
+        if (string.IsNullOrWhiteSpace(ruleName))
+            return FirewallOperationResult.Fail("Пустое имя правила.");
+
+        var name = ruleName.Trim();
+        lock (_sync)
+        {
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+
+                int removed = 0;
+                foreach (var candidate in CandidateNames(name, direction))
+                {
+                    if (direction is FirewallDirection.Inbound or FirewallDirection.Outbound)
+                    {
+                        dynamic? found = FindRule(rules, candidate);
+                        if (found is null) continue;
+                        try
+                        {
+                            int dir = SafeGetInt(found, "Direction", DirIn);
+                            bool match = direction == FirewallDirection.Inbound ? dir == DirIn : dir == DirOut;
+                            if (!match) continue;
+                        }
+                        finally { Release(found); }
+                    }
+
+                    if (RemoveRuleByName(rules, candidate)) removed++;
+                }
+
+                return removed > 0
+                    ? FirewallOperationResult.Ok($"Правило {name} удалено (удалено: {removed}).", name)
+                    : FirewallOperationResult.Fail($"Правило {name} не найдено.", name);
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).", name);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "DeleteRule({Name}) не выполнен", name);
+                return FirewallOperationResult.Fail($"Не удалось удалить правило {name}: {FriendlyError(ex)}", name);
+            }
+            finally
+            {
+                Release(rulesObj);
+                Release(policyObj);
+            }
+        }
+    }
+
+    /// <summary>Включает/выключает правило по имени.</summary>
+    public FirewallOperationResult ToggleRule(string ruleName, FirewallDirection direction, bool enable)
+    {
+        if (string.IsNullOrWhiteSpace(ruleName))
+            return FirewallOperationResult.Fail("Пустое имя правила.");
+
+        var name = ruleName.Trim();
+        lock (_sync)
+        {
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+
+                int toggled = 0;
+                foreach (var candidate in CandidateNames(name, direction))
+                {
+                    dynamic? found = FindRule(rules, candidate);
+                    if (found is null) continue;
+                    try
+                    {
+                        if (direction is FirewallDirection.Inbound or FirewallDirection.Outbound)
+                        {
+                            int dir = SafeGetInt(found, "Direction", DirIn);
+                            bool match = direction == FirewallDirection.Inbound ? dir == DirIn : dir == DirOut;
+                            if (!match) continue;
+                        }
+
+                        found.Enabled = enable;
+                        toggled++;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "ToggleRule({Name}): не удалось переключить Enabled", candidate);
+                    }
+                    finally { Release(found); }
+                }
+
+                return toggled > 0
+                    ? FirewallOperationResult.Ok($"Правило {name} {(enable ? "включено" : "выключено")}.", name)
+                    : FirewallOperationResult.Fail($"Правило {name} не найдено.", name);
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).", name);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "ToggleRule({Name}) не выполнен", name);
+                return FirewallOperationResult.Fail($"Не удалось переключить правило {name}: {FriendlyError(ex)}", name);
+            }
+            finally
+            {
+                Release(rulesObj);
+                Release(policyObj);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Устанавливает режим фильтрации: настраивает политику
+    /// (FirewallEnabled / DefaultOutboundAction) или спецправило Killswitch.
+    /// </summary>
+    public FirewallOperationResult SetFilteringMode(FirewallFilteringMode mode)
+    {
+        if (!Enum.IsDefined(typeof(FirewallFilteringMode), mode))
+            return FirewallOperationResult.Fail($"Неизвестный режим фильтрации: {(int)mode}.");
+
+        lock (_sync)
+        {
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+
+                switch (mode)
+                {
+                    case FirewallFilteringMode.Normal:
+                        SetFirewallEnabledAll(policy, true);
+                        SetDefaultOutboundAll(policy, ActionAllow);
+                        RemoveRuleByName(rules, KillswitchRuleNameIn);
+                        RemoveRuleByName(rules, KillswitchRuleNameOut);
+                        break;
+
+                    case FirewallFilteringMode.WhitelistOutbound:
+                        SetFirewallEnabledAll(policy, true);
+                        RemoveRuleByName(rules, KillswitchRuleNameIn);
+                        RemoveRuleByName(rules, KillswitchRuleNameOut);
+                        SetDefaultOutboundAll(policy, ActionBlock);
+                        break;
+
+                    case FirewallFilteringMode.KillswitchBlockAll:
+                        SetFirewallEnabledAll(policy, true);
+                        UpsertKillswitchRule(rules, KillswitchRuleNameIn, DirIn);
+                        UpsertKillswitchRule(rules, KillswitchRuleNameOut, DirOut);
+                        break;
+
+                    case FirewallFilteringMode.Disabled:
+                        RemoveRuleByName(rules, KillswitchRuleNameIn);
+                        RemoveRuleByName(rules, KillswitchRuleNameOut);
+                        SetFirewallEnabledAll(policy, false);
+                        break;
+                }
+
+                Log.Information("Firewall: режим фильтрации -> {Mode}", mode);
+                return FirewallOperationResult.Ok($"Режим фильтрации: {mode}.");
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "SetFilteringMode({Mode}) не выполнен", mode);
+                return FirewallOperationResult.Fail($"Не удалось установить режим {mode}: {FriendlyError(ex)}");
+            }
+            finally
+            {
+                Release(rulesObj);
+                Release(policyObj);
+            }
+        }
+    }
+
+    /// <summary>Возвращает текущий режим фильтрации (эвристика по политике и Killswitch-правилу).</summary>
+    public FirewallFilteringMode GetFilteringMode()
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            bool d = IsEnabledSafe(policy, ProfileDomain);
+            bool p = IsEnabledSafe(policy, ProfilePrivate);
+            bool pub = IsEnabledSafe(policy, ProfilePublic);
+            if (!d && !p && !pub)
+                return FirewallFilteringMode.Disabled;
+
+            if (IsKillswitchActive(rules))
+                return FirewallFilteringMode.KillswitchBlockAll;
+
+            if (IsDefaultOutboundBlocked(policy))
+                return FirewallFilteringMode.WhitelistOutbound;
+
+            return FirewallFilteringMode.Normal;
+        }
+        catch
+        {
+            return FirewallFilteringMode.Normal;
+        }
+        finally
+        {
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    private static IEnumerable<string> CandidateNames(string name, FirewallDirection direction)
+    {
+        if (direction == FirewallDirection.Both)
+        {
+            yield return name;
+            yield return name + "_In";
+            yield return name + "_Out";
+        }
+        else
+        {
+            yield return name;
+            yield return name + (direction == FirewallDirection.Outbound ? "_Out" : "_In");
+        }
+    }
+
+    private static string UpsertGenericRule(FirewallRuleDto dto, string name, int direction)
+    {
+        object? policyObj = null;
+        object? rulesObj = null;
+        dynamic? rule = null;
+        try
+        {
+            dynamic policy = CreatePolicy(out policyObj);
+            dynamic rules = policy.Rules;
+            rulesObj = rules;
+
+            rule = FindRule(rules, name);
+            bool created = rule is null;
+            if (created)
+            {
+                Release(rule);
+                rule = CreateRuleObject();
+                rule.Name = name;
+            }
+
+            ApplyDtoToComRule(rule, dto, name, direction);
+            if (created)
+                rules.Add(rule);
+
+            return name;
+        }
+        finally
+        {
+            Release(rule);
+            Release(rulesObj);
+            Release(policyObj);
+        }
+    }
+
+    private static void ApplyDtoToComRule(dynamic comRule, FirewallRuleDto dto, string name, int direction)
+    {
+        comRule.Name = name;
+        if (!string.IsNullOrWhiteSpace(dto.Description))
+            comRule.Description = dto.Description;
+        comRule.Direction = direction;
+        comRule.Action = dto.Action == FirewallAction.Allow ? ActionAllow : ActionBlock;
+        comRule.Enabled = dto.Enabled;
+        comRule.Profiles = ToComProfiles(dto.Profiles);
+        comRule.Protocol = dto.Protocol switch
+        {
+            FirewallProtocol.Tcp => ProtoTcp,
+            FirewallProtocol.Udp => ProtoUdp,
+            _ => ProtoAny,
+        };
+
+        var app = dto.ApplicationPath ?? dto.ApplicationName;
+        if (!string.IsNullOrWhiteSpace(app))
+            comRule.ApplicationName = app;
+        if (!string.IsNullOrWhiteSpace(dto.ServiceName))
+        {
+            try { comRule.ServiceName = dto.ServiceName; } catch { }
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.LocalPorts))
+        {
+            try { comRule.LocalPorts = dto.LocalPorts.Trim(); } catch { }
+        }
+        if (!string.IsNullOrWhiteSpace(dto.RemotePorts))
+        {
+            try { comRule.RemotePorts = dto.RemotePorts.Trim(); } catch { }
+        }
+        if (!string.IsNullOrWhiteSpace(dto.RemoteAddresses))
+        {
+            try { comRule.RemoteAddresses = dto.RemoteAddresses.Trim(); } catch { }
+        }
+        if (!string.IsNullOrWhiteSpace(dto.Grouping))
+            comRule.Grouping = dto.Grouping;
+        else if (name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase))
+            comRule.Grouping = RuleGroup;
+    }
+
+    private static int ToComProfiles(FirewallProfile profiles)
+    {
+        if (profiles.HasFlag(FirewallProfile.Domain)
+            && profiles.HasFlag(FirewallProfile.Private)
+            && profiles.HasFlag(FirewallProfile.Public))
+            return ProfilesAll;
+        int mask = (int)profiles & 7;
+        return mask == 0 ? ProfilesAll : mask;
+    }
+
+    private static void UpsertKillswitchRule(dynamic rules, string name, int direction)
+    {
+        dynamic? rule = FindRule(rules, name);
+        bool created = rule is null;
+        try
+        {
+            if (created)
+            {
+                Release(rule);
+                rule = CreateRuleObject();
+                rule!.Name = name;
+            }
+
+            rule!.Description = "Killswitch StartupMonitor: блокировка всего трафика.";
+            rule!.Grouping = RuleGroup;
+            rule!.Direction = direction;
+            rule!.Action = ActionBlock;
+            rule!.Enabled = true;
+            rule!.Profiles = ProfilesAll;
+            rule!.Protocol = ProtoAny;
+
+            if (created)
+                rules.Add(rule);
+            else
+                rule!.Enabled = true;
+        }
+        finally
+        {
+            Release(rule);
+        }
+    }
+
+    private static bool IsKillswitchActive(dynamic rules)
+    {
+        foreach (var n in new[] { KillswitchRuleNameIn, KillswitchRuleNameOut })
+        {
+            dynamic? rule = FindRule(rules, n);
+            if (rule is null) continue;
+            try
+            {
+                bool enabled = SafeGetBool(rule, "Enabled", false);
+                int action = SafeGetInt(rule, "Action", ActionAllow);
+                if (enabled && action == ActionBlock) return true;
+            }
+            finally { Release(rule); }
+        }
+
+        return false;
+    }
+
+    private static void SetFirewallEnabledAll(dynamic policy, bool enabled)
+    {
+        foreach (var profile in new[] { ProfileDomain, ProfilePrivate, ProfilePublic })
+        {
+            try { policy.FirewallEnabled[profile] = enabled; } catch { }
+        }
+    }
+
+    private static void SetDefaultOutboundAll(dynamic policy, int action)
+    {
+        foreach (var profile in new[] { ProfileDomain, ProfilePrivate, ProfilePublic })
+        {
+            try { policy.DefaultOutboundAction[profile] = action; } catch { }
+        }
+    }
+
+    private static bool IsDefaultOutboundBlocked(dynamic policy)
+    {
+        foreach (var profile in new[] { ProfileDomain, ProfilePrivate, ProfilePublic })
+        {
+            try
+            {
+                int v = Convert.ToInt32(policy.DefaultOutboundAction[profile]);
+                if (v == ActionBlock) return true;
+            }
+            catch { }
+        }
+
+        return false;
+    }
+
     // --- Внутренняя логика: агрегированные IP --------------------------------
 
     private string AddIpToAggregated(string normalizedIp, int direction, string ruleName, string description)
@@ -750,6 +1232,9 @@ public sealed class WindowsFirewallService
         int profilesMask = SafeGetInt(r, "Profiles", ProfilesAll) & 7;
         if (profilesMask == 0) profilesMask = 7;
 
+        string? app = SafeGet(r, "ApplicationName");
+        bool managed = name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase);
+
         return new FirewallRuleDto
         {
             Name = name,
@@ -763,11 +1248,14 @@ public sealed class WindowsFirewallService
                 _ => FirewallProtocol.Any,
             },
             LocalPorts = SafeGet(r, "LocalPorts") ?? string.Empty,
+            RemotePorts = SafeGet(r, "RemotePorts"),
             RemoteAddresses = SafeGet(r, "RemoteAddresses") ?? string.Empty,
-            ApplicationPath = SafeGet(r, "ApplicationName"),
+            ApplicationPath = app,
+            ServiceName = SafeGet(r, "ServiceName"),
             Enabled = SafeGetBool(r, "Enabled", true),
             Profiles = (FirewallProfile)profilesMask,
-            IsManaged = name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase),
+            Grouping = SafeGet(r, "Grouping"),
+            IsManaged = managed,
         };
     }
 

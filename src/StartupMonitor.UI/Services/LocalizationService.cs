@@ -954,6 +954,32 @@ public class LocalizationService : INotifyPropertyChanged
     /// <summary>Кнопка «Закрыть».</summary>
     public string PortDefenderCloseButton => this["PortDefenderCloseButton"];
 
+    // ──── Центр сетевой безопасности (NetworkSecurityHubView / FirewallPage) ────
+    /// <summary>Название пункта навигации «Сетевой экран».</summary>
+    public string NavFirewall => this["NavFirewall"];
+    /// <summary>Заголовок хаба сетевой безопасности.</summary>
+    public string FirewallHubTitle => this["FirewallHubTitle"];
+    /// <summary>Действие правила «Разрешить».</summary>
+    public string RuleActionAllow => this["RuleActionAllow"];
+    /// <summary>Действие правила «Блокировать».</summary>
+    public string RuleActionBlock => this["RuleActionBlock"];
+    /// <summary>Направление правила «Входящее».</summary>
+    public string RuleDirIn => this["RuleDirIn"];
+    /// <summary>Направление правила «Исходящее».</summary>
+    public string RuleDirOut => this["RuleDirOut"];
+    /// <summary>Режим фильтрации «Обычный».</summary>
+    public string FilteringModeNormal => this["FilteringModeNormal"];
+    /// <summary>Режим фильтрации «Белый список».</summary>
+    public string FilteringModeWhitelist => this["FilteringModeWhitelist"];
+    /// <summary>Режим фильтрации «Killswitch».</summary>
+    public string FilteringModeKillswitch => this["FilteringModeKillswitch"];
+    /// <summary>Кнопка «Создать правило».</summary>
+    public string BtnCreateRule => this["BtnCreateRule"];
+    /// <summary>Кнопка «Редактировать» правило.</summary>
+    public string BtnEditRule => this["BtnEditRule"];
+    /// <summary>Кнопка «Удалить» правило.</summary>
+    public string BtnDeleteRule => this["BtnDeleteRule"];
+
     /// <summary>Формирует строку счётчика сокетов «Соединений: N (... )».</summary>
     public string GetFwSocketCount(int total, int established, int listening) =>
         string.Format(CultureInfo.CurrentUICulture, this["FwSocketCountFormat"], total, established, listening);

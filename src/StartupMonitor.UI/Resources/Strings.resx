@@ -1753,4 +1753,40 @@ Do you really want to proceed?</value>
   <data name="FwSocketCountFormat" xml:space="preserve">
     <value>Connections: {0} (established: {1}, listening: {2})</value>
   </data>
+  <data name="NavFirewall" xml:space="preserve">
+    <value>Firewall &amp; Security</value>
+  </data>
+  <data name="FirewallHubTitle" xml:space="preserve">
+    <value>Network Security Hub</value>
+  </data>
+  <data name="RuleActionAllow" xml:space="preserve">
+    <value>Allow</value>
+  </data>
+  <data name="RuleActionBlock" xml:space="preserve">
+    <value>Block</value>
+  </data>
+  <data name="RuleDirIn" xml:space="preserve">
+    <value>Inbound</value>
+  </data>
+  <data name="RuleDirOut" xml:space="preserve">
+    <value>Outbound</value>
+  </data>
+  <data name="FilteringModeNormal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="FilteringModeWhitelist" xml:space="preserve">
+    <value>Whitelist</value>
+  </data>
+  <data name="FilteringModeKillswitch" xml:space="preserve">
+    <value>Killswitch</value>
+  </data>
+  <data name="BtnCreateRule" xml:space="preserve">
+    <value>Create Rule</value>
+  </data>
+  <data name="BtnEditRule" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="BtnDeleteRule" xml:space="preserve">
+    <value>Delete</value>
+  </data>
 </root>

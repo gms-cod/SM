@@ -1520,6 +1520,176 @@ public class PipeServer : BackgroundService
                     }
                     break;
 
+                case PipeMessageTypes.GetAllFirewallRules:
+                    try
+                    {
+                        var rules = _firewallService.GetAllRules();
+                        response.Type = PipeMessageTypes.GetAllFirewallRulesResponse;
+                        response.Payload = JsonSerializer.Serialize(new FirewallRulesPayload(rules.ToList()), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.CreateFirewallRule:
+                    try
+                    {
+                        FirewallRuleDto? ruleDto = null;
+                        try { ruleDto = JsonSerializer.Deserialize<CreateRulePayload>(message.Payload, JsonOptions)?.Rule; } catch { }
+                        if (ruleDto == null)
+                        {
+                            try { ruleDto = JsonSerializer.Deserialize<CreateRuleRequest>(message.Payload, JsonOptions)?.Rule; } catch { }
+                        }
+                        if (ruleDto == null)
+                        {
+                            try { ruleDto = JsonSerializer.Deserialize<FirewallRuleDto>(message.Payload, JsonOptions); } catch { }
+                        }
+                        if (ruleDto == null || string.IsNullOrWhiteSpace(ruleDto.Name))
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректное правило брандмауэра для создания."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.CreateOrUpdateRule(ruleDto);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.DeleteFirewallRule:
+                    try
+                    {
+                        string? ruleName = null;
+                        var direction = FirewallDirection.Both;
+                        try
+                        {
+                            var p = JsonSerializer.Deserialize<DeleteRulePayload>(message.Payload, JsonOptions);
+                            if (p != null) { ruleName = p.Name; direction = p.Direction; }
+                        }
+                        catch { }
+                        if (string.IsNullOrWhiteSpace(ruleName))
+                        {
+                            try
+                            {
+                                var r = JsonSerializer.Deserialize<DeleteRuleRequest>(message.Payload, JsonOptions);
+                                if (r != null) { ruleName = r.Name; direction = r.Direction; }
+                            }
+                            catch { }
+                        }
+                        if (string.IsNullOrWhiteSpace(ruleName))
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Не указано имя правила для удаления."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.DeleteRule(ruleName, direction);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.ToggleFirewallRule:
+                    try
+                    {
+                        ToggleRulePayload? toggleReq = null;
+                        try { toggleReq = JsonSerializer.Deserialize<ToggleRulePayload>(message.Payload, JsonOptions); } catch { }
+                        string? toggleName = toggleReq?.Name;
+                        var toggleDir = toggleReq?.Direction ?? FirewallDirection.Both;
+                        var toggleEnable = toggleReq?.Enable ?? false;
+                        var hasToggle = toggleReq != null && !string.IsNullOrWhiteSpace(toggleName);
+                        if (!hasToggle)
+                        {
+                            try
+                            {
+                                var r = JsonSerializer.Deserialize<ToggleRuleRequest>(message.Payload, JsonOptions);
+                                if (r != null && !string.IsNullOrWhiteSpace(r.Name))
+                                {
+                                    toggleName = r.Name;
+                                    toggleDir = r.Direction;
+                                    toggleEnable = r.Enable;
+                                    hasToggle = true;
+                                }
+                            }
+                            catch { }
+                        }
+                        if (!hasToggle || string.IsNullOrWhiteSpace(toggleName))
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректный запрос переключения правила."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.ToggleRule(toggleName, toggleDir, toggleEnable);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.SetFirewallFilteringMode:
+                    try
+                    {
+                        FirewallFilteringMode? mode = null;
+                        try { mode = JsonSerializer.Deserialize<FilteringModePayload>(message.Payload, JsonOptions)?.Mode; } catch { }
+                        if (mode == null)
+                        {
+                            try { mode = JsonSerializer.Deserialize<SetFilteringModeRequest>(message.Payload, JsonOptions)?.Mode; } catch { }
+                        }
+                        if (mode == null)
+                        {
+                            try { mode = JsonSerializer.Deserialize<FirewallFilteringMode>(message.Payload, JsonOptions); } catch { }
+                        }
+                        if (mode == null)
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректный режим фильтрации."), JsonOptions);
+                            break;
+                        }
+
+                        var result = _firewallService.SetFilteringMode(mode.Value);
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(result, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.GetFirewallFilteringMode:
+                    try
+                    {
+                        var mode = _firewallService.GetFilteringMode();
+                        response.Type = PipeMessageTypes.GetFirewallFilteringModeResponse;
+                        response.Payload = JsonSerializer.Serialize(new FilteringModePayload(mode), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
                 case PipeMessageTypes.ShutdownService:
                     _logger.LogInformation("Получен запрос на остановку службы от UI (ShutdownService)");
                     response.Type = PipeMessageTypes.Success;

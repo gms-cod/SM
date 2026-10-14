@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:models="clr-namespace:StartupMonitor.Shared.Models;assembly=StartupMonitor.Shared"
+    xmlns:views="clr-namespace:StartupMonitor.UI.Views"
     Title="{Binding AppName, Source={StaticResource Loc}}"
     Height="800" Width="1200" MinHeight="680" MinWidth="1080"
     WindowStartupLocation="CenterScreen"
@@ -146,19 +147,31 @@
                              </StackPanel>
                          </Grid>
                      </Border>
-                     <Border x:Name="NavItem5" Tag="5" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                         <Grid>
-                             <Rectangle x:Name="NavBar5" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                 <Viewbox Width="16" Height="16">
-                                     <Path Data="{StaticResource IconDocumentList}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                 </Viewbox>
-                                 <TextBlock Text="{Binding NavLogs, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                             </StackPanel>
-                         </Grid>
-                     </Border>
-                </StackPanel>
+                      <Border x:Name="NavItem5" Tag="5" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+                          <Grid>
+                              <Rectangle x:Name="NavBar5" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                  <Viewbox Width="16" Height="16">
+                                      <Path Data="{StaticResource IconDocumentList}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                  </Viewbox>
+                                  <TextBlock Text="{Binding NavLogs, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                              </StackPanel>
+                          </Grid>
+                      </Border>
+                      <Border x:Name="NavItem8" Tag="8" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+                          <Grid>
+                              <Rectangle x:Name="NavBar8" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                  <Viewbox Width="16" Height="16">
+                                      <Path Data="{StaticResource IconShieldCheckmark}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                  </Viewbox>
+                                  <TextBlock Text="{Binding NavFirewall, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                              </StackPanel>
+                          </Grid>
+                      </Border>
+                 </StackPanel>
 
                 <!-- Настройки и выход -->
                 <StackPanel Grid.Row="2" Margin="8 0 8 12">
@@ -2688,6 +2701,11 @@
                     </Border>
                 </StackPanel>
             </ScrollViewer>
+        </Grid>
+
+        <!-- Страница Центра сетевой безопасности (Сетевой экран) -->
+        <Grid Grid.Column="1" x:Name="FirewallPage" Tag="8" Visibility="Collapsed">
+            <views:NetworkSecurityHubView x:Name="FirewallHubView" />
         </Grid>
 
             <!-- Оверлей загрузки -->

@@ -64,6 +64,19 @@ public enum FirewallBlockStatus
     BlockedBoth = 3
 }
 
+/// <summary>Режим фильтрации брандмауэра Windows (ядро управления правилами).</summary>
+public enum FirewallFilteringMode
+{
+    /// <summary>Обычный режим: действуют правила пользователя/системы.</summary>
+    Normal = 0,
+    /// <summary>Белый список исходящих: исходящие по умолчанию блокируются.</summary>
+    WhitelistOutbound = 1,
+    /// <summary>Killswitch: блокируется весь трафик спецправилом StartupMonitor.</summary>
+    KillswitchBlockAll = 2,
+    /// <summary>Брандмауэр выключен для всех профилей.</summary>
+    Disabled = 3
+}
+
 /// <summary>Результат операции с брандмауэром (Zero-Crash: исключения не уходят наружу без упаковки).</summary>
 public sealed class FirewallOperationResult
 {
@@ -119,6 +132,10 @@ public sealed class FirewallRuleDto
     [JsonPropertyName("localPorts")]
     public string LocalPorts { get; set; } = string.Empty;
 
+    /// <summary>Удалённые порты ("80", "443", "5000-5010"). Null/пусто = любые.</summary>
+    [JsonPropertyName("remotePorts")]
+    public string? RemotePorts { get; set; }
+
     /// <summary>Удалённые адреса (CSV: "1.2.3.4,5.6.0.0/16").</summary>
     [JsonPropertyName("remoteAddresses")]
     public string RemoteAddresses { get; set; } = string.Empty;
@@ -126,6 +143,18 @@ public sealed class FirewallRuleDto
     /// <summary>Приложение (ApplicationName / FullPath), пусто = вся система.</summary>
     [JsonPropertyName("applicationPath")]
     public string? ApplicationPath { get; set; }
+
+    /// <summary>Алиас ApplicationPath для ядра управления правилами (COM ApplicationName).</summary>
+    [JsonPropertyName("applicationName")]
+    public string? ApplicationName
+    {
+        get => ApplicationPath;
+        set => ApplicationPath = value;
+    }
+
+    /// <summary>Имя службы (COM ServiceName). Null/пусто = без привязки к службе.</summary>
+    [JsonPropertyName("serviceName")]
+    public string? ServiceName { get; set; }
 
     /// <summary>Включено ли правило.</summary>
     [JsonPropertyName("enabled")]
@@ -135,9 +164,139 @@ public sealed class FirewallRuleDto
     [JsonPropertyName("profiles")]
     public FirewallProfile Profiles { get; set; } = FirewallProfile.All;
 
+    /// <summary>
+    /// Профили в виде int-маски COM API. All отображается как 0x7FFFFFFF.
+    /// Прокси к <see cref="Profiles"/> для ядра управления правилами.
+    /// </summary>
+    [JsonPropertyName("profilesMask")]
+    public int ProfilesMask
+    {
+        get => Profiles == FirewallProfile.All ? unchecked((int)0x7FFFFFFF) : (int)Profiles;
+        set
+        {
+            if (value == unchecked((int)0x7FFFFFFF))
+                Profiles = FirewallProfile.All;
+            else
+                Profiles = (FirewallProfile)(value & 7);
+        }
+    }
+
+    /// <summary>Группа правила (COM Grouping, отображается в wf.msc).</summary>
+    [JsonPropertyName("grouping")]
+    public string? Grouping { get; set; }
+
     /// <summary>Признак правила StartupMonitor (префикс имени).</summary>
     [JsonPropertyName("isManaged")]
     public bool IsManaged { get; set; }
+
+    /// <summary>Алиас IsManaged для ядра управления правилами.</summary>
+    [JsonPropertyName("isStartupMonitorManaged")]
+    public bool IsStartupMonitorManaged
+    {
+        get => IsManaged;
+        set => IsManaged = value;
+    }
+}
+
+/// <summary>Запрос создания/обновления произвольного правила (ядро управления правилами).</summary>
+public sealed class CreateRuleRequest
+{
+    /// <summary>Правило для создания/обновления.</summary>
+    [JsonPropertyName("rule")]
+    public FirewallRuleDto Rule { get; set; } = new();
+
+    /// <summary>CreateRuleRequest: пустой конструктор для десериализации.</summary>
+    public CreateRuleRequest() { }
+
+    /// <summary>CreateRuleRequest: создаёт запрос из DTO правила.</summary>
+    public CreateRuleRequest(FirewallRuleDto rule) => Rule = rule;
+}
+
+/// <summary>Запрос удаления правила по имени.</summary>
+public sealed class DeleteRuleRequest
+{
+    /// <summary>Имя правила.</summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Алиас имени (совместимость с контрактом RuleName).</summary>
+    [JsonPropertyName("ruleName")]
+    public string RuleName
+    {
+        get => Name;
+        set => Name = value;
+    }
+
+    /// <summary>Направление (Both удаляет In+Out варианты).</summary>
+    [JsonPropertyName("direction")]
+    public FirewallDirection Direction { get; set; } = FirewallDirection.Both;
+
+    /// <summary>DeleteRuleRequest: пустой конструктор для десериализации.</summary>
+    public DeleteRuleRequest() { }
+
+    /// <summary>DeleteRuleRequest: создаёт запрос.</summary>
+    public DeleteRuleRequest(string name, FirewallDirection direction = FirewallDirection.Both)
+    {
+        Name = name;
+        Direction = direction;
+    }
+}
+
+/// <summary>Запрос вкл/выкл правила по имени.</summary>
+public sealed class ToggleRuleRequest
+{
+    /// <summary>Имя правила.</summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Алиас имени (совместимость с контрактом RuleName).</summary>
+    [JsonPropertyName("ruleName")]
+    public string RuleName
+    {
+        get => Name;
+        set => Name = value;
+    }
+
+    /// <summary>Направление.</summary>
+    [JsonPropertyName("direction")]
+    public FirewallDirection Direction { get; set; } = FirewallDirection.Both;
+
+    /// <summary>Включить (true) или выключить (false).</summary>
+    [JsonPropertyName("enable")]
+    public bool Enable { get; set; }
+
+    /// <summary>Алиас Enable (совместимость с контрактом Enabled).</summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled
+    {
+        get => Enable;
+        set => Enable = value;
+    }
+
+    /// <summary>ToggleRuleRequest: пустой конструктор для десериализации.</summary>
+    public ToggleRuleRequest() { }
+
+    /// <summary>ToggleRuleRequest: создаёт запрос.</summary>
+    public ToggleRuleRequest(string name, FirewallDirection direction, bool enable)
+    {
+        Name = name;
+        Direction = direction;
+        Enable = enable;
+    }
+}
+
+/// <summary>Запрос смены режима фильтрации.</summary>
+public sealed class SetFilteringModeRequest
+{
+    /// <summary>Целевой режим.</summary>
+    [JsonPropertyName("mode")]
+    public FirewallFilteringMode Mode { get; set; } = FirewallFilteringMode.Normal;
+
+    /// <summary>SetFilteringModeRequest: пустой конструктор для десериализации.</summary>
+    public SetFilteringModeRequest() { }
+
+    /// <summary>SetFilteringModeRequest: создаёт запрос.</summary>
+    public SetFilteringModeRequest(FirewallFilteringMode mode) => Mode = mode;
 }
 
 /// <summary>Запрос блокировки IP.</summary>

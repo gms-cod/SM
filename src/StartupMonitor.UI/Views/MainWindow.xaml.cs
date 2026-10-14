@@ -26,6 +26,8 @@ public partial class MainWindow
     private WindowState _lastNonMinimizedState = WindowState.Normal;
     /// <summary>Индекс выбранной вкладки навигации.</summary>
     private int _selectedNavIndex;
+    /// <summary>Флаг замены дизайнерского экземпляра хаба сетевой безопасности на подключённый к <see cref="_pipeClient"/>.</summary>
+    private bool _firewallHubInitialized;
 
     /// <summary>Время последнего клика мышью для определения двойного клика.</summary>
     private DateTime _lastClickTime;
@@ -106,7 +108,7 @@ public partial class MainWindow
         {
             _hasShown = true;
             var savedTab = MainViewModel.LoadSetting("lastActiveTab", 0);
-            if (savedTab < 0 || savedTab > 7) savedTab = 0;
+            if (savedTab < 0 || savedTab > 8) savedTab = 0;
             App.Log($"MainWindow: Loaded, savedTab={savedTab}, WindowState={WindowState}, IsMinimized={App.IsMinimized}");
             NavigateToPage(savedTab);
             await StartupSequence();
@@ -125,6 +127,7 @@ public partial class MainWindow
                     _ = _viewModel.TaskManager.ActivateAsync();
                 }
                 else if (savedTab == 7) _ = _viewModel.LoadBootTimeAsync();
+                else if (savedTab == 8) _ = RefreshFirewallHubAsync();
             }
 
             if (App.IsMinimized)
@@ -616,9 +619,10 @@ public partial class MainWindow
         LogsPage.Visibility = idx == 5 ? Visibility.Visible : Visibility.Collapsed;
         TaskManagerPage.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;
         BootTimePage.Visibility = idx == 7 ? Visibility.Visible : Visibility.Collapsed;
+        FirewallPage.Visibility = idx == 8 ? Visibility.Visible : Visibility.Collapsed;
 
-        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7 };
-        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7 };
+        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8 };
+        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8 };
         Brush selected;
         try { selected = (Brush)FindResource("ControlFillColorSecondaryBrush"); }
         catch { selected = Brushes.Transparent; }
@@ -658,6 +662,43 @@ public partial class MainWindow
             _ = _viewModel.LoadHistoryAsync();
         else if (idx == 7)
             _ = _viewModel.LoadBootTimeAsync();
+        else if (idx == 8)
+            _ = RefreshFirewallHubAsync();
+    }
+
+    /// <summary>Гарантирует, что хаб сетевой безопасности использует общий подключённый <see cref="_pipeClient"/>.</summary>
+    /// <remarks>XAML создаёт <see cref="NetworkSecurityHubView"/> через конструктор без параметров
+    /// (с собственным неподключённым клиентом, чьи запросы молча возвращают null).
+    /// При первом переходе на страницу 8 экземпляр заменяется на подключённый к общему каналу службы.</remarks>
+    private void EnsureFirewallHub()
+    {
+        if (_firewallHubInitialized) return;
+        _firewallHubInitialized = true;
+        try
+        {
+            FirewallPage.Children.Clear();
+            FirewallHubView = new NetworkSecurityHubView(_pipeClient);
+            FirewallPage.Children.Add(FirewallHubView);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"MainWindow: Error initializing FirewallHub: {ex.Message}");
+        }
+    }
+
+    /// <summary>Инициализирует хаб сетевой безопасности общим клиентом и обновляет его данные.</summary>
+    private async Task RefreshFirewallHubAsync()
+    {
+        try
+        {
+            EnsureFirewallHub();
+            if (FirewallHubView != null)
+                await FirewallHubView.RefreshAllAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"MainWindow: Error refreshing FirewallHub: {ex.Message}");
+        }
     }
 
     /// <summary>Восстанавливает главное окно из системного трея в его исходное состояние (Normal или Maximized).</summary>

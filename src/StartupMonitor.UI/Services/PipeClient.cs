@@ -1293,6 +1293,136 @@ public class PipeClient : IDisposable
         return response?.Type == PipeMessageTypes.Success;
     }
 
+    /// <summary>Запрашивает все правила брандмауэра Windows.</summary>
+    public async Task<List<FirewallRuleDto>> GetAllFirewallRulesAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAllFirewallRules }, ct);
+        if (response?.Type == PipeMessageTypes.GetAllFirewallRulesResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var payload = JsonSerializer.Deserialize<FirewallRulesPayload>(response.Payload, JsonOptions);
+                if (payload?.Rules != null) return payload.Rules;
+            }
+            catch { }
+            try
+            {
+                return JsonSerializer.Deserialize<List<FirewallRuleDto>>(response.Payload, JsonOptions) ?? new List<FirewallRuleDto>();
+            }
+            catch { }
+        }
+        return new List<FirewallRuleDto>();
+    }
+
+    /// <summary>Создаёт или обновляет правило брандмауэра Windows.</summary>
+    public async Task<FirewallOperationResult> CreateOrUpdateFirewallRuleAsync(FirewallRuleDto rule, CancellationToken ct = default)
+    {
+        if (rule == null)
+            return FirewallOperationResult.Fail("Правило брандмауэра не может быть null.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CreateFirewallRule,
+            Payload = JsonSerializer.Serialize(new CreateRulePayload(rule), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось создать правило брандмауэра.");
+    }
+
+    /// <summary>Удаляет правило брандмауэра по имени.</summary>
+    public async Task<FirewallOperationResult> DeleteFirewallRuleAsync(string name, FirewallDirection direction = FirewallDirection.Both, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return FirewallOperationResult.Fail("Имя правила не указано.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.DeleteFirewallRule,
+            Payload = JsonSerializer.Serialize(new DeleteRulePayload(name.Trim(), direction), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось удалить правило брандмауэра.");
+    }
+
+    /// <summary>Включает или выключает правило брандмауэра.</summary>
+    public async Task<FirewallOperationResult> ToggleFirewallRuleAsync(string name, FirewallDirection direction, bool enable, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return FirewallOperationResult.Fail("Имя правила не указано.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.ToggleFirewallRule,
+            Payload = JsonSerializer.Serialize(new ToggleRulePayload(name.Trim(), direction, enable), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось переключить правило брандмауэра.");
+    }
+
+    /// <summary>Устанавливает режим фильтрации брандмауэра Windows.</summary>
+    public async Task<FirewallOperationResult> SetFirewallFilteringModeAsync(FirewallFilteringMode mode, CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetFirewallFilteringMode,
+            Payload = JsonSerializer.Serialize(new FilteringModePayload(mode), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch { }
+        }
+        if (response?.Type == PipeMessageTypes.Success)
+            return FirewallOperationResult.Ok(response.Payload ?? "Режим фильтрации обновлён.");
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось установить режим фильтрации.");
+    }
+
+    /// <summary>Запрашивает текущий режим фильтрации брандмауэра Windows.</summary>
+    public async Task<FirewallFilteringMode> GetFirewallFilteringModeAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallFilteringMode }, ct);
+        if (response?.Type == PipeMessageTypes.GetFirewallFilteringModeResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var payload = JsonSerializer.Deserialize<FilteringModePayload>(response.Payload, JsonOptions);
+                if (payload != null) return payload.Mode;
+            }
+            catch { }
+            try
+            {
+                return JsonSerializer.Deserialize<FirewallFilteringMode>(response.Payload, JsonOptions);
+            }
+            catch { }
+        }
+        return FirewallFilteringMode.Normal;
+    }
+
     /// <summary>Запрашивает штатную остановку фоновой службы (мягкое завершение хоста).</summary>
     /// <param name="timeoutMs">Таймаут ожидания ответа от службы в миллисекундах.</param>
     /// <returns>True, если служба подтвердила остановку (Success).</returns>

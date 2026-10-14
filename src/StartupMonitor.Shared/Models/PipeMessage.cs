@@ -216,6 +216,22 @@ public static class PipeMessageTypes
     public const string PortDefenderAttackBlocked = "PortDefenderAttackBlocked";
     /// <summary>Запрос штатной остановки фоновой службы (инициируется UI при выходе).</summary>
     public const string ShutdownService = "ShutdownService";
+    /// <summary>Запрос всех правил брандмауэра Windows.</summary>
+    public const string GetAllFirewallRules = "GetAllFirewallRules";
+    /// <summary>Ответ со списком всех правил брандмауэра Windows.</summary>
+    public const string GetAllFirewallRulesResponse = "GetAllFirewallRulesResponse";
+    /// <summary>Создание/обновление правила брандмауэра.</summary>
+    public const string CreateFirewallRule = "CreateFirewallRule";
+    /// <summary>Удаление правила брандмауэра по имени.</summary>
+    public const string DeleteFirewallRule = "DeleteFirewallRule";
+    /// <summary>Включение/выключение правила брандмауэра.</summary>
+    public const string ToggleFirewallRule = "ToggleFirewallRule";
+    /// <summary>Установка режима фильтрации брандмауэра.</summary>
+    public const string SetFirewallFilteringMode = "SetFirewallFilteringMode";
+    /// <summary>Запрос режима фильтрации брандмауэра.</summary>
+    public const string GetFirewallFilteringMode = "GetFirewallFilteringMode";
+    /// <summary>Ответ с режимом фильтрации брандмауэра.</summary>
+    public const string GetFirewallFilteringModeResponse = "GetFirewallFilteringModeResponse";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>
@@ -437,4 +453,19 @@ public record UnblockPortPayload(
 
 /// <summary>Полезная нагрузка ответа со списком активных банов Port Defender.</summary>
 public record ActiveBansPayload(List<ActiveBanDto> Bans);
+
+/// <summary>Полезная нагрузка ответа со списком всех правил брандмауэра.</summary>
+public record FirewallRulesPayload(List<FirewallRuleDto> Rules);
+
+/// <summary>Полезная нагрузка запроса создания/обновления правила брандмауэра.</summary>
+public record CreateRulePayload(FirewallRuleDto Rule);
+
+/// <summary>Полезная нагрузка запроса удаления правила брандмауэра.</summary>
+public record DeleteRulePayload(string Name, FirewallDirection Direction = FirewallDirection.Both);
+
+/// <summary>Полезная нагрузка запроса включения/выключения правила брандмауэра.</summary>
+public record ToggleRulePayload(string Name, FirewallDirection Direction, bool Enable);
+
+/// <summary>Полезная нагрузка режима фильтрации брандмауэра.</summary>
+public record FilteringModePayload(FirewallFilteringMode Mode);
 

@@ -233,7 +233,7 @@ def delete_asset_by_url(token: str, asset_url: str) -> None:
         raise GitHubApiError(f"DELETE {asset_url} -> HTTP {status}", status=status)
 
 
-def upload_asset(token: str, upload_url_template: str, file_path: Path, timeout: int = 120) -> dict:
+def upload_asset(token: str, upload_url_template: str, file_path: Path, timeout: int = 600) -> dict:
     base = upload_url_template.split("{")[0]
     url = f"{base}?name={urllib.parse.quote(file_path.name)}"
     content_type, _ = mimetypes.guess_type(file_path.name)
