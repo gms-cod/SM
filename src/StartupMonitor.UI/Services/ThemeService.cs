@@ -112,7 +112,7 @@ public static class ThemeService
     /// <summary>Палитра для светлой темы (чистота, контрастность, читаемость текста и карточек).</summary>
     public static void ApplyLightTheme(ResourceDictionary res)
     {
-        res["WindowBackgroundBrush"] = CreateSolidBrush(0xFF, 0xF1, 0xF5, 0xF9);
+        res["WindowBackgroundBrush"] = CreateSolidBrush(0xD8, 0xF3, 0xF6, 0xFA);
         // Боковая панель полупрозрачная (эффекты Aurora Glow переходят и на нее, убирая глухой белый цвет)
         res["SidebarBackgroundBrush"] = CreateLinearBrush(
             Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF),

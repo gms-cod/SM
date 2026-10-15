@@ -81,7 +81,7 @@ public partial class ProcessConnectionsWindow
         {
             Interval = TimeSpan.FromSeconds(2)
         };
-        _pollTimer.Tick += async (_, _) => await LoadConnectionsAsync();
+        _pollTimer.Tick += OnPollTimerTick;
 
         Loaded += async (_, _) =>
         {
@@ -92,8 +92,15 @@ public partial class ProcessConnectionsWindow
             }
         };
 
-        Closed += (_, _) => _pollTimer.Stop();
+        Closed += (_, _) =>
+        {
+            _pollTimer.Tick -= OnPollTimerTick;
+            _pollTimer.Stop();
+        };
     }
+
+    /// <summary>Тик автообновления сокетов (2 сек). Именованный обработчик — отписывается в Closed.</summary>
+    private async void OnPollTimerTick(object? sender, EventArgs e) => await LoadConnectionsAsync();
 
     /// <summary>LoadConnectionsAsync: Загружает данные ConnectionsAsync.</summary>
     private async Task LoadConnectionsAsync()
@@ -197,12 +204,12 @@ public partial class ProcessConnectionsWindow
         if (!string.IsNullOrEmpty(filter))
         {
             items = items.Where(s =>
-                s.LocalAddress.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                s.RemoteAddress.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                (s.LocalAddress?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true) ||
+                (s.RemoteAddress?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true) ||
                 s.LocalPort.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase) ||
                 s.RemotePort.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                s.State.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                s.Protocol.Contains(filter, StringComparison.OrdinalIgnoreCase));
+                (s.State?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true) ||
+                (s.Protocol?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true));
         }
 
         var list = items.Select(s => new ConnectionRow(s, ComputeFirewallBadge(s))).ToList<object>();

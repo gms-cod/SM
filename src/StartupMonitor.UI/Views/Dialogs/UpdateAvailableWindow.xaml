@@ -51,7 +51,7 @@
         </Grid>
 
         <!-- Блок списка изменений (Changelog) -->
-        <Border Grid.Row="2" Background="{DynamicResource CardBackgroundBrush}" 
+        <Border Grid.Row="2" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" 
                 BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="14,12" Margin="4,0,4,12">
             <Grid>

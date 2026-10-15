@@ -40,11 +40,11 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border x:Name="FirewallStateBadge" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0"
                                 Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtFirewallState" Text="Брандмауэр: неизвестно"
+                            <TextBlock x:Name="TxtFirewallState" Text="{Binding NetFwStateUnknown, Source={StaticResource Loc}}"
                                        FontSize="13" FontWeight="SemiBold"
                                        Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock x:Name="TxtFirewallDetails" Text="Статус загружается…"
+                        <TextBlock x:Name="TxtFirewallDetails" Text="{Binding NetStatusLoading, Source={StaticResource Loc}}"
                                    FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -52,17 +52,17 @@
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                         <Border x:Name="ProfileDomainBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
                                 Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtProfileDomain" Text="Доменный: —" FontSize="11"
+                            <TextBlock x:Name="TxtProfileDomain" Text="{Binding NetProfileDomainDefault, Source={StaticResource Loc}}" FontSize="11"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                         </Border>
                         <Border x:Name="ProfilePrivateBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
                                 Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtProfilePrivate" Text="Частный: —" FontSize="11"
+                            <TextBlock x:Name="TxtProfilePrivate" Text="{Binding NetProfilePrivateDefault, Source={StaticResource Loc}}" FontSize="11"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                         </Border>
                         <Border x:Name="ProfilePublicBadge" CornerRadius="4" Padding="8,3"
                                 Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtProfilePublic" Text="Публичный: —" FontSize="11"
+                            <TextBlock x:Name="TxtProfilePublic" Text="{Binding NetProfilePublicDefault, Source={StaticResource Loc}}" FontSize="11"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                         </Border>
                     </StackPanel>
@@ -70,33 +70,33 @@
 
                 <!-- Кнопка обновления статуса -->
                 <ui:Button x:Name="BtnRefreshStatus" Grid.Row="0" Grid.Column="2" Appearance="Secondary"
-                           Content="Обновить статус" Click="OnRefreshStatusClick"
+                           Content="{Binding NetBtnRefreshStatus, Source={StaticResource Loc}}" Click="OnRefreshStatusClick"
                            VerticalAlignment="Center" Margin="12,0,0,0" />
 
                 <!-- Переключатели режима фильтрации -->
                 <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
-                    <TextBlock Text="Режим фильтрации" FontSize="11" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding NetFilteringModeHeader, Source={StaticResource Loc}}" FontSize="11" FontWeight="SemiBold"
                                Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
                     <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode" Content="Обычный"
+                        <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode" Content="{Binding NetFilterModeNormal, Source={StaticResource Loc}}"
                                      Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
                         <RadioButton x:Name="RbModeWhitelist" GroupName="FilteringMode"
-                                     Content="Белый список (блокировать исходящие по умолчанию)"
+                                     Content="{Binding NetFilterModeWhitelist, Source={StaticResource Loc}}"
                                      Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
                         <RadioButton x:Name="RbModeKillswitch" GroupName="FilteringMode"
-                                     Content="Экстренный Killswitch (блокировать всю сеть)"
+                                     Content="{Binding NetFilterModeKillswitch, Source={StaticResource Loc}}"
                                      Checked="OnFilteringModeChecked" VerticalAlignment="Center"
-                                     Foreground="#D83B01" FontWeight="SemiBold" />
+                                     Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" FontWeight="SemiBold" />
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Тумблер интерактивных уведомлений о неизвестных программах -->
                 <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
                     <CheckBox x:Name="ChkInteractiveAlerts"
-                              Content="Интерактивные уведомления о неизвестных программах"
+                              Content="{Binding NetInteractiveAlertsCheck, Source={StaticResource Loc}}"
                               Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged"
                               VerticalAlignment="Center"
-                              ToolTip="Показывать всплывающее окно при новом исходящем подключении неизвестной программы" />
+                              ToolTip="{Binding NetInteractiveAlertsTip, Source={StaticResource Loc}}" />
                 </StackPanel>
             </Grid>
         </ui:Card>
@@ -109,7 +109,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <ui:SymbolIcon Symbol="Globe24" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <TextBlock Text="Активные соединения (Live)" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}" VerticalAlignment="Center" />
                     </StackPanel>
                 </TabItem.Header>
                 <Grid Margin="0,8,0,0">
@@ -131,36 +131,36 @@
                         </Grid.RowDefinitions>
 
                         <ui:TextBox x:Name="TxtSearchConnections" Grid.Row="0" Grid.Column="0"
-                                    PlaceholderText="Поиск по процессу, PID, IP, порту..."
-                                    TextChanged="OnConnectionsSearchChanged" Margin="0,0,12,6" />
+                                     PlaceholderText="{Binding NetSearchConnectionsHint, Source={StaticResource Loc}}"
+                                     TextChanged="OnConnectionsSearchChanged" Margin="0,0,12,6" />
 
                         <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                            <RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="Все"
+                            <RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="{Binding NetFilterAll, Source={StaticResource Loc}}"
                                          IsChecked="True" Checked="OnConnectionsFilterChanged"
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="Интернет WAN"
+                            <RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="{Binding NetFilterWan, Source={StaticResource Loc}}"
                                          Checked="OnConnectionsFilterChanged"
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="Локальные LAN"
+                            <RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="{Binding NetFilterLan, Source={StaticResource Loc}}"
                                          Checked="OnConnectionsFilterChanged"
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="Установленные ESTABLISHED"
+                            <RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="{Binding NetFilterEstablished, Source={StaticResource Loc}}"
                                          Checked="OnConnectionsFilterChanged"
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="Прослушиваемые LISTEN"
+                            <RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="{Binding NetFilterListen, Source={StaticResource Loc}}"
                                          Checked="OnConnectionsFilterChanged"
                                          VerticalAlignment="Center" />
                         </WrapPanel>
 
                         <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                                     Orientation="Horizontal" VerticalAlignment="Center">
-                            <CheckBox x:Name="ChkAutoRefreshConn" Content="Автообновление (2 сек)"
+                            <CheckBox x:Name="ChkAutoRefreshConn" Content="{Binding NetAutoRefresh2s, Source={StaticResource Loc}}"
                                       IsChecked="True"
                                       Checked="OnAutoRefreshConnChanged" Unchecked="OnAutoRefreshConnChanged"
                                       VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="Обновить сейчас"
+                            <ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="{Binding NetBtnRefreshNow, Source={StaticResource Loc}}"
                                        Click="OnRefreshConnClick" Margin="0,0,12,0" />
-                            <TextBlock x:Name="TxtConnectionsSummary" Text="Соединений: 0 • WAN: 0 • Процессов: 0"
+                            <TextBlock x:Name="TxtConnectionsSummary" Text="—"
                                        FontSize="12"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
                                        VerticalAlignment="Center" />
@@ -184,21 +184,21 @@
                                   RowHeight="34">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem x:Name="CtxBlockRemoteIp" Header="🚫 Заблокировать удаленный IP" Click="OnCtxBlockRemoteIpClick" />
-                                    <MenuItem x:Name="CtxCreateRuleForProcess" Header="🛡️ Создать правило для процесса..." Click="OnCtxCreateRuleForProcessClick" />
+                                    <MenuItem x:Name="CtxBlockRemoteIp" Header="{Binding NetCtxBlockRemoteIp, Source={StaticResource Loc}}" Click="OnCtxBlockRemoteIpClick" />
+                                    <MenuItem x:Name="CtxCreateRuleForProcess" Header="{Binding NetCtxCreateRuleForProcess, Source={StaticResource Loc}}" Click="OnCtxCreateRuleForProcessClick" />
                                     <Separator />
-                                    <MenuItem x:Name="CtxCopyRemoteIp" Header="📋 Копировать удаленный IP" Click="OnCtxCopyRemoteIpClick" />
-                                    <MenuItem x:Name="CtxCopyEndpoint" Header="📋 Копировать адрес и порт" Click="OnCtxCopyEndpointClick" />
+                                    <MenuItem x:Name="CtxCopyRemoteIp" Header="{Binding NetCtxCopyRemoteIp, Source={StaticResource Loc}}" Click="OnCtxCopyRemoteIpClick" />
+                                    <MenuItem x:Name="CtxCopyEndpoint" Header="{Binding NetCtxCopyEndpoint, Source={StaticResource Loc}}" Click="OnCtxCopyEndpointClick" />
                                     <Separator />
-                                    <MenuItem x:Name="CtxWhois" Header="🌐 Информация об IP (Whois / IPInfo)" Click="OnCtxWhoisClick" />
-                                    <MenuItem x:Name="CtxVirusTotal" Header="🔍 Проверить IP в VirusTotal" Click="OnCtxVirusTotalClick" />
+                                    <MenuItem x:Name="CtxWhois" Header="{Binding NetCtxWhois, Source={StaticResource Loc}}" Click="OnCtxWhoisClick" />
+                                    <MenuItem x:Name="CtxVirusTotal" Header="{Binding NetCtxVirusTotal, Source={StaticResource Loc}}" Click="OnCtxVirusTotalClick" />
                                     <Separator />
-                                    <MenuItem x:Name="CtxKillProcess" Header="❌ Завершить процесс (Kill)" Click="OnCtxKillProcessClick" />
+                                    <MenuItem x:Name="CtxKillProcess" Header="{Binding NetCtxKillProcess, Source={StaticResource Loc}}" Click="OnCtxKillProcessClick" />
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <!-- Процесс -->
-                                <DataGridTemplateColumn Header="Процесс" Width="1.5*">
+                                <DataGridTemplateColumn Header="{Binding NetColProcess, Source={StaticResource Loc}}" Width="1.5*">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -214,30 +214,30 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Протокол -->
-                                <DataGridTextColumn Header="Протокол" Binding="{Binding Protocol}" Width="60" />
+                                <DataGridTextColumn Header="{Binding NetColProtocol, Source={StaticResource Loc}}" Binding="{Binding Protocol}" Width="60" />
 
                                 <!-- Локальный адрес -->
-                                <DataGridTextColumn Header="Локальный адрес" Binding="{Binding LocalEndPoint}" Width="150" />
+                                <DataGridTextColumn Header="{Binding NetColLocalAddress, Source={StaticResource Loc}}" Binding="{Binding LocalEndPoint}" Width="150" />
 
                                 <!-- Удаленный адрес -->
-                                <DataGridTextColumn Header="Удаленный адрес" Binding="{Binding RemoteEndPoint}" Width="160" />
+                                <DataGridTextColumn Header="{Binding NetColRemoteAddress, Source={StaticResource Loc}}" Binding="{Binding RemoteEndPoint}" Width="160" />
 
                                 <!-- Статус -->
-                                <DataGridTemplateColumn Header="Статус" Width="120">
+                                <DataGridTemplateColumn Header="{Binding NetColStatus, Source={StaticResource Loc}}" Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="4" Padding="6,2"
                                                     Background="{Binding StateBadgeBrush}"
                                                     HorizontalAlignment="Left" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding State}" FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                                           Foreground="White" />
                                             </Border>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
 
                                 <!-- Сеть / Гео -->
-                                <DataGridTemplateColumn Header="Сеть / Гео" Width="130">
+                                <DataGridTemplateColumn Header="{Binding NetColNetworkGeo, Source={StaticResource Loc}}" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -252,7 +252,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Брандмауэр -->
-                                <DataGridTextColumn Header="Брандмауэр" Binding="{Binding FirewallBadge}" Width="110" />
+                                <DataGridTextColumn Header="{Binding NetColFirewall, Source={StaticResource Loc}}" Binding="{Binding FirewallBadge}" Width="110" />
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -260,10 +260,10 @@
                             <ui:SymbolIcon Symbol="Globe24" FontSize="32"
                                            Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                            HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="Активных сетевых соединений не найдено" FontSize="14" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding NetNoConnectionsTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
                                        HorizontalAlignment="Center" />
-                            <TextBlock Text="Измените фильтр поиска или обновите список" FontSize="12"
+                            <TextBlock Text="{Binding NetNoConnectionsSubtitle, Source={StaticResource Loc}}" FontSize="12"
                                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                        HorizontalAlignment="Center" Margin="0,4,0,0" />
                         </StackPanel>
@@ -272,7 +272,7 @@
             </TabItem>
 
             <!-- Вкладка 1: Правила брандмауэра -->
-            <TabItem Header="Правила брандмауэра">
+            <TabItem Header="{Binding NetTabFirewallRules, Source={StaticResource Loc}}">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -287,19 +287,19 @@
                             <ColumnDefinition Width="3*" />
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="TxtRuleSearch" Grid.Column="0"
-                                    PlaceholderText="Поиск по имени, порту, IP, процессу…"
-                                    TextChanged="OnRuleSearchTextChanged" Margin="0,0,12,0" />
+                                     PlaceholderText="{Binding NetSearchRulesHint, Source={StaticResource Loc}}"
+                                     TextChanged="OnRuleSearchTextChanged" Margin="0,0,12,0" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Фильтр:" FontSize="12"
+                            <TextBlock Text="{Binding NetRulesFilterLabel, Source={StaticResource Loc}}" FontSize="12"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
                                        VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="Все" IsChecked="True"
+                            <RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="{Binding NetRulesFilterAll, Source={StaticResource Loc}}" IsChecked="True"
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="Входящие"
+                            <RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterInbound, Source={StaticResource Loc}}"
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="Исходящие"
+                            <RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterOutbound, Source={StaticResource Loc}}"
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="Блокирующие"
+                            <RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="{Binding NetRulesFilterBlock, Source={StaticResource Loc}}"
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <RadioButton x:Name="FilterManaged" GroupName="RuleFilter" Content="StartupMonitor"
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" />
@@ -308,41 +308,41 @@
 
                     <!-- Кнопки действий -->
                     <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-                        <ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="Создать правило"
+                        <ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="{Binding NetBtnCreateRule, Source={StaticResource Loc}}"
                                    Click="OnCreateRuleClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="Редактировать"
+                        <ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="{Binding NetBtnEditRule, Source={StaticResource Loc}}"
                                    Click="OnEditRuleClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="Удалить"
+                        <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="{Binding NetBtnDeleteRule, Source={StaticResource Loc}}"
                                    Click="OnDeleteRuleClick" Margin="0,0,8,4" />
                         <ui:Button x:Name="BtnExportRules" Appearance="Secondary"
                                    Icon="{ui:SymbolIcon Save24}"
-                                   Content="Экспорт..."
-                                   ToolTip="Экспорт правил в JSON-файл"
+                                   Content="{Binding NetBtnExport, Source={StaticResource Loc}}"
+                                   ToolTip="{Binding NetBtnExportTip, Source={StaticResource Loc}}"
                                    Click="OnExportRulesClick" Margin="0,0,8,4" />
                         <ui:Button x:Name="BtnImportRules" Appearance="Secondary"
                                    Icon="{ui:SymbolIcon FolderOpen24}"
-                                   Content="Импорт..."
-                                   ToolTip="Импорт правил из JSON-файла"
+                                   Content="{Binding NetBtnImport, Source={StaticResource Loc}}"
+                                   ToolTip="{Binding NetBtnImportTip, Source={StaticResource Loc}}"
                                    Click="OnImportRulesClick" Margin="0,0,8,4" />
                         <ui:DropDownButton x:Name="BtnSecurityPresets" Appearance="Secondary"
                                            Icon="{ui:SymbolIcon ShieldCheckmark24}"
-                                           Content="Пресеты безопасности"
+                                           Content="{Binding NetBtnSecurityPresets, Source={StaticResource Loc}}"
                                            Margin="0,0,8,4">
                             <ui:DropDownButton.Flyout>
                                 <ContextMenu>
-                                    <MenuItem Header="🛡️ Максимальная приватность (Анти-телеметрия)" Click="OnApplyPresetMaxPrivacyClick" />
-                                    <MenuItem Header="🎮 Игровой режим (Steam, Battle.net, LAN)" Click="OnApplyPresetGamingClick" />
-                                    <MenuItem Header="☕ Публичный Wi-Fi (Изоляция сети)" Click="OnApplyPresetPublicWifiClick" />
+                                    <MenuItem Header="{Binding NetPresetMaxPrivacy, Source={StaticResource Loc}}" Click="OnApplyPresetMaxPrivacyClick" />
+                                    <MenuItem Header="{Binding NetPresetGaming, Source={StaticResource Loc}}" Click="OnApplyPresetGamingClick" />
+                                    <MenuItem Header="{Binding NetPresetPublicWifi, Source={StaticResource Loc}}" Click="OnApplyPresetPublicWifiClick" />
                                     <Separator />
-                                    <MenuItem Header="↩️ Сбросить добавленные пресеты" Click="OnApplyPresetResetClick" />
+                                    <MenuItem Header="{Binding NetPresetReset, Source={StaticResource Loc}}" Click="OnApplyPresetResetClick" />
                                 </ContextMenu>
                             </ui:DropDownButton.Flyout>
                         </ui:DropDownButton>
-                        <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="Обновить"
+                        <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
                                    Click="OnRefreshRulesClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="Анти-телеметрия (1 клик)"
+                        <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="{Binding NetBtnAntiTelemetry, Source={StaticResource Loc}}"
                                    Click="OnAntiTelemetryClick" Margin="0,0,0,4"
-                                   ToolTip="Создаёт исходящие блокирующие правила для известных телеметрических адресов Microsoft" />
+                                   ToolTip="{Binding NetBtnAntiTelemetryTip, Source={StaticResource Loc}}" />
                     </WrapPanel>
 
                     <!-- Таблица правил -->
@@ -363,7 +363,7 @@
                                   MouseDoubleClick="OnRuleGridDoubleClick">
                             <DataGrid.Columns>
                                 <!-- Включение -->
-                                <DataGridTemplateColumn Header="Вкл" Width="52">
+                                <DataGridTemplateColumn Header="{Binding NetColEnabled, Source={StaticResource Loc}}" Width="52">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}"
@@ -375,7 +375,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Действие -->
-                                <DataGridTemplateColumn Header="Действие" Width="110">
+                                <DataGridTemplateColumn Header="{Binding NetColAction, Source={StaticResource Loc}}" Width="110">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
@@ -412,7 +412,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Направление -->
-                                <DataGridTemplateColumn Header="Напр." Width="80">
+                                <DataGridTemplateColumn Header="{Binding NetColDirection, Source={StaticResource Loc}}" Width="80">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
@@ -439,12 +439,12 @@
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
 
-                                <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="2*" />
-                                <DataGridTextColumn Header="Программа" Binding="{Binding ShortProgram}" Width="1.5*" />
-                                <DataGridTextColumn Header="Протокол" Binding="{Binding ProtocolDisplay}" Width="80" />
-                                <DataGridTextColumn Header="Локальные порты" Binding="{Binding LocalPorts}" Width="110" />
-                                <DataGridTextColumn Header="Удалённые адреса" Binding="{Binding RemoteAddresses}" Width="1.5*" />
-                                <DataGridTextColumn Header="Профили" Binding="{Binding ProfilesDisplay}" Width="130" />
+                                <DataGridTextColumn Header="{Binding NetColName, Source={StaticResource Loc}}" Binding="{Binding Name}" Width="2*" />
+                                <DataGridTextColumn Header="{Binding NetColProgram, Source={StaticResource Loc}}" Binding="{Binding ShortProgram}" Width="1.5*" />
+                                <DataGridTextColumn Header="{Binding NetColProtocol, Source={StaticResource Loc}}" Binding="{Binding ProtocolDisplay}" Width="80" />
+                                <DataGridTextColumn Header="{Binding NetColLocalPorts, Source={StaticResource Loc}}" Binding="{Binding LocalPorts}" Width="110" />
+                                <DataGridTextColumn Header="{Binding NetColRemoteAddresses, Source={StaticResource Loc}}" Binding="{Binding RemoteAddresses}" Width="1.5*" />
+                                <DataGridTextColumn Header="{Binding NetColProfiles, Source={StaticResource Loc}}" Binding="{Binding ProfilesDisplay}" Width="130" />
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -452,10 +452,10 @@
                             <ui:SymbolIcon Symbol="Shield24" FontSize="32"
                                            Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                            HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="Правила не найдены" FontSize="14" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding NetNoRulesTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
                                        HorizontalAlignment="Center" />
-                            <TextBlock Text="Измените поисковый запрос или фильтр" FontSize="12"
+                            <TextBlock Text="{Binding NetNoRulesSubtitle, Source={StaticResource Loc}}" FontSize="12"
                                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                        HorizontalAlignment="Center" Margin="0,4,0,0" />
                         </StackPanel>
@@ -464,7 +464,7 @@
             </TabItem>
 
             <!-- Вкладка 2: Port Defender -->
-            <TabItem Header="Port Defender">
+            <TabItem Header="{Binding NetTabPortDefender, Source={StaticResource Loc}}">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -487,7 +487,7 @@
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtDefenderState" Text="Port Defender: статус загружается…"
+                                <TextBlock x:Name="TxtDefenderState" Text="{Binding NetDefenderStateLoading, Source={StaticResource Loc}}"
                                            FontSize="13" FontWeight="SemiBold"
                                            Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
                                 <TextBlock x:Name="TxtDefenderDetails" Text="—" FontSize="12"
@@ -495,17 +495,17 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <ui:Button x:Name="BtnConfigureDefender" Appearance="Primary"
-                                           Content="Настроить Port Defender"
+                                           Content="{Binding PortDefenderTitle, Source={StaticResource Loc}}"
                                            Click="OnConfigureDefenderClick" Margin="0,0,8,0" />
                                 <ui:Button x:Name="BtnRefreshDefender" Appearance="Secondary"
-                                           Content="Обновить" Click="OnRefreshDefenderClick" />
+                                           Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}" Click="OnRefreshDefenderClick" />
                             </StackPanel>
                         </Grid>
                     </ui:Card>
 
                     <ui:Card Grid.Row="1" Padding="14">
                         <StackPanel>
-                            <TextBlock Text="Защищаемые локальные порты" FontSize="12" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding PortDefenderProtectedPortsLabel, Source={StaticResource Loc}}" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
                             <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="14"
                                        FontFamily="Consolas, Segoe UI"
@@ -517,7 +517,7 @@
             </TabItem>
 
             <!-- Вкладка 3: Журнал атак и банов -->
-            <TabItem Header="Журнал атак и банов">
+            <TabItem Header="{Binding NetTabAttackBans, Source={StaticResource Loc}}">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -525,13 +525,13 @@
                     </Grid.RowDefinitions>
 
                     <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                        <ui:Button x:Name="BtnRefreshBans" Appearance="Secondary" Content="Обновить"
+                        <ui:Button x:Name="BtnRefreshBans" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
                                    Click="OnRefreshBansClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnUnblockIp" Appearance="Secondary" Content="Разблокировать выбранный IP"
+                        <ui:Button x:Name="BtnUnblockIp" Appearance="Secondary" Content="{Binding NetBtnUnbanSelectedIp, Source={StaticResource Loc}}"
                                    Click="OnUnblockIpClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnClearBans" Appearance="Danger" Content="Сбросить все баны"
+                        <ui:Button x:Name="BtnClearBans" Appearance="Danger" Content="{Binding NetBtnResetAllBans, Source={StaticResource Loc}}"
                                    Click="OnClearBansClick" Margin="0,0,0,4" />
-                        <TextBlock x:Name="TxtBansCount" Text="Активных банов: 0" FontSize="12"
+                        <TextBlock x:Name="TxtBansCount" Text="—" FontSize="12"
                                    Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
                                    VerticalAlignment="Center" Margin="12,0,0,4" />
                     </WrapPanel>
@@ -551,13 +551,13 @@
                                   Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
                                   RowHeight="34">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="130" />
-                                <DataGridTextColumn Header="Порт" Binding="{Binding TargetPort}" Width="70" />
-                                <DataGridTextColumn Header="Процесс" Binding="{Binding TargetProcess}" Width="1.5*" />
-                                <DataGridTextColumn Header="Попыток" Binding="{Binding AttackRate}" Width="80" />
-                                <DataGridTextColumn Header="Причина" Binding="{Binding Reason}" Width="2*" />
-                                <DataGridTextColumn Header="Осталось" Binding="{Binding RemainingText}" Width="110" />
-                                <DataGridTextColumn Header="Повторы" Binding="{Binding RepeatCount}" Width="80" />
+                                <DataGridTextColumn Header="{Binding NetColIp, Source={StaticResource Loc}}" Binding="{Binding Ip}" Width="130" />
+                                <DataGridTextColumn Header="{Binding NetColPort, Source={StaticResource Loc}}" Binding="{Binding TargetPort}" Width="70" />
+                                <DataGridTextColumn Header="{Binding NetColProcess, Source={StaticResource Loc}}" Binding="{Binding TargetProcess}" Width="1.5*" />
+                                <DataGridTextColumn Header="{Binding NetColAttempts, Source={StaticResource Loc}}" Binding="{Binding AttackRate}" Width="80" />
+                                <DataGridTextColumn Header="{Binding NetColReason, Source={StaticResource Loc}}" Binding="{Binding Reason}" Width="2*" />
+                                <DataGridTextColumn Header="{Binding NetColRemaining, Source={StaticResource Loc}}" Binding="{Binding RemainingText}" Width="110" />
+                                <DataGridTextColumn Header="{Binding NetColRepeats, Source={StaticResource Loc}}" Binding="{Binding RepeatCount}" Width="80" />
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -565,10 +565,10 @@
                             <ui:SymbolIcon Symbol="Shield24" FontSize="32"
                                            Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                            HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="Активных банов нет" FontSize="14" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding NetNoBansTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
                                        HorizontalAlignment="Center" />
-                            <TextBlock Text="Port Defender не зафиксировал атак" FontSize="12"
+                            <TextBlock Text="{Binding NetNoBansSubtitle, Source={StaticResource Loc}}" FontSize="12"
                                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                        HorizontalAlignment="Center" Margin="0,4,0,0" />
                         </StackPanel>
@@ -579,7 +579,7 @@
 
         <!-- ===== Статусная строка ===== -->
         <Grid Grid.Row="2" Margin="0,8,0,0">
-            <TextBlock x:Name="TxtStatus" Text="Готово" FontSize="12"
+            <TextBlock x:Name="TxtStatus" Text="{Binding NetStatusReady, Source={StaticResource Loc}}" FontSize="12"
                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </Grid>

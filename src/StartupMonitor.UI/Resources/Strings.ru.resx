@@ -1,110 +1,52 @@
-<?xml version="1.0" encoding="utf-8"?>
-<root>
-  <!-- 
-    Microsoft ResX Schema 
-    
-    Version 2.0
-    
-    The primary goals of this format is to allow a simple XML format 
-    that is mostly human readable. The generation and parsing of the 
-    various data types are done through the TypeConverter classes 
-    associated with the data types.
-    
-    Example:
-    
-    ... ado.net/XML headers & schema ...
-    <resheader name="resmimetype">text/microsoft-resx</resheader>
-    <resheader name="version">2.0</resheader>
-    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
-    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
-    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
-    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
-    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
-        <value>[base64 mime encoded serialized .NET Framework object]</value>
-    </data>
-    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
-        <comment>This is a comment</comment>
-    </data>
-                
-    There are any number of "resheader" rows that contain simple 
-    name/value pairs.
-    
-    Each data row contains a name, and value. The row also contains a 
-    type or mimetype. Type corresponds to a .NET class that support 
-    text/value conversion through the TypeConverter architecture. 
-    Classes that don't support this are serialized and stored with the 
-    mimetype set.
-    
-    The mimetype is used for serialized objects, and tells the 
-    ResXResourceReader how to depersist the object. This is currently not 
-    extensible. For a given mimetype the value must be set accordingly:
-    
-    Note - application/x-microsoft.net.object.binary.base64 is the format 
-    that the ResXResourceWriter will generate, however the reader can 
-    read any of the formats listed below.
-    
-    mimetype: application/x-microsoft.net.object.binary.base64
-    value   : The object must be serialized with 
-            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
-            : and then encoded with base64 encoding.
-    
-    mimetype: application/x-microsoft.net.object.soap.base64
-    value   : The object must be serialized with 
-            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
-            : and then encoded with base64 encoding.
-
-    mimetype: application/x-microsoft.net.object.bytearray.base64
-    value   : The object must be serialized into a byte array 
-            : using a System.ComponentModel.TypeConverter
-            : and then encoded with base64 encoding.
-    -->
-  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
-    <xsd:element name="root" msdata:IsDataSet="true">
-      <xsd:complexType>
-        <xsd:choice maxOccurs="unbounded">
-          <xsd:element name="metadata">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" />
-              </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string" />
-              <xsd:attribute name="type" type="xsd:string" />
-              <xsd:attribute name="mimetype" type="xsd:string" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="assembly">
-            <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string" />
-              <xsd:attribute name="name" type="xsd:string" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="data">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="resheader">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" />
-            </xsd:complexType>
-          </xsd:element>
-        </xsd:choice>
-      </xsd:complexType>
-    </xsd:element>
-  </xsd:schema>
+<?xml version='1.0' encoding='utf-8'?>
+<root xmlns:ns1="urn:schemas-microsoft-com:xml-msdata" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  
+  <xs:schema id="root">
+    <xs:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xs:element name="root" ns1:IsDataSet="true">
+      <xs:complexType>
+        <xs:choice maxOccurs="unbounded">
+          <xs:element name="metadata">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" />
+              </xs:sequence>
+              <xs:attribute name="name" use="required" type="xsd:string" />
+              <xs:attribute name="type" type="xsd:string" />
+              <xs:attribute name="mimetype" type="xsd:string" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="assembly">
+            <xs:complexType>
+              <xs:attribute name="alias" type="xsd:string" />
+              <xs:attribute name="name" type="xsd:string" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="data">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+                <xs:element name="comment" type="xsd:string" minOccurs="0" ns1:Ordinal="2" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" ns1:Ordinal="1" />
+              <xs:attribute name="type" type="xsd:string" ns1:Ordinal="3" />
+              <xs:attribute name="mimetype" type="xsd:string" ns1:Ordinal="4" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="resheader">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" />
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -265,7 +207,7 @@
     <value>Реестр</value>
   </data>
   <data name="StatusServiceNotFound" xml:space="preserve">
-    <value>Служба не найдена</value>
+    <value>Служба не найдена: {0}</value>
   </data>
   <data name="LocComObject" xml:space="preserve">
     <value>COM Object</value>
@@ -1788,5 +1730,345 @@
   </data>
   <data name="BtnDeleteRule" xml:space="preserve">
     <value>Удалить</value>
+  </data>
+  <data name="NetFwStateUnknown" xml:space="preserve">
+    <value>Брандмауэр: неизвестно</value>
+  </data>
+  <data name="NetStatusLoading" xml:space="preserve">
+    <value>Статус загружается…</value>
+  </data>
+  <data name="NetProfileDomainDefault" xml:space="preserve">
+    <value>Доменный: —</value>
+  </data>
+  <data name="NetProfilePrivateDefault" xml:space="preserve">
+    <value>Частный: —</value>
+  </data>
+  <data name="NetProfilePublicDefault" xml:space="preserve">
+    <value>Публичный: —</value>
+  </data>
+  <data name="NetBtnRefreshStatus" xml:space="preserve">
+    <value>Обновить статус</value>
+  </data>
+  <data name="NetFilteringModeHeader" xml:space="preserve">
+    <value>Режим фильтрации</value>
+  </data>
+  <data name="NetFilterModeNormal" xml:space="preserve">
+    <value>Обычный</value>
+  </data>
+  <data name="NetFilterModeWhitelist" xml:space="preserve">
+    <value>Белый список (блокировать исходящие по умолчанию)</value>
+  </data>
+  <data name="NetFilterModeKillswitch" xml:space="preserve">
+    <value>Экстренный Killswitch (блокировать всю сеть)</value>
+  </data>
+  <data name="NetInteractiveAlertsCheck" xml:space="preserve">
+    <value>Интерактивные уведомления о неизвестных программах</value>
+  </data>
+  <data name="NetInteractiveAlertsTip" xml:space="preserve">
+    <value>Показывать всплывающее окно при новом исходящем подключении неизвестной программы</value>
+  </data>
+  <data name="NetLiveConnectionsHeader" xml:space="preserve">
+    <value>Активные соединения (Live)</value>
+  </data>
+  <data name="NetFilterAll" xml:space="preserve">
+    <value>Все</value>
+  </data>
+  <data name="NetFilterWan" xml:space="preserve">
+    <value>Интернет WAN</value>
+  </data>
+  <data name="NetFilterLan" xml:space="preserve">
+    <value>Локальные LAN</value>
+  </data>
+  <data name="NetFilterEstablished" xml:space="preserve">
+    <value>Установленные</value>
+  </data>
+  <data name="NetFilterListen" xml:space="preserve">
+    <value>Прослушиваемые</value>
+  </data>
+  <data name="NetAutoRefresh2s" xml:space="preserve">
+    <value>Автообновление (2 сек)</value>
+  </data>
+  <data name="NetBtnRefreshNow" xml:space="preserve">
+    <value>Обновить сейчас</value>
+  </data>
+  <data name="NetConnectionsSummaryFormat" xml:space="preserve">
+    <value>Соединений: {0} • WAN: {1} • Процессов: {2}</value>
+  </data>
+  <data name="NetTabFirewallRules" xml:space="preserve">
+    <value>Правила брандмауэра</value>
+  </data>
+  <data name="NetRulesFilterLabel" xml:space="preserve">
+    <value>Фильтр:</value>
+  </data>
+  <data name="NetRulesFilterAll" xml:space="preserve">
+    <value>Все</value>
+  </data>
+  <data name="NetRulesFilterInbound" xml:space="preserve">
+    <value>Входящие</value>
+  </data>
+  <data name="NetRulesFilterOutbound" xml:space="preserve">
+    <value>Исходящие</value>
+  </data>
+  <data name="NetRulesFilterBlock" xml:space="preserve">
+    <value>Блокирующие</value>
+  </data>
+  <data name="NetBtnCreateRule" xml:space="preserve">
+    <value>Создать правило</value>
+  </data>
+  <data name="NetBtnEditRule" xml:space="preserve">
+    <value>Редактировать</value>
+  </data>
+  <data name="NetBtnDeleteRule" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="NetBtnExport" xml:space="preserve">
+    <value>Экспорт...</value>
+  </data>
+  <data name="NetBtnExportTip" xml:space="preserve">
+    <value>Экспорт правил в JSON-файл</value>
+  </data>
+  <data name="NetBtnImport" xml:space="preserve">
+    <value>Импорт...</value>
+  </data>
+  <data name="NetBtnImportTip" xml:space="preserve">
+    <value>Импорт правил из JSON-файла</value>
+  </data>
+  <data name="NetBtnSecurityPresets" xml:space="preserve">
+    <value>Пресеты безопасности</value>
+  </data>
+  <data name="NetPresetMaxPrivacy" xml:space="preserve">
+    <value>Максимальная приватность (Анти-телеметрия)</value>
+  </data>
+  <data name="NetPresetGaming" xml:space="preserve">
+    <value>Игровой режим (Steam, Battle.net, LAN)</value>
+  </data>
+  <data name="NetPresetPublicWifi" xml:space="preserve">
+    <value>Публичный Wi-Fi (Изоляция сети)</value>
+  </data>
+  <data name="NetPresetReset" xml:space="preserve">
+    <value>Сбросить добавленные пресеты</value>
+  </data>
+  <data name="NetBtnRefreshRules" xml:space="preserve">
+    <value>Обновить</value>
+  </data>
+  <data name="NetBtnAntiTelemetry" xml:space="preserve">
+    <value>Анти-телеметрия (1 клик)</value>
+  </data>
+  <data name="NetBtnAntiTelemetryTip" xml:space="preserve">
+    <value>Создаёт исходящие блокирующие правила для известных телеметрических адресов Microsoft</value>
+  </data>
+  <data name="NetTabPortDefender" xml:space="preserve">
+    <value>Port Defender</value>
+  </data>
+  <data name="NetTabAttackBans" xml:space="preserve">
+    <value>Журнал атак и банов</value>
+  </data>
+  <data name="NetBtnUnbanSelectedIp" xml:space="preserve">
+    <value>Разблокировать выбранный IP</value>
+  </data>
+  <data name="NetBtnResetAllBans" xml:space="preserve">
+    <value>Сбросить все баны</value>
+  </data>
+  <data name="NetNoConnectionsTitle" xml:space="preserve">
+    <value>Активных сетевых соединений не найдено</value>
+  </data>
+  <data name="NetNoConnectionsSubtitle" xml:space="preserve">
+    <value>Измените фильтр поиска или обновите список</value>
+  </data>
+  <data name="NetNoRulesTitle" xml:space="preserve">
+    <value>Правила не найдены</value>
+  </data>
+  <data name="NetNoBansTitle" xml:space="preserve">
+    <value>Активных банов нет</value>
+  </data>
+  <data name="FwRuleCreateTitle" xml:space="preserve">
+    <value>Создание правила брандмауэра</value>
+  </data>
+  <data name="FwRuleEditTitle" xml:space="preserve">
+    <value>Редактирование правила</value>
+  </data>
+  <data name="FwRuleSubtitle" xml:space="preserve">
+    <value>Правило брандмауэра Windows (INetFwRules)</value>
+  </data>
+  <data name="FwRuleNameLabel" xml:space="preserve">
+    <value>Имя правила *</value>
+  </data>
+  <data name="FwRuleDescLabel" xml:space="preserve">
+    <value>Описание</value>
+  </data>
+  <data name="FwRuleActionLabel" xml:space="preserve">
+    <value>Действие</value>
+  </data>
+  <data name="FwRuleActionAllow" xml:space="preserve">
+    <value>Разрешить подключение</value>
+  </data>
+  <data name="FwRuleActionBlock" xml:space="preserve">
+    <value>Блокировать подключение</value>
+  </data>
+  <data name="FwRuleDirectionLabel" xml:space="preserve">
+    <value>Направление</value>
+  </data>
+  <data name="FwRuleDirInbound" xml:space="preserve">
+    <value>Входящее</value>
+  </data>
+  <data name="FwRuleDirOutbound" xml:space="preserve">
+    <value>Исходящее</value>
+  </data>
+  <data name="FwRuleProtocolLabel" xml:space="preserve">
+    <value>Протокол</value>
+  </data>
+  <data name="FwRuleLocalPortsLabel" xml:space="preserve">
+    <value>Локальные порты</value>
+  </data>
+  <data name="FwRuleRemotePortsLabel" xml:space="preserve">
+    <value>Удаленные порты</value>
+  </data>
+  <data name="FwRuleRemoteIpsLabel" xml:space="preserve">
+    <value>Удаленные IP-адреса / подсети</value>
+  </data>
+  <data name="FwRuleProgramPathLabel" xml:space="preserve">
+    <value>Путь к программе</value>
+  </data>
+  <data name="FwRuleBtnBrowse" xml:space="preserve">
+    <value>Обзор...</value>
+  </data>
+  <data name="FwRuleServiceNameLabel" xml:space="preserve">
+    <value>Имя службы</value>
+  </data>
+  <data name="FwRuleProfilesLabel" xml:space="preserve">
+    <value>Профили сети</value>
+  </data>
+  <data name="FwRuleProfileDomain" xml:space="preserve">
+    <value>Доменный</value>
+  </data>
+  <data name="FwRuleProfilePrivate" xml:space="preserve">
+    <value>Частный</value>
+  </data>
+  <data name="FwRuleProfilePublic" xml:space="preserve">
+    <value>Общедоступный</value>
+  </data>
+  <data name="FwRuleEnabledCheck" xml:space="preserve">
+    <value>Правило включено</value>
+  </data>
+  <data name="FwRuleBtnSave" xml:space="preserve">
+    <value>Сохранить правило</value>
+  </data>
+  <data name="NetAlertTitle" xml:space="preserve">
+    <value>Новое сетевое подключение</value>
+  </data>
+  <data name="NetAlertBtnAllowAlways" xml:space="preserve">
+    <value>🟢 Разрешить всегда</value>
+  </data>
+  <data name="NetAlertBtnAllowSession" xml:space="preserve">
+    <value>🟡 На этот сеанс</value>
+  </data>
+  <data name="NetAlertBtnBlock" xml:space="preserve">
+    <value>🔴 Заблокировать</value>
+  </data>
+<data name="NetColProcess" xml:space="preserve"><value>Процесс</value></data>
+<data name="NetColProtocol" xml:space="preserve"><value>Протокол</value></data>
+<data name="NetColLocalAddress" xml:space="preserve"><value>Локальный адрес</value></data>
+<data name="NetColRemoteAddress" xml:space="preserve"><value>Удалённый адрес</value></data>
+<data name="NetColStatus" xml:space="preserve"><value>Статус</value></data>
+<data name="NetColNetworkGeo" xml:space="preserve"><value>Сеть / Гео</value></data>
+<data name="NetColFirewall" xml:space="preserve"><value>Брандмауэр</value></data>
+<data name="NetColEnabled" xml:space="preserve"><value>Вкл</value></data>
+<data name="NetColAction" xml:space="preserve"><value>Действие</value></data>
+<data name="NetColDirection" xml:space="preserve"><value>Направление</value></data>
+<data name="NetColName" xml:space="preserve"><value>Имя</value></data>
+<data name="NetColProgram" xml:space="preserve"><value>Программа</value></data>
+<data name="NetColLocalPorts" xml:space="preserve"><value>Локальные порты</value></data>
+<data name="NetColRemoteAddresses" xml:space="preserve"><value>Удалённые адреса</value></data>
+<data name="NetColProfiles" xml:space="preserve"><value>Профили</value></data>
+<data name="NetColIp" xml:space="preserve"><value>IP</value></data>
+<data name="NetColPort" xml:space="preserve"><value>Порт</value></data>
+<data name="NetColAttempts" xml:space="preserve"><value>Попытки</value></data>
+<data name="NetColReason" xml:space="preserve"><value>Причина</value></data>
+<data name="NetColRemaining" xml:space="preserve"><value>Осталось</value></data>
+<data name="NetColRepeats" xml:space="preserve"><value>Повторы</value></data>
+<data name="NetSearchConnectionsHint" xml:space="preserve"><value>Поиск по процессу, PID, IP, порту...</value></data>
+<data name="NetSearchRulesHint" xml:space="preserve"><value>Поиск по имени, порту, IP, процессу...</value></data>
+<data name="NetCtxBlockRemoteIp" xml:space="preserve"><value>🚫 Заблокировать удалённый IP</value></data>
+<data name="NetCtxCreateRuleForProcess" xml:space="preserve"><value>🛡️ Создать правило для процесса...</value></data>
+<data name="NetCtxCopyRemoteIp" xml:space="preserve"><value>📋 Копировать удалённый IP</value></data>
+<data name="NetCtxCopyEndpoint" xml:space="preserve"><value>📋 Копировать адрес и порт</value></data>
+<data name="NetCtxWhois" xml:space="preserve"><value>🌐 Информация об IP (Whois / IPInfo)</value></data>
+<data name="NetCtxVirusTotal" xml:space="preserve"><value>🔍 Проверить IP в VirusTotal</value></data>
+<data name="NetCtxKillProcess" xml:space="preserve"><value>❌ Завершить процесс (Kill)</value></data>
+<data name="NetNoRulesSubtitle" xml:space="preserve"><value>Измените поисковый запрос или фильтр</value></data>
+<data name="NetNoBansSubtitle" xml:space="preserve"><value>Port Defender не зафиксировал атак</value></data>
+<data name="NetDefenderStateLoading" xml:space="preserve"><value>Port Defender: статус загружается...</value></data>
+<data name="NetStatusReady" xml:space="preserve"><value>Готово</value></data>
+<data name="FwRuleProtocolAny" xml:space="preserve"><value>Любой</value></data>
+<data name="FwRuleNameHint" xml:space="preserve"><value>Например: StartupMonitor — блокировка 192.168.1.0/24</value></data>
+<data name="FwRuleDescHint" xml:space="preserve"><value>Необязательный комментарий</value></data>
+<data name="FwRulePortsHint" xml:space="preserve"><value>80, 443 или 8000-8080 (только TCP/UDP)</value></data>
+<data name="FwRuleRemoteIpsHint" xml:space="preserve"><value>192.168.1.0/24 или * (пусто = любые)</value></data>
+<data name="FwRuleProgramHint" xml:space="preserve"><value>Пусто = применяется ко всей системе</value></data>
+<data name="FwRuleServiceHint" xml:space="preserve"><value>Пусто = без привязки к службе</value></data>
+<data name="FwRuleBtnCancel" xml:space="preserve"><value>Отмена</value></data>
+<data name="NetAlertCloseTip" xml:space="preserve"><value>Закрыть (разрешить на этот сеанс)</value></data>
+<data name="NetAlertAllowAlwaysTip" xml:space="preserve"><value>Создать разрешающее правило в Windows Firewall</value></data>
+<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Разрешить без создания правила (до перезапуска)</value></data>
+<data name="NetAlertBlockTip" xml:space="preserve"><value>Создать блокирующее правило в Windows Firewall</value></data>
+<data name="NetAlertCountdownHint" xml:space="preserve"><value>Автоматическое решение через 15 сек...</value></data>
+<data name="NetBansCountFormat" xml:space="preserve"><value>Активных банов: {0}</value></data>
+<data name="PortDefenderPortsHint" xml:space="preserve"><value>Например: 3389, 22, 445</value></data>
+<data name="PortDefenderWhitelistHint" xml:space="preserve"><value>Например: 192.168.1.10, 10.0.0.0/24</value></data>
+  <data name="NetKillswitchConfirmMsg" xml:space="preserve">
+    <value>Экстренный Killswitch заблокирует ВЕСЬ сетевой трафик.
+Продолжить?</value>
+  </data>
+  <data name="NetKillswitchConfirmTitle" xml:space="preserve">
+    <value>Подтверждение Killswitch</value>
+  </data>
+  <data name="NetDeleteRuleConfirmTitle" xml:space="preserve">
+    <value>Подтверждение удаления</value>
+  </data>
+  <data name="NetDeleteRuleConfirmFormat" xml:space="preserve">
+    <value>Удалить правило «{0}» ({1})?</value>
+  </data>
+  <data name="NetClearBansConfirmTitle" xml:space="preserve">
+    <value>Сброс всех банов</value>
+  </data>
+  <data name="NetClearBansConfirmFormat" xml:space="preserve">
+    <value>Снять все активные баны ({0})?</value>
+  </data>
+  <data name="NetKillProcessConfirmTitle" xml:space="preserve">
+    <value>Подтверждение завершения</value>
+  </data>
+  <data name="NetKillProcessConfirmFormat" xml:space="preserve">
+    <value>Завершить процесс «{0}» (PID {1})?</value>
+  </data>
+  <data name="NetImportConfirmTitle" xml:space="preserve">
+    <value>Подтверждение импорта</value>
+  </data>
+  <data name="NetImportConfirmFormat" xml:space="preserve">
+    <value>В файле найдено правил: {0}.
+Импортировать с перезаписью существующих правил?</value>
+  </data>
+  <data name="NetStatusExportedFormat" xml:space="preserve">
+    <value>Экспортировано {0} правил в файл {1}.</value>
+  </data>
+  <data name="NetStatusPresetAppliedFormat" xml:space="preserve">
+    <value>Пресет «{0}» применён (правил: {1}).</value>
+  </data>
+  <data name="NetPresetAppliedTitle" xml:space="preserve">
+    <value>Пресет безопасности</value>
+  </data>
+  <data name="NetImportCompletedTitle" xml:space="preserve">
+    <value>Импорт правил</value>
+  </data>
+  <data name="NetImportCompletedFormat" xml:space="preserve">
+    <value>Импорт завершён: импортировано {0}, пропущено {1}.</value>
+  </data>
+  <data name="FwPortsOnlyTcpUdpMsg" xml:space="preserve">
+    <value>Порты применимы только к протоколам TCP и UDP. Очистить поля портов и продолжить?</value>
+  </data>
+  <data name="FwPortsOnlyTcpUdpTitle" xml:space="preserve">
+    <value>Предупреждение</value>
+  </data>
+  <data name="FwSelfBlockGuardTitle" xml:space="preserve">
+    <value>Защита от самоблокировки</value>
   </data>
 </root>

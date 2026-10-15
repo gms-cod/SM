@@ -992,6 +992,326 @@ public class LocalizationService : INotifyPropertyChanged
     public string GetPortDefenderBanPermanent(int repeatCount) =>
         string.Format(CultureInfo.CurrentUICulture, this["PortDefenderBanPermanentFormat"], repeatCount);
 
+    // ──── Сетевой экран / Firewall Rules / Port Defender / Alerts (Worker 1) ────
+    /// <summary>Локализованная строка «NetFwStateUnknown».</summary>
+    public string NetFwStateUnknown => this["NetFwStateUnknown"];
+    /// <summary>Локализованная строка «NetStatusLoading».</summary>
+    public string NetStatusLoading => this["NetStatusLoading"];
+    /// <summary>Локализованная строка «NetProfileDomainDefault».</summary>
+    public string NetProfileDomainDefault => this["NetProfileDomainDefault"];
+    /// <summary>Локализованная строка «NetProfilePrivateDefault».</summary>
+    public string NetProfilePrivateDefault => this["NetProfilePrivateDefault"];
+    /// <summary>Локализованная строка «NetProfilePublicDefault».</summary>
+    public string NetProfilePublicDefault => this["NetProfilePublicDefault"];
+    /// <summary>Локализованная строка «NetBtnRefreshStatus».</summary>
+    public string NetBtnRefreshStatus => this["NetBtnRefreshStatus"];
+    /// <summary>Локализованная строка «NetFilteringModeHeader».</summary>
+    public string NetFilteringModeHeader => this["NetFilteringModeHeader"];
+    /// <summary>Локализованная строка «NetFilterModeNormal».</summary>
+    public string NetFilterModeNormal => this["NetFilterModeNormal"];
+    /// <summary>Локализованная строка «NetFilterModeWhitelist».</summary>
+    public string NetFilterModeWhitelist => this["NetFilterModeWhitelist"];
+    /// <summary>Локализованная строка «NetFilterModeKillswitch».</summary>
+    public string NetFilterModeKillswitch => this["NetFilterModeKillswitch"];
+    /// <summary>Локализованная строка «NetInteractiveAlertsCheck».</summary>
+    public string NetInteractiveAlertsCheck => this["NetInteractiveAlertsCheck"];
+    /// <summary>Локализованная строка «NetInteractiveAlertsTip».</summary>
+    public string NetInteractiveAlertsTip => this["NetInteractiveAlertsTip"];
+    /// <summary>Локализованная строка «NetLiveConnectionsHeader».</summary>
+    public string NetLiveConnectionsHeader => this["NetLiveConnectionsHeader"];
+    /// <summary>Локализованная строка «NetFilterAll».</summary>
+    public string NetFilterAll => this["NetFilterAll"];
+    /// <summary>Локализованная строка «NetFilterWan».</summary>
+    public string NetFilterWan => this["NetFilterWan"];
+    /// <summary>Локализованная строка «NetFilterLan».</summary>
+    public string NetFilterLan => this["NetFilterLan"];
+    /// <summary>Локализованная строка «NetFilterEstablished».</summary>
+    public string NetFilterEstablished => this["NetFilterEstablished"];
+    /// <summary>Локализованная строка «NetFilterListen».</summary>
+    public string NetFilterListen => this["NetFilterListen"];
+    /// <summary>Локализованная строка «NetAutoRefresh2s».</summary>
+    public string NetAutoRefresh2s => this["NetAutoRefresh2s"];
+    /// <summary>Локализованная строка «NetBtnRefreshNow».</summary>
+    public string NetBtnRefreshNow => this["NetBtnRefreshNow"];
+    /// <summary>Локализованная строка «NetConnectionsSummaryFormat».</summary>
+    public string NetConnectionsSummaryFormat => this["NetConnectionsSummaryFormat"];
+    /// <summary>Локализованная строка «NetTabFirewallRules».</summary>
+    public string NetTabFirewallRules => this["NetTabFirewallRules"];
+    /// <summary>Локализованная строка «NetRulesFilterLabel».</summary>
+    public string NetRulesFilterLabel => this["NetRulesFilterLabel"];
+    /// <summary>Локализованная строка «NetRulesFilterAll».</summary>
+    public string NetRulesFilterAll => this["NetRulesFilterAll"];
+    /// <summary>Локализованная строка «NetRulesFilterInbound».</summary>
+    public string NetRulesFilterInbound => this["NetRulesFilterInbound"];
+    /// <summary>Локализованная строка «NetRulesFilterOutbound».</summary>
+    public string NetRulesFilterOutbound => this["NetRulesFilterOutbound"];
+    /// <summary>Локализованная строка «NetRulesFilterBlock».</summary>
+    public string NetRulesFilterBlock => this["NetRulesFilterBlock"];
+    /// <summary>Локализованная строка «NetBtnCreateRule».</summary>
+    public string NetBtnCreateRule => this["NetBtnCreateRule"];
+    /// <summary>Локализованная строка «NetBtnEditRule».</summary>
+    public string NetBtnEditRule => this["NetBtnEditRule"];
+    /// <summary>Локализованная строка «NetBtnDeleteRule».</summary>
+    public string NetBtnDeleteRule => this["NetBtnDeleteRule"];
+    /// <summary>Локализованная строка «NetBtnExport».</summary>
+    public string NetBtnExport => this["NetBtnExport"];
+    /// <summary>Локализованная строка «NetBtnExportTip».</summary>
+    public string NetBtnExportTip => this["NetBtnExportTip"];
+    /// <summary>Локализованная строка «NetBtnImport».</summary>
+    public string NetBtnImport => this["NetBtnImport"];
+    /// <summary>Локализованная строка «NetBtnImportTip».</summary>
+    public string NetBtnImportTip => this["NetBtnImportTip"];
+    /// <summary>Локализованная строка «NetBtnSecurityPresets».</summary>
+    public string NetBtnSecurityPresets => this["NetBtnSecurityPresets"];
+    /// <summary>Локализованная строка «NetPresetMaxPrivacy».</summary>
+    public string NetPresetMaxPrivacy => this["NetPresetMaxPrivacy"];
+    /// <summary>Локализованная строка «NetPresetGaming».</summary>
+    public string NetPresetGaming => this["NetPresetGaming"];
+    /// <summary>Локализованная строка «NetPresetPublicWifi».</summary>
+    public string NetPresetPublicWifi => this["NetPresetPublicWifi"];
+    /// <summary>Локализованная строка «NetPresetReset».</summary>
+    public string NetPresetReset => this["NetPresetReset"];
+    /// <summary>Локализованная строка «NetBtnRefreshRules».</summary>
+    public string NetBtnRefreshRules => this["NetBtnRefreshRules"];
+    /// <summary>Локализованная строка «NetBtnAntiTelemetry».</summary>
+    public string NetBtnAntiTelemetry => this["NetBtnAntiTelemetry"];
+    /// <summary>Локализованная строка «NetBtnAntiTelemetryTip».</summary>
+    public string NetBtnAntiTelemetryTip => this["NetBtnAntiTelemetryTip"];
+    /// <summary>Локализованная строка «NetTabPortDefender».</summary>
+    public string NetTabPortDefender => this["NetTabPortDefender"];
+    /// <summary>Локализованная строка «NetTabAttackBans».</summary>
+    public string NetTabAttackBans => this["NetTabAttackBans"];
+    /// <summary>Локализованная строка «NetBtnUnbanSelectedIp».</summary>
+    public string NetBtnUnbanSelectedIp => this["NetBtnUnbanSelectedIp"];
+    /// <summary>Локализованная строка «NetBtnResetAllBans».</summary>
+    public string NetBtnResetAllBans => this["NetBtnResetAllBans"];
+    /// <summary>Локализованная строка «NetNoConnectionsTitle».</summary>
+    public string NetNoConnectionsTitle => this["NetNoConnectionsTitle"];
+    /// <summary>Локализованная строка «NetNoConnectionsSubtitle».</summary>
+    public string NetNoConnectionsSubtitle => this["NetNoConnectionsSubtitle"];
+    /// <summary>Локализованная строка «NetNoRulesTitle».</summary>
+    public string NetNoRulesTitle => this["NetNoRulesTitle"];
+    /// <summary>Локализованная строка «NetNoBansTitle».</summary>
+    public string NetNoBansTitle => this["NetNoBansTitle"];
+    /// <summary>Локализованная строка «FwRuleCreateTitle».</summary>
+    public string FwRuleCreateTitle => this["FwRuleCreateTitle"];
+    /// <summary>Локализованная строка «FwRuleEditTitle».</summary>
+    public string FwRuleEditTitle => this["FwRuleEditTitle"];
+    /// <summary>Локализованная строка «FwRuleSubtitle».</summary>
+    public string FwRuleSubtitle => this["FwRuleSubtitle"];
+    /// <summary>Локализованная строка «FwRuleNameLabel».</summary>
+    public string FwRuleNameLabel => this["FwRuleNameLabel"];
+    /// <summary>Локализованная строка «FwRuleDescLabel».</summary>
+    public string FwRuleDescLabel => this["FwRuleDescLabel"];
+    /// <summary>Локализованная строка «FwRuleActionLabel».</summary>
+    public string FwRuleActionLabel => this["FwRuleActionLabel"];
+    /// <summary>Локализованная строка «FwRuleActionAllow».</summary>
+    public string FwRuleActionAllow => this["FwRuleActionAllow"];
+    /// <summary>Локализованная строка «FwRuleActionBlock».</summary>
+    public string FwRuleActionBlock => this["FwRuleActionBlock"];
+    /// <summary>Локализованная строка «FwRuleDirectionLabel».</summary>
+    public string FwRuleDirectionLabel => this["FwRuleDirectionLabel"];
+    /// <summary>Локализованная строка «FwRuleDirInbound».</summary>
+    public string FwRuleDirInbound => this["FwRuleDirInbound"];
+    /// <summary>Локализованная строка «FwRuleDirOutbound».</summary>
+    public string FwRuleDirOutbound => this["FwRuleDirOutbound"];
+    /// <summary>Локализованная строка «FwRuleProtocolLabel».</summary>
+    public string FwRuleProtocolLabel => this["FwRuleProtocolLabel"];
+    /// <summary>Локализованная строка «FwRuleLocalPortsLabel».</summary>
+    public string FwRuleLocalPortsLabel => this["FwRuleLocalPortsLabel"];
+    /// <summary>Локализованная строка «FwRuleRemotePortsLabel».</summary>
+    public string FwRuleRemotePortsLabel => this["FwRuleRemotePortsLabel"];
+    /// <summary>Локализованная строка «FwRuleRemoteIpsLabel».</summary>
+    public string FwRuleRemoteIpsLabel => this["FwRuleRemoteIpsLabel"];
+    /// <summary>Локализованная строка «FwRuleProgramPathLabel».</summary>
+    public string FwRuleProgramPathLabel => this["FwRuleProgramPathLabel"];
+    /// <summary>Локализованная строка «FwRuleBtnBrowse».</summary>
+    public string FwRuleBtnBrowse => this["FwRuleBtnBrowse"];
+    /// <summary>Локализованная строка «FwRuleServiceNameLabel».</summary>
+    public string FwRuleServiceNameLabel => this["FwRuleServiceNameLabel"];
+    /// <summary>Локализованная строка «FwRuleProfilesLabel».</summary>
+    public string FwRuleProfilesLabel => this["FwRuleProfilesLabel"];
+    /// <summary>Локализованная строка «FwRuleProfileDomain».</summary>
+    public string FwRuleProfileDomain => this["FwRuleProfileDomain"];
+    /// <summary>Локализованная строка «FwRuleProfilePrivate».</summary>
+    public string FwRuleProfilePrivate => this["FwRuleProfilePrivate"];
+    /// <summary>Локализованная строка «FwRuleProfilePublic».</summary>
+    public string FwRuleProfilePublic => this["FwRuleProfilePublic"];
+    /// <summary>Локализованная строка «FwRuleEnabledCheck».</summary>
+    public string FwRuleEnabledCheck => this["FwRuleEnabledCheck"];
+    /// <summary>Локализованная строка «FwRuleBtnSave».</summary>
+    public string FwRuleBtnSave => this["FwRuleBtnSave"];
+    /// <summary>Локализованная строка «NetAlertTitle».</summary>
+    public string NetAlertTitle => this["NetAlertTitle"];
+    /// <summary>Локализованная строка «NetAlertBtnAllowAlways».</summary>
+    public string NetAlertBtnAllowAlways => this["NetAlertBtnAllowAlways"];
+    /// <summary>Локализованная строка «NetAlertBtnAllowSession».</summary>
+    public string NetAlertBtnAllowSession => this["NetAlertBtnAllowSession"];
+    /// <summary>Локализованная строка «NetAlertBtnBlock».</summary>
+    public string NetAlertBtnBlock => this["NetAlertBtnBlock"];
+
+    /// <summary>Локализованная строка «NetColProcess».</summary>
+    public string NetColProcess => this["NetColProcess"];
+    /// <summary>Локализованная строка «NetColProtocol».</summary>
+    public string NetColProtocol => this["NetColProtocol"];
+    /// <summary>Локализованная строка «NetColLocalAddress».</summary>
+    public string NetColLocalAddress => this["NetColLocalAddress"];
+    /// <summary>Локализованная строка «NetColRemoteAddress».</summary>
+    public string NetColRemoteAddress => this["NetColRemoteAddress"];
+    /// <summary>Локализованная строка «NetColStatus».</summary>
+    public string NetColStatus => this["NetColStatus"];
+    /// <summary>Локализованная строка «NetColNetworkGeo».</summary>
+    public string NetColNetworkGeo => this["NetColNetworkGeo"];
+    /// <summary>Локализованная строка «NetColFirewall».</summary>
+    public string NetColFirewall => this["NetColFirewall"];
+    /// <summary>Локализованная строка «NetColEnabled».</summary>
+    public string NetColEnabled => this["NetColEnabled"];
+    /// <summary>Локализованная строка «NetColAction».</summary>
+    public string NetColAction => this["NetColAction"];
+    /// <summary>Локализованная строка «NetColDirection».</summary>
+    public string NetColDirection => this["NetColDirection"];
+    /// <summary>Локализованная строка «NetColName».</summary>
+    public string NetColName => this["NetColName"];
+    /// <summary>Локализованная строка «NetColProgram».</summary>
+    public string NetColProgram => this["NetColProgram"];
+    /// <summary>Локализованная строка «NetColLocalPorts».</summary>
+    public string NetColLocalPorts => this["NetColLocalPorts"];
+    /// <summary>Локализованная строка «NetColRemoteAddresses».</summary>
+    public string NetColRemoteAddresses => this["NetColRemoteAddresses"];
+    /// <summary>Локализованная строка «NetColProfiles».</summary>
+    public string NetColProfiles => this["NetColProfiles"];
+    /// <summary>Локализованная строка «NetColIp».</summary>
+    public string NetColIp => this["NetColIp"];
+    /// <summary>Локализованная строка «NetColPort».</summary>
+    public string NetColPort => this["NetColPort"];
+    /// <summary>Локализованная строка «NetColAttempts».</summary>
+    public string NetColAttempts => this["NetColAttempts"];
+    /// <summary>Локализованная строка «NetColReason».</summary>
+    public string NetColReason => this["NetColReason"];
+    /// <summary>Локализованная строка «NetColRemaining».</summary>
+    public string NetColRemaining => this["NetColRemaining"];
+    /// <summary>Локализованная строка «NetColRepeats».</summary>
+    public string NetColRepeats => this["NetColRepeats"];
+    /// <summary>Локализованная строка «NetSearchConnectionsHint».</summary>
+    public string NetSearchConnectionsHint => this["NetSearchConnectionsHint"];
+    /// <summary>Локализованная строка «NetSearchRulesHint».</summary>
+    public string NetSearchRulesHint => this["NetSearchRulesHint"];
+    /// <summary>Локализованная строка «NetCtxBlockRemoteIp».</summary>
+    public string NetCtxBlockRemoteIp => this["NetCtxBlockRemoteIp"];
+    /// <summary>Локализованная строка «NetCtxCreateRuleForProcess».</summary>
+    public string NetCtxCreateRuleForProcess => this["NetCtxCreateRuleForProcess"];
+    /// <summary>Локализованная строка «NetCtxCopyRemoteIp».</summary>
+    public string NetCtxCopyRemoteIp => this["NetCtxCopyRemoteIp"];
+    /// <summary>Локализованная строка «NetCtxCopyEndpoint».</summary>
+    public string NetCtxCopyEndpoint => this["NetCtxCopyEndpoint"];
+    /// <summary>Локализованная строка «NetCtxWhois».</summary>
+    public string NetCtxWhois => this["NetCtxWhois"];
+    /// <summary>Локализованная строка «NetCtxVirusTotal».</summary>
+    public string NetCtxVirusTotal => this["NetCtxVirusTotal"];
+    /// <summary>Локализованная строка «NetCtxKillProcess».</summary>
+    public string NetCtxKillProcess => this["NetCtxKillProcess"];
+    /// <summary>Локализованная строка «NetNoRulesSubtitle».</summary>
+    public string NetNoRulesSubtitle => this["NetNoRulesSubtitle"];
+    /// <summary>Локализованная строка «NetNoBansSubtitle».</summary>
+    public string NetNoBansSubtitle => this["NetNoBansSubtitle"];
+    /// <summary>Локализованная строка «NetDefenderStateLoading».</summary>
+    public string NetDefenderStateLoading => this["NetDefenderStateLoading"];
+    /// <summary>Локализованная строка «NetStatusReady».</summary>
+    public string NetStatusReady => this["NetStatusReady"];
+    /// <summary>Локализованная строка «FwRuleProtocolAny».</summary>
+    public string FwRuleProtocolAny => this["FwRuleProtocolAny"];
+    /// <summary>Локализованная строка «FwRuleNameHint».</summary>
+    public string FwRuleNameHint => this["FwRuleNameHint"];
+    /// <summary>Локализованная строка «FwRuleDescHint».</summary>
+    public string FwRuleDescHint => this["FwRuleDescHint"];
+    /// <summary>Локализованная строка «FwRulePortsHint».</summary>
+    public string FwRulePortsHint => this["FwRulePortsHint"];
+    /// <summary>Локализованная строка «FwRuleRemoteIpsHint».</summary>
+    public string FwRuleRemoteIpsHint => this["FwRuleRemoteIpsHint"];
+    /// <summary>Локализованная строка «FwRuleProgramHint».</summary>
+    public string FwRuleProgramHint => this["FwRuleProgramHint"];
+    /// <summary>Локализованная строка «FwRuleServiceHint».</summary>
+    public string FwRuleServiceHint => this["FwRuleServiceHint"];
+    /// <summary>Локализованная строка «FwRuleBtnCancel».</summary>
+    public string FwRuleBtnCancel => this["FwRuleBtnCancel"];
+    /// <summary>Локализованная строка «NetAlertCloseTip».</summary>
+    public string NetAlertCloseTip => this["NetAlertCloseTip"];
+    /// <summary>Локализованная строка «NetAlertAllowAlwaysTip».</summary>
+    public string NetAlertAllowAlwaysTip => this["NetAlertAllowAlwaysTip"];
+    /// <summary>Локализованная строка «NetAlertAllowSessionTip».</summary>
+    public string NetAlertAllowSessionTip => this["NetAlertAllowSessionTip"];
+    /// <summary>Локализованная строка «NetAlertBlockTip».</summary>
+    public string NetAlertBlockTip => this["NetAlertBlockTip"];
+    /// <summary>Локализованная строка «NetAlertCountdownHint».</summary>
+    public string NetAlertCountdownHint => this["NetAlertCountdownHint"];
+
+    /// <summary>Локализованная строка «NetBansCountFormat».</summary>
+    public string NetBansCountFormat => this["NetBansCountFormat"];
+    /// <summary>Локализованная строка «PortDefenderPortsHint».</summary>
+    public string PortDefenderPortsHint => this["PortDefenderPortsHint"];
+    /// <summary>Локализованная строка «PortDefenderWhitelistHint».</summary>
+    public string PortDefenderWhitelistHint => this["PortDefenderWhitelistHint"];
+
+    /// <summary>Формирует строку сводки соединений «Соединений: N • WAN: M • Процессов: K».</summary>
+    public string GetNetConnectionsSummary(int total, int wan, int processes) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetConnectionsSummaryFormat"], total, wan, processes);
+
+    /// <summary>Возвращает локализованную строку «Служба не найдена» (статус службы) с именем службы.</summary>
+    public string GetStatusServiceNotFound(string name) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["StatusServiceNotFound"], name);
+
+    // ──── Подтверждения и статусы Центра сетевой безопасности (Worker 3) ────
+    /// <summary>Текст подтверждения Killswitch.</summary>
+    public string NetKillswitchConfirmMsg => this["NetKillswitchConfirmMsg"];
+    /// <summary>Заголовок подтверждения Killswitch.</summary>
+    public string NetKillswitchConfirmTitle => this["NetKillswitchConfirmTitle"];
+    /// <summary>Заголовок подтверждения удаления правила.</summary>
+    public string NetDeleteRuleConfirmTitle => this["NetDeleteRuleConfirmTitle"];
+    /// <summary>Заголовок подтверждения сброса всех банов.</summary>
+    public string NetClearBansConfirmTitle => this["NetClearBansConfirmTitle"];
+    /// <summary>Заголовок подтверждения завершения процесса.</summary>
+    public string NetKillProcessConfirmTitle => this["NetKillProcessConfirmTitle"];
+    /// <summary>Заголовок подтверждения импорта правил.</summary>
+    public string NetImportConfirmTitle => this["NetImportConfirmTitle"];
+    /// <summary>Заголовок завершения импорта правил.</summary>
+    public string NetImportCompletedTitle => this["NetImportCompletedTitle"];
+    /// <summary>Заголовок применения пресета безопасности.</summary>
+    public string NetPresetAppliedTitle => this["NetPresetAppliedTitle"];
+    /// <summary>Текст предупреждения «Порты применимы только к TCP/UDP».</summary>
+    public string FwPortsOnlyTcpUdpMsg => this["FwPortsOnlyTcpUdpMsg"];
+    /// <summary>Заголовок предупреждения о портах.</summary>
+    public string FwPortsOnlyTcpUdpTitle => this["FwPortsOnlyTcpUdpTitle"];
+    /// <summary>Заголовок «Защита от самоблокировки».</summary>
+    public string FwSelfBlockGuardTitle => this["FwSelfBlockGuardTitle"];
+
+    /// <summary>Формирует подтверждение удаления правила «{0}» ({1}).</summary>
+    public string GetNetDeleteRuleConfirm(string name, object direction) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetDeleteRuleConfirmFormat"], name, direction);
+
+    /// <summary>Формирует подтверждение сброса всех банов ({0}).</summary>
+    public string GetNetClearBansConfirm(int count) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetClearBansConfirmFormat"], count);
+
+    /// <summary>Формирует подтверждение завершения процесса «{0}» (PID {1}).</summary>
+    public string GetNetKillProcessConfirm(string processName, int pid) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetKillProcessConfirmFormat"], processName, pid);
+
+    /// <summary>Формирует подтверждение импорта правил.</summary>
+    public string GetNetImportConfirm(int count) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetImportConfirmFormat"], count);
+
+    /// <summary>Формирует статус «Экспортировано N правил...».</summary>
+    public string GetNetStatusExported(int count, string fileName) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetStatusExportedFormat"], count, fileName);
+
+    /// <summary>Формирует статус «Пресет применён...».</summary>
+    public string GetNetStatusPresetApplied(string displayName, int applied) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetStatusPresetAppliedFormat"], displayName, applied);
+
+    /// <summary>Формирует итог импорта «Импорт завершён: ...».</summary>
+    public string GetNetImportCompleted(int imported, int skipped) =>
+        string.Format(System.Globalization.CultureInfo.CurrentUICulture, this["NetImportCompletedFormat"], imported, skipped);
+
     /// <summary>Переключает язык интерфейса и оповещает подписчиков через INotifyPropertyChanged.</summary>
     /// <param name="cultureCode">Код культуры (например, "ru", "en").</param>
     public void ChangeLanguage(string cultureCode)

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
 
@@ -161,6 +160,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
             }
 
             int added = 0;
+            // P0: GetAllRules() вызывается ровно один раз за скан (дорогой COM-перебор
+            // всех правил), а в цикле проверка идёт за O(1) через HashSet путей.
+            var rulePaths = BuildFirewallRulePathSet();
             foreach (var socket in sockets)
             {
                 if (socket is null)
@@ -188,12 +190,15 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     continue;
 
                 // 4. Если для программы уже есть правило — алерт не создаём.
-                if (HasExistingFirewallRule(processPath, processName))
+                if (HasExistingFirewallRuleCached(processPath, processName, rulePaths))
                     continue;
 
                 // 5. Дедупликация повторных обращений к тому же remote:port.
                 if (_pendingById.Count >= MaxPendingAlerts)
                     continue;
+                // Защита от утечки памяти: сбрасываем дедупликационный кеш при переполнении.
+                if (_seenKeys.Count > 10000)
+                    _seenKeys.Clear();
                 var seenKey = sessionKey + "|" + remote.ToLowerInvariant() + ":" + socket.RemotePort;
                 if (!_seenKeys.TryAdd(seenKey, 0))
                     continue;
@@ -325,13 +330,94 @@ public sealed class NetworkConnectionAlertService : IDisposable
             return null;
         try
         {
-            using var proc = Process.GetProcessById(pid);
-            return proc.MainModule?.FileName;
+            // Быстрый путь через QueryFullProcessImageName (без тяжёлого MainModule).
+            var fastPath = ProcessMetadataEnricher.TryGetProcessPath(pid);
+            return string.IsNullOrWhiteSpace(fastPath) ? null : fastPath;
         }
         catch
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Строит кеш путей программ с правилами Firewall (в нижнем регистре) за один
+    /// проход. Возвращает null, когда проверка переопределена тестом или недоступна.
+    /// </summary>
+    private HashSet<string>? BuildFirewallRulePathSet()
+    {
+        if (HasFirewallRuleOverride != null)
+            return null;
+
+        try
+        {
+            var rules = _firewall.GetAllRules();
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rule in rules)
+            {
+                var app = rule.ApplicationPath ?? rule.ApplicationName;
+                if (string.IsNullOrWhiteSpace(app))
+                    continue;
+                var appTrimmed = app.Trim();
+                if (appTrimmed.Length == 0)
+                    continue;
+                set.Add(appTrimmed.ToLowerInvariant());
+                try
+                {
+                    var fileName = Path.GetFileName(appTrimmed);
+                    if (!string.IsNullOrWhiteSpace(fileName))
+                        set.Add(fileName.ToLowerInvariant());
+                }
+                catch { }
+            }
+
+            return set;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "NetworkAlerts: не удалось проверить правила Firewall");
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// O(1)-проверка наличия правила Firewall по пред построенному кешу путей.
+    /// </summary>
+    private bool HasExistingFirewallRuleCached(string? processPath, string? processName, HashSet<string>? rulePaths)
+    {
+        if (HasFirewallRuleOverride != null)
+        {
+            try { return HasFirewallRuleOverride(processPath ?? string.Empty); }
+            catch { return false; }
+        }
+
+        if (rulePaths is null)
+            return HasExistingFirewallRule(processPath, processName);
+
+        if (string.IsNullOrWhiteSpace(processPath) && string.IsNullOrWhiteSpace(processName))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(processPath) &&
+            rulePaths.Contains(processPath.Trim().ToLowerInvariant()))
+            return true;
+
+        string? wantedFile = null;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(processPath))
+                wantedFile = Path.GetFileName(processPath.Trim());
+        }
+        catch { }
+
+        if (!string.IsNullOrWhiteSpace(wantedFile) &&
+            rulePaths.Contains(wantedFile.ToLowerInvariant()))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(processName) &&
+            rulePaths.Contains(processName.Trim().ToLowerInvariant()))
+            return true;
+
+        return false;
     }
 
     private bool HasExistingFirewallRule(string? processPath, string? processName)

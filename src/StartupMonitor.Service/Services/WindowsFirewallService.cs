@@ -13,7 +13,7 @@ namespace StartupMonitor.Service.Services;
 /// <item>Late binding (<c>Type.GetTypeFromProgID</c> + <c>dynamic</c>) — без COM-reference,
 ///   совместимо с .NET 8 single-file/self-contained публикацией.</item>
 /// <item>COM-объекты живут только внутри одной операции и всегда освобождаются
-///   через <c>Marshal.ReleaseComObject</c> (утечек RCW нет).</item>
+///   через <c>Marshal.FinalReleaseComObject</c> (утечек RCW нет).</item>
 /// <item>Агрегированные правила <c>StartupMonitor_Blocked_IPs_In/Out</c>: O(1) правил
 ///   вместо O(N) на каждый IP — минимальный оверхед файрвола.</item>
 /// <item>Thread-safe: мутации под <c>lock</c> (read-modify-write CSV списка IP).</item>
@@ -456,7 +456,7 @@ public sealed class WindowsFirewallService
     /// <summary>
     /// Перечисляет ВСЕ правила COM-политики (включая чужие).
     /// Каждое COM-свойство читается через SafeGet (может бросать при Any-протоколе),
-    /// все RCW освобождаются через <c>Marshal.ReleaseComObject</c> (Zero-Crash).
+    /// все RCW освобождаются через <c>Marshal.FinalReleaseComObject</c> (Zero-Crash).
     /// </summary>
     public IReadOnlyList<FirewallRuleDto> GetAllRules()
     {
@@ -940,11 +940,11 @@ public sealed class WindowsFirewallService
             {
                 PresetRule(
                     $"{RulePrefix}Preset_MaxPrivacy_Telemetry",
-                    "MaxPrivacy: блокировка телеметрии Microsoft (vortex, telemetry, diagnostics).",
+                    "MaxPrivacy: блокировка телеметрии Microsoft (диапазоны IP телеметрии).",
                     FirewallDirection.Outbound,
                     FirewallAction.Block,
                     FirewallProtocol.Any,
-                    remoteAddresses: "vortex.data.microsoft.com,vortex-win.data.microsoft.com,telecommand.telemetry.microsoft.com,oca.telemetry.microsoft.com,settings-win.data.microsoft.com"),
+                    remoteAddresses: "20.180.0.0/16,51.10.0.0/16,13.107.4.0/24,20.190.128.0/18"),
                 PresetRule(
                     $"{RulePrefix}Preset_MaxPrivacy_Cortana",
                     "MaxPrivacy: блокировка Cortana (SearchUI) — исходящие соединения.",
@@ -958,7 +958,7 @@ public sealed class WindowsFirewallService
                     FirewallDirection.Outbound,
                     FirewallAction.Block,
                     FirewallProtocol.Tcp,
-                    remoteAddresses: "diagnostics.support.microsoft.com,oca.telemetry.microsoft.com,191.232.139.0/24,65.55.44.0/24"),
+                    remoteAddresses: "191.232.139.0/24,65.55.44.0/24,20.180.0.0/16,51.10.0.0/16,13.107.4.0/24,20.190.128.0/18"),
             },
             SecurityPresetType.Gaming => new List<FirewallRuleDto>
             {
@@ -1471,9 +1471,34 @@ public sealed class WindowsFirewallService
             ?? throw new FirewallNotAvailableException("Не удалось создать INetFwRule."));
     }
 
-    /// <summary>Поиск правила по имени с корректным освобождением неподошедших RCW.</summary>
+    /// <summary>Поиск правила по имени: сначала быстрый нативный Item(), затем линейный обход.</summary>
     private static dynamic? FindRule(dynamic rules, string name)
     {
+        // Быстрый нативный поиск O(1) без перечисления всей коллекции COM.
+        try
+        {
+            dynamic? direct = rules.Item(name);
+            if (direct is not null)
+            {
+                try
+                {
+                    // Обращение к свойству подтверждает, что объект живой.
+                    _ = (string)direct.Name;
+                    return direct; // владение RCW переходит вызывающему коду
+                }
+                catch
+                {
+                    Release(direct);
+                }
+            }
+            else
+            {
+                Release(direct);
+            }
+        }
+        catch (COMException) { }
+        catch (FileNotFoundException) { }
+
         System.Collections.IEnumerator? enumerator = null;
         try
         {
@@ -1620,14 +1645,14 @@ public sealed class WindowsFirewallService
         catch { return false; }
     }
 
-    /// <summary>Освобождение одного COM RCW. Не-COM объекты игнорируются.</summary>
+    /// <summary>Освобождение одного COM RCW (обнуление счётчика). Не-COM объекты игнорируются.</summary>
     private static void Release(object? comObject)
     {
         if (comObject is null) return;
         try
         {
             if (Marshal.IsComObject(comObject))
-                Marshal.ReleaseComObject(comObject);
+                Marshal.FinalReleaseComObject(comObject);
         }
         catch { /* повторное освобождение — игнорируем */ }
     }

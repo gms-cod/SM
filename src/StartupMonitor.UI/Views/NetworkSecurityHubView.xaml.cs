@@ -269,13 +269,81 @@ public partial class NetworkSecurityHubView : UserControl
             }
             catch { }
         };
-        Unloaded += (_, _) =>
+        Unloaded += (_, _) => Deactivate();
+    }
+
+    /// <summary>Финализатор: страховка от зомби-таймеров при потере Unloaded.</summary>
+    ~NetworkSecurityHubView()
+    {
+        try { _banTimer?.Stop(); } catch { }
+        try { _bansRefreshTimer?.Stop(); } catch { }
+        try { _liveConnTimer?.Stop(); } catch { }
+        try { _alertPollerTimer?.Stop(); } catch { }
+    }
+
+    /// <summary>
+    /// Останавливает все фоновые таймеры хаба (зомби-таймеры).
+    /// Вызывается при уходе со страницы, сворачивании в трей и закрытии окна.
+    /// Потокобезопасен: при вызове с фонового потока маршалится на UI-диспетчер.
+    /// </summary>
+    public void Deactivate()
+    {
+        try
         {
-            _banTimer.Stop();
-            _bansRefreshTimer.Stop();
-            _liveConnTimer.Stop();
-            _alertPollerTimer.Stop();
-        };
+            if (!Dispatcher.CheckAccess())
+            {
+                try { Dispatcher.BeginInvoke(new Action(Deactivate)); } catch { }
+                return;
+            }
+        }
+        catch { }
+
+        try { _banTimer?.Stop(); } catch { }
+        try { _bansRefreshTimer?.Stop(); } catch { }
+        try { _liveConnTimer?.Stop(); } catch { }
+        try { _alertPollerTimer?.Stop(); } catch { }
+    }
+
+    /// <summary>
+    /// Возобновляет фоновые таймеры хаба при входе на страницу / разворачивании окна
+    /// и запускает немедленное фоновое обновление.
+    /// </summary>
+    public void Activate()
+    {
+        try
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                try { Dispatcher.BeginInvoke(new Action(Activate)); } catch { }
+                return;
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (_banTimer != null && !_banTimer.IsEnabled)
+                _banTimer.Start();
+            if (_bansRefreshTimer != null && !_bansRefreshTimer.IsEnabled)
+                _bansRefreshTimer.Start();
+            try
+            {
+                if (_liveConnTimer != null && !_liveConnTimer.IsEnabled
+                    && ChkAutoRefreshConn != null && ChkAutoRefreshConn.IsChecked == true)
+                    _liveConnTimer.Start();
+            }
+            catch { }
+            try
+            {
+                if (_alertPollerTimer != null && !_alertPollerTimer.IsEnabled && _alertsEnabled)
+                    _alertPollerTimer.Start();
+            }
+            catch { }
+        }
+        catch { }
+
+        // Немедленное фоновое обновление (fire-and-forget, Zero-Crash внутри RefreshAllAsync).
+        try { _ = RefreshAllAsync(); } catch { }
     }
 
     // ===== Загрузка =====
@@ -759,8 +827,8 @@ public partial class NetworkSecurityHubView : UserControl
             if (target == FirewallFilteringMode.KillswitchBlockAll)
             {
                 var confirm = MessageBox.Show(Window.GetWindow(this),
-                    "Экстренный Killswitch заблокирует ВЕСЬ сетевой трафик.\nПродолжить?",
-                    "Подтверждение Killswitch",
+                    LocalizationService.Instance.NetKillswitchConfirmMsg,
+                    LocalizationService.Instance.NetKillswitchConfirmTitle,
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning,
                     MessageBoxResult.No);
@@ -845,8 +913,8 @@ public partial class NetworkSecurityHubView : UserControl
             }
 
             var confirm = MessageBox.Show(Window.GetWindow(this),
-                $"Удалить правило «{row.Name}» ({row.Direction})?",
-                "Подтверждение удаления",
+                LocalizationService.Instance.GetNetDeleteRuleConfirm(row.Name, row.Direction),
+                LocalizationService.Instance.NetDeleteRuleConfirmTitle,
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
                 MessageBoxResult.No);
@@ -1176,8 +1244,8 @@ public partial class NetworkSecurityHubView : UserControl
             }
 
             var confirm = MessageBox.Show(Window.GetWindow(this),
-                $"Снять все активные баны ({_banRows.Count})?",
-                "Сброс всех банов",
+                LocalizationService.Instance.GetNetClearBansConfirm(_banRows.Count),
+                LocalizationService.Instance.NetClearBansConfirmTitle,
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
                 MessageBoxResult.No);
@@ -1638,8 +1706,8 @@ public partial class NetworkSecurityHubView : UserControl
             }
 
             var confirm = MessageBox.Show(Window.GetWindow(this),
-                $"Завершить процесс «{selected.ProcessName}» (PID {selected.ProcessId})?",
-                "Подтверждение завершения",
+                LocalizationService.Instance.GetNetKillProcessConfirm(selected.ProcessName, selected.ProcessId),
+                LocalizationService.Instance.NetKillProcessConfirmTitle,
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
                 MessageBoxResult.No);
@@ -1737,7 +1805,7 @@ public partial class NetworkSecurityHubView : UserControl
             var json = SerializeBackupToJson(backup);
             await File.WriteAllTextAsync(dialog.FileName, json);
             var count = backup.Rules?.Count ?? 0;
-            SetStatus($"Экспортировано {count} правил в файл {dialog.FileName}.");
+            SetStatus(LocalizationService.Instance.GetNetStatusExported(count, dialog.FileName));
         }
         catch (Exception ex)
         {
@@ -1790,9 +1858,8 @@ public partial class NetworkSecurityHubView : UserControl
             }
 
             var confirm = MessageBox.Show(Window.GetWindow(this),
-                $"В файле найдено правил: {backup.Rules.Count}.\n" +
-                $"Импортировать с перезаписью существующих правил?",
-                "Подтверждение импорта",
+                LocalizationService.Instance.GetNetImportConfirm(backup.Rules.Count),
+                LocalizationService.Instance.NetImportConfirmTitle,
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question,
                 MessageBoxResult.No);
@@ -1802,10 +1869,10 @@ public partial class NetworkSecurityHubView : UserControl
             SetStatus("Импорт правил брандмауэра…");
             var (imported, skipped) = await _pipeClient.ImportFirewallRulesAsync(backup, overwrite: true);
             await LoadAllRulesAsync();
-            SetStatus($"Импортировано {imported}, пропущено {skipped}.");
+            SetStatus(LocalizationService.Instance.GetNetImportCompleted(imported, skipped));
             MessageBox.Show(Window.GetWindow(this),
-                $"Импорт завершён: импортировано {imported}, пропущено {skipped}.",
-                "Импорт правил",
+                LocalizationService.Instance.GetNetImportCompleted(imported, skipped),
+                LocalizationService.Instance.NetImportCompletedTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -1824,10 +1891,10 @@ public partial class NetworkSecurityHubView : UserControl
             SetStatus($"Применение пресета «{displayName}»…");
             var applied = await _pipeClient.ApplySecurityPresetAsync(presetType);
             await LoadAllRulesAsync();
-            SetStatus($"Пресет «{displayName}» применён (правил: {applied}).");
+            SetStatus(LocalizationService.Instance.GetNetStatusPresetApplied(displayName, applied));
             MessageBox.Show(Window.GetWindow(this),
-                $"Пресет «{displayName}» применён (правил: {applied}).",
-                "Пресет безопасности",
+                LocalizationService.Instance.GetNetStatusPresetApplied(displayName, applied),
+                LocalizationService.Instance.NetPresetAppliedTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }

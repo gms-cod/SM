@@ -16,6 +16,7 @@ public sealed class LiveConnectionRow
     private static readonly Brush TimeWaitBrush = Freeze("#CA5010");
     private static readonly Brush CloseWaitBrush = Freeze("#605E5C");
     private static readonly Brush DefaultStateBrush = Freeze("#605E5C");
+    private static readonly Brush StateForegroundContrastBrush = Freeze("#FFFFFF");
 
     /// <summary>Исходный сокет.</summary>
     public ProcessNetworkSocket Socket { get; }
@@ -71,6 +72,9 @@ public sealed class LiveConnectionRow
 
     /// <summary>Кисть цвета статуса соединения для бейджа колонки «Состояние».</summary>
     public Brush StateBadgeBrush => GetStateBrush(State);
+
+    /// <summary>Контрастный цвет текста для бейджа статуса (белый #FFFFFF для светлой и тёмной тем).</summary>
+    public Brush StateForegroundBrush => StateForegroundContrastBrush;
 
     /// <summary>Создаёт строку с GeoIP-резолвом удалённого адреса.</summary>
     /// <param name="socket">Сокет процесса.</param>

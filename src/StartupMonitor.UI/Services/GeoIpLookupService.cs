@@ -293,6 +293,8 @@ public static class GeoIpLookupService
         }
 
         Cache[key] = result;
+        if (Cache.Count > 5000)
+            Cache.Clear();
         return result;
     }
 

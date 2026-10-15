@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    Title="Новое сетевое подключение"
+    Title="{Binding NetAlertTitle, Source={StaticResource Loc}}"
     Width="400"
     SizeToContent="Height"
     MinHeight="200"
@@ -58,7 +58,7 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
 
-                <TextBlock Grid.Column="1" Text="Новое сетевое подключение"
+                <TextBlock Grid.Column="1" Text="{Binding NetAlertTitle, Source={StaticResource Loc}}"
                            FontSize="14" FontWeight="SemiBold"
                            Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
                            VerticalAlignment="Center" TextWrapping="Wrap" />
@@ -71,7 +71,7 @@
                            Padding="8,4" Margin="8,0,0,0"
                            VerticalAlignment="Center"
                            Click="OnCloseClick"
-                           ToolTip="Закрыть (разрешить на этот сеанс)" />
+                           ToolTip="{Binding NetAlertCloseTip, Source={StaticResource Loc}}" />
             </Grid>
 
             <!-- Строка процесса: иконка приложения, имя, PID, путь -->
@@ -132,7 +132,7 @@
                         <TextBlock x:Name="TxtRemoteEndpoint" Text="149.154.167.91:443"
                                    FontFamily="Consolas, Segoe UI" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
-                        <TextBlock x:Name="TxtCountryName" Text="Интернет"
+                        <TextBlock x:Name="TxtCountryName" Text="—"
                                    FontSize="11"
                                    Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
                     </StackPanel>
@@ -151,7 +151,7 @@
 
             <!-- Таймер обратного отсчета -->
             <TextBlock x:Name="TxtCountdown" Grid.Row="3"
-                       Text="Автоматическое решение через 15 сек..."
+                       Text="{Binding NetAlertCountdownHint, Source={StaticResource Loc}}"
                        FontSize="11"
                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                        Margin="0,0,0,6" />
@@ -161,25 +161,25 @@
                 <ui:Button x:Name="BtnAllowAlways"
                            Appearance="Primary"
                            Background="#107C41" BorderBrush="#0E6B38" Foreground="White"
-                           Content="🟢 Разрешить всегда"
+                           Content="{Binding NetAlertBtnAllowAlways, Source={StaticResource Loc}}"
                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                            Padding="10,7" Margin="0,0,0,6"
                            Click="OnAllowAlwaysClick"
-                           ToolTip="Создать разрешающее правило в Windows Firewall" />
+                           ToolTip="{Binding NetAlertAllowAlwaysTip, Source={StaticResource Loc}}" />
                 <ui:Button x:Name="BtnAllowSession"
                            Appearance="Secondary"
-                           Content="🟡 На этот сеанс"
+                           Content="{Binding NetAlertBtnAllowSession, Source={StaticResource Loc}}"
                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                            Padding="10,7" Margin="0,0,0,6"
                            Click="OnAllowSessionClick"
-                           ToolTip="Разрешить без создания правила (до перезапуска)" />
+                           ToolTip="{Binding NetAlertAllowSessionTip, Source={StaticResource Loc}}" />
                 <ui:Button x:Name="BtnBlockAlways"
                            Appearance="Danger"
-                           Content="🔴 Заблокировать"
+                           Content="{Binding NetAlertBtnBlock, Source={StaticResource Loc}}"
                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                            Padding="10,7"
                            Click="OnBlockAlwaysClick"
-                           ToolTip="Создать блокирующее правило в Windows Firewall" />
+                           ToolTip="{Binding NetAlertBlockTip, Source={StaticResource Loc}}" />
             </StackPanel>
 
             <!-- Тонкий ProgressBar обратного отсчета -->

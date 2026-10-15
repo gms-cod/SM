@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.UI.Services;
 
@@ -378,6 +379,170 @@ public sealed class FirewallHubUiTests
             Assert.Equal("Network Security Hub", loc.FirewallHubTitle);
             Assert.Equal("Allow", loc.RuleActionAllow);
             Assert.Equal("Block", loc.RuleActionBlock);
+        });
+    }
+
+    // ─── 9. Синхронизация ресурсов: StatusServiceNotFound содержит {0} ───
+
+    private static string FindResxPath(string fileName)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            var candidate = Path.Combine(dir.FullName, "src", "StartupMonitor.UI", "Resources", fileName);
+            if (File.Exists(candidate))
+                return candidate;
+            var direct = Path.Combine(dir.FullName, fileName);
+            if (File.Exists(direct))
+                return direct;
+            dir = dir.Parent;
+        }
+        // Fallback: относительный путь от рабочей директории тестов.
+        var fallback = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "StartupMonitor.UI", "Resources", fileName));
+        return fallback;
+    }
+
+    private static Dictionary<string, string> LoadResxValues(string path)
+    {
+        Assert.True(File.Exists(path), $"Файл ресурсов не найден: {path}");
+        var doc = System.Xml.Linq.XDocument.Load(path);
+        return doc.Descendants("data")
+            .Where(e => e.Attribute("name") != null)
+            .ToDictionary(
+                e => e.Attribute("name")!.Value,
+                e => e.Element("value")?.Value ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Новые ключи диалогов/статусов хаба (Worker 3): должны существовать в обоих .resx
+    /// и возвращать непустые строки в обеих культурах.
+    /// </summary>
+    public static readonly string[] NewNetFwKeys =
+    {
+        "NetKillswitchConfirmMsg",
+        "NetKillswitchConfirmTitle",
+        "NetDeleteRuleConfirmTitle",
+        "NetDeleteRuleConfirmFormat",
+        "NetClearBansConfirmTitle",
+        "NetClearBansConfirmFormat",
+        "NetKillProcessConfirmTitle",
+        "NetKillProcessConfirmFormat",
+        "NetImportConfirmTitle",
+        "NetImportConfirmFormat",
+        "NetStatusExportedFormat",
+        "NetStatusPresetAppliedFormat",
+        "NetPresetAppliedTitle",
+        "NetImportCompletedTitle",
+        "NetImportCompletedFormat",
+        "FwPortsOnlyTcpUdpMsg",
+        "FwPortsOnlyTcpUdpTitle",
+        "FwSelfBlockGuardTitle",
+    };
+
+    [Fact]
+    public void Resx_StatusServiceNotFound_RuContainsFormatPlaceholder()
+    {
+        var ruPath = FindResxPath("Strings.ru.resx");
+        var values = LoadResxValues(ruPath);
+        Assert.True(values.TryGetValue("StatusServiceNotFound", out var text),
+            "В Strings.ru.resx отсутствует ключ StatusServiceNotFound.");
+        Assert.False(string.IsNullOrWhiteSpace(text));
+        Assert.Contains("{0}", text);
+    }
+
+    [Fact]
+    public void Resx_NetFwKeys_PresentInBothResx()
+    {
+        var enPath = FindResxPath("Strings.resx");
+        var ruPath = FindResxPath("Strings.ru.resx");
+        var en = LoadResxValues(enPath);
+        var ru = LoadResxValues(ruPath);
+
+        // Все новые ключи обязаны присутствовать в обоих файлах и быть непустыми.
+        foreach (var key in NewNetFwKeys)
+        {
+            Assert.True(en.TryGetValue(key, out var enVal), $"Strings.resx: отсутствует ключ {key}.");
+            Assert.True(ru.TryGetValue(key, out var ruVal), $"Strings.ru.resx: отсутствует ключ {key}.");
+            Assert.False(string.IsNullOrWhiteSpace(enVal), $"Strings.resx: ключ {key} пуст.");
+            Assert.False(string.IsNullOrWhiteSpace(ruVal), $"Strings.ru.resx: ключ {key} пуст.");
+        }
+
+        // Паритет множеств Net*/Fw*: ни один ключ не должен существовать только в одном файле.
+        var enNetFw = en.Keys.Where(k => k.StartsWith("Net") || k.StartsWith("Fw")).ToHashSet();
+        var ruNetFw = ru.Keys.Where(k => k.StartsWith("Net") || k.StartsWith("Fw")).ToHashSet();
+        Assert.NotEmpty(enNetFw);
+        Assert.Equal(enNetFw, ruNetFw);
+
+        // Форматные ключи обязаны содержать плейсхолдеры.
+        Assert.Contains("{0}", en["NetDeleteRuleConfirmFormat"]);
+        Assert.Contains("{0}", ru["NetClearBansConfirmFormat"]);
+        Assert.Contains("{1}", en["NetKillProcessConfirmFormat"]);
+        Assert.Contains("{0}", en["NetStatusExportedFormat"]);
+        Assert.Contains("{1}", en["NetStatusExportedFormat"]);
+        Assert.Contains("{0}", en["NetStatusPresetAppliedFormat"]);
+        Assert.Contains("{0}", ru["NetImportCompletedFormat"]);
+    }
+
+    [Theory]
+    [InlineData("NetKillswitchConfirmMsg")]
+    [InlineData("NetKillswitchConfirmTitle")]
+    [InlineData("NetDeleteRuleConfirmTitle")]
+    [InlineData("NetDeleteRuleConfirmFormat")]
+    [InlineData("NetClearBansConfirmTitle")]
+    [InlineData("NetClearBansConfirmFormat")]
+    [InlineData("NetKillProcessConfirmTitle")]
+    [InlineData("NetKillProcessConfirmFormat")]
+    [InlineData("NetImportConfirmTitle")]
+    [InlineData("NetImportConfirmFormat")]
+    [InlineData("NetStatusExportedFormat")]
+    [InlineData("NetStatusPresetAppliedFormat")]
+    [InlineData("NetPresetAppliedTitle")]
+    [InlineData("NetImportCompletedTitle")]
+    [InlineData("NetImportCompletedFormat")]
+    [InlineData("FwPortsOnlyTcpUdpMsg")]
+    [InlineData("FwPortsOnlyTcpUdpTitle")]
+    [InlineData("FwSelfBlockGuardTitle")]
+    public void Localization_NewKeys_NonEmptyInBothLanguages(string key)
+    {
+        WithCulture("ru", () =>
+        {
+            var ru = LocalizationService.Instance[key];
+            Assert.NotEqual(key, ru);
+            Assert.False(string.IsNullOrWhiteSpace(ru));
+        });
+        WithCulture("en", () =>
+        {
+            var en = LocalizationService.Instance[key];
+            Assert.NotEqual(key, en);
+            Assert.False(string.IsNullOrWhiteSpace(en));
+        });
+    }
+
+    [Fact]
+    public void Localization_NewFormatHelpers_ProduceNonEmptyStrings()
+    {
+        WithCulture("ru", () =>
+        {
+            var loc = LocalizationService.Instance;
+            Assert.Contains("TestRule", loc.GetNetDeleteRuleConfirm("TestRule", "Inbound"));
+            Assert.Contains("5", loc.GetNetClearBansConfirm(5));
+            Assert.Contains("9999", loc.GetNetKillProcessConfirm("proc.exe", 9999));
+            Assert.Contains("3", loc.GetNetImportConfirm(3));
+            Assert.Contains("7", loc.GetNetStatusExported(7, "backup.json"));
+            Assert.Contains("2", loc.GetNetStatusPresetApplied("Тест", 2));
+            Assert.Contains("1", loc.GetNetImportCompleted(1, 0));
+        });
+        WithCulture("en", () =>
+        {
+            var loc = LocalizationService.Instance;
+            Assert.Contains("TestRule", loc.GetNetDeleteRuleConfirm("TestRule", "Inbound"));
+            Assert.Contains("5", loc.GetNetClearBansConfirm(5));
+            Assert.Contains("9999", loc.GetNetKillProcessConfirm("proc.exe", 9999));
+            Assert.False(string.IsNullOrWhiteSpace(loc.NetKillswitchConfirmTitle));
+            Assert.False(string.IsNullOrWhiteSpace(loc.FwPortsOnlyTcpUdpTitle));
+            Assert.False(string.IsNullOrWhiteSpace(loc.FwSelfBlockGuardTitle));
         });
     }
 }

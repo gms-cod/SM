@@ -1,110 +1,52 @@
-<?xml version="1.0" encoding="utf-8"?>
-<root>
-  <!-- 
-    Microsoft ResX Schema 
-    
-    Version 2.0
-    
-    The primary goals of this format is to allow a simple XML format 
-    that is mostly human readable. The generation and parsing of the 
-    various data types are done through the TypeConverter classes 
-    associated with the data types.
-    
-    Example:
-    
-    ... ado.net/XML headers & schema ...
-    <resheader name="resmimetype">text/microsoft-resx</resheader>
-    <resheader name="version">2.0</resheader>
-    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
-    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
-    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
-    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
-    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
-        <value>[base64 mime encoded serialized .NET Framework object]</value>
-    </data>
-    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
-        <comment>This is a comment</comment>
-    </data>
-                
-    There are any number of "resheader" rows that contain simple 
-    name/value pairs.
-    
-    Each data row contains a name, and value. The row also contains a 
-    type or mimetype. Type corresponds to a .NET class that support 
-    text/value conversion through the TypeConverter architecture. 
-    Classes that don't support this are serialized and stored with the 
-    mimetype set.
-    
-    The mimetype is used for serialized objects, and tells the 
-    ResXResourceReader how to depersist the object. This is currently not 
-    extensible. For a given mimetype the value must be set accordingly:
-    
-    Note - application/x-microsoft.net.object.binary.base64 is the format 
-    that the ResXResourceWriter will generate, however the reader can 
-    read any of the formats listed below.
-    
-    mimetype: application/x-microsoft.net.object.binary.base64
-    value   : The object must be serialized with 
-            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
-            : and then encoded with base64 encoding.
-    
-    mimetype: application/x-microsoft.net.object.soap.base64
-    value   : The object must be serialized with 
-            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
-            : and then encoded with base64 encoding.
-
-    mimetype: application/x-microsoft.net.object.bytearray.base64
-    value   : The object must be serialized into a byte array 
-            : using a System.ComponentModel.TypeConverter
-            : and then encoded with base64 encoding.
-    -->
-  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
-    <xsd:element name="root" msdata:IsDataSet="true">
-      <xsd:complexType>
-        <xsd:choice maxOccurs="unbounded">
-          <xsd:element name="metadata">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" />
-              </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string" />
-              <xsd:attribute name="type" type="xsd:string" />
-              <xsd:attribute name="mimetype" type="xsd:string" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="assembly">
-            <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string" />
-              <xsd:attribute name="name" type="xsd:string" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="data">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="resheader">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" />
-            </xsd:complexType>
-          </xsd:element>
-        </xsd:choice>
-      </xsd:complexType>
-    </xsd:element>
-  </xsd:schema>
+<?xml version='1.0' encoding='utf-8'?>
+<root xmlns:ns1="urn:schemas-microsoft-com:xml-msdata" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  
+  <xs:schema id="root">
+    <xs:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xs:element name="root" ns1:IsDataSet="true">
+      <xs:complexType>
+        <xs:choice maxOccurs="unbounded">
+          <xs:element name="metadata">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" />
+              </xs:sequence>
+              <xs:attribute name="name" use="required" type="xsd:string" />
+              <xs:attribute name="type" type="xsd:string" />
+              <xs:attribute name="mimetype" type="xsd:string" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="assembly">
+            <xs:complexType>
+              <xs:attribute name="alias" type="xsd:string" />
+              <xs:attribute name="name" type="xsd:string" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="data">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+                <xs:element name="comment" type="xsd:string" minOccurs="0" ns1:Ordinal="2" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" ns1:Ordinal="1" />
+              <xs:attribute name="type" type="xsd:string" ns1:Ordinal="3" />
+              <xs:attribute name="mimetype" type="xsd:string" ns1:Ordinal="4" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="resheader">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" />
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1788,5 +1730,345 @@ Do you really want to proceed?</value>
   </data>
   <data name="BtnDeleteRule" xml:space="preserve">
     <value>Delete</value>
+  </data>
+  <data name="NetFwStateUnknown" xml:space="preserve">
+    <value>Firewall: Unknown</value>
+  </data>
+  <data name="NetStatusLoading" xml:space="preserve">
+    <value>Loading status…</value>
+  </data>
+  <data name="NetProfileDomainDefault" xml:space="preserve">
+    <value>Domain: —</value>
+  </data>
+  <data name="NetProfilePrivateDefault" xml:space="preserve">
+    <value>Private: —</value>
+  </data>
+  <data name="NetProfilePublicDefault" xml:space="preserve">
+    <value>Public: —</value>
+  </data>
+  <data name="NetBtnRefreshStatus" xml:space="preserve">
+    <value>Refresh Status</value>
+  </data>
+  <data name="NetFilteringModeHeader" xml:space="preserve">
+    <value>Filtering Mode</value>
+  </data>
+  <data name="NetFilterModeNormal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="NetFilterModeWhitelist" xml:space="preserve">
+    <value>Whitelist (block outbound by default)</value>
+  </data>
+  <data name="NetFilterModeKillswitch" xml:space="preserve">
+    <value>Emergency Killswitch (block all traffic)</value>
+  </data>
+  <data name="NetInteractiveAlertsCheck" xml:space="preserve">
+    <value>Interactive alerts for unknown apps</value>
+  </data>
+  <data name="NetInteractiveAlertsTip" xml:space="preserve">
+    <value>Show alert popup on new outbound connection from unknown app</value>
+  </data>
+  <data name="NetLiveConnectionsHeader" xml:space="preserve">
+    <value>Active Connections (Live)</value>
+  </data>
+  <data name="NetFilterAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="NetFilterWan" xml:space="preserve">
+    <value>Internet WAN</value>
+  </data>
+  <data name="NetFilterLan" xml:space="preserve">
+    <value>Local LAN</value>
+  </data>
+  <data name="NetFilterEstablished" xml:space="preserve">
+    <value>Established</value>
+  </data>
+  <data name="NetFilterListen" xml:space="preserve">
+    <value>Listening</value>
+  </data>
+  <data name="NetAutoRefresh2s" xml:space="preserve">
+    <value>Auto-refresh (2s)</value>
+  </data>
+  <data name="NetBtnRefreshNow" xml:space="preserve">
+    <value>Refresh Now</value>
+  </data>
+  <data name="NetConnectionsSummaryFormat" xml:space="preserve">
+    <value>Connections: {0} • WAN: {1} • Processes: {2}</value>
+  </data>
+  <data name="NetTabFirewallRules" xml:space="preserve">
+    <value>Firewall Rules</value>
+  </data>
+  <data name="NetRulesFilterLabel" xml:space="preserve">
+    <value>Filter:</value>
+  </data>
+  <data name="NetRulesFilterAll" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="NetRulesFilterInbound" xml:space="preserve">
+    <value>Inbound</value>
+  </data>
+  <data name="NetRulesFilterOutbound" xml:space="preserve">
+    <value>Outbound</value>
+  </data>
+  <data name="NetRulesFilterBlock" xml:space="preserve">
+    <value>Blocking</value>
+  </data>
+  <data name="NetBtnCreateRule" xml:space="preserve">
+    <value>Create Rule</value>
+  </data>
+  <data name="NetBtnEditRule" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="NetBtnDeleteRule" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="NetBtnExport" xml:space="preserve">
+    <value>Export...</value>
+  </data>
+  <data name="NetBtnExportTip" xml:space="preserve">
+    <value>Export rules to JSON file</value>
+  </data>
+  <data name="NetBtnImport" xml:space="preserve">
+    <value>Import...</value>
+  </data>
+  <data name="NetBtnImportTip" xml:space="preserve">
+    <value>Import rules from JSON file</value>
+  </data>
+  <data name="NetBtnSecurityPresets" xml:space="preserve">
+    <value>Security Presets</value>
+  </data>
+  <data name="NetPresetMaxPrivacy" xml:space="preserve">
+    <value>Maximum Privacy (Anti-Telemetry)</value>
+  </data>
+  <data name="NetPresetGaming" xml:space="preserve">
+    <value>Gaming Mode (Steam, Battle.net, LAN)</value>
+  </data>
+  <data name="NetPresetPublicWifi" xml:space="preserve">
+    <value>Public Wi-Fi (Network Isolation)</value>
+  </data>
+  <data name="NetPresetReset" xml:space="preserve">
+    <value>Reset Added Presets</value>
+  </data>
+  <data name="NetBtnRefreshRules" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="NetBtnAntiTelemetry" xml:space="preserve">
+    <value>Anti-Telemetry (1-Click)</value>
+  </data>
+  <data name="NetBtnAntiTelemetryTip" xml:space="preserve">
+    <value>Creates outbound blocking rules for known Microsoft telemetry addresses</value>
+  </data>
+  <data name="NetTabPortDefender" xml:space="preserve">
+    <value>Port Defender</value>
+  </data>
+  <data name="NetTabAttackBans" xml:space="preserve">
+    <value>Attack &amp; Ban Log</value>
+  </data>
+  <data name="NetBtnUnbanSelectedIp" xml:space="preserve">
+    <value>Unban Selected IP</value>
+  </data>
+  <data name="NetBtnResetAllBans" xml:space="preserve">
+    <value>Reset All Bans</value>
+  </data>
+  <data name="NetNoConnectionsTitle" xml:space="preserve">
+    <value>No active network connections found</value>
+  </data>
+  <data name="NetNoConnectionsSubtitle" xml:space="preserve">
+    <value>Change search filter or refresh list</value>
+  </data>
+  <data name="NetNoRulesTitle" xml:space="preserve">
+    <value>No rules found</value>
+  </data>
+  <data name="NetNoBansTitle" xml:space="preserve">
+    <value>No active bans</value>
+  </data>
+  <data name="FwRuleCreateTitle" xml:space="preserve">
+    <value>Firewall Rule Creation</value>
+  </data>
+  <data name="FwRuleEditTitle" xml:space="preserve">
+    <value>Edit Firewall Rule</value>
+  </data>
+  <data name="FwRuleSubtitle" xml:space="preserve">
+    <value>Windows Firewall Rule (INetFwRules)</value>
+  </data>
+  <data name="FwRuleNameLabel" xml:space="preserve">
+    <value>Rule Name *</value>
+  </data>
+  <data name="FwRuleDescLabel" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="FwRuleActionLabel" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="FwRuleActionAllow" xml:space="preserve">
+    <value>Allow connection</value>
+  </data>
+  <data name="FwRuleActionBlock" xml:space="preserve">
+    <value>Block connection</value>
+  </data>
+  <data name="FwRuleDirectionLabel" xml:space="preserve">
+    <value>Direction</value>
+  </data>
+  <data name="FwRuleDirInbound" xml:space="preserve">
+    <value>Inbound</value>
+  </data>
+  <data name="FwRuleDirOutbound" xml:space="preserve">
+    <value>Outbound</value>
+  </data>
+  <data name="FwRuleProtocolLabel" xml:space="preserve">
+    <value>Protocol</value>
+  </data>
+  <data name="FwRuleLocalPortsLabel" xml:space="preserve">
+    <value>Local Ports</value>
+  </data>
+  <data name="FwRuleRemotePortsLabel" xml:space="preserve">
+    <value>Remote Ports</value>
+  </data>
+  <data name="FwRuleRemoteIpsLabel" xml:space="preserve">
+    <value>Remote IPs / Subnets</value>
+  </data>
+  <data name="FwRuleProgramPathLabel" xml:space="preserve">
+    <value>Program Path</value>
+  </data>
+  <data name="FwRuleBtnBrowse" xml:space="preserve">
+    <value>Browse...</value>
+  </data>
+  <data name="FwRuleServiceNameLabel" xml:space="preserve">
+    <value>Service Name</value>
+  </data>
+  <data name="FwRuleProfilesLabel" xml:space="preserve">
+    <value>Network Profiles</value>
+  </data>
+  <data name="FwRuleProfileDomain" xml:space="preserve">
+    <value>Domain</value>
+  </data>
+  <data name="FwRuleProfilePrivate" xml:space="preserve">
+    <value>Private</value>
+  </data>
+  <data name="FwRuleProfilePublic" xml:space="preserve">
+    <value>Public</value>
+  </data>
+  <data name="FwRuleEnabledCheck" xml:space="preserve">
+    <value>Rule enabled</value>
+  </data>
+  <data name="FwRuleBtnSave" xml:space="preserve">
+    <value>Save Rule</value>
+  </data>
+  <data name="NetAlertTitle" xml:space="preserve">
+    <value>New Network Connection</value>
+  </data>
+  <data name="NetAlertBtnAllowAlways" xml:space="preserve">
+    <value>🟢 Allow Always</value>
+  </data>
+  <data name="NetAlertBtnAllowSession" xml:space="preserve">
+    <value>🟡 For This Session</value>
+  </data>
+  <data name="NetAlertBtnBlock" xml:space="preserve">
+    <value>🔴 Block</value>
+  </data>
+<data name="NetColProcess" xml:space="preserve"><value>Process</value></data>
+<data name="NetColProtocol" xml:space="preserve"><value>Protocol</value></data>
+<data name="NetColLocalAddress" xml:space="preserve"><value>Local Address</value></data>
+<data name="NetColRemoteAddress" xml:space="preserve"><value>Remote Address</value></data>
+<data name="NetColStatus" xml:space="preserve"><value>Status</value></data>
+<data name="NetColNetworkGeo" xml:space="preserve"><value>Network / Geo</value></data>
+<data name="NetColFirewall" xml:space="preserve"><value>Firewall</value></data>
+<data name="NetColEnabled" xml:space="preserve"><value>On</value></data>
+<data name="NetColAction" xml:space="preserve"><value>Action</value></data>
+<data name="NetColDirection" xml:space="preserve"><value>Direction</value></data>
+<data name="NetColName" xml:space="preserve"><value>Name</value></data>
+<data name="NetColProgram" xml:space="preserve"><value>Program</value></data>
+<data name="NetColLocalPorts" xml:space="preserve"><value>Local Ports</value></data>
+<data name="NetColRemoteAddresses" xml:space="preserve"><value>Remote Addresses</value></data>
+<data name="NetColProfiles" xml:space="preserve"><value>Profiles</value></data>
+<data name="NetColIp" xml:space="preserve"><value>IP</value></data>
+<data name="NetColPort" xml:space="preserve"><value>Port</value></data>
+<data name="NetColAttempts" xml:space="preserve"><value>Attempts</value></data>
+<data name="NetColReason" xml:space="preserve"><value>Reason</value></data>
+<data name="NetColRemaining" xml:space="preserve"><value>Remaining</value></data>
+<data name="NetColRepeats" xml:space="preserve"><value>Repeats</value></data>
+<data name="NetSearchConnectionsHint" xml:space="preserve"><value>Search by process, PID, IP, port...</value></data>
+<data name="NetSearchRulesHint" xml:space="preserve"><value>Search by name, port, IP, process...</value></data>
+<data name="NetCtxBlockRemoteIp" xml:space="preserve"><value>🚫 Block remote IP</value></data>
+<data name="NetCtxCreateRuleForProcess" xml:space="preserve"><value>🛡️ Create rule for process...</value></data>
+<data name="NetCtxCopyRemoteIp" xml:space="preserve"><value>📋 Copy remote IP</value></data>
+<data name="NetCtxCopyEndpoint" xml:space="preserve"><value>📋 Copy address and port</value></data>
+<data name="NetCtxWhois" xml:space="preserve"><value>🌐 IP info (Whois / IPInfo)</value></data>
+<data name="NetCtxVirusTotal" xml:space="preserve"><value>🔍 Check IP in VirusTotal</value></data>
+<data name="NetCtxKillProcess" xml:space="preserve"><value>❌ Kill process</value></data>
+<data name="NetNoRulesSubtitle" xml:space="preserve"><value>Change search query or filter</value></data>
+<data name="NetNoBansSubtitle" xml:space="preserve"><value>Port Defender recorded no attacks</value></data>
+<data name="NetDefenderStateLoading" xml:space="preserve"><value>Port Defender: loading status...</value></data>
+<data name="NetStatusReady" xml:space="preserve"><value>Ready</value></data>
+<data name="FwRuleProtocolAny" xml:space="preserve"><value>Any</value></data>
+<data name="FwRuleNameHint" xml:space="preserve"><value>E.g.: StartupMonitor — block 192.168.1.0/24</value></data>
+<data name="FwRuleDescHint" xml:space="preserve"><value>Optional comment</value></data>
+<data name="FwRulePortsHint" xml:space="preserve"><value>80, 443 or 8000-8080 (TCP/UDP only)</value></data>
+<data name="FwRuleRemoteIpsHint" xml:space="preserve"><value>192.168.1.0/24 or * (empty = any)</value></data>
+<data name="FwRuleProgramHint" xml:space="preserve"><value>Empty = applies to whole system</value></data>
+<data name="FwRuleServiceHint" xml:space="preserve"><value>Empty = no service binding</value></data>
+<data name="FwRuleBtnCancel" xml:space="preserve"><value>Cancel</value></data>
+<data name="NetAlertCloseTip" xml:space="preserve"><value>Close (allow for this session)</value></data>
+<data name="NetAlertAllowAlwaysTip" xml:space="preserve"><value>Create allow rule in Windows Firewall</value></data>
+<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Allow without creating a rule (until restart)</value></data>
+<data name="NetAlertBlockTip" xml:space="preserve"><value>Create blocking rule in Windows Firewall</value></data>
+<data name="NetAlertCountdownHint" xml:space="preserve"><value>Auto-resolve in 15 sec...</value></data>
+<data name="NetBansCountFormat" xml:space="preserve"><value>Active bans: {0}</value></data>
+<data name="PortDefenderPortsHint" xml:space="preserve"><value>E.g.: 3389, 22, 445</value></data>
+<data name="PortDefenderWhitelistHint" xml:space="preserve"><value>E.g.: 192.168.1.10, 10.0.0.0/24</value></data>
+  <data name="NetKillswitchConfirmMsg" xml:space="preserve">
+    <value>Emergency Killswitch will block ALL network traffic.
+Continue?</value>
+  </data>
+  <data name="NetKillswitchConfirmTitle" xml:space="preserve">
+    <value>Killswitch confirmation</value>
+  </data>
+  <data name="NetDeleteRuleConfirmTitle" xml:space="preserve">
+    <value>Delete confirmation</value>
+  </data>
+  <data name="NetDeleteRuleConfirmFormat" xml:space="preserve">
+    <value>Delete rule &quot;{0}&quot; ({1})?</value>
+  </data>
+  <data name="NetClearBansConfirmTitle" xml:space="preserve">
+    <value>Reset all bans</value>
+  </data>
+  <data name="NetClearBansConfirmFormat" xml:space="preserve">
+    <value>Lift all active bans ({0})?</value>
+  </data>
+  <data name="NetKillProcessConfirmTitle" xml:space="preserve">
+    <value>Termination confirmation</value>
+  </data>
+  <data name="NetKillProcessConfirmFormat" xml:space="preserve">
+    <value>Terminate process &quot;{0}&quot; (PID {1})?</value>
+  </data>
+  <data name="NetImportConfirmTitle" xml:space="preserve">
+    <value>Import confirmation</value>
+  </data>
+  <data name="NetImportConfirmFormat" xml:space="preserve">
+    <value>Found {0} rules in file.
+Import with overwrite of existing rules?</value>
+  </data>
+  <data name="NetStatusExportedFormat" xml:space="preserve">
+    <value>Exported {0} rules to {1}.</value>
+  </data>
+  <data name="NetStatusPresetAppliedFormat" xml:space="preserve">
+    <value>Preset &quot;{0}&quot; applied (rules: {1}).</value>
+  </data>
+  <data name="NetPresetAppliedTitle" xml:space="preserve">
+    <value>Security preset</value>
+  </data>
+  <data name="NetImportCompletedTitle" xml:space="preserve">
+    <value>Rules import</value>
+  </data>
+  <data name="NetImportCompletedFormat" xml:space="preserve">
+    <value>Import completed: imported {0}, skipped {1}.</value>
+  </data>
+  <data name="FwPortsOnlyTcpUdpMsg" xml:space="preserve">
+    <value>Ports apply only to TCP and UDP protocols. Clear port fields and continue?</value>
+  </data>
+  <data name="FwPortsOnlyTcpUdpTitle" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="FwSelfBlockGuardTitle" xml:space="preserve">
+    <value>Self-block protection</value>
   </data>
 </root>

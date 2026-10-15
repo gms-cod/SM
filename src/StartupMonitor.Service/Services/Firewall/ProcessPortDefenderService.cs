@@ -578,6 +578,16 @@ public sealed class ProcessPortDefenderService : IDisposable
         if (_disposed) return;
         try
         {
+            // Быстрый выход ДО тяжёлого опроса IP Helper API, когда защита не активна.
+            PortDefenderConfigDto cfg;
+            lock (_sync)
+            {
+                cfg = _config;
+            }
+
+            if (!cfg.IsGloballyEnabled || cfg.Rules.Count == 0 || !cfg.Rules.Any(r => r.IsEnabled))
+                return;
+
             var sockets = _networkTracker.GetSockets();
             if (sockets != null && sockets.Count > 0)
             {

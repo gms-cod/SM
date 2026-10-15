@@ -58,6 +58,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Полный неотфильтрованный список записей автозапуска.</summary>
     private List<StartupEntry> _allEntries = [];
 
+    /// <summary>Блокировка доступа к <see cref="_allEntries"/> (фоновый polling vs UI-поток).</summary>
+    private readonly object _entriesLock = new();
+
     /// <summary>
     /// Ревизия записей автозапуска, известная клиенту (синхронизирована с сервером через GetEntriesDelta).
     /// 0 = первая синхронизация (сервер вернёт полный список + актуальную ревизию).
@@ -264,31 +267,40 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ApplySort()
     {
         using var _prof = ExecutionProfiler.Measure("UI.Main.ApplySort");
-        _allEntries = _sortColumn switch
+        StartupEntry[] snapshot;
+        lock (_entriesLock)
+        {
+            snapshot = _allEntries.ToArray();
+        }
+        var sorted = _sortColumn switch
         {
             "name" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
-                : [.. _allEntries.OrderByDescending(e => e.Name, StringComparer.OrdinalIgnoreCase)],
+                ? [.. snapshot.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
+                : [.. snapshot.OrderByDescending(e => e.Name, StringComparer.OrdinalIgnoreCase)],
             "date" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => e.DetectedAt)]
-                : [.. _allEntries.OrderByDescending(e => e.DetectedAt)],
+                ? [.. snapshot.OrderBy(e => e.DetectedAt)]
+                : [.. snapshot.OrderByDescending(e => e.DetectedAt)],
             "publisher" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => string.IsNullOrWhiteSpace(e.Publisher)).ThenBy(e => e.Publisher, StringComparer.OrdinalIgnoreCase).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
-                : [.. _allEntries.OrderBy(e => string.IsNullOrWhiteSpace(e.Publisher)).ThenByDescending(e => e.Publisher, StringComparer.OrdinalIgnoreCase).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
+                ? [.. snapshot.OrderBy(e => string.IsNullOrWhiteSpace(e.Publisher)).ThenBy(e => e.Publisher, StringComparer.OrdinalIgnoreCase).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
+                : [.. snapshot.OrderBy(e => string.IsNullOrWhiteSpace(e.Publisher)).ThenByDescending(e => e.Publisher, StringComparer.OrdinalIgnoreCase).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
             "impact" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => ImpactSeverity(e.Location)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
-                : [.. _allEntries.OrderByDescending(e => ImpactSeverity(e.Location)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
+                ? [.. snapshot.OrderBy(e => ImpactSeverity(e.Location)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
+                : [.. snapshot.OrderByDescending(e => ImpactSeverity(e.Location)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
             "status" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => e.Status).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
-                : [.. _allEntries.OrderByDescending(e => e.Status).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
+                ? [.. snapshot.OrderBy(e => e.Status).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
+                : [.. snapshot.OrderByDescending(e => e.Status).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
             "rating" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => e.AiRating).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
-                : [.. _allEntries.OrderByDescending(e => e.AiRating).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
+                ? [.. snapshot.OrderBy(e => e.AiRating).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
+                : [.. snapshot.OrderByDescending(e => e.AiRating).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
             "kaspersky" => _sortAscending
-                ? [.. _allEntries.OrderBy(e => CirclSeverity(e.KasperskyZone)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
-                : [.. _allEntries.OrderByDescending(e => CirclSeverity(e.KasperskyZone)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
-            _ => _allEntries,
+                ? [.. snapshot.OrderBy(e => CirclSeverity(e.KasperskyZone)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)]
+                : [.. snapshot.OrderByDescending(e => CirclSeverity(e.KasperskyZone)).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)],
+            _ => snapshot.ToList(),
         };
+        lock (_entriesLock)
+        {
+            _allEntries = sorted;
+        }
     }
 
     /// <summary>Инициализирует выпадающие списки языка и темы переведёнными названиями.</summary>
@@ -1622,7 +1634,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void SetInitialData(List<StartupEntry> entries, List<BlacklistRule> rules)
     {
         _entriesRevision = 0; // ревизия неизвестна — первый дельта-опрос вернёт полный список + ревизию
-        _allEntries = entries;
+        lock (_entriesLock) { _allEntries = entries; }
         _previousEntryIds = entries.Select(e => e.Id).ToHashSet();
         _isFirstPoll = true;
         ApplyBlacklistToEntries(rules);
@@ -1659,13 +1671,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             if (entries.Count == 0)
             {
-                App.Log($"LoadDataIfChanged: сервис вернул 0 записей — пропускаю, чтобы не затереть {_allEntries.Count} записей");
+                int currentCount;
+                lock (_entriesLock) { currentCount = _allEntries.Count; }
+                App.Log($"LoadDataIfChanged: сервис вернул 0 записей — пропускаю, чтобы не затереть {currentCount} записей");
                 return;
             }
 
             if (HasChanges(entries, rules))
             {
-                App.Log($"LoadDataIfChanged: изменения — было {_allEntries.Count}, стало {entries.Count} записей");
+                int oldCount;
+                lock (_entriesLock) { oldCount = _allEntries.Count; }
+                App.Log($"LoadDataIfChanged: изменения — было {oldCount}, стало {entries.Count} записей");
                 var newIds = entries.Select(e => e.Id).ToHashSet();
                 if (NotifyOnNewEntry && !_isFirstPoll && !SilentMode)
                 {
@@ -1683,24 +1699,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 }
                 _isFirstPoll = false;
 
-                _allEntries = entries;
+                lock (_entriesLock) { _allEntries = entries; }
                 _previousEntryIds = newIds;
                 ApplyBlacklistToEntries(Blacklist.ToList());
                 ApplySort();
-                RefreshStats();
 
-                if (System.Windows.Application.Current?.Dispatcher != null && !System.Windows.Application.Current.Dispatcher.CheckAccess())
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.CheckAccess())
                 {
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    dispatcher.Invoke(() =>
                     {
                         ApplyFilter();
                         Blacklist = new ObservableCollection<BlacklistRule>(rules);
                     });
+                    _ = System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => RefreshStats());
                 }
                 else
                 {
                     ApplyFilter();
                     Blacklist = new ObservableCollection<BlacklistRule>(rules);
+                    if (dispatcher != null)
+                        _ = dispatcher.InvokeAsync(() => RefreshStats());
+                    else
+                        RefreshStats();
                 }
             }
         }
@@ -1720,7 +1741,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var pathRules = rules.Where(r => r.MatchType == BlacklistMatchType.Path)
             .Select(r => r.Value)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in _allEntries)
+        StartupEntry[] snapshot;
+        lock (_entriesLock) { snapshot = _allEntries.ToArray(); }
+        foreach (var entry in snapshot)
         {
             if (!string.IsNullOrEmpty(entry.FilePath) && pathRules.Contains(entry.FilePath))
             {
@@ -1735,10 +1758,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool HasChanges(List<StartupEntry> entries, List<BlacklistRule> rules)
     {
         using var _prof = ExecutionProfiler.Measure("UI.Main.HasChanges");
-        if (entries.Count != _allEntries.Count || rules.Count != Blacklist.Count)
+        StartupEntry[] snapshot;
+        lock (_entriesLock) { snapshot = _allEntries.ToArray(); }
+        if (entries.Count != snapshot.Length || rules.Count != Blacklist.Count)
             return true;
 
-        var oldById = _allEntries.ToDictionary(e => e.Id);
+        var oldById = snapshot.ToDictionary(e => e.Id);
         foreach (var e in entries)
         {
             if (!oldById.TryGetValue(e.Id, out var old))
@@ -1764,9 +1789,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void RefreshStats()
     {
         using var _prof = ExecutionProfiler.Measure("UI.Main.RefreshStats");
-        TotalCount = _allEntries.Count;
-        EnabledCount = _allEntries.Count(e => e.Status == EntryStatus.Enabled);
-        BlockedCount = _allEntries.Count(e => e.Status == EntryStatus.Blocked);
+        StartupEntry[] snapshot;
+        lock (_entriesLock) { snapshot = _allEntries.ToArray(); }
+        TotalCount = snapshot.Length;
+        EnabledCount = snapshot.Count(e => e.Status == EntryStatus.Enabled);
+        BlockedCount = snapshot.Count(e => e.Status == EntryStatus.Blocked);
     }
 
     /// <summary>Активен ли режим сравнения с контрольным снимком («Было — Стало»).</summary>
@@ -1885,7 +1912,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ApplyFilter()
     {
         using var _prof = ExecutionProfiler.Measure("UI.Main.ApplyFilter");
-        var filtered = _allEntries.AsEnumerable();
+        StartupEntry[] snapshot;
+        lock (_entriesLock) { snapshot = _allEntries.ToArray(); }
+        var filtered = snapshot.AsEnumerable();
 
         if (IsSnapshotComparisonActive)
         {
@@ -1979,7 +2008,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            _allEntries = entries;
+            lock (_entriesLock) { _allEntries = entries; }
             _previousEntryIds = entries.Select(e => e.Id).ToHashSet();
             ApplySort();
             RefreshStats();

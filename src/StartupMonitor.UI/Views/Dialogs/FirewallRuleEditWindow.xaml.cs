@@ -175,8 +175,8 @@ public partial class FirewallRuleEditWindow
             return true;
 
         var confirm = MessageBox.Show(this,
-            "Порты применимы только к протоколам TCP и UDP. Очистить поля портов и продолжить?",
-            "Предупреждение",
+            LocalizationService.Instance.FwPortsOnlyTcpUdpMsg,
+            LocalizationService.Instance.FwPortsOnlyTcpUdpTitle,
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -249,7 +249,7 @@ public partial class FirewallRuleEditWindow
             if (addrError != null)
             {
                 TxtStatus.Text = addrError;
-                MessageBox.Show(this, addrError, "Защита от самоблокировки", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(this, addrError, LocalizationService.Instance.FwSelfBlockGuardTitle, MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 

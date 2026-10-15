@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    Title="Создание правила брандмауэра"
+    Title="{Binding FwRuleCreateTitle, Source={StaticResource Loc}}"
     WindowStartupLocation="CenterOwner"
     Background="{ui:ThemeResource ApplicationBackgroundBrush}"
     ExtendsContentIntoTitleBar="True"
@@ -20,7 +20,7 @@
         </Grid.RowDefinitions>
 
         <!-- TitleBar -->
-        <ui:TitleBar x:Name="TitleBar" Grid.Row="0" Title="Создание правила брандмауэра" ShowMinimize="False" ShowMaximize="False" ShowClose="True" />
+        <ui:TitleBar x:Name="TitleBar" Grid.Row="0" Title="{Binding FwRuleCreateTitle, Source={StaticResource Loc}}" ShowMinimize="False" ShowMaximize="False" ShowClose="True" />
 
         <!-- Заголовок -->
         <ui:Card Grid.Row="1" Margin="0,4,0,12" Padding="14">
@@ -29,8 +29,8 @@
                     <ui:SymbolIcon Symbol="Shield24" FontSize="20" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtHeaderTitle" Text="Создание правила брандмауэра" FontSize="16" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
-                    <TextBlock Text="Правило брандмауэра Windows (INetFwRules)" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="TxtHeaderTitle" Text="{Binding FwRuleCreateTitle, Source={StaticResource Loc}}" FontSize="16" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                    <TextBlock Text="{Binding FwRuleSubtitle, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </StackPanel>
         </ui:Card>
@@ -38,63 +38,63 @@
         <!-- Форма -->
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="Имя правила *" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
-                <ui:TextBox x:Name="TxtName" PlaceholderText="Например: StartupMonitor — блокировка 192.168.1.0/24" Margin="0,0,0,12" />
+                <TextBlock Text="{Binding FwRuleNameLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtName" PlaceholderText="{Binding FwRuleNameHint, Source={StaticResource Loc}}" Margin="0,0,0,12" />
 
-                <TextBlock Text="Описание" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
-                <ui:TextBox x:Name="TxtDescription" PlaceholderText="Необязательный комментарий" TextWrapping="Wrap" MinHeight="48" Margin="0,0,0,12" />
+                <TextBlock Text="{Binding FwRuleDescLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtDescription" PlaceholderText="{Binding FwRuleDescHint, Source={StaticResource Loc}}" TextWrapping="Wrap" MinHeight="48" Margin="0,0,0,12" />
 
-                <TextBlock Text="Действие" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding FwRuleActionLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <RadioButton x:Name="RadioAllow" Content="Разрешить подключение" Foreground="#4CAF50" FontWeight="SemiBold" Margin="0,0,20,0" VerticalAlignment="Center" />
-                    <RadioButton x:Name="RadioBlock" Content="Блокировать подключение" Foreground="#F44336" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RadioAllow" Content="{Binding FwRuleActionAllow, Source={StaticResource Loc}}" Foreground="{ui:ThemeResource SystemFillColorSuccessBrush}" FontWeight="SemiBold" Margin="0,0,20,0" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RadioBlock" Content="{Binding FwRuleActionBlock, Source={StaticResource Loc}}" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <TextBlock Text="Направление" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding FwRuleDirectionLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <RadioButton x:Name="RadioInbound" Content="Входящее" Margin="0,0,20,0" VerticalAlignment="Center" />
-                    <RadioButton x:Name="RadioOutbound" Content="Исходящее" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RadioInbound" Content="{Binding FwRuleDirInbound, Source={StaticResource Loc}}" Margin="0,0,20,0" VerticalAlignment="Center" />
+                    <RadioButton x:Name="RadioOutbound" Content="{Binding FwRuleDirOutbound, Source={StaticResource Loc}}" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <TextBlock Text="Протокол" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding FwRuleProtocolLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
                 <ComboBox x:Name="CmbProtocol" Margin="0,0,0,12" SelectedIndex="0">
-                    <ComboBoxItem Content="Любой" Tag="256" />
+                    <ComboBoxItem Content="{Binding FwRuleProtocolAny, Source={StaticResource Loc}}" Tag="256" />
                     <ComboBoxItem Content="TCP" Tag="6" />
                     <ComboBoxItem Content="UDP" Tag="17" />
                     <ComboBoxItem Content="ICMPv4" Tag="1" />
                     <ComboBoxItem Content="ICMPv6" Tag="58" />
                 </ComboBox>
 
-                <TextBlock Text="Локальные порты" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
-                <ui:TextBox x:Name="TxtLocalPorts" PlaceholderText="80, 443 или 8000-8080 (только TCP/UDP)" Margin="0,0,0,12" />
+                <TextBlock Text="{Binding FwRuleLocalPortsLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtLocalPorts" PlaceholderText="{Binding FwRulePortsHint, Source={StaticResource Loc}}" Margin="0,0,0,12" />
 
-                <TextBlock Text="Удаленные порты" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
-                <ui:TextBox x:Name="TxtRemotePorts" PlaceholderText="80, 443 или 8000-8080 (только TCP/UDP)" Margin="0,0,0,12" />
+                <TextBlock Text="{Binding FwRuleRemotePortsLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtRemotePorts" PlaceholderText="{Binding FwRulePortsHint, Source={StaticResource Loc}}" Margin="0,0,0,12" />
 
-                <TextBlock Text="Удаленные IP-адреса / подсети" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
-                <ui:TextBox x:Name="TxtRemoteAddresses" PlaceholderText="192.168.1.0/24 или * (пусто = любые)" TextWrapping="Wrap" MinHeight="48" Margin="0,0,0,12" />
+                <TextBlock Text="{Binding FwRuleRemoteIpsLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtRemoteAddresses" PlaceholderText="{Binding FwRuleRemoteIpsHint, Source={StaticResource Loc}}" TextWrapping="Wrap" MinHeight="48" Margin="0,0,0,12" />
 
-                <TextBlock Text="Путь к программе" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding FwRuleProgramPathLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
                 <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="TxtApplicationPath" Grid.Column="0" PlaceholderText="Пусто = применяется ко всей системе" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="1" Appearance="Secondary" Content="Обзор..." Click="OnBrowseAppClick" MinWidth="90" />
+                    <ui:TextBox x:Name="TxtApplicationPath" Grid.Column="0" PlaceholderText="{Binding FwRuleProgramHint, Source={StaticResource Loc}}" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="1" Appearance="Secondary" Content="{Binding FwRuleBtnBrowse, Source={StaticResource Loc}}" Click="OnBrowseAppClick" MinWidth="90" />
                 </Grid>
 
-                <TextBlock Text="Имя службы" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
-                <ui:TextBox x:Name="TxtServiceName" PlaceholderText="Пусто = без привязки к службе" Margin="0,0,0,12" />
+                <TextBlock Text="{Binding FwRuleServiceNameLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtServiceName" PlaceholderText="{Binding FwRuleServiceHint, Source={StaticResource Loc}}" Margin="0,0,0,12" />
 
-                <TextBlock Text="Профили сети" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <TextBlock Text="{Binding FwRuleProfilesLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <CheckBox x:Name="ChkDomain" Content="Доменный" Margin="0,0,16,0" />
-                    <CheckBox x:Name="ChkPrivate" Content="Частный" Margin="0,0,16,0" />
-                    <CheckBox x:Name="ChkPublic" Content="Общедоступный" />
+                    <CheckBox x:Name="ChkDomain" Content="{Binding FwRuleProfileDomain, Source={StaticResource Loc}}" Margin="0,0,16,0" />
+                    <CheckBox x:Name="ChkPrivate" Content="{Binding FwRuleProfilePrivate, Source={StaticResource Loc}}" Margin="0,0,16,0" />
+                    <CheckBox x:Name="ChkPublic" Content="{Binding FwRuleProfilePublic, Source={StaticResource Loc}}" />
                 </StackPanel>
 
-                <CheckBox x:Name="ChkEnabled" Content="Правило включено" IsChecked="True" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <CheckBox x:Name="ChkEnabled" Content="{Binding FwRuleEnabledCheck, Source={StaticResource Loc}}" IsChecked="True" FontWeight="SemiBold" Margin="0,0,0,12" />
 
                 <TextBlock x:Name="TxtStatus" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
             </StackPanel>
@@ -107,8 +107,8 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <ui:Button Grid.Column="1" Appearance="Secondary" Content="Отмена" Click="OnCancelClick" Margin="0,0,8,0" MinWidth="100" />
-            <ui:Button Grid.Column="2" Appearance="Primary" Content="Сохранить правило" Click="OnSaveClick" MinWidth="150" />
+            <ui:Button Grid.Column="1" Appearance="Secondary" Content="{Binding FwRuleBtnCancel, Source={StaticResource Loc}}" Click="OnCancelClick" Margin="0,0,8,0" MinWidth="100" />
+            <ui:Button Grid.Column="2" Appearance="Primary" Content="{Binding FwRuleBtnSave, Source={StaticResource Loc}}" Click="OnSaveClick" MinWidth="150" />
         </Grid>
     </Grid>
 </ui:FluentWindow>

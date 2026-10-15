@@ -162,6 +162,7 @@ public partial class MainWindow
         Closed += (_, _) =>
         {
             App.Log("MainWindow: Closed event");
+            try { FirewallHubView?.Deactivate(); } catch { }
             _viewModel.Dispose();
             _pipeClient.Dispose();
         };
@@ -207,6 +208,7 @@ public partial class MainWindow
                 _viewModel.SuspendCpuTimer();
                 if (_selectedNavIndex == 6)
                     _ = _viewModel.TaskManager.DeactivateAsync();
+                try { FirewallHubView?.Deactivate(); } catch { }
             }
             else
             {
@@ -214,6 +216,10 @@ public partial class MainWindow
                     _viewModel.ResumeCpuTimer();
                 if (_selectedNavIndex == 6 && _isStartupComplete && WindowState != WindowState.Minimized)
                     _ = _viewModel.TaskManager.ActivateAsync();
+                if (_selectedNavIndex == 8 && _isStartupComplete && WindowState != WindowState.Minimized)
+                {
+                    try { FirewallHubView?.Activate(); } catch { }
+                }
             }
         };
 
@@ -224,6 +230,7 @@ public partial class MainWindow
                 // Окно свернуто/ушло в трей — приостанавливаем CPU-таймер (0% CPU)
                 _viewModel.SuspendCpuTimer();
                 _ = _viewModel.TaskManager.DeactivateAsync();
+                try { FirewallHubView?.Deactivate(); } catch { }
                 if (_hasShown && _viewModel.MinimizeToTray)
                     Hide();
             }
@@ -234,6 +241,10 @@ public partial class MainWindow
                     _viewModel.ResumeCpuTimer();
                 if (_selectedNavIndex == 6 && _isStartupComplete && IsVisible)
                     _ = _viewModel.TaskManager.ActivateAsync();
+                if (_selectedNavIndex == 8 && _isStartupComplete && IsVisible)
+                {
+                    try { FirewallHubView?.Activate(); } catch { }
+                }
             }
         };
 
@@ -608,6 +619,7 @@ public partial class MainWindow
     /// <summary>Переключает видимость страниц и обновляет состояние выбранного пункта навигации.</summary>
     private void NavigateToPage(int idx)
     {
+        var previousNavIndex = _selectedNavIndex;
         _selectedNavIndex = idx;
         MainViewModel.SaveSetting("lastActiveTab", idx);
 
@@ -637,6 +649,12 @@ public partial class MainWindow
         {
             // До завершения StartupSequence не выполняем сетевые запросы и фоновые активации
             return;
+        }
+
+        // Сетевой экран (8): останавливаем зомби-таймеры при уходе, возобновляем при входе.
+        if (previousNavIndex == 8 && idx != 8)
+        {
+            try { FirewallHubView?.Deactivate(); } catch { }
         }
 
         if (idx == 6)
@@ -693,12 +711,13 @@ public partial class MainWindow
         {
             EnsureFirewallHub();
             if (FirewallHubView != null)
-                await FirewallHubView.RefreshAllAsync();
+                FirewallHubView.Activate();
         }
         catch (Exception ex)
         {
             App.Log($"MainWindow: Error refreshing FirewallHub: {ex.Message}");
         }
+        await Task.CompletedTask;
     }
 
     /// <summary>Восстанавливает главное окно из системного трея в его исходное состояние (Normal или Maximized).</summary>
@@ -712,6 +731,10 @@ public partial class MainWindow
         if (_selectedNavIndex == 6 && _isStartupComplete)
         {
             _ = _viewModel.TaskManager.ActivateAsync();
+        }
+        if (_selectedNavIndex == 8 && _isStartupComplete)
+        {
+            try { FirewallHubView?.Activate(); } catch { }
         }
     }
 
