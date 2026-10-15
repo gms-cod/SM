@@ -314,6 +314,30 @@
                                    Click="OnEditRuleClick" Margin="0,0,8,4" />
                         <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="Удалить"
                                    Click="OnDeleteRuleClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnExportRules" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon Save24}"
+                                   Content="Экспорт..."
+                                   ToolTip="Экспорт правил в JSON-файл"
+                                   Click="OnExportRulesClick" Margin="0,0,8,4" />
+                        <ui:Button x:Name="BtnImportRules" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon FolderOpen24}"
+                                   Content="Импорт..."
+                                   ToolTip="Импорт правил из JSON-файла"
+                                   Click="OnImportRulesClick" Margin="0,0,8,4" />
+                        <ui:DropDownButton x:Name="BtnSecurityPresets" Appearance="Secondary"
+                                           Icon="{ui:SymbolIcon ShieldCheckmark24}"
+                                           Content="Пресеты безопасности"
+                                           Margin="0,0,8,4">
+                            <ui:DropDownButton.Flyout>
+                                <ContextMenu>
+                                    <MenuItem Header="🛡️ Максимальная приватность (Анти-телеметрия)" Click="OnApplyPresetMaxPrivacyClick" />
+                                    <MenuItem Header="🎮 Игровой режим (Steam, Battle.net, LAN)" Click="OnApplyPresetGamingClick" />
+                                    <MenuItem Header="☕ Публичный Wi-Fi (Изоляция сети)" Click="OnApplyPresetPublicWifiClick" />
+                                    <Separator />
+                                    <MenuItem Header="↩️ Сбросить добавленные пресеты" Click="OnApplyPresetResetClick" />
+                                </ContextMenu>
+                            </ui:DropDownButton.Flyout>
+                        </ui:DropDownButton>
                         <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="Обновить"
                                    Click="OnRefreshRulesClick" Margin="0,0,8,4" />
                         <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="Анти-телеметрия (1 клик)"

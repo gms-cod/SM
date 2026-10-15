@@ -246,6 +246,18 @@ public static class PipeMessageTypes
     public const string GetAlertsEnabled = "GetAlertsEnabled";
     /// <summary>Ответ службы с состоянием детектора новых сетевых подключений.</summary>
     public const string GetAlertsEnabledResponse = "GetAlertsEnabledResponse";
+    /// <summary>Запрос экспорта правил брандмауэра в бэкап.</summary>
+    public const string ExportFirewallRules = "ExportFirewallRules";
+    /// <summary>Ответ службы с бэкапом правил брандмауэра.</summary>
+    public const string ExportFirewallRulesResponse = "ExportFirewallRulesResponse";
+    /// <summary>Запрос импорта правил брандмауэра из бэкапа.</summary>
+    public const string ImportFirewallRules = "ImportFirewallRules";
+    /// <summary>Ответ службы с результатом импорта правил брандмауэра.</summary>
+    public const string ImportFirewallRulesResponse = "ImportFirewallRulesResponse";
+    /// <summary>Запрос применения готового пресета безопасности.</summary>
+    public const string ApplySecurityPreset = "ApplySecurityPreset";
+    /// <summary>Ответ службы с результатом применения пресета безопасности.</summary>
+    public const string ApplySecurityPresetResponse = "ApplySecurityPresetResponse";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>
@@ -496,4 +508,57 @@ public record AlertsEnabledPayload(bool Enabled);
 
 /// <summary>Полезная нагрузка ответа на решение по сетевому алерту.</summary>
 public record ResolveNetworkAlertResultPayload(bool Success, string Message);
+
+/// <summary>Полезная нагрузка запроса импорта правил брандмауэра из бэкапа.</summary>
+public sealed class ImportFirewallRulesRequest
+{
+    /// <summary>Бэкап правил для импорта.</summary>
+    [JsonPropertyName("backup")]
+    public FirewallBackupDto Backup { get; set; } = new();
+
+    /// <summary>Перезаписывать существующие правила с тем же именем.</summary>
+    [JsonPropertyName("overwriteExisting")]
+    public bool OverwriteExisting { get; set; }
+
+    /// <summary>ImportFirewallRulesRequest: пустой конструктор для десериализации.</summary>
+    public ImportFirewallRulesRequest() { }
+
+    /// <summary>ImportFirewallRulesRequest: создаёт запрос.</summary>
+    /// <param name="backup">Входные данные: значение параметра backup (FirewallBackupDto).</param>
+    /// <param name="overwriteExisting">Входные данные: значение параметра overwriteExisting (bool).</param>
+    public ImportFirewallRulesRequest(FirewallBackupDto backup, bool overwriteExisting = false)
+    {
+        Backup = backup;
+        OverwriteExisting = overwriteExisting;
+    }
+}
+
+/// <summary>Полезная нагрузка ответа с результатом импорта правил брандмауэра.</summary>
+public record FirewallImportResultPayload(int Imported, int Skipped);
+
+/// <summary>Полезная нагрузка запроса применения готового пресета безопасности.</summary>
+public sealed class ApplySecurityPresetRequest
+{
+    /// <summary>Применяемый пресет.</summary>
+    [JsonPropertyName("preset")]
+    public SecurityPresetType Preset { get; set; } = SecurityPresetType.MaxPrivacy;
+
+    /// <summary>Алиас пресета (совместимость с контрактом presetType).</summary>
+    [JsonPropertyName("presetType")]
+    public SecurityPresetType PresetType
+    {
+        get => Preset;
+        set => Preset = value;
+    }
+
+    /// <summary>ApplySecurityPresetRequest: пустой конструктор для десериализации.</summary>
+    public ApplySecurityPresetRequest() { }
+
+    /// <summary>ApplySecurityPresetRequest: создаёт запрос.</summary>
+    /// <param name="preset">Входные данные: значение параметра preset (SecurityPresetType).</param>
+    public ApplySecurityPresetRequest(SecurityPresetType preset) => Preset = preset;
+}
+
+/// <summary>Полезная нагрузка ответа с результатом применения пресета безопасности.</summary>
+public record SecurityPresetResultPayload(SecurityPresetType Preset, int AppliedCount, bool Success, string Message);
 

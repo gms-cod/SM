@@ -5,12 +5,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.UI.Models;
@@ -1663,6 +1665,189 @@ public partial class NetworkSecurityHubView : UserControl
             SetStatus($"Ошибка завершения процесса: {ex.Message}");
         }
     }
+
+    // ===== Экспорт / импорт бэкапов и пресеты безопасности =====
+
+    /// <summary>Псевдоним мгновенного обновления таблицы правил (требование Worker 3).</summary>
+    public Task LoadAllRulesAsync() => LoadRulesAsync();
+
+    /// <summary>Имя файла бэкапа по умолчанию: FirewallRules_Backup_yyyyMMdd.json.</summary>
+    public static string BuildDefaultBackupFileName(DateTime now) =>
+        $"FirewallRules_Backup_{now:yyyyMMdd}.json";
+
+    /// <summary>Сериализует бэкап в JSON с отступами (формат файла экспорта).</summary>
+    public static string SerializeBackupToJson(FirewallBackupDto backup)
+    {
+        if (backup == null)
+            throw new ArgumentNullException(nameof(backup));
+        return JsonSerializer.Serialize(backup, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNameCaseInsensitive = true
+        });
+    }
+
+    /// <summary>Десериализует бэкап из JSON файла импорта.</summary>
+    public static FirewallBackupDto? DeserializeBackupFromJson(string json) =>
+        JsonSerializer.Deserialize<FirewallBackupDto>(json ?? throw new ArgumentNullException(nameof(json)),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+    /// <summary>Строит Pipe-запрос импорта (единая точка для UI и тестов).</summary>
+    public static ImportFirewallRulesRequest BuildImportRequest(FirewallBackupDto backup, bool overwrite) =>
+        new(backup ?? throw new ArgumentNullException(nameof(backup)), overwrite);
+
+    /// <summary>Строит Pipe-запрос применения пресета (единая точка для UI и тестов).</summary>
+    public static ApplySecurityPresetRequest BuildPresetRequest(SecurityPresetType presetType) =>
+        new(presetType);
+
+    /// <summary>Человекочитаемое имя пресета безопасности.</summary>
+    public static string GetSecurityPresetDisplayName(SecurityPresetType presetType) => presetType switch
+    {
+        SecurityPresetType.MaxPrivacy => "Максимальная приватность",
+        SecurityPresetType.Gaming => "Игровой режим",
+        SecurityPresetType.PublicWifi => "Публичный Wi-Fi",
+        SecurityPresetType.ResetToDefaults => "Сброс к стандартным параметрам",
+        _ => presetType.ToString()
+    };
+
+    /// <summary>
+    /// Экспорт правил: диалог сохранения → ExportFirewallRulesAsync → JSON с отступами → файл.
+    /// </summary>
+    private async void OnExportRulesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new SaveFileDialog
+            {
+                Filter = "JSON Files (*.json)|*.json",
+                FileName = BuildDefaultBackupFileName(DateTime.Now),
+                DefaultExt = ".json"
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+                return;
+
+            SetStatus("Экспорт правил брандмауэра…");
+            var backup = await _pipeClient.ExportFirewallRulesAsync();
+            if (backup == null)
+            {
+                SetStatus("Не удалось экспортировать правила: служба недоступна.");
+                return;
+            }
+
+            var json = SerializeBackupToJson(backup);
+            await File.WriteAllTextAsync(dialog.FileName, json);
+            var count = backup.Rules?.Count ?? 0;
+            SetStatus($"Экспортировано {count} правил в файл {dialog.FileName}.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка экспорта правил: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Импорт правил: диалог открытия → чтение → десериализация → подтверждение →
+    /// ImportFirewallRulesAsync(overwrite: true) → мгновенное обновление таблицы.
+    /// </summary>
+    private async void OnImportRulesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new OpenFileDialog
+            {
+                Filter = "JSON Files (*.json)|*.json",
+                DefaultExt = ".json"
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+                return;
+
+            string json;
+            try
+            {
+                json = await File.ReadAllTextAsync(dialog.FileName);
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Не удалось прочитать файл: {ex.Message}");
+                return;
+            }
+
+            FirewallBackupDto? backup;
+            try
+            {
+                backup = DeserializeBackupFromJson(json);
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Некорректный файл бэкапа: {ex.Message}");
+                return;
+            }
+
+            if (backup?.Rules == null || backup.Rules.Count == 0)
+            {
+                SetStatus("В файле нет правил для импорта.");
+                return;
+            }
+
+            var confirm = MessageBox.Show(Window.GetWindow(this),
+                $"В файле найдено правил: {backup.Rules.Count}.\n" +
+                $"Импортировать с перезаписью существующих правил?",
+                "Подтверждение импорта",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question,
+                MessageBoxResult.No);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            SetStatus("Импорт правил брандмауэра…");
+            var (imported, skipped) = await _pipeClient.ImportFirewallRulesAsync(backup, overwrite: true);
+            await LoadAllRulesAsync();
+            SetStatus($"Импортировано {imported}, пропущено {skipped}.");
+            MessageBox.Show(Window.GetWindow(this),
+                $"Импорт завершён: импортировано {imported}, пропущено {skipped}.",
+                "Импорт правил",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка импорта правил: {ex.Message}");
+        }
+    }
+
+    /// <summary>Общий исполнитель пресетов: вызов службы → обновление таблицы → уведомление.</summary>
+    private async Task ApplyPresetAsync(SecurityPresetType presetType)
+    {
+        try
+        {
+            var displayName = GetSecurityPresetDisplayName(presetType);
+            SetStatus($"Применение пресета «{displayName}»…");
+            var applied = await _pipeClient.ApplySecurityPresetAsync(presetType);
+            await LoadAllRulesAsync();
+            SetStatus($"Пресет «{displayName}» применён (правил: {applied}).");
+            MessageBox.Show(Window.GetWindow(this),
+                $"Пресет «{displayName}» применён (правил: {applied}).",
+                "Пресет безопасности",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка применения пресета: {ex.Message}");
+        }
+    }
+
+    private async void OnApplyPresetMaxPrivacyClick(object sender, RoutedEventArgs e) =>
+        await ApplyPresetAsync(SecurityPresetType.MaxPrivacy);
+
+    private async void OnApplyPresetGamingClick(object sender, RoutedEventArgs e) =>
+        await ApplyPresetAsync(SecurityPresetType.Gaming);
+
+    private async void OnApplyPresetPublicWifiClick(object sender, RoutedEventArgs e) =>
+        await ApplyPresetAsync(SecurityPresetType.PublicWifi);
+
+    private async void OnApplyPresetResetClick(object sender, RoutedEventArgs e) =>
+        await ApplyPresetAsync(SecurityPresetType.ResetToDefaults);
 
     // ===== Статусная строка =====
 

@@ -745,6 +745,328 @@ public sealed class WindowsFirewallService
         }
     }
 
+    // --- Публичный API: экспорт/импорт и пресеты ---------------------------------
+
+    /// <summary>Собирает текущие правила брандмауэра в объект бэкапа.</summary>
+    public FirewallBackupDto ExportRulesBackup()
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.ExportRulesBackup");
+        var rules = GetAllRules();
+        return new FirewallBackupDto
+        {
+            Version = "1.6.0",
+            ExportedAt = DateTime.UtcNow,
+            Description = $"Экспорт правил брандмауэра ({rules.Count}) от {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC",
+            Rules = rules.ToList(),
+        };
+    }
+
+    /// <summary>
+    /// Импортирует правила из бэкапа, пропуская или обновляя существующие.
+    /// </summary>
+    /// <param name="backup">Бэкап правил.</param>
+    /// <param name="overwriteExisting">Перезаписывать существующие правила с тем же именем.</param>
+    /// <returns>Кортеж (импортировано, пропущено).</returns>
+    public (int Imported, int Skipped) ImportRulesBackup(FirewallBackupDto backup, bool overwriteExisting = false)
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.ImportRulesBackup");
+        if (backup is null)
+            throw new ArgumentNullException(nameof(backup));
+        var rules = backup.Rules ?? new List<FirewallRuleDto>();
+        if (rules.Count == 0)
+            return (0, 0);
+
+        IReadOnlyList<FirewallRuleDto> existing;
+        try
+        {
+            existing = GetAllRules();
+        }
+        catch
+        {
+            existing = Array.Empty<FirewallRuleDto>();
+        }
+
+        var existingNames = new HashSet<string>(
+            existing.Select(r => r.Name ?? string.Empty).Where(n => !string.IsNullOrWhiteSpace(n)),
+            StringComparer.OrdinalIgnoreCase);
+
+        int imported = 0, skipped = 0;
+        lock (_sync)
+        {
+            foreach (var rule in rules)
+            {
+                if (rule is null || string.IsNullOrWhiteSpace(rule.Name))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var name = rule.Name.Trim();
+                bool exists = existingNames.Contains(name)
+                    || existingNames.Contains(name + "_In")
+                    || existingNames.Contains(name + "_Out");
+                if (exists && !overwriteExisting)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                FirewallOperationResult result;
+                try
+                {
+                    result = CreateOrUpdateRule(rule);
+                }
+                catch
+                {
+                    skipped++;
+                    continue;
+                }
+
+                if (result?.Success == true)
+                {
+                    imported++;
+                    existingNames.Add(name);
+                }
+                else
+                {
+                    skipped++;
+                }
+            }
+        }
+
+        Log.Information("Firewall: импорт бэкапа v{Version}: импортировано {Imported}, пропущено {Skipped}",
+            backup.Version, imported, skipped);
+        return (imported, skipped);
+    }
+
+    /// <summary>Генерирует и применяет комплект правил для выбранного пресета.</summary>
+    /// <param name="presetType">Пресет безопасности.</param>
+    /// <returns>Число применённых правил.</returns>
+    public int ApplyPreset(SecurityPresetType presetType)
+    {
+        using var _ = ExecutionProfiler.Measure("Service.Firewall.ApplyPreset");
+        if (!Enum.IsDefined(typeof(SecurityPresetType), presetType))
+            throw new ArgumentOutOfRangeException(nameof(presetType), $"Неизвестный пресет: {(int)presetType}.");
+
+        if (presetType == SecurityPresetType.ResetToDefaults)
+        {
+            lock (_sync)
+            {
+                int removed;
+                try
+                {
+                    removed = RemoveAllManagedRules();
+                }
+                catch
+                {
+                    removed = 0;
+                }
+
+                try
+                {
+                    SetFilteringMode(FirewallFilteringMode.Normal);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "ApplyPreset(ResetToDefaults): не удалось сбросить режим фильтрации");
+                }
+
+                Log.Information("Firewall: пресет ResetToDefaults применён, удалено правил: {Count}", removed);
+                return removed;
+            }
+        }
+
+        var presetRules = BuildPresetRules(presetType);
+        int applied = 0;
+        lock (_sync)
+        {
+            foreach (var rule in presetRules)
+            {
+                FirewallOperationResult result;
+                try
+                {
+                    result = CreateOrUpdateRule(rule);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "ApplyPreset({Preset}): правило {Name} не применено", presetType, rule?.Name);
+                    continue;
+                }
+
+                if (result?.Success == true)
+                    applied++;
+            }
+        }
+
+        Log.Information("Firewall: пресет {Preset} применён, правил: {Count}", presetType, applied);
+        return applied;
+    }
+
+    /// <summary>
+    /// Чистый построитель комплектов правил для пресетов (без обращения к COM —
+    /// пригоден для модульных тестов и Pipe-слоя).
+    /// </summary>
+    public static IReadOnlyList<FirewallRuleDto> BuildPresetRules(SecurityPresetType presetType)
+    {
+        FirewallRuleDto PresetRule(
+            string name,
+            string description,
+            FirewallDirection direction,
+            FirewallAction action,
+            FirewallProtocol protocol,
+            string localPorts = "",
+            string remoteAddresses = "",
+            string? remotePorts = null,
+            string? applicationPath = null) => new()
+            {
+                Name = name,
+                Description = description,
+                Direction = direction,
+                Action = action,
+                Protocol = protocol,
+                LocalPorts = localPorts,
+                RemotePorts = remotePorts,
+                RemoteAddresses = remoteAddresses,
+                ApplicationPath = applicationPath,
+                Enabled = true,
+                Profiles = FirewallProfile.All,
+                Grouping = RuleGroup,
+                IsManaged = true,
+            };
+
+        return presetType switch
+        {
+            SecurityPresetType.MaxPrivacy => new List<FirewallRuleDto>
+            {
+                PresetRule(
+                    $"{RulePrefix}Preset_MaxPrivacy_Telemetry",
+                    "MaxPrivacy: блокировка телеметрии Microsoft (vortex, telemetry, diagnostics).",
+                    FirewallDirection.Outbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Any,
+                    remoteAddresses: "vortex.data.microsoft.com,vortex-win.data.microsoft.com,telecommand.telemetry.microsoft.com,oca.telemetry.microsoft.com,settings-win.data.microsoft.com"),
+                PresetRule(
+                    $"{RulePrefix}Preset_MaxPrivacy_Cortana",
+                    "MaxPrivacy: блокировка Cortana (SearchUI) — исходящие соединения.",
+                    FirewallDirection.Outbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Any,
+                    applicationPath: @"%SystemRoot%\SystemApps\Microsoft.Windows.Cortana_cw5n1h2txyewy\SearchUI.exe"),
+                PresetRule(
+                    $"{RulePrefix}Preset_MaxPrivacy_Diagnostics",
+                    "MaxPrivacy: блокировка диагностических серверов Microsoft.",
+                    FirewallDirection.Outbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Tcp,
+                    remoteAddresses: "diagnostics.support.microsoft.com,oca.telemetry.microsoft.com,191.232.139.0/24,65.55.44.0/24"),
+            },
+            SecurityPresetType.Gaming => new List<FirewallRuleDto>
+            {
+                PresetRule(
+                    $"{RulePrefix}Preset_Gaming_Steam",
+                    "Gaming: входящие Steam (27015-27036 TCP/UDP).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Allow,
+                    FirewallProtocol.Any,
+                    localPorts: "27015-27036"),
+                PresetRule(
+                    $"{RulePrefix}Preset_Gaming_BattleNet",
+                    "Gaming: входящие Battle.net (3724, 1119 TCP).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Allow,
+                    FirewallProtocol.Tcp,
+                    localPorts: "3724,1119"),
+                PresetRule(
+                    $"{RulePrefix}Preset_Gaming_EpicGames",
+                    "Gaming: входящие Epic Games (5222, 443, 3478-3479).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Allow,
+                    FirewallProtocol.Tcp,
+                    localPorts: "5222,443,3478-3479"),
+            },
+            SecurityPresetType.PublicWifi => new List<FirewallRuleDto>
+            {
+                PresetRule(
+                    $"{RulePrefix}Preset_PublicWifi_NetBIOS",
+                    "PublicWifi: блокировка входящих NetBIOS (137-139).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Any,
+                    localPorts: "137-139"),
+                PresetRule(
+                    $"{RulePrefix}Preset_PublicWifi_SMB",
+                    "PublicWifi: блокировка входящего SMB (445).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Tcp,
+                    localPorts: "445"),
+                PresetRule(
+                    $"{RulePrefix}Preset_PublicWifi_RDP",
+                    "PublicWifi: блокировка входящего RDP (3389).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Tcp,
+                    localPorts: "3389"),
+                PresetRule(
+                    $"{RulePrefix}Preset_PublicWifi_RPC",
+                    "PublicWifi: блокировка входящего RPC (135).",
+                    FirewallDirection.Inbound,
+                    FirewallAction.Block,
+                    FirewallProtocol.Tcp,
+                    localPorts: "135"),
+            },
+            SecurityPresetType.ResetToDefaults => Array.Empty<FirewallRuleDto>(),
+            _ => throw new ArgumentOutOfRangeException(nameof(presetType), $"Неизвестный пресет: {(int)presetType}."),
+        };
+    }
+
+    /// <summary>
+    /// Чистый подсчёт плана импорта (без COM): сколько правил будет импортировано/пропущено.
+    /// </summary>
+    /// <param name="backup">Бэкап правил.</param>
+    /// <param name="existingNames">Имена уже существующих правил.</param>
+    /// <param name="overwriteExisting">Перезаписывать существующие.</param>
+    public static (int Imported, int Skipped) PlanImport(
+        FirewallBackupDto backup,
+        IReadOnlySet<string> existingNames,
+        bool overwriteExisting = false)
+    {
+        if (backup is null)
+            throw new ArgumentNullException(nameof(backup));
+        var rules = backup.Rules ?? new List<FirewallRuleDto>();
+        var existing = existingNames ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var comparer = StringComparer.OrdinalIgnoreCase;
+        int imported = 0, skipped = 0;
+        foreach (var rule in rules)
+        {
+            if (rule is null || string.IsNullOrWhiteSpace(rule.Name))
+            {
+                skipped++;
+                continue;
+            }
+
+            var name = rule.Name.Trim();
+            bool exists = existing.Contains(name)
+                || existing.Contains(name + "_In")
+                || existing.Contains(name + "_Out");
+            // Двунаправленные правила создают варианты _In/_Out: учитываем и обратное отображение.
+            if (!exists && (name.EndsWith("_In", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("_Out", StringComparison.OrdinalIgnoreCase)))
+            {
+                var baseName = name.Substring(0, name.Length - 3);
+                exists = existing.Contains(baseName);
+            }
+
+            _ = comparer;
+            if (exists && !overwriteExisting)
+                skipped++;
+            else
+                imported++;
+        }
+
+        return (imported, skipped);
+    }
+
     private static IEnumerable<string> CandidateNames(string name, FirewallDirection direction)
     {
         if (direction == FirewallDirection.Both)

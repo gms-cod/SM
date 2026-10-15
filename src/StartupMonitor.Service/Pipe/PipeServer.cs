@@ -1696,6 +1696,91 @@ public class PipeServer : BackgroundService
                     }
                     break;
 
+                case PipeMessageTypes.ExportFirewallRules:
+                    try
+                    {
+                        var backup = _firewallService.ExportRulesBackup();
+                        response.Type = PipeMessageTypes.ExportFirewallRulesResponse;
+                        response.Payload = JsonSerializer.Serialize(backup, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.ImportFirewallRules:
+                    try
+                    {
+                        FirewallBackupDto? backupDto = null;
+                        var overwrite = false;
+                        try
+                        {
+                            var req = JsonSerializer.Deserialize<ImportFirewallRulesRequest>(message.Payload, JsonOptions);
+                            if (req?.Backup != null)
+                            {
+                                backupDto = req.Backup;
+                                overwrite = req.OverwriteExisting;
+                            }
+                        }
+                        catch { }
+                        if (backupDto == null && !string.IsNullOrWhiteSpace(message.Payload))
+                        {
+                            try { backupDto = JsonSerializer.Deserialize<FirewallBackupDto>(message.Payload, JsonOptions); } catch { }
+                        }
+                        if (backupDto == null)
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректный бэкап правил брандмауэра для импорта."), JsonOptions);
+                            break;
+                        }
+
+                        var (imported, skipped) = _firewallService.ImportRulesBackup(backupDto, overwrite);
+                        response.Type = PipeMessageTypes.ImportFirewallRulesResponse;
+                        response.Payload = JsonSerializer.Serialize(new FirewallImportResultPayload(imported, skipped), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.ApplySecurityPreset:
+                    try
+                    {
+                        SecurityPresetType? preset = null;
+                        try { preset = JsonSerializer.Deserialize<ApplySecurityPresetRequest>(message.Payload, JsonOptions)?.Preset; } catch { }
+                        if (preset == null)
+                        {
+                            try { preset = JsonSerializer.Deserialize<SecurityPresetType>(message.Payload, JsonOptions); } catch { }
+                        }
+                        if (preset == null && int.TryParse((message.Payload ?? "").Trim().Trim('"'), out var presetInt)
+                            && Enum.IsDefined(typeof(SecurityPresetType), presetInt))
+                        {
+                            preset = (SecurityPresetType)presetInt;
+                        }
+                        if (preset == null || !Enum.IsDefined(typeof(SecurityPresetType), preset.Value))
+                        {
+                            response.Type = PipeMessageTypes.FirewallOperationResponse;
+                            response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail("Некорректный пресет безопасности."), JsonOptions);
+                            break;
+                        }
+
+                        var applied = _firewallService.ApplyPreset(preset.Value);
+                        response.Type = PipeMessageTypes.ApplySecurityPresetResponse;
+                        response.Payload = JsonSerializer.Serialize(
+                            new SecurityPresetResultPayload(preset.Value, applied, true, $"Пресет {preset.Value} применён (правил: {applied})."),
+                            JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.FirewallOperationResponse;
+                        response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
                 case PipeMessageTypes.GetPendingNetworkAlerts:
                     try
                     {

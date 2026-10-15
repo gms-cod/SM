@@ -1583,6 +1583,105 @@ public class PipeClient : IDisposable
         }
     }
 
+    /// <summary>Запрашивает у службы бэкап правил брандмауэра (экспорт).</summary>
+    /// <returns>Бэкап <see cref="FirewallBackupDto"/> или null при недоступности службы.</returns>
+    public async Task<FirewallBackupDto?> ExportFirewallRulesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ExportFirewallRules
+            }, ct);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Payload))
+                return null;
+
+            try
+            {
+                return JsonSerializer.Deserialize<FirewallBackupDto>(response.Payload, JsonOptions);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Отправляет службе бэкап правил для импорта.</summary>
+    /// <param name="backup">Бэкап правил.</param>
+    /// <param name="overwrite">Перезаписывать существующие правила с тем же именем.</param>
+    /// <returns>Кортеж (Imported, Skipped). При ошибке — (0, 0).</returns>
+    public async Task<(int Imported, int Skipped)> ImportFirewallRulesAsync(FirewallBackupDto backup, bool overwrite = false, CancellationToken ct = default)
+    {
+        if (backup == null)
+            return (0, 0);
+
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ImportFirewallRules,
+                Payload = JsonSerializer.Serialize(new ImportFirewallRulesRequest(backup, overwrite), JsonOptions)
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.ImportFirewallRulesResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var result = JsonSerializer.Deserialize<FirewallImportResultPayload>(response.Payload, JsonOptions);
+                    if (result != null)
+                        return (result.Imported, result.Skipped);
+                }
+                catch { }
+            }
+
+            return (0, 0);
+        }
+        catch
+        {
+            return (0, 0);
+        }
+    }
+
+    /// <summary>Применяет готовый пресет безопасности брандмауэра.</summary>
+    /// <param name="presetType">Тип пресета.</param>
+    /// <returns>Количество применённых правил (0 при ошибке).</returns>
+    public async Task<int> ApplySecurityPresetAsync(SecurityPresetType presetType, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ApplySecurityPreset,
+                Payload = JsonSerializer.Serialize(new ApplySecurityPresetRequest(presetType), JsonOptions)
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.ApplySecurityPresetResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var result = JsonSerializer.Deserialize<SecurityPresetResultPayload>(response.Payload, JsonOptions);
+                    if (result != null)
+                        return result.AppliedCount;
+                }
+                catch { }
+            }
+
+            return 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     /// <summary>Возвращает дату создания/модификации исполняемого файла текущего процесса UI (UTC).</summary>
     private static DateTime? GetLocalProcessDateUtc()
     {
