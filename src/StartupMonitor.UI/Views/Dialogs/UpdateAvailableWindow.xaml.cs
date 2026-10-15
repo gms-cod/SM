@@ -27,10 +27,25 @@ public partial class UpdateAvailableWindow : FluentWindow
 
     private void PopulateData()
     {
-        TxtNewVersion.Text = $"Startup Monitor v{_updateInfo.Version}";
-        var dateStr = _updateInfo.ReleaseDate.ToString("dd.MM.yyyy");
-        var currentVer = string.IsNullOrEmpty(_updateInfo.CurrentVersion) ? "1.3.2" : _updateInfo.CurrentVersion;
-        TxtSubtitle.Text = $"Опубликовано: {dateStr} • Текущая версия: v{currentVer}";
+        var versionText = $"Startup Monitor v{_updateInfo.Version}";
+        if (_updateInfo.IsNewerByDate)
+        {
+            versionText += " (Обновлённый билд)";
+        }
+        TxtNewVersion.Text = versionText;
+
+        var effectiveDate = _updateInfo.InstallerDate ?? _updateInfo.ReleaseDate;
+        var dateStr = effectiveDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+        var currentVer = string.IsNullOrEmpty(_updateInfo.CurrentVersion) ? "1.4.0" : _updateInfo.CurrentVersion;
+
+        if (_updateInfo.IsNewerByDate)
+        {
+            TxtSubtitle.Text = $"Инсталлятор обновлен: {dateStr} • Текущая версия: v{currentVer}";
+        }
+        else
+        {
+            TxtSubtitle.Text = $"Опубликовано: {dateStr} • Текущая версия: v{currentVer}";
+        }
 
         TxtChangelog.Text = string.IsNullOrWhiteSpace(_updateInfo.Changelog)
             ? "Информация об изменениях не предоставлена автором релиза."

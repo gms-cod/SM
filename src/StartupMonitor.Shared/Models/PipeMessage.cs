@@ -362,18 +362,23 @@ public record AutoGuardConfigPayload(
     bool BlockNewServices
 );
 
-/// <summary>Запрос проверки обновлений. Клиент передаёт свою версию UI для раздельной оценки.</summary>
+/// <summary>Запрос проверки обновлений. Клиент передаёт свою версию UI и дату сборки для точной оценки.</summary>
 public sealed class CheckForUpdatesRequest
 {
-    /// <summary>Версия UI-клиента (например "1.2.4"). Null — старый клиент без поддержки.</summary>
+    /// <summary>Версия UI-клиента (например "1.4.0"). Null — старый клиент без поддержки.</summary>
     [JsonPropertyName("clientVersion")]
     public string? ClientVersion { get; set; }
 
-    /// <summary>CheckForUpdatesRequest: Выполняет операцию CheckForUpdatesRequest.</summary>
+    /// <summary>Дата сборки/создания исполняемого файла UI-клиента (UTC).</summary>
+    [JsonPropertyName("clientBuildDateUtc")]
+    public DateTime? ClientBuildDateUtc { get; set; }
+
     public CheckForUpdatesRequest() { }
-    /// <summary>CheckForUpdatesRequest: Выполняет операцию CheckForUpdatesRequest.</summary>
-    /// <param name="clientVersion">Входные данные: значение параметра clientVersion (string?).</param>
-    public CheckForUpdatesRequest(string? clientVersion) { ClientVersion = clientVersion; }
+    public CheckForUpdatesRequest(string? clientVersion, DateTime? clientBuildDateUtc = null)
+    {
+        ClientVersion = clientVersion;
+        ClientBuildDateUtc = clientBuildDateUtc;
+    }
 }
 
 /// <summary>Запрос дельты записей автозапуска. Клиент передаёт последнюю известную ревизию.</summary>

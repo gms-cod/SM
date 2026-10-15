@@ -97,8 +97,13 @@ public sealed class GitHubUpdateService : IDisposable
                 if (!string.IsNullOrEmpty(cfg.Settings.SkippedUpdateVersion) &&
                     string.Equals(cfg.Settings.SkippedUpdateVersion.TrimStart('v', 'V'), update.Version.TrimStart('v', 'V'), StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger.LogInformation("Update v{Version} was skipped by user. Suppressing notifications.", update.Version);
-                    return;
+                    // Если инсталлятор был перевыпущен с более свежей датой сборки, не подавляем обновление
+                    if (!update.IsNewerByDate)
+                    {
+                        _logger.LogInformation("Update v{Version} was skipped by user. Suppressing notifications.", update.Version);
+                        return;
+                    }
+                    _logger.LogInformation("Update v{Version} was re-released with newer installer build date ({Date}). Notifying user.", update.Version, update.InstallerDate);
                 }
 
                 // Уведомление в трей/UI
@@ -130,15 +135,20 @@ public sealed class GitHubUpdateService : IDisposable
     /// Проверяет наличие нового релиза на GitHub.
     /// </summary>
     public Task<UpdateCheckResult> CheckForUpdatesAsync(bool isManual, CancellationToken ct)
-        => CheckForUpdatesAsync(isManual, ct, clientVersionString: null);
+        => CheckForUpdatesAsync(isManual, ct, clientVersionString: null, clientBuildDateUtc: null);
 
     /// <summary>
     /// Проверяет наличие нового релиза на GitHub с раздельной оценкой для службы и UI-клиента.
     /// </summary>
     /// <param name="isManual">Признак ручной проверки (зарезервировано для телеметрии).</param>
     /// <param name="ct">Токен отмены.</param>
-    /// <param name="clientVersionString">Версия UI-клиента (например "1.2.4"), null — не оценивать.</param>
-    public async Task<UpdateCheckResult> CheckForUpdatesAsync(bool isManual, CancellationToken ct, string? clientVersionString)
+    /// <param name="clientVersionString">Версия UI-клиента (например "1.4.0"), null — не оценивать.</param>
+    /// <param name="clientBuildDateUtc">UTC-дата сборки/создания UI-клиента.</param>
+    public async Task<UpdateCheckResult> CheckForUpdatesAsync(
+        bool isManual,
+        CancellationToken ct,
+        string? clientVersionString,
+        DateTime? clientBuildDateUtc = null)
     {
         try
         {
@@ -221,21 +231,33 @@ public sealed class GitHubUpdateService : IDisposable
                 var body = root.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
                 var publishedAt = root.TryGetProperty("published_at", out var pubProp) && pubProp.TryGetDateTime(out var dt) ? dt : DateTime.UtcNow;
 
-                var (downloadUrl, fileName, sizeBytes) = FindInstallerAsset(root);
+                var (downloadUrl, fileName, sizeBytes, assetDate) = FindInstallerAsset(root);
+                var effectiveInstallerDate = assetDate ?? publishedAt;
 
                 // Парсим версию релиза. Сравнение через CompareVersions: недостающие
                 // компоненты (Build/Revision = -1) трактуются как 0, поэтому
                 // 1.2.4 == 1.2.4.0, а 1.3.0 > 1.2.4.0 (и наоборот) определяется корректно.
                 var cleanTag = CleanVersionTag(tagName);
                 var remoteVersion = ParseSemVer(cleanTag);
-                var serviceAvailable = IsNewerVersion(remoteVersion, CurrentVersion);
+
+                var serviceBuildDate = GetLocalBuildDateUtc();
+                var serviceAvailable = IsUpdateCandidate(remoteVersion, CurrentVersion, effectiveInstallerDate, serviceBuildDate, out var serviceNewerByDate);
+
                 Version? clientVer = null;
+                bool clientAvailable = false;
+                bool clientNewerByDate = false;
                 if (!string.IsNullOrWhiteSpace(clientVersionString))
                 {
                     try { clientVer = ParseSemVer(CleanVersionTag(clientVersionString)); } catch { clientVer = null; }
+                    if (clientVer != null)
+                    {
+                        var effectiveClientDate = clientBuildDateUtc ?? serviceBuildDate;
+                        clientAvailable = IsUpdateCandidate(remoteVersion, clientVer, effectiveInstallerDate, effectiveClientDate, out clientNewerByDate);
+                    }
                 }
-                var clientAvailable = clientVer != null && IsNewerVersion(remoteVersion, clientVer);
+
                 var isAvailable = serviceAvailable || clientAvailable;
+                var isNewerByDate = serviceNewerByDate || clientNewerByDate;
 
                 // Извлекаем SHA-256 хэш (из текста релиза или .sha256 ассета)
                 var sha256 = ExtractSha256Checksum(body, root);
@@ -246,6 +268,9 @@ public sealed class GitHubUpdateService : IDisposable
                     Title = title,
                     Changelog = body,
                     ReleaseDate = publishedAt,
+                    InstallerDate = effectiveInstallerDate,
+                    InstalledBuildDate = serviceBuildDate > DateTime.MinValue ? serviceBuildDate : null,
+                    IsNewerByDate = isNewerByDate,
                     DownloadUrl = downloadUrl,
                     FileName = fileName,
                     Sha256 = sha256,
@@ -547,10 +572,81 @@ public sealed class GitHubUpdateService : IDisposable
     public static bool IsNewerVersion(Version remote, Version current)
         => CompareVersions(remote, current) > 0;
 
-    public static (string DownloadUrl, string FileName, long SizeBytes) FindInstallerAsset(JsonElement releaseRoot)
+    /// <summary>
+    /// Определяет, является ли удалённый релиз кандидатом на обновление по версии и времени создания инсталлятора.
+    /// Если удалённая версия строго выше локальной — обновление доступно.
+    /// Если версии совпадают, проверяется дата создания/обновления инсталлятора: если инсталлятор новее
+    /// локальной сборки более чем на 2 минуты — обновление также считается доступным (перевыпущенный билд).
+    /// </summary>
+    public static bool IsUpdateCandidate(
+        Version remoteVersion,
+        Version localVersion,
+        DateTime? remoteInstallerDateUtc,
+        DateTime? localBuildDateUtc,
+        out bool isNewerByDate)
+    {
+        isNewerByDate = false;
+        var cmp = CompareVersions(remoteVersion, localVersion);
+        if (cmp > 0)
+        {
+            return true;
+        }
+
+        if (cmp == 0)
+        {
+            // Проверка по времени создания/обновления инсталлятора
+            if (remoteInstallerDateUtc.HasValue && localBuildDateUtc.HasValue && localBuildDateUtc.Value > DateTime.MinValue)
+            {
+                // Запас в 2 минуты для сглаживания погрешностей времени сборки и выгрузки в GitHub Releases
+                if (remoteInstallerDateUtc.Value > localBuildDateUtc.Value.AddMinutes(2))
+                {
+                    isNewerByDate = true;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Возвращает UTC-дату создания или модификации исполняемого файла текущего процесса/сборки.
+    /// </summary>
+    public static DateTime GetLocalBuildDateUtc()
+    {
+        try
+        {
+            var processPath = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath))
+            {
+                var writeTime = File.GetLastWriteTimeUtc(processPath);
+                var createTime = File.GetCreationTimeUtc(processPath);
+                return writeTime > createTime ? writeTime : createTime;
+            }
+
+            var baseDir = AppContext.BaseDirectory;
+            if (!string.IsNullOrEmpty(baseDir))
+            {
+                var exePath = Path.Combine(baseDir, "StartupMonitor.Service.exe");
+                var dllPath = Path.Combine(baseDir, "StartupMonitor.Service.dll");
+                var targetPath = File.Exists(exePath) ? exePath : (File.Exists(dllPath) ? dllPath : null);
+                if (targetPath != null)
+                {
+                    var writeTime = File.GetLastWriteTimeUtc(targetPath);
+                    var createTime = File.GetCreationTimeUtc(targetPath);
+                    return writeTime > createTime ? writeTime : createTime;
+                }
+            }
+        }
+        catch { }
+
+        return DateTime.MinValue;
+    }
+
+    public static (string DownloadUrl, string FileName, long SizeBytes, DateTime? UpdatedAtUtc) FindInstallerAsset(JsonElement releaseRoot)
     {
         if (!releaseRoot.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
-            return ("", "", 0);
+            return ("", "", 0, null);
 
         JsonElement? bestAsset = null;
         int bestScore = -1;
@@ -577,10 +673,20 @@ public sealed class GitHubUpdateService : IDisposable
             var name = asset.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
             var url = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
             var size = asset.TryGetProperty("size", out var s) && s.TryGetInt64(out var sz) ? sz : 0;
-            return (url, name, size);
+            DateTime? updatedAt = null;
+            if (asset.TryGetProperty("updated_at", out var up) && up.TryGetDateTime(out var upDt))
+            {
+                updatedAt = upDt.ToUniversalTime();
+            }
+            else if (asset.TryGetProperty("created_at", out var cr) && cr.TryGetDateTime(out var crDt))
+            {
+                updatedAt = crDt.ToUniversalTime();
+            }
+
+            return (url, name, size, updatedAt);
         }
 
-        return ("", "", 0);
+        return ("", "", 0, null);
     }
 
     public static string? ExtractSha256Checksum(string body, JsonElement releaseRoot)

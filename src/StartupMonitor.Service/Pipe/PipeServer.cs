@@ -1251,16 +1251,18 @@ public class PipeServer : BackgroundService
 
                 case PipeMessageTypes.CheckForUpdates:
                     string? clientVer = null;
+                    DateTime? clientBuildDate = null;
                     if (!string.IsNullOrWhiteSpace(message.Payload))
                     {
                         try
                         {
                             var updateReq = JsonSerializer.Deserialize<CheckForUpdatesRequest>(message.Payload, JsonOptions);
                             clientVer = updateReq?.ClientVersion;
+                            clientBuildDate = updateReq?.ClientBuildDateUtc;
                         }
                         catch { }
                     }
-                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None, clientVer);
+                    var updateCheckRes = await _updateService.CheckForUpdatesAsync(isManual: true, CancellationToken.None, clientVer, clientBuildDate);
                     response.Type = PipeMessageTypes.CheckForUpdatesResponse;
                     response.Payload = JsonSerializer.Serialize(updateCheckRes, JsonOptions);
                     break;

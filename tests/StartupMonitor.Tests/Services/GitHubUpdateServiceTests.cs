@@ -79,7 +79,7 @@ public class GitHubUpdateServiceTests
         """;
 
         using var doc = JsonDocument.Parse(json);
-        var (url, name, size) = GitHubUpdateService.FindInstallerAsset(doc.RootElement);
+        var (url, name, size, _) = GitHubUpdateService.FindInstallerAsset(doc.RootElement);
 
         Assert.Equal("StartupMonitorSetup-1.2.3.exe", name);
         Assert.Equal("https://github.com/.../StartupMonitorSetup-1.2.3.exe", url);
@@ -214,5 +214,128 @@ public class GitHubUpdateServiceTests
 
         Assert.NotNull(restored);
         Assert.Equal("1.2.3", restored.ClientVersion);
+    }
+
+    [Fact]
+    public void CheckForUpdatesRequest_WithBuildDate_MaintainsDateIntegrity()
+    {
+        var buildDate = new DateTime(2026, 10, 14, 10, 0, 0, DateTimeKind.Utc);
+        var req = new CheckForUpdatesRequest("1.4.0", buildDate);
+
+        var json = JsonSerializer.Serialize(req);
+        var restored = JsonSerializer.Deserialize<CheckForUpdatesRequest>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal("1.4.0", restored.ClientVersion);
+        Assert.Equal(buildDate, restored.ClientBuildDateUtc);
+    }
+
+    [Fact]
+    public void FindInstallerAsset_ExtractsAssetTimestamps()
+    {
+        var json = """
+        {
+            "assets": [
+                {
+                    "name": "StartupMonitorSetup-1.4.0.exe",
+                    "browser_download_url": "https://github.com/gms-cod/SM/releases/download/v1.4.0/StartupMonitorSetup-1.4.0.exe",
+                    "size": 50000000,
+                    "created_at": "2026-10-14T10:00:00Z",
+                    "updated_at": "2026-10-14T12:30:00Z"
+                }
+            ]
+        }
+        """;
+
+        using var doc = JsonDocument.Parse(json);
+        var (url, name, size, updatedAt) = GitHubUpdateService.FindInstallerAsset(doc.RootElement);
+
+        Assert.Equal("StartupMonitorSetup-1.4.0.exe", name);
+        Assert.Equal(50000000, size);
+        Assert.NotNull(updatedAt);
+        Assert.Equal(new DateTime(2026, 10, 14, 12, 30, 0, DateTimeKind.Utc), updatedAt.Value);
+    }
+
+    [Fact]
+    public void IsUpdateCandidate_WhenVersionIsSame_AndRemoteInstallerIsNewer_ReturnsTrueAndSetsFlag()
+    {
+        var remoteVer = new Version(1, 4, 0);
+        var localVer = new Version(1, 4, 0);
+        var localBuildDate = new DateTime(2026, 10, 14, 8, 0, 0, DateTimeKind.Utc);
+        var remoteInstallerDate = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+
+        var candidate = GitHubUpdateService.IsUpdateCandidate(
+            remoteVer, localVer, remoteInstallerDate, localBuildDate, out var isNewerByDate);
+
+        Assert.True(candidate);
+        Assert.True(isNewerByDate);
+    }
+
+    [Fact]
+    public void IsUpdateCandidate_WhenVersionIsSame_AndRemoteInstallerIsOlder_ReturnsFalse()
+    {
+        var remoteVer = new Version(1, 4, 0);
+        var localVer = new Version(1, 4, 0);
+        var localBuildDate = new DateTime(2026, 10, 14, 14, 0, 0, DateTimeKind.Utc);
+        var remoteInstallerDate = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+
+        var candidate = GitHubUpdateService.IsUpdateCandidate(
+            remoteVer, localVer, remoteInstallerDate, localBuildDate, out var isNewerByDate);
+
+        Assert.False(candidate);
+        Assert.False(isNewerByDate);
+    }
+
+    [Fact]
+    public void IsUpdateCandidate_WhenVersionIsSame_AndDifferenceIsUnderThreshold_ReturnsFalse()
+    {
+        var remoteVer = new Version(1, 4, 0);
+        var localVer = new Version(1, 4, 0);
+        var localBuildDate = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var remoteInstallerDate = new DateTime(2026, 10, 14, 12, 1, 0, DateTimeKind.Utc); // всего 1 минута
+
+        var candidate = GitHubUpdateService.IsUpdateCandidate(
+            remoteVer, localVer, remoteInstallerDate, localBuildDate, out var isNewerByDate);
+
+        Assert.False(candidate);
+        Assert.False(isNewerByDate);
+    }
+
+    [Fact]
+    public void IsUpdateCandidate_WhenRemoteVersionIsStrictlyNewer_ReturnsTrueWithoutDateFlag()
+    {
+        var remoteVer = new Version(1, 4, 1);
+        var localVer = new Version(1, 4, 0);
+        var localBuildDate = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+        var remoteInstallerDate = new DateTime(2026, 10, 14, 10, 0, 0, DateTimeKind.Utc);
+
+        var candidate = GitHubUpdateService.IsUpdateCandidate(
+            remoteVer, localVer, remoteInstallerDate, localBuildDate, out var isNewerByDate);
+
+        Assert.True(candidate);
+        Assert.False(isNewerByDate);
+    }
+
+    [Fact]
+    public void UpdateInfo_Serialization_PreservesInstallerDateAndNewerByDate()
+    {
+        var info = new UpdateInfo
+        {
+            Version = "1.4.0",
+            CurrentVersion = "1.4.0",
+            InstallerDate = new DateTime(2026, 10, 14, 12, 30, 0, DateTimeKind.Utc),
+            InstalledBuildDate = new DateTime(2026, 10, 14, 8, 0, 0, DateTimeKind.Utc),
+            IsNewerByDate = true,
+            IsUpdateAvailable = true
+        };
+
+        var json = JsonSerializer.Serialize(info);
+        var restored = JsonSerializer.Deserialize<UpdateInfo>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal(info.InstallerDate, restored.InstallerDate);
+        Assert.Equal(info.InstalledBuildDate, restored.InstalledBuildDate);
+        Assert.True(restored.IsNewerByDate);
+        Assert.True(restored.IsUpdateAvailable);
     }
 }

@@ -1057,8 +1057,9 @@ public class PipeClient : IDisposable
     /// <summary>Запрашивает проверку наличия обновлений на GitHub через службу.</summary>
     public async Task<UpdateCheckResult?> CheckForUpdatesAsync()
     {
-        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.3.2";
-        var req = new CheckForUpdatesRequest(uiVersion);
+        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.4.0";
+        var clientBuildDate = GetLocalProcessDateUtc();
+        var req = new CheckForUpdatesRequest(uiVersion, clientBuildDate);
         var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.CheckForUpdates,
@@ -1441,6 +1442,23 @@ public class PipeClient : IDisposable
         {
             return false;
         }
+    }
+
+    /// <summary>Возвращает дату создания/модификации исполняемого файла текущего процесса UI (UTC).</summary>
+    private static DateTime? GetLocalProcessDateUtc()
+    {
+        try
+        {
+            var p = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(p) && File.Exists(p))
+            {
+                var w = File.GetLastWriteTimeUtc(p);
+                var c = File.GetCreationTimeUtc(p);
+                return w > c ? w : c;
+            }
+        }
+        catch { }
+        return null;
     }
 
     /// <summary>Освобождает все ресурсы: каналы, читатели, писатели, токены отмены.</summary>

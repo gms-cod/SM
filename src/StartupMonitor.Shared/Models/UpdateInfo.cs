@@ -53,9 +53,21 @@ public class UpdateInfo
     [JsonPropertyName("client_version")]
     public string? ClientVersion { get; set; }
 
-    /// <summary>Признак: доступно ли обновление для UI-клиента (remote &gt; clientVersion).</summary>
+    /// <summary>Признак: доступно ли обновление для UI-клиента (remote &gt; clientVersion или новее по дате).</summary>
     [JsonPropertyName("is_update_available_for_client")]
     public bool IsUpdateAvailableForClient { get; set; }
+
+    /// <summary>Дата создания/обновления файла инсталлятора на сервере (UTC).</summary>
+    [JsonPropertyName("installer_date")]
+    public DateTime? InstallerDate { get; set; }
+
+    /// <summary>Дата сборки/создания установленного локального файла приложения (UTC).</summary>
+    [JsonPropertyName("installed_build_date")]
+    public DateTime? InstalledBuildDate { get; set; }
+
+    /// <summary>Признак: обновление обнаружено по более свежей дате создания инсталлятора при той же версии программы.</summary>
+    [JsonPropertyName("is_newer_by_date")]
+    public bool IsNewerByDate { get; set; }
 }
 
 /// <summary>Результат проверки обновлений.</summary>
