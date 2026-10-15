@@ -168,6 +168,9 @@ public partial class NetworkConnectionAlertWindow : Window
         UpdateCountdownText();
     }
 
+    private async void OnWhitelistClick(object sender, RoutedEventArgs e) =>
+        await ResolveAndCloseAsync(NetworkAlertResolution.WhitelistProgram).ConfigureAwait(true);
+
     private async void OnAllowAlwaysClick(object sender, RoutedEventArgs e) =>
         await ResolveAndCloseAsync(NetworkAlertResolution.AllowAlways).ConfigureAwait(true);
 
@@ -219,6 +222,7 @@ public partial class NetworkConnectionAlertWindow : Window
     {
         try
         {
+            BtnWhitelist.IsEnabled = enabled;
             BtnAllowAlways.IsEnabled = enabled;
             BtnAllowSession.IsEnabled = enabled;
             BtnBlockAlways.IsEnabled = enabled;

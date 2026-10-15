@@ -1296,7 +1296,7 @@ public class PipeClient : IDisposable
     }
 
     /// <summary>Запрашивает все правила брандмауэра Windows.</summary>
-    public async Task<List<FirewallRuleDto>> GetAllFirewallRulesAsync(CancellationToken ct = default)
+    public async Task<List<FirewallRuleDto>?> GetAllFirewallRulesAsync(CancellationToken ct = default)
     {
         var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAllFirewallRules }, ct);
         if (response?.Type == PipeMessageTypes.GetAllFirewallRulesResponse && !string.IsNullOrWhiteSpace(response.Payload))
@@ -1309,11 +1309,11 @@ public class PipeClient : IDisposable
             catch { }
             try
             {
-                return JsonSerializer.Deserialize<List<FirewallRuleDto>>(response.Payload, JsonOptions) ?? new List<FirewallRuleDto>();
+                return JsonSerializer.Deserialize<List<FirewallRuleDto>>(response.Payload, JsonOptions);
             }
             catch { }
         }
-        return new List<FirewallRuleDto>();
+        return null;
     }
 
     /// <summary>Создаёт или обновляет правило брандмауэра Windows.</summary>

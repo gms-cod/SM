@@ -738,11 +738,16 @@ public static class EntryOperations
             {
                 try
                 {
+                    var procName = proc.ProcessName;
+                    if (string.IsNullOrEmpty(procName)) continue;
+                    var nameWithExe = procName + ".exe";
+                    if (IsProtectedProcessName(nameWithExe) || SystemProtectionHelper.IsHostProcess(nameWithExe) || SystemProtectionHelper.IsHostProcess(procName)) continue;
+
                     string? procPath = ProcessMetadataEnricher.TryGetProcessPath(proc.Id);
                     if (string.IsNullOrEmpty(procPath)) procPath = null;
 
-                    var testPath = procPath ?? (proc.ProcessName + ".exe");
-                    if (IsProtectedProcessName(testPath) || SystemProtectionHelper.IsHostProcess(testPath) || SystemProtectionHelper.IsHostProcess(proc.ProcessName)) continue;
+                    var testPath = procPath ?? nameWithExe;
+                    if (procPath != null && (IsProtectedProcessName(testPath) || SystemProtectionHelper.IsHostProcess(testPath))) continue;
 
                     foreach (var rule in activeRules)
                     {

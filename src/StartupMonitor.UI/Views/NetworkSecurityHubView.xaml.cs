@@ -632,9 +632,16 @@ public partial class NetworkSecurityHubView : UserControl
     {
         try
         {
-            var rules = await _pipeClient.GetAllFirewallRulesAsync() ?? new List<FirewallRuleDto>();
-            _allRules = rules.Select(r => new FirewallRuleRow(r)).OrderBy(r => r.Name).ToList();
-            ApplyRuleFilter();
+            var rules = await _pipeClient.GetAllFirewallRulesAsync();
+            if (rules != null)
+            {
+                _allRules = rules.Select(r => new FirewallRuleRow(r)).OrderBy(r => r.Name).ToList();
+                ApplyRuleFilter();
+            }
+            else
+            {
+                SetStatus("Не удалось получить правила брандмауэра (служба занята или недоступна).");
+            }
         }
         catch (Exception ex)
         {

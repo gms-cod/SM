@@ -50,7 +50,10 @@ public enum NetworkAlertResolution
     AllowSession = 1,
 
     /// <summary>Всегда блокировать: создать блокирующее правило в Windows Firewall.</summary>
-    BlockAlways = 2
+    BlockAlways = 2,
+
+    /// <summary>Добавить программу в белый список: создать глобальное разрешающее правило в Windows Firewall для программы и перманентно доверять.</summary>
+    WhitelistProgram = 3
 }
 
 /// <summary>Запрос резолва сетевого алерта (Pipe: ResolveNetworkAlert).</summary>

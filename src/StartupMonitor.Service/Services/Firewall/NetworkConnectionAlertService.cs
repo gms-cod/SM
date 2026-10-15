@@ -258,8 +258,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
         switch (request.Resolution)
         {
+            case NetworkAlertResolution.WhitelistProgram:
             case NetworkAlertResolution.AllowAlways:
-                _sessionDecisions[sessionKey] = NetworkAlertResolution.AllowAlways;
+                _sessionDecisions[sessionKey] = request.Resolution;
                 if (!string.IsNullOrWhiteSpace(path))
                     ApplyRule(BuildAppRule(path, name, FirewallAction.Allow));
                 break;

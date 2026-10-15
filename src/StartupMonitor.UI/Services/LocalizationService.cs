@@ -957,6 +957,9 @@ public class LocalizationService : INotifyPropertyChanged
     // ──── Центр сетевой безопасности (NetworkSecurityHubView / FirewallPage) ────
     /// <summary>Название пункта навигации «Сетевой экран».</summary>
     public string NavFirewall => this["NavFirewall"];
+    public string NavToolbox => this["NavToolbox"];
+    public string NetAlertBtnWhitelist => this["NetAlertBtnWhitelist"];
+    public string NetAlertWhitelistTip => this["NetAlertWhitelistTip"];
     /// <summary>Заголовок хаба сетевой безопасности.</summary>
     public string FirewallHubTitle => this["FirewallHubTitle"];
     /// <summary>Действие правила «Разрешить».</summary>

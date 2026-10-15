@@ -238,6 +238,35 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    public void ResolveAlert_WhitelistProgram_CreatesAllowRuleAndWhitelistsSession()
+    {
+        var applied = new List<FirewallRuleDto>();
+        var svc = CreateService(
+            new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
+            Paths((1234, EvilPath)),
+            appliedRules: applied);
+        var alert = ScanSingle(svc);
+
+        var ok = svc.ResolveAlert(new ResolveNetworkAlertRequest
+        {
+            AlertId = alert.AlertId,
+            ProcessPath = EvilPath,
+            ProcessName = "evil.exe",
+            RemoteAddress = "93.184.216.34",
+            Resolution = NetworkAlertResolution.WhitelistProgram,
+        });
+
+        Assert.True(ok);
+        Assert.Empty(svc.GetPendingAlerts());
+        var rule = Assert.Single(applied);
+        Assert.Equal(FirewallAction.Allow, rule.Action);
+        Assert.Equal(EvilPath, rule.ApplicationPath);
+        Assert.True(rule.Enabled);
+        var key = NetworkConnectionAlertService.BuildSessionKey(EvilPath, "evil.exe");
+        Assert.Equal(NetworkAlertResolution.WhitelistProgram, svc.SessionDecisions[key]);
+    }
+
+    [Fact]
     public void ResolveAlert_BlockAlways_CreatesBlockRuleAndRemovesAlert()
     {
         var applied = new List<FirewallRuleDto>();

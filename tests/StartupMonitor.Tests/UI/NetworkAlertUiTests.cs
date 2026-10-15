@@ -254,12 +254,13 @@ public sealed class NetworkAlertUiTests
     public void ResolveRequests_AllResolutions_SerializeDistinctly()
     {
         var alert = SampleAlert("multi");
-        var jsons = Enum.GetValues<NetworkAlertResolution>()
+        var allResolutions = Enum.GetValues<NetworkAlertResolution>();
+        var jsons = allResolutions
             .Select(r => JsonSerializer.Serialize(
                 NetworkSecurityHubView.BuildResolveRequest(alert, r), JsonOptions))
             .ToList();
 
-        Assert.Equal(3, jsons.Distinct().Count());
+        Assert.Equal(allResolutions.Length, jsons.Distinct().Count());
         Assert.All(jsons, j => Assert.Contains("\"alertId\"", j));
     }
 }

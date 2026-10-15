@@ -1965,6 +1965,12 @@ Do you really want to proceed?</value>
   <data name="NetAlertBtnBlock" xml:space="preserve">
     <value>🔴 Block</value>
   </data>
+  <data name="NetAlertBtnWhitelist" xml:space="preserve">
+    <value>🛡️ Добавить программу в белый список</value>
+  </data>
+  <data name="NetAlertWhitelistTip" xml:space="preserve">
+    <value>Allow all network activity for this program and add to whitelist</value>
+  </data>
 <data name="NetColProcess" xml:space="preserve"><value>Process</value></data>
 <data name="NetColProtocol" xml:space="preserve"><value>Protocol</value></data>
 <data name="NetColLocalAddress" xml:space="preserve"><value>Local Address</value></data>

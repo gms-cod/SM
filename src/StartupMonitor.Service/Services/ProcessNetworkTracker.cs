@@ -284,6 +284,9 @@ public class ProcessNetworkTracker
         }
     }
 
+    // Потокобезопасный кэш PID -> (Имя процесса, время истечения TTL) для исключения постоянного выделения Process объектов
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, (string Name, DateTime ExpiresAt)> _procNameCache = new();
+
     /// <summary>
     /// Возвращает список активных сетевых соединений (сокетов) для конкретного процесса (или для всех, если targetPid <= 0).
     /// </summary>
@@ -292,24 +295,41 @@ public class ProcessNetworkTracker
         using var _profNetScan = ExecutionProfiler.Profile("Service.NetworkConnectionsScan");
         using var _prof = ExecutionProfiler.Measure("Service.Network.GetSockets");
         var sockets = new List<ProcessNetworkSocket>(64);
-        var procNames = new Dictionary<int, string>();
+        var now = DateTime.UtcNow;
 
         string GetProcName(int pid)
         {
             if (pid <= 0) return string.Empty;
-            if (procNames.TryGetValue(pid, out var cached)) return cached;
+            if (_procNameCache.TryGetValue(pid, out var cached) && cached.ExpiresAt > now)
+                return cached.Name;
+
+            string name = string.Empty;
             try
             {
-                using var p = Process.GetProcessById(pid);
-                var name = p.ProcessName + ".exe";
-                procNames[pid] = name;
-                return name;
+                // Быстрый путь через QueryFullProcessImageName без создания объекта Process
+                var path = ProcessMetadataEnricher.TryGetProcessPath(pid);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    name = System.IO.Path.GetFileName(path);
+                }
             }
-            catch
+            catch { }
+
+            if (string.IsNullOrEmpty(name))
             {
-                procNames[pid] = string.Empty;
-                return string.Empty;
+                try
+                {
+                    using var p = Process.GetProcessById(pid);
+                    name = p.ProcessName + ".exe";
+                }
+                catch
+                {
+                    name = string.Empty;
+                }
             }
+
+            _procNameCache[pid] = (name, now.AddSeconds(15));
+            return name;
         }
 
         // 1. TCP IPv4

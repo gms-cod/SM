@@ -1069,17 +1069,27 @@ public sealed class WindowsFirewallService
 
     private static IEnumerable<string> CandidateNames(string name, FirewallDirection direction)
     {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name };
+
+        // Если имя уже оканчивается на _In или _Out, получаем базовое имя
+        string baseName = name;
+        if (name.EndsWith("_In", StringComparison.OrdinalIgnoreCase))
+            baseName = name[..^3];
+        else if (name.EndsWith("_Out", StringComparison.OrdinalIgnoreCase))
+            baseName = name[..^4];
+
+        set.Add(baseName);
         if (direction == FirewallDirection.Both)
         {
-            yield return name;
-            yield return name + "_In";
-            yield return name + "_Out";
+            set.Add(baseName + "_In");
+            set.Add(baseName + "_Out");
         }
         else
         {
-            yield return name;
-            yield return name + (direction == FirewallDirection.Outbound ? "_Out" : "_In");
+            set.Add(baseName + (direction == FirewallDirection.Outbound ? "_Out" : "_In"));
         }
+
+        return set;
     }
 
     private static string UpsertGenericRule(FirewallRuleDto dto, string name, int direction)
@@ -1140,13 +1150,16 @@ public sealed class WindowsFirewallService
             try { comRule.ServiceName = dto.ServiceName; } catch { }
         }
 
-        if (!string.IsNullOrWhiteSpace(dto.LocalPorts))
+        if (comRule.Protocol is ProtoTcp or ProtoUdp)
         {
-            try { comRule.LocalPorts = dto.LocalPorts.Trim(); } catch { }
-        }
-        if (!string.IsNullOrWhiteSpace(dto.RemotePorts))
-        {
-            try { comRule.RemotePorts = dto.RemotePorts.Trim(); } catch { }
+            if (!string.IsNullOrWhiteSpace(dto.LocalPorts))
+            {
+                try { comRule.LocalPorts = dto.LocalPorts.Trim(); } catch { }
+            }
+            if (!string.IsNullOrWhiteSpace(dto.RemotePorts))
+            {
+                try { comRule.RemotePorts = dto.RemotePorts.Trim(); } catch { }
+            }
         }
         if (!string.IsNullOrWhiteSpace(dto.RemoteAddresses))
         {

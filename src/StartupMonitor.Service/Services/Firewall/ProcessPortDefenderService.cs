@@ -75,8 +75,8 @@ public sealed class ProcessPortDefenderService : IDisposable
         LoadConfig();
         LoadActiveBans();
 
-        // Запуск периодического секундного снимка сетевых соединений
-        _pollTimer = new Timer(OnPollTimerTick, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1));
+        // Запуск периодического снимка сетевых соединений (интервал 3 сек для минимизации нагрузки на CPU)
+        _pollTimer = new Timer(OnPollTimerTick, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
     }
 
     // ───────────────────────────── Конфигурация ─────────────────────────────

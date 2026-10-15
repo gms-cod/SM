@@ -20,7 +20,7 @@
     <Border
         Margin="12"
         CornerRadius="12"
-        Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+        Background="{DynamicResource WindowBackgroundBrush}"
         BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
         BorderThickness="1"
         Padding="16,14,16,12">
@@ -28,11 +28,11 @@
             <DropShadowEffect
                 BlurRadius="20"
                 ShadowDepth="4"
-                Opacity="0.35"
+                Opacity="0.5"
                 Color="Black" />
         </Border.Effect>
 
-        <Grid>
+        <Grid Background="{DynamicResource WindowBackgroundBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -158,6 +158,14 @@
 
             <!-- Кнопки действий -->
             <StackPanel Grid.Row="4" Margin="0,0,0,10">
+                <ui:Button x:Name="BtnWhitelist"
+                           Appearance="Primary"
+                           Background="#0284C7" BorderBrush="#0369A1" Foreground="White"
+                           Content="{Binding NetAlertBtnWhitelist, Source={StaticResource Loc}}"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                           Padding="10,7" Margin="0,0,0,6"
+                           Click="OnWhitelistClick"
+                           ToolTip="{Binding NetAlertWhitelistTip, Source={StaticResource Loc}}" />
                 <ui:Button x:Name="BtnAllowAlways"
                            Appearance="Primary"
                            Background="#107C41" BorderBrush="#0E6B38" Foreground="White"
