@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -10,7 +11,9 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
+using StartupMonitor.UI.Models;
 using StartupMonitor.UI.Services;
 using StartupMonitor.UI.Views.Dialogs;
 
@@ -26,6 +29,7 @@ public partial class NetworkSecurityHubView : UserControl
     private readonly PipeClient _pipeClient;
     private readonly DispatcherTimer _banTimer;
     private readonly DispatcherTimer _bansRefreshTimer;
+    private readonly DispatcherTimer _liveConnTimer;
 
     private List<FirewallRuleRow> _allRules = new();
     private List<BanRow> _banRows = new();
@@ -37,6 +41,12 @@ public partial class NetworkSecurityHubView : UserControl
     private bool _isLoading;
     private bool _suppressModeEvents;
 
+    private List<LiveConnectionRow> _allConnections = new();
+    private string _connSearchText = string.Empty;
+    private ConnFilter _activeConnFilter = ConnFilter.All;
+    private bool _isLoadingConn;
+    private HashSet<string> _blockedIps = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Фильтр таблицы правил брандмауэра.</summary>
     private enum RuleFilter
     {
@@ -45,6 +55,16 @@ public partial class NetworkSecurityHubView : UserControl
         Outbound,
         Blocking,
         Managed
+    }
+
+    /// <summary>Фильтр таблицы активных соединений (вкладка Live).</summary>
+    private enum ConnFilter
+    {
+        All,
+        Wan,
+        Lan,
+        Established,
+        Listening
     }
 
     /// <summary>
@@ -219,11 +239,25 @@ public partial class NetworkSecurityHubView : UserControl
         _bansRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _bansRefreshTimer.Tick += async (_, _) => await LoadBansAsync(silent: true);
 
-        Loaded += async (_, _) => await RefreshAllAsync();
+        _liveConnTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _liveConnTimer.Tick += async (_, _) => await LoadLiveConnectionsAsync();
+
+        Loaded += async (_, _) =>
+        {
+            await RefreshAllAsync();
+            // Live-соединения: первичная загрузка + автообновление по чекбоксу.
+            try
+            {
+                if (ChkAutoRefreshConn.IsChecked == true && !_liveConnTimer.IsEnabled)
+                    _liveConnTimer.Start();
+            }
+            catch { }
+        };
         Unloaded += (_, _) =>
         {
             _banTimer.Stop();
             _bansRefreshTimer.Stop();
+            _liveConnTimer.Stop();
         };
     }
 
@@ -243,7 +277,8 @@ public partial class NetworkSecurityHubView : UserControl
             await LoadRulesAsync();
             await LoadDefenderAsync();
             await LoadBansAsync(silent: true);
-            SetStatus($"Обновлено в {DateTime.Now:HH:mm:ss} • Правил: {_allRules.Count} • Банов: {_banRows.Count}");
+            await LoadLiveConnectionsAsync();
+            SetStatus($"Обновлено в {DateTime.Now:HH:mm:ss} • Правил: {_allRules.Count} • Банов: {_banRows.Count} • Соединений: {_allConnections.Count}");
             if (!_banTimer.IsEnabled)
                 _banTimer.Start();
             if (!_bansRefreshTimer.IsEnabled)
@@ -971,6 +1006,477 @@ public partial class NetworkSecurityHubView : UserControl
         catch (Exception ex)
         {
             SetStatus($"Ошибка сброса банов: {ex.Message}");
+        }
+    }
+
+    // ===== Активные соединения (Live) =====
+
+    /// <summary>
+    /// Загружает живые соединения через GetProcessNetworkConnectionsAsync(-1),
+    /// обогащает строки GeoIP (внутри LiveConnectionRow) и проставляет
+    /// бейдж брандмауэра по списку заблокированных IP (баны + кэш правил).
+    /// Zero-Crash: любые ошибки уходят в статусную строку.
+    /// </summary>
+    private async Task LoadLiveConnectionsAsync()
+    {
+        if (_isLoadingConn)
+            return;
+        _isLoadingConn = true;
+        try
+        {
+            var sockets = await _pipeClient.GetProcessNetworkConnectionsAsync(-1)
+                ?? new List<ProcessNetworkSocket>();
+
+            var blocked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var bans = await _pipeClient.GetActiveBansAsync() ?? new List<ActiveBanDto>();
+                foreach (var ban in bans)
+                {
+                    var ip = (ban.Ip ?? string.Empty).Trim();
+                    if (!string.IsNullOrWhiteSpace(ip))
+                        blocked.Add(ip);
+                }
+            }
+            catch
+            {
+                // Zero-Crash: баны недоступны — сверяемся только с кэшем правил.
+            }
+
+            // Локальный кэш правил: все RemoteAddresses блокирующих правил.
+            try
+            {
+                foreach (var rule in _allRules)
+                {
+                    if (rule.Action != FirewallAction.Block)
+                        continue;
+                    var raw = rule.RemoteAddresses ?? string.Empty;
+                    foreach (var token in raw.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var addr = token.Trim();
+                        if (string.IsNullOrWhiteSpace(addr)
+                            || addr == "*"
+                            || addr.Equals("Any", StringComparison.OrdinalIgnoreCase))
+                            continue;
+                        blocked.Add(addr);
+                    }
+                }
+            }
+            catch { }
+            _blockedIps = blocked;
+
+            var rows = new List<LiveConnectionRow>(sockets.Count);
+            foreach (var socket in sockets)
+            {
+                if (socket == null)
+                    continue;
+                try
+                {
+                    var remote = (socket.RemoteAddress ?? string.Empty).Trim();
+                    var isBlocked = !string.IsNullOrWhiteSpace(remote)
+                        && (blocked.Contains(remote) || IsIpCoveredByBlockRules(remote));
+                    // GeoIP-обогащение выполняется внутри конструктора
+                    // LiveConnectionRow через GeoIpLookupService.Resolve(...).
+                    rows.Add(new LiveConnectionRow(
+                        socket,
+                        isBlocked ? "🚫 Заблокирован" : "🟢 Разрешено"));
+                }
+                catch
+                {
+                    // Zero-Crash: битый сокет пропускаем.
+                }
+            }
+
+            _allConnections = rows
+                .OrderBy(r => r.ProcessName)
+                .ThenBy(r => r.RemoteAddress)
+                .ToList();
+            ApplyConnFilter();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Не удалось загрузить соединения: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingConn = false;
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, покрыт ли IP блокирующим правилом из локального кэша
+    /// (точное вхождение или подсеть/токен содержит IP).
+    /// </summary>
+    private bool IsIpCoveredByBlockRules(string ip)
+    {
+        try
+        {
+            foreach (var rule in _allRules)
+            {
+                if (rule.Action != FirewallAction.Block)
+                    continue;
+                var raw = rule.RemoteAddresses ?? string.Empty;
+                if (raw.IndexOf(ip, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>Применяет поиск и фильтр WAN/LAN/ESTABLISHED/LISTEN к таблице соединений.</summary>
+    private void ApplyConnFilter()
+    {
+        try
+        {
+            var query = (_connSearchText ?? string.Empty).Trim().ToLowerInvariant();
+            var filtered = _allConnections.Where(r => MatchesConnFilter(r, query)).ToList();
+
+            GridLiveConnections.ItemsSource = filtered;
+            PanelConnEmpty.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            var wan = _allConnections.Count(c => !c.IsPrivate);
+            var procs = _allConnections.Select(c => c.ProcessId).Distinct().Count();
+            TxtConnectionsSummary.Text =
+                $"Соединений: {_allConnections.Count} • WAN: {wan} • Процессов: {procs}";
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка фильтрации соединений: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Предикат фильтрации соединений: тип сети/состояния + поиск по
+    /// ProcessName, ProcessId, RemoteAddress, LocalEndPoint, RemoteEndPoint.
+    /// </summary>
+    private bool MatchesConnFilter(LiveConnectionRow row, string queryLower)
+    {
+        switch (_activeConnFilter)
+        {
+            case ConnFilter.Wan:
+                if (row.IsPrivate)
+                    return false;
+                break;
+            case ConnFilter.Lan:
+                if (!row.IsPrivate)
+                    return false;
+                break;
+            case ConnFilter.Established:
+                if (!string.Equals((row.State ?? string.Empty).Trim(), "ESTABLISHED", StringComparison.OrdinalIgnoreCase))
+                    return false;
+                break;
+            case ConnFilter.Listening:
+                var state = (row.State ?? string.Empty).Trim().ToUpperInvariant();
+                if (state != "LISTENING" && state != "LISTEN" && state != "BOUND")
+                    return false;
+                break;
+        }
+
+        if (string.IsNullOrEmpty(queryLower))
+            return true;
+
+        return (row.ProcessName ?? string.Empty).ToLowerInvariant().Contains(queryLower)
+            || row.ProcessId.ToString().Contains(queryLower, StringComparison.OrdinalIgnoreCase)
+            || (row.RemoteAddress ?? string.Empty).ToLowerInvariant().Contains(queryLower)
+            || (row.LocalEndPoint ?? string.Empty).ToLowerInvariant().Contains(queryLower)
+            || (row.RemoteEndPoint ?? string.Empty).ToLowerInvariant().Contains(queryLower);
+    }
+
+    private void OnConnectionsSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        try
+        {
+            _connSearchText = TxtSearchConnections.Text ?? string.Empty;
+            if (GridLiveConnections != null)
+                ApplyConnFilter();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка поиска соединений: {ex.Message}");
+        }
+    }
+
+    private void OnConnectionsFilterChanged(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (ReferenceEquals(sender, RbConnWan))
+                _activeConnFilter = ConnFilter.Wan;
+            else if (ReferenceEquals(sender, RbConnLan))
+                _activeConnFilter = ConnFilter.Lan;
+            else if (ReferenceEquals(sender, RbConnEstablished))
+                _activeConnFilter = ConnFilter.Established;
+            else if (ReferenceEquals(sender, RbConnListening))
+                _activeConnFilter = ConnFilter.Listening;
+            else
+                _activeConnFilter = ConnFilter.All;
+
+            if (GridLiveConnections != null)
+                ApplyConnFilter();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка переключения фильтра соединений: {ex.Message}");
+        }
+    }
+
+    private async void OnRefreshConnClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SetStatus("Обновление соединений…");
+            await LoadLiveConnectionsAsync();
+            SetStatus($"Загружено соединений: {_allConnections.Count}.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка обновления соединений: {ex.Message}");
+        }
+    }
+
+    private void OnAutoRefreshConnChanged(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_liveConnTimer == null || ChkAutoRefreshConn == null)
+                return;
+            if (ChkAutoRefreshConn.IsChecked == true)
+                _liveConnTimer.Start();
+            else
+                _liveConnTimer.Stop();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка автообновления соединений: {ex.Message}");
+        }
+    }
+
+    /// <summary>Возвращает соединение, выбранное в таблице Live.</summary>
+    private LiveConnectionRow? GetSelectedConnection() =>
+        GridLiveConnections?.SelectedItem as LiveConnectionRow;
+
+    /// <summary>Проверяет, что у строки есть реальный удалённый IP для действий.</summary>
+    private static bool HasUsableRemoteIp(LiveConnectionRow row) =>
+        !string.IsNullOrWhiteSpace(row.RemoteAddress)
+        && row.RemoteAddress != "*"
+        && row.RemoteAddress != "0.0.0.0"
+        && row.RemoteAddress != "::";
+
+    private async void OnCtxBlockRemoteIpClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null)
+            {
+                SetStatus("Выберите соединение для блокировки IP.");
+                return;
+            }
+            if (!HasUsableRemoteIp(selected) || !selected.CanBlockIp)
+            {
+                SetStatus("У выбранного соединения нет публичного удалённого IP (LAN/слушающий сокет).");
+                return;
+            }
+
+            var ip = selected.RemoteAddress.Trim();
+            if (!FirewallGuard.IsBlockableAddress(ip, out var guardError))
+            {
+                SetStatus($"Блокировка запрещена: {guardError}");
+                return;
+            }
+
+            SetStatus($"Блокировка {ip}…");
+            var rule = new FirewallRuleDto
+            {
+                Name = $"StartupMonitor_Block_{ip}",
+                Description = $"Ручная блокировка IP {ip} ({selected.ProcessName}, PID {selected.ProcessId}). Создано из вкладки «Активные соединения».",
+                Direction = FirewallDirection.Both,
+                Action = FirewallAction.Block,
+                Protocol = FirewallProtocol.Any,
+                LocalPorts = string.Empty,
+                RemoteAddresses = ip,
+                Enabled = true,
+                Profiles = FirewallProfile.All,
+                Grouping = "StartupMonitor",
+                IsManaged = true
+            };
+
+            var result = await _pipeClient.CreateOrUpdateFirewallRuleAsync(rule);
+            if (result != null && result.Success)
+            {
+                SetStatus(result.Message);
+                await LoadRulesAsync();
+                await LoadLiveConnectionsAsync();
+            }
+            else
+            {
+                SetStatus(result?.Message ?? $"Не удалось заблокировать {ip}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка блокировки IP: {ex.Message}");
+        }
+    }
+
+    private async void OnCtxCreateRuleForProcessClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null)
+            {
+                SetStatus("Выберите соединение для создания правила.");
+                return;
+            }
+
+            var proto = (selected.Protocol ?? string.Empty).IndexOf("UDP", StringComparison.OrdinalIgnoreCase) >= 0
+                ? FirewallProtocol.Udp
+                : FirewallProtocol.Tcp;
+
+            var dto = new FirewallRuleDto
+            {
+                Name = $"StartupMonitor_{selected.ProcessName}_{selected.RemoteAddress}",
+                Description = $"Правило для {selected.ProcessName} (PID {selected.ProcessId}), удалённый адрес {selected.RemoteEndPoint}. Создано из вкладки «Активные соединения».",
+                Direction = FirewallDirection.Outbound,
+                Action = FirewallAction.Block,
+                Protocol = proto,
+                LocalPorts = string.Empty,
+                RemoteAddresses = selected.CanBlockIp ? selected.RemoteAddress : string.Empty,
+                ApplicationPath = null,
+                Enabled = true,
+                Profiles = FirewallProfile.All,
+                Grouping = "StartupMonitor",
+                IsManaged = true
+            };
+
+            var owner = Window.GetWindow(this);
+            var dialog = new FirewallRuleEditWindow(_pipeClient, dto);
+            if (owner != null)
+                dialog.Owner = owner;
+            if (dialog.ShowDialog() == true)
+                await LoadRulesAsync();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Не удалось открыть редактор правил: {ex.Message}");
+        }
+    }
+
+    private void OnCtxCopyRemoteIpClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null || string.IsNullOrWhiteSpace(selected.RemoteAddress))
+            {
+                SetStatus("Выберите соединение для копирования IP.");
+                return;
+            }
+            Clipboard.SetText(selected.RemoteAddress);
+            SetStatus($"IP {selected.RemoteAddress} скопирован в буфер обмена.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка копирования IP: {ex.Message}");
+        }
+    }
+
+    private void OnCtxCopyEndpointClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null || string.IsNullOrWhiteSpace(selected.RemoteEndPoint))
+            {
+                SetStatus("Выберите соединение для копирования адреса.");
+                return;
+            }
+            Clipboard.SetText(selected.RemoteEndPoint);
+            SetStatus($"Адрес {selected.RemoteEndPoint} скопирован в буфер обмена.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка копирования адреса: {ex.Message}");
+        }
+    }
+
+    private void OnCtxWhoisClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null || !HasUsableRemoteIp(selected))
+            {
+                SetStatus("Выберите соединение с удалённым IP для Whois.");
+                return;
+            }
+            var url = $"https://ipinfo.io/{selected.RemoteAddress.Trim()}";
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Не удалось открыть Whois: {ex.Message}");
+        }
+    }
+
+    private void OnCtxVirusTotalClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null || !HasUsableRemoteIp(selected))
+            {
+                SetStatus("Выберите соединение с удалённым IP для VirusTotal.");
+                return;
+            }
+            var url = $"https://www.virustotal.com/gui/ip-address/{selected.RemoteAddress.Trim()}";
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Не удалось открыть VirusTotal: {ex.Message}");
+        }
+    }
+
+    private async void OnCtxKillProcessClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = GetSelectedConnection();
+            if (selected == null)
+            {
+                SetStatus("Выберите соединение для завершения процесса.");
+                return;
+            }
+
+            var confirm = MessageBox.Show(Window.GetWindow(this),
+                $"Завершить процесс «{selected.ProcessName}» (PID {selected.ProcessId})?",
+                "Подтверждение завершения",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            SetStatus($"Завершение процесса {selected.ProcessName} (PID {selected.ProcessId})…");
+            var result = await _pipeClient.KillProcessAsync(selected.ProcessId, selected.ProcessName);
+            if (result?.Success == true)
+            {
+                SetStatus(string.IsNullOrWhiteSpace(result.Message)
+                    ? $"Процесс {selected.ProcessName} (PID {selected.ProcessId}) завершён."
+                    : result.Message);
+                await LoadLiveConnectionsAsync();
+            }
+            else
+            {
+                SetStatus(result?.Message ?? $"Не удалось завершить процесс {selected.ProcessId}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка завершения процесса: {ex.Message}");
         }
     }
 

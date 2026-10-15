@@ -94,6 +94,173 @@
         <!-- ===== Вкладки ===== -->
         <TabControl Grid.Row="1" x:Name="MainTabs">
 
+            <!-- Вкладка 0: Активные соединения (Live) -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="Globe24" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="Активные соединения (Live)" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Верхняя панель управления -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="3*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <ui:TextBox x:Name="TxtSearchConnections" Grid.Row="0" Grid.Column="0"
+                                    PlaceholderText="Поиск по процессу, PID, IP, порту..."
+                                    TextChanged="OnConnectionsSearchChanged" Margin="0,0,12,6" />
+
+                        <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+                            <RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="Все"
+                                         IsChecked="True" Checked="OnConnectionsFilterChanged"
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="Интернет WAN"
+                                         Checked="OnConnectionsFilterChanged"
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="Локальные LAN"
+                                         Checked="OnConnectionsFilterChanged"
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="Установленные ESTABLISHED"
+                                         Checked="OnConnectionsFilterChanged"
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="Прослушиваемые LISTEN"
+                                         Checked="OnConnectionsFilterChanged"
+                                         VerticalAlignment="Center" />
+                        </WrapPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                    Orientation="Horizontal" VerticalAlignment="Center">
+                            <CheckBox x:Name="ChkAutoRefreshConn" Content="Автообновление (2 сек)"
+                                      IsChecked="True"
+                                      Checked="OnAutoRefreshConnChanged" Unchecked="OnAutoRefreshConnChanged"
+                                      VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="Обновить сейчас"
+                                       Click="OnRefreshConnClick" Margin="0,0,12,0" />
+                            <TextBlock x:Name="TxtConnectionsSummary" Text="Соединений: 0 • WAN: 0 • Процессов: 0"
+                                       FontSize="12"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Таблица живых соединений -->
+                    <Grid Grid.Row="2">
+                        <DataGrid x:Name="GridLiveConnections"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  BorderThickness="1"
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                  RowHeight="34">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem x:Name="CtxBlockRemoteIp" Header="🚫 Заблокировать удаленный IP" Click="OnCtxBlockRemoteIpClick" />
+                                    <MenuItem x:Name="CtxCreateRuleForProcess" Header="🛡️ Создать правило для процесса..." Click="OnCtxCreateRuleForProcessClick" />
+                                    <Separator />
+                                    <MenuItem x:Name="CtxCopyRemoteIp" Header="📋 Копировать удаленный IP" Click="OnCtxCopyRemoteIpClick" />
+                                    <MenuItem x:Name="CtxCopyEndpoint" Header="📋 Копировать адрес и порт" Click="OnCtxCopyEndpointClick" />
+                                    <Separator />
+                                    <MenuItem x:Name="CtxWhois" Header="🌐 Информация об IP (Whois / IPInfo)" Click="OnCtxWhoisClick" />
+                                    <MenuItem x:Name="CtxVirusTotal" Header="🔍 Проверить IP в VirusTotal" Click="OnCtxVirusTotalClick" />
+                                    <Separator />
+                                    <MenuItem x:Name="CtxKillProcess" Header="❌ Завершить процесс (Kill)" Click="OnCtxKillProcessClick" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <!-- Процесс -->
+                                <DataGridTemplateColumn Header="Процесс" Width="1.5*">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding ProcessName}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Pid, StringFormat=' ({0})'}" FontSize="11"
+                                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Протокол -->
+                                <DataGridTextColumn Header="Протокол" Binding="{Binding Protocol}" Width="60" />
+
+                                <!-- Локальный адрес -->
+                                <DataGridTextColumn Header="Локальный адрес" Binding="{Binding LocalEndPoint}" Width="150" />
+
+                                <!-- Удаленный адрес -->
+                                <DataGridTextColumn Header="Удаленный адрес" Binding="{Binding RemoteEndPoint}" Width="160" />
+
+                                <!-- Статус -->
+                                <DataGridTemplateColumn Header="Статус" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Padding="6,2"
+                                                    Background="{Binding StateBadgeBrush}"
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding State}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Сеть / Гео -->
+                                <DataGridTemplateColumn Header="Сеть / Гео" Width="130">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding CountryFlag}" FontSize="12"
+                                                           VerticalAlignment="Center" Margin="0,0,4,0" />
+                                                <TextBlock Text="{Binding CountryText}" FontSize="12"
+                                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Брандмауэр -->
+                                <DataGridTextColumn Header="Брандмауэр" Binding="{Binding FirewallBadge}" Width="110" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <StackPanel x:Name="PanelConnEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                            <ui:SymbolIcon Symbol="Globe24" FontSize="32"
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+                            <TextBlock Text="Активных сетевых соединений не найдено" FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Измените фильтр поиска или обновите список" FontSize="12"
+                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
             <!-- Вкладка 1: Правила брандмауэра -->
             <TabItem Header="Правила брандмауэра">
                 <Grid Margin="0,8,0,0">
