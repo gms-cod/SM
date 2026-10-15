@@ -11,11 +11,17 @@ description: >-
 This skill guides Antigravity (operating with Gemini 3.8 Flash) in acting as the lead architect and delegating implementation, repetitive coding, testing, and documentation to the free subagent.
 
 ## Model Profile
-- **Model ID:** `opencode/muse-spark-1.3-contributor-free`
+- **Model IDs:** `opencode/muse-spark-1.3-contributor-free`, `opencode/deepseek-v4.1-flash-free`
 - **Context Limit:** 1,048,576 tokens (1M tokens)
 - **Cost:** 100% Free (0$ input / 0$ output)
 - **Reasoning Variants:** `minimal`, `low`, `medium`, `high`, `xhigh`
 - **Specialties:** Boilerplate code, Unit tests, Docstrings, File refactoring, AST/Log parsing.
+
+---
+
+## Mandatory Rule: 3+ Subagents Parallel Swarm
+- **Каждый раз при постановке пользователем ЛЮБОЙ задачи** оркестратор ОБЯЗАН декомпозировать её и запустить **не менее 3 субагентов параллельно**.
+- Запрещено выполнять рутину последовательно или вручную.
 
 ---
 
