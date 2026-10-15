@@ -2071,4 +2071,28 @@ Import with overwrite of existing rules?</value>
   <data name="FwSelfBlockGuardTitle" xml:space="preserve">
     <value>Self-block protection</value>
   </data>
+  <data name="NavToolbox" xml:space="preserve">
+    <value>Toolbox</value>
+  </data>
+  <data name="ToolboxTitle" xml:space="preserve">
+    <value>Daily Utility Toolbox</value>
+  </data>
+  <data name="ToolboxSubtitle" xml:space="preserve">
+    <value>Essential lightweight PC tools: File Locksmith, Keep-Awake, Junk Cleaner, Wi-Fi Scanner, Hash &amp; Passwords</value>
+  </data>
+  <data name="ToolboxTabLocksmith" xml:space="preserve">
+    <value>File Locksmith</value>
+  </data>
+  <data name="ToolboxTabAwake" xml:space="preserve">
+    <value>Keep-Awake</value>
+  </data>
+  <data name="ToolboxTabCleaner" xml:space="preserve">
+    <value>Junk Cleaner</value>
+  </data>
+  <data name="ToolboxTabLanScanner" xml:space="preserve">
+    <value>LAN Scanner</value>
+  </data>
+  <data name="ToolboxTabSecurity" xml:space="preserve">
+    <value>Hash &amp; Passwords</value>
+  </data>
 </root>

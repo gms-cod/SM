@@ -171,6 +171,16 @@
                               </StackPanel>
                           </Grid>
                       </Border>
+                      <Border x:Name="NavItem9" Tag="9" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+                          <Grid>
+                              <Rectangle x:Name="NavBar9" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                  <ui:SymbolIcon Symbol="Wrench24" FontSize="16" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                  <TextBlock Text="{Binding NavToolbox, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                              </StackPanel>
+                          </Grid>
+                      </Border>
                  </StackPanel>
 
                 <!-- Настройки и выход -->
@@ -2706,6 +2716,11 @@
         <!-- Страница Центра сетевой безопасности (Сетевой экран) -->
         <Grid Grid.Column="1" x:Name="FirewallPage" Tag="8" Visibility="Collapsed">
             <views:NetworkSecurityHubView x:Name="FirewallHubView" />
+        </Grid>
+
+        <!-- Страница Повседневных инструментов (Toolbox) -->
+        <Grid Grid.Column="1" x:Name="ToolboxPage" Tag="9" Visibility="Collapsed">
+            <views:ToolboxView x:Name="ToolboxMainView" />
         </Grid>
 
             <!-- Оверлей загрузки -->

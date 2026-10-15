@@ -2071,4 +2071,28 @@
   <data name="FwSelfBlockGuardTitle" xml:space="preserve">
     <value>Защита от самоблокировки</value>
   </data>
+  <data name="NavToolbox" xml:space="preserve">
+    <value>Инструменты</value>
+  </data>
+  <data name="ToolboxTitle" xml:space="preserve">
+    <value>Набор повседневных инструментов</value>
+  </data>
+  <data name="ToolboxSubtitle" xml:space="preserve">
+    <value>Полезные системные утилиты: Разблокировщик файлов, Бодрствование, Очистка диска, Сканер Wi-Fi/LAN, Хеши и пароли</value>
+  </data>
+  <data name="ToolboxTabLocksmith" xml:space="preserve">
+    <value>Разблокировщик</value>
+  </data>
+  <data name="ToolboxTabAwake" xml:space="preserve">
+    <value>Бодрствование</value>
+  </data>
+  <data name="ToolboxTabCleaner" xml:space="preserve">
+    <value>Очистка диска</value>
+  </data>
+  <data name="ToolboxTabLanScanner" xml:space="preserve">
+    <value>Сканер сети</value>
+  </data>
+  <data name="ToolboxTabSecurity" xml:space="preserve">
+    <value>Хеши и пароли</value>
+  </data>
 </root>
