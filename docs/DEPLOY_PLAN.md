@@ -1,7 +1,7 @@
 # План развёртывания сайта www/ на VPS
 
-- Версия сайта: 1.2.2 (`www/`, ~204 КБ статики, zero-dependency, секретов нет)
-- Статус: **развёрнуто 2026-10-09** → https://sm.monidom.ru:8443 (релиз `1.2.2-r2`: кнопки привязаны к GitHub Releases)
+- Версия сайта: 1.7.2 (`www/`, ~210 КБ статики, zero-dependency, секретов нет)
+- Статус: **обновлено 2026-10-15 под релиз v1.7.2** (кнопки привязаны к GitHub Releases v1.7.2)
 - Сервер: 2.26.55.66 (Ubuntu 26.04 LTS, доступы: `D:\Nas\Coding\VPS\README.md`)
 - Домен: sm.monidom.ru (A → 2.26.55.66, проверено), TLS: Let's Encrypt до 2027-01-07, renew по таймеру certbot
 - Email для LE: gms@bk.ru

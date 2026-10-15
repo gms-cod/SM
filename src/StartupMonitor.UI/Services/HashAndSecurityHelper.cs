@@ -119,3 +119,4 @@ public static class HashAndSecurityHelper
         return (score, text);
     }
 }
+
