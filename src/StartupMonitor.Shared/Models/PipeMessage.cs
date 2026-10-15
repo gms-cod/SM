@@ -232,6 +232,20 @@ public static class PipeMessageTypes
     public const string GetFirewallFilteringMode = "GetFirewallFilteringMode";
     /// <summary>Ответ с режимом фильтрации брандмауэра.</summary>
     public const string GetFirewallFilteringModeResponse = "GetFirewallFilteringModeResponse";
+    /// <summary>Запрос ожидающих алертов о новых сетевых подключениях программ.</summary>
+    public const string GetPendingNetworkAlerts = "GetPendingNetworkAlerts";
+    /// <summary>Ответ службы со списком ожидающих сетевых алертов.</summary>
+    public const string GetPendingNetworkAlertsResponse = "GetPendingNetworkAlertsResponse";
+    /// <summary>Решение пользователя по сетевому алерту (разрешить/блокировать).</summary>
+    public const string ResolveNetworkAlert = "ResolveNetworkAlert";
+    /// <summary>Ответ на решение по сетевому алерту.</summary>
+    public const string ResolveNetworkAlertResponse = "ResolveNetworkAlertResponse";
+    /// <summary>Включение/выключение детектора новых сетевых подключений.</summary>
+    public const string SetAlertsEnabled = "SetAlertsEnabled";
+    /// <summary>Запрос состояния детектора новых сетевых подключений.</summary>
+    public const string GetAlertsEnabled = "GetAlertsEnabled";
+    /// <summary>Ответ службы с состоянием детектора новых сетевых подключений.</summary>
+    public const string GetAlertsEnabledResponse = "GetAlertsEnabledResponse";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>
@@ -473,4 +487,13 @@ public record ToggleRulePayload(string Name, FirewallDirection Direction, bool E
 
 /// <summary>Полезная нагрузка режима фильтрации брандмауэра.</summary>
 public record FilteringModePayload(FirewallFilteringMode Mode);
+
+/// <summary>Полезная нагрузка ответа со списком ожидающих сетевых алертов.</summary>
+public record NetworkAlertsPayload(List<NetworkConnectionAlertDto> Alerts);
+
+/// <summary>Полезная нагрузка состояния детектора новых сетевых подключений.</summary>
+public record AlertsEnabledPayload(bool Enabled);
+
+/// <summary>Полезная нагрузка ответа на решение по сетевому алерту.</summary>
+public record ResolveNetworkAlertResultPayload(bool Success, string Message);
 

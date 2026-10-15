@@ -1444,6 +1444,145 @@ public class PipeClient : IDisposable
         }
     }
 
+    /// <summary>Отправляет решение пользователя по алерту о новом сетевом подключении.</summary>
+    /// <param name="request">Запрос резолва (AlertId + выбранное решение).</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>True, если служба применила решение.</returns>
+    public async Task<bool> ResolveNetworkAlertAsync(ResolveNetworkAlertRequest request, CancellationToken ct = default)
+    {
+        if (request == null)
+            return false;
+
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ResolveNetworkAlert,
+                Payload = JsonSerializer.Serialize(request, JsonOptions)
+            }, ct);
+
+            if (response == null)
+                return false;
+
+            if (response.Type == PipeMessageTypes.ResolveNetworkAlertResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var result = JsonSerializer.Deserialize<ResolveNetworkAlertResultPayload>(response.Payload, JsonOptions);
+                    return result?.Success ?? false;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            return response.Type == PipeMessageTypes.Success;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Запрашивает у службы список ожидающих сетевых алертов о новых подключениях.</summary>
+    /// <returns>Список <see cref="NetworkConnectionAlertDto"/> (пустой при недоступности службы).</returns>
+    public async Task<List<NetworkConnectionAlertDto>> GetPendingNetworkAlertsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetPendingNetworkAlerts
+            }, ct);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Payload))
+                return new List<NetworkConnectionAlertDto>();
+
+            if (response.Type == PipeMessageTypes.GetPendingNetworkAlertsResponse)
+            {
+                try
+                {
+                    var payload = JsonSerializer.Deserialize<NetworkAlertsPayload>(response.Payload, JsonOptions);
+                    if (payload?.Alerts != null)
+                        return payload.Alerts;
+                }
+                catch { }
+                // Fallback: служба может вернуть голый список алертов.
+                try
+                {
+                    return JsonSerializer.Deserialize<List<NetworkConnectionAlertDto>>(response.Payload, JsonOptions)
+                        ?? new List<NetworkConnectionAlertDto>();
+                }
+                catch { }
+            }
+
+            return new List<NetworkConnectionAlertDto>();
+        }
+        catch
+        {
+            return new List<NetworkConnectionAlertDto>();
+        }
+    }
+
+    /// <summary>Включает/выключает детектор новых сетевых подключений на стороне службы.</summary>
+    /// <param name="enabled">True — интерактивные уведомления включены.</param>
+    /// <returns>True, если служба подтвердила изменение.</returns>
+    public async Task<bool> SetNetworkAlertsEnabledAsync(bool enabled, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetAlertsEnabled,
+                Payload = JsonSerializer.Serialize(new AlertsEnabledPayload(enabled), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Запрашивает текущее состояние детектора новых сетевых подключений.</summary>
+    /// <returns>True — интерактивные уведомления включены; false — выключены/нет данных.</returns>
+    public async Task<bool> GetNetworkAlertsEnabledAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetAlertsEnabled
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.GetAlertsEnabledResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var payload = JsonSerializer.Deserialize<AlertsEnabledPayload>(response.Payload, JsonOptions);
+                    if (payload != null)
+                        return payload.Enabled;
+                }
+                catch { }
+                // Fallback: служба может вернуть голый bool.
+                try
+                {
+                    return JsonSerializer.Deserialize<bool>(response.Payload, JsonOptions);
+                }
+                catch { }
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>Возвращает дату создания/модификации исполняемого файла текущего процесса UI (UTC).</summary>
     private static DateTime? GetLocalProcessDateUtc()
     {

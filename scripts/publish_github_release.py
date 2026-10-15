@@ -32,9 +32,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-DEFAULT_VERSION = "1.5.0"
+DEFAULT_VERSION = "1.6.0"
 DEFAULT_REPOS = ("gms-cod/SM", "gms-cod/Startup-Monitor")
-DEFAULT_RELEASE_NAME_TEMPLATE = "Startup Monitor v{version} \u2014 Live Network Monitor & Security Hub"
+DEFAULT_RELEASE_NAME_TEMPLATE = "Startup Monitor v{version} \u2014 Interactive Firewall & Connection Prompts"
 API_URL = "https://api.github.com"
 USER_AGENT = "StartupMonitor-release-publisher/1.0"
 VERIFY_REPO = "gms-cod/SM"

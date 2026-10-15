@@ -1,0 +1,193 @@
+<Window
+    x:Class="StartupMonitor.UI.Views.Dialogs.NetworkConnectionAlertWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Новое сетевое подключение"
+    Width="400"
+    SizeToContent="Height"
+    MinHeight="200"
+    WindowStyle="None"
+    AllowsTransparency="True"
+    Background="Transparent"
+    Topmost="True"
+    ShowInTaskbar="False"
+    ShowActivated="True"
+    ResizeMode="NoResize"
+    WindowStartupLocation="Manual"
+    Opacity="0">
+
+    <Border
+        Margin="12"
+        CornerRadius="12"
+        Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+        BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        Padding="16,14,16,12">
+        <Border.Effect>
+            <DropShadowEffect
+                BlurRadius="20"
+                ShadowDepth="4"
+                Opacity="0.35"
+                Color="Black" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Заголовок: иконка щита/сети, текст, кнопка закрытия -->
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8"
+                        Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                        Margin="0,0,10,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="Shield24" FontSize="18"
+                                   Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <TextBlock Grid.Column="1" Text="Новое сетевое подключение"
+                           FontSize="14" FontWeight="SemiBold"
+                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                           VerticalAlignment="Center" TextWrapping="Wrap" />
+
+                <ui:Button x:Name="BtnClose" Grid.Column="2"
+                           Appearance="Transparent"
+                           Content="✕"
+                           FontSize="12" FontWeight="Bold"
+                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                           Padding="8,4" Margin="8,0,0,0"
+                           VerticalAlignment="Center"
+                           Click="OnCloseClick"
+                           ToolTip="Закрыть (разрешить на этот сеанс)" />
+            </Grid>
+
+            <!-- Строка процесса: иконка приложения, имя, PID, путь -->
+            <Grid Grid.Row="1" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8"
+                        Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                        Margin="0,0,10,0" VerticalAlignment="Top">
+                    <ui:SymbolIcon Symbol="AppGeneric24" FontSize="18"
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtProcessName" Text="telegram.exe"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                   Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtProcessPid" Text="PID: 1234"
+                                       FontSize="11"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtProcessPath"
+                               Text="C:\Users\User\AppData\Roaming\Telegram Desktop\Telegram.exe"
+                               FontSize="11"
+                               Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               TextWrapping="NoWrap"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Строка адреса: флаг страны, IP:порт, протокол -->
+            <Border Grid.Row="2" Margin="0,0,0,12" Padding="10,8"
+                    CornerRadius="8"
+                    Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="TxtCountryFlag" Grid.Column="0" Text="🌐"
+                               FontSize="20" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtRemoteEndpoint" Text="149.154.167.91:443"
+                                   FontFamily="Consolas, Segoe UI" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock x:Name="TxtCountryName" Text="Интернет"
+                                   FontSize="11"
+                                   Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+                    </StackPanel>
+
+                    <Border Grid.Column="2" CornerRadius="4" Padding="8,3"
+                            Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            VerticalAlignment="Center" Margin="8,0,0,0">
+                        <TextBlock x:Name="TxtProtocol" Text="TCP"
+                                   FontSize="11" FontWeight="Bold"
+                                   Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Таймер обратного отсчета -->
+            <TextBlock x:Name="TxtCountdown" Grid.Row="3"
+                       Text="Автоматическое решение через 15 сек..."
+                       FontSize="11"
+                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+                       Margin="0,0,0,6" />
+
+            <!-- Кнопки действий -->
+            <StackPanel Grid.Row="4" Margin="0,0,0,10">
+                <ui:Button x:Name="BtnAllowAlways"
+                           Appearance="Primary"
+                           Background="#107C41" BorderBrush="#0E6B38" Foreground="White"
+                           Content="🟢 Разрешить всегда"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                           Padding="10,7" Margin="0,0,0,6"
+                           Click="OnAllowAlwaysClick"
+                           ToolTip="Создать разрешающее правило в Windows Firewall" />
+                <ui:Button x:Name="BtnAllowSession"
+                           Appearance="Secondary"
+                           Content="🟡 На этот сеанс"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                           Padding="10,7" Margin="0,0,0,6"
+                           Click="OnAllowSessionClick"
+                           ToolTip="Разрешить без создания правила (до перезапуска)" />
+                <ui:Button x:Name="BtnBlockAlways"
+                           Appearance="Danger"
+                           Content="🔴 Заблокировать"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                           Padding="10,7"
+                           Click="OnBlockAlwaysClick"
+                           ToolTip="Создать блокирующее правило в Windows Firewall" />
+            </StackPanel>
+
+            <!-- Тонкий ProgressBar обратного отсчета -->
+            <ProgressBar x:Name="CountdownBar" Grid.Row="5"
+                         Height="4" Minimum="0" Maximum="15" Value="15"
+                         Background="Transparent"
+                         Foreground="{ui:ThemeResource SystemAccentColorPrimaryBrush}"
+                         BorderThickness="0" />
+        </Grid>
+    </Border>
+</Window>

@@ -96,6 +96,7 @@ try
             services.AddSingleton<BlacklistManager>();
             services.AddSingleton<WindowsFirewallService>();
             services.AddSingleton<ProcessNetworkTracker>();
+            services.AddSingleton<StartupMonitor.Service.Services.Firewall.NetworkConnectionAlertService>();
             services.AddSingleton<ProcessPortDefenderService>();
             services.AddHostedService<AutoUnbanWorker>();
             services.AddSingleton<HashLookupService>();

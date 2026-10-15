@@ -23,6 +23,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Иконка щита -->
@@ -87,6 +88,15 @@
                                      Checked="OnFilteringModeChecked" VerticalAlignment="Center"
                                      Foreground="#D83B01" FontWeight="SemiBold" />
                     </StackPanel>
+                </StackPanel>
+
+                <!-- Тумблер интерактивных уведомлений о неизвестных программах -->
+                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                    <CheckBox x:Name="ChkInteractiveAlerts"
+                              Content="Интерактивные уведомления о неизвестных программах"
+                              Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged"
+                              VerticalAlignment="Center"
+                              ToolTip="Показывать всплывающее окно при новом исходящем подключении неизвестной программы" />
                 </StackPanel>
             </Grid>
         </ui:Card>

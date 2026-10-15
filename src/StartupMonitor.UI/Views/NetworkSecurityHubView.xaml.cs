@@ -30,6 +30,11 @@ public partial class NetworkSecurityHubView : UserControl
     private readonly DispatcherTimer _banTimer;
     private readonly DispatcherTimer _bansRefreshTimer;
     private readonly DispatcherTimer _liveConnTimer;
+    private readonly DispatcherTimer _alertPollerTimer;
+    private bool _alertsEnabled;
+    private bool _suppressAlertsToggle;
+    private bool _alertWindowOpen;
+    private bool _isPollingAlerts;
 
     private List<FirewallRuleRow> _allRules = new();
     private List<BanRow> _banRows = new();
@@ -242,6 +247,9 @@ public partial class NetworkSecurityHubView : UserControl
         _liveConnTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _liveConnTimer.Tick += async (_, _) => await LoadLiveConnectionsAsync();
 
+        _alertPollerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+        _alertPollerTimer.Tick += async (_, _) => await PollNetworkAlertsAsync();
+
         Loaded += async (_, _) =>
         {
             await RefreshAllAsync();
@@ -252,12 +260,19 @@ public partial class NetworkSecurityHubView : UserControl
                     _liveConnTimer.Start();
             }
             catch { }
+            try
+            {
+                if (!_alertPollerTimer.IsEnabled)
+                    _alertPollerTimer.Start();
+            }
+            catch { }
         };
         Unloaded += (_, _) =>
         {
             _banTimer.Stop();
             _bansRefreshTimer.Stop();
             _liveConnTimer.Stop();
+            _alertPollerTimer.Stop();
         };
     }
 
@@ -274,6 +289,7 @@ public partial class NetworkSecurityHubView : UserControl
             SetStatus("Загрузка данных сетевой безопасности…");
             await LoadFirewallStatusAsync();
             await LoadFilteringModeAsync();
+            await LoadAlertsEnabledStateAsync();
             await LoadRulesAsync();
             await LoadDefenderAsync();
             await LoadBansAsync(silent: true);
@@ -283,6 +299,8 @@ public partial class NetworkSecurityHubView : UserControl
                 _banTimer.Start();
             if (!_bansRefreshTimer.IsEnabled)
                 _bansRefreshTimer.Start();
+            if (!_alertPollerTimer.IsEnabled)
+                _alertPollerTimer.Start();
         }
         catch (Exception ex)
         {
@@ -370,6 +388,172 @@ public partial class NetworkSecurityHubView : UserControl
         finally
         {
             _suppressModeEvents = false;
+        }
+    }
+
+    /// <summary>Загружает состояние тумблера интерактивных уведомлений и синхронизирует чекбокс.</summary>
+    private async Task LoadAlertsEnabledStateAsync()
+    {
+        try
+        {
+            _alertsEnabled = await _pipeClient.GetNetworkAlertsEnabledAsync();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Не удалось получить состояние интерактивных уведомлений: {ex.Message}");
+            return;
+        }
+
+        _suppressAlertsToggle = true;
+        try
+        {
+            ChkInteractiveAlerts.IsChecked = _alertsEnabled;
+        }
+        catch { }
+        finally
+        {
+            _suppressAlertsToggle = false;
+        }
+    }
+
+    /// <summary>Обработчик тумблера интерактивных уведомлений: отправляет состояние службе.</summary>
+    private async void OnInteractiveAlertsChanged(object sender, RoutedEventArgs e)
+    {
+        if (_suppressAlertsToggle || _isLoading)
+            return;
+
+        var enabled = ChkInteractiveAlerts.IsChecked == true;
+        try
+        {
+            SetStatus(enabled ? "Включение интерактивных уведомлений…" : "Выключение интерактивных уведомлений…");
+            var ok = await _pipeClient.SetNetworkAlertsEnabledAsync(enabled);
+            if (ok)
+            {
+                _alertsEnabled = enabled;
+                SetStatus(enabled
+                    ? "Интерактивные уведомления включены."
+                    : "Интерактивные уведомления выключены.");
+            }
+            else
+            {
+                // Откатываем чекбокс к фактическому состоянию.
+                _suppressAlertsToggle = true;
+                try { ChkInteractiveAlerts.IsChecked = _alertsEnabled; } catch { }
+                finally { _suppressAlertsToggle = false; }
+                SetStatus("Служба не подтвердила изменение интерактивных уведомлений.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _suppressAlertsToggle = true;
+            try { ChkInteractiveAlerts.IsChecked = _alertsEnabled; } catch { }
+            finally { _suppressAlertsToggle = false; }
+            SetStatus($"Ошибка переключения интерактивных уведомлений: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Фоновый опрос ожидающих сетевых алертов (тик _alertPollerTimer, 2.5 сек).
+    /// Если уведомления включены и есть алерты, а окно ещё не открыто — открывает тост.
+    /// Zero-Crash: любые ошибки подавляются, повторный вход запрещён флагом.
+    /// </summary>
+    private async Task PollNetworkAlertsAsync()
+    {
+        if (_isPollingAlerts)
+            return;
+        _isPollingAlerts = true;
+        try
+        {
+            if (!_alertsEnabled || _alertWindowOpen)
+                return;
+
+            List<NetworkConnectionAlertDto>? alerts = null;
+            try
+            {
+                alerts = await _pipeClient.GetPendingNetworkAlertsAsync();
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!ShouldShowAlertWindow(_alertsEnabled, alerts, _alertWindowOpen))
+                return;
+
+            ShowNetworkAlertWindow(alerts![0]);
+        }
+        catch { }
+        finally
+        {
+            _isPollingAlerts = false;
+        }
+    }
+
+    /// <summary>
+    /// Чистая решающая функция тика поллера (покрыта UI-тестами без WPF-диспетчера):
+    /// окно показывается только если уведомления включены, есть алерты и окно ещё не открыто.
+    /// </summary>
+    public static bool ShouldShowAlertWindow(
+        bool alertsEnabled,
+        IReadOnlyList<NetworkConnectionAlertDto>? alerts,
+        bool windowAlreadyOpen)
+    {
+        if (!alertsEnabled)
+            return false;
+        if (windowAlreadyOpen)
+            return false;
+        if (alerts == null || alerts.Count == 0)
+            return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Формирует <see cref="ResolveNetworkAlertRequest"/> из DTO алерта и решения
+    /// (единая точка маппинга для окна-тоста и UI-тестов).
+    /// </summary>
+    public static ResolveNetworkAlertRequest BuildResolveRequest(
+        NetworkConnectionAlertDto alert,
+        NetworkAlertResolution resolution)
+    {
+        if (alert == null)
+            throw new ArgumentNullException(nameof(alert));
+
+        return new ResolveNetworkAlertRequest
+        {
+            AlertId = alert.AlertId ?? string.Empty,
+            ProcessPath = alert.ProcessPath ?? string.Empty,
+            ProcessName = alert.ProcessName ?? string.Empty,
+            RemoteAddress = alert.RemoteAddress ?? string.Empty,
+            Resolution = resolution
+        };
+    }
+
+    /// <summary>
+    /// Открывает <c>NetworkConnectionAlertWindow</c> для первого ожидающего алерта.
+    /// Окно само позиционируется в правом нижнем углу; флаг _alertWindowOpen
+    /// блокирует дубли до закрытия окна.
+    /// </summary>
+    private void ShowNetworkAlertWindow(NetworkConnectionAlertDto alert)
+    {
+        try
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action<NetworkConnectionAlertDto>(ShowNetworkAlertWindow), alert);
+                return;
+            }
+
+            if (_alertWindowOpen || alert == null)
+                return;
+
+            _alertWindowOpen = true;
+            var window = new NetworkConnectionAlertWindow(alert, _pipeClient);
+            window.Closed += (_, _) => { _alertWindowOpen = false; };
+            window.Show();
+        }
+        catch
+        {
+            _alertWindowOpen = false;
         }
     }
 

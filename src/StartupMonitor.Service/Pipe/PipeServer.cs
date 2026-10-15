@@ -67,6 +67,8 @@ public class PipeServer : BackgroundService
     private readonly WindowsFirewallService _firewallService;
     // Служба Port Defender
     private readonly ProcessPortDefenderService? _portDefenderService;
+    // Детектор новых сетевых подключений программ (сетевые алерты)
+    private readonly NetworkConnectionAlertService? _alertService;
     // Управление жизненным циклом хоста (для штатной остановки по запросу UI)
     private readonly IHostApplicationLifetime _lifetime;
     // Токен отмены для фоновых задач
@@ -141,6 +143,8 @@ public class PipeServer : BackgroundService
         _updateService = updateService;
         _firewallService = firewallService ?? throw new ArgumentNullException(nameof(firewallService));
         _portDefenderService = serviceProvider.GetService<ProcessPortDefenderService>();
+        _alertService = serviceProvider.GetService<NetworkConnectionAlertService>();
+        try { _alertService?.StartBackgroundScan(); } catch { }
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
 
         if (cfg?.Entries != null)
@@ -1689,6 +1693,105 @@ public class PipeServer : BackgroundService
                     {
                         response.Type = PipeMessageTypes.FirewallOperationResponse;
                         response.Payload = JsonSerializer.Serialize(FirewallOperationResult.Fail(ex.Message), JsonOptions);
+                    }
+                    break;
+
+                case PipeMessageTypes.GetPendingNetworkAlerts:
+                    try
+                    {
+                        if (_alertService == null)
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Служба сетевых алертов недоступна.";
+                            break;
+                        }
+
+                        _alertService.ScanNewConnections();
+                        var alerts = _alertService.GetPendingAlerts();
+                        response.Type = PipeMessageTypes.GetPendingNetworkAlertsResponse;
+                        response.Payload = JsonSerializer.Serialize(new NetworkAlertsPayload(alerts), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.ResolveNetworkAlert:
+                    try
+                    {
+                        if (_alertService == null)
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Служба сетевых алертов недоступна.";
+                            break;
+                        }
+
+                        var resolveReq = JsonSerializer.Deserialize<ResolveNetworkAlertRequest>(message.Payload, JsonOptions);
+                        if (resolveReq == null || string.IsNullOrWhiteSpace(resolveReq.AlertId))
+                        {
+                            response.Type = PipeMessageTypes.ResolveNetworkAlertResponse;
+                            response.Payload = JsonSerializer.Serialize(new ResolveNetworkAlertResultPayload(false, "Некорректный запрос резолва алерта."), JsonOptions);
+                            break;
+                        }
+
+                        var resolved = _alertService.ResolveAlert(resolveReq);
+                        response.Type = PipeMessageTypes.ResolveNetworkAlertResponse;
+                        response.Payload = JsonSerializer.Serialize(
+                            new ResolveNetworkAlertResultPayload(resolved, resolved ? "Решение применено." : "Алерт не найден."),
+                            JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.SetAlertsEnabled:
+                    try
+                    {
+                        if (_alertService == null)
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Служба сетевых алертов недоступна.";
+                            break;
+                        }
+
+                        bool enabled = _alertService.AlertsEnabled;
+                        try
+                        {
+                            var payload = JsonSerializer.Deserialize<AlertsEnabledPayload>(message.Payload, JsonOptions);
+                            if (payload != null)
+                                enabled = payload.Enabled;
+                            else if (bool.TryParse((message.Payload ?? "").Trim().Trim('"'), out var b))
+                                enabled = b;
+                        }
+                        catch { }
+
+                        _alertService.SetAlertsEnabled(enabled);
+                        _logger.LogInformation("Детектор сетевых алертов: AlertsEnabled={Value}", enabled);
+                        response.Type = PipeMessageTypes.Success;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.GetAlertsEnabled:
+                    try
+                    {
+                        var isEnabled = _alertService?.AlertsEnabled ?? false;
+                        response.Type = PipeMessageTypes.GetAlertsEnabledResponse;
+                        response.Payload = JsonSerializer.Serialize(new AlertsEnabledPayload(isEnabled), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
                     }
                     break;
 
