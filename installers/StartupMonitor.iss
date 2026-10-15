@@ -3,7 +3,7 @@
 ; =====================================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.7.2"
+  #define MyAppVersion "1.7.3"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -37,6 +37,7 @@ PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=commandline
 CloseApplications=yes
 CloseApplicationsFilter=StartupMonitor*.exe
+UsedUserAreasWarning=no
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -56,6 +57,21 @@ Source: "..\SMon2\icon.svg"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
 Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
+
+[Registry]
+; Автозапуск UI через системный реестр Run (параметр --minimized), без ярлыков в меню Пуск
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "StartupMonitor.UI"; ValueData: """{app}\{#MyAppExeName}"" --minimized"; Tasks: autostart; Flags: uninsdeletevalue
+
+[InstallDelete]
+; Гарантированное удаление устаревших ярлыков из папки автозагрузки меню «Пуск»
+Type: files; Name: "{autostartup}\{#MyAppName}.lnk"
+Type: files; Name: "{userstartup}\{#MyAppName}.lnk"
+Type: files; Name: "{commonstartup}\{#MyAppName}.lnk"
+
+[UninstallDelete]
+Type: files; Name: "{autostartup}\{#MyAppName}.lnk"
+Type: files; Name: "{userstartup}\{#MyAppName}.lnk"
+Type: files; Name: "{commonstartup}\{#MyAppName}.lnk"
 
 [Run]
 ; Создание или обновление службы Windows

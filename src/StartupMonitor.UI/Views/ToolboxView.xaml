@@ -275,7 +275,7 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="Network24" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <ui:SymbolIcon Symbol="NetworkCheck24" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
                         <TextBlock Text="{Binding ToolboxTabLanScanner, Source={StaticResource Loc}}" VerticalAlignment="Center" />
                     </StackPanel>
                 </TabItem.Header>
@@ -442,10 +442,10 @@
                                 </StackPanel>
 
                                 <!-- Длина пароля -->
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="SpaceBetween">
-                                    <TextBlock Text="Длина пароля:" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock x:Name="TxtPasswordLengthVal" Text="16 символов" FontSize="12" FontWeight="SemiBold" />
-                                </StackPanel>
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock HorizontalAlignment="Left" Text="Длина пароля:" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock HorizontalAlignment="Right" x:Name="TxtPasswordLengthVal" Text="16 символов" FontSize="12" FontWeight="SemiBold" />
+                                </Grid>
                                 <Slider x:Name="SliderPasswordLength" Minimum="8" Maximum="64" Value="16" SmallChange="1"
                                         ValueChanged="OnPasswordLengthChanged" />
 

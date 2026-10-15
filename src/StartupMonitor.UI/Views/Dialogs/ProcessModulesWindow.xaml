@@ -237,7 +237,7 @@
                                 <Separator />
                                 <MenuItem Header="{Binding PmCtxCheckKaspersky, Source={StaticResource Loc}}" Click="OnCheckKasperskyClick">
                                     <MenuItem.Icon>
-                                        <ui:SymbolIcon Symbol="ShieldSearch24" Foreground="#107C41" FontSize="16" />
+                                        <ui:SymbolIcon Symbol="ShieldCheckmark24" Foreground="#107C41" FontSize="16" />
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <MenuItem Header="{Binding PmCtxCheckVirusTotal, Source={StaticResource Loc}}" Click="OnCheckVirusTotalClick">
@@ -251,7 +251,7 @@
 
                     <!-- Заглушка, если ничего не найдено -->
                     <StackPanel x:Name="PanelEmptyModules" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
-                        <ui:SymbolIcon Symbol="CubeOff24" FontSize="48" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                        <ui:SymbolIcon Symbol="DocumentDismiss24" FontSize="48" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,12" />
                         <TextBlock Text="{Binding PmEmptyModules, Source={StaticResource Loc}}" FontSize="15" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
                     </StackPanel>
                 </Grid>
