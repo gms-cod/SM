@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using StartupMonitor.Service.Services.Runtime;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
 
@@ -72,8 +73,19 @@ public sealed class NetworkConnectionAlertService : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly object _scanLock = new();
-    private Timer? _pollTimer;
     private bool _disposed;
+
+    // ── Фоновый цикл в режиме 0% CPU Idle ──
+    // Пока окно «Сетевая безопасность» закрыто (нет активных UI-клиентов),
+    // цикл спит неограниченно долго и не выполняет ни сокет-таблицу, ни COM-перебор правил.
+    private readonly ActivityGate _wake = new();
+    private CancellationTokenSource? _cts;
+    private Task? _loop;
+    private TimeSpan _due = TimeSpan.FromSeconds(5);
+    private TimeSpan _period = TimeSpan.FromSeconds(5);
+
+    /// <summary>Открыто ли окно мониторинга сети у активного UI-клиента.</summary>
+    private volatile bool _monitorWindowActive;
 
     /// <summary>Включён ли детектор (переключается через Pipe: SetAlertsEnabled).</summary>
     public bool AlertsEnabled { get; private set; } = true;
@@ -95,24 +107,56 @@ public sealed class NetworkConnectionAlertService : IDisposable
         _firewall = firewall ?? throw new ArgumentNullException(nameof(firewall));
     }
 
-    /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).</summary>
+    /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).
+    /// Пока окно мониторинга закрыто — цикл находится в глубоком сне (0% CPU).</summary>
     public void StartBackgroundScan(TimeSpan? dueTime = null, TimeSpan? period = null)
     {
         StopBackgroundScan();
-        _pollTimer = new Timer(
-            _ => { try { ScanNewConnections(); } catch { } },
-            null,
-            dueTime ?? TimeSpan.FromSeconds(5),
-            period ?? TimeSpan.FromSeconds(5));
+        _due = dueTime ?? TimeSpan.FromSeconds(5);
+        _period = period ?? TimeSpan.FromSeconds(5);
+        _cts = new CancellationTokenSource();
+        _loop = RunAsync(_cts.Token);
     }
 
-    /// <summary>Останавливает фоновый опрос.</summary>
+    /// <summary>Останавливает фоновый опрос (полная остановка цикла).</summary>
     public void StopBackgroundScan()
     {
-        var timer = Interlocked.Exchange(ref _pollTimer, null);
-        try { timer?.Dispose(); }
-        catch { }
+        var cts = _cts;
+        _cts = null;
+        _loop = null;
+        if (cts == null) return;
+        try { cts.Cancel(); } catch { }
+        cts.Dispose();
     }
+
+    /// <summary>
+    /// Открытие/закрытие окна мониторинга сети активным UI-клиентом. Закрытие
+    /// усыпляет фоновый скан (полная остановка без периодического опроса).
+    /// </summary>
+    public void SetMonitorWindowActive(bool active)
+    {
+        if (_monitorWindowActive == active) return;
+        _monitorWindowActive = active;
+        _wake.Pulse();
+    }
+
+    /// <summary>
+    /// Фоновый цикл: скан выполняется только при включённых алертах и открытом окне.
+    /// При закрытом окне — глубокий сон до <see cref="SetMonitorWindowActive"/>.
+    /// </summary>
+    private Task RunAsync(CancellationToken ct)
+        => SleepAwareLoop.RunAsync(
+            _wake,
+            hasWork: () => AlertsEnabled && _monitorWindowActive,
+            activeInterval: _period,
+            idleInterval: Timeout.InfiniteTimeSpan, // 0% CPU: сон до события/отмены
+            body: _ =>
+            {
+                try { ScanNewConnections(); }
+                catch { /* скан логирует сам */ }
+                return Task.CompletedTask;
+            },
+            ct);
 
     /// <summary>Освобождает таймер фонового опроса.</summary>
     public void Dispose()
@@ -120,6 +164,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
         if (_disposed) return;
         _disposed = true;
         StopBackgroundScan();
+        _wake.Dispose();
     }
 
     /// <summary>Включает/выключает детектор. Выключение сбрасывает очередь ожидающих алертов.</summary>
@@ -128,6 +173,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
         AlertsEnabled = enabled;
         if (!enabled)
             ClearPending();
+        _wake.Pulse();
     }
 
     /// <summary>Очищает очередь ожидающих алертов (сессионные решения сохраняются).</summary>

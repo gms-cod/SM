@@ -28,6 +28,8 @@ public partial class ToolboxView : UserControl
 
     private CancellationTokenSource? _lanScanCts;
     private CancellationTokenSource? _junkCts;
+    private CancellationTokenSource? _locksmithCts;
+    private CancellationTokenSource? _hashCts;
 
     /// <summary>Дизайнерский конструктор.</summary>
     public ToolboxView() : this(new PipeClient()) { }
@@ -52,11 +54,13 @@ public partial class ToolboxView : UserControl
         await RefreshAwakeStatusAsync();
     }
 
-    /// <summary>Деактивация при уходе с вкладки: отмена длительных операций.</summary>
+    /// <summary>Деактивация при уходе с вкладки: гарантированная отмена всех операций Toolbox.</summary>
     public void Deactivate()
     {
         _lanScanCts?.Cancel();
         _junkCts?.Cancel();
+        _locksmithCts?.Cancel();
+        _hashCts?.Cancel();
     }
 
     #region 1. File Locksmith
@@ -93,9 +97,15 @@ public partial class ToolboxView : UserControl
         TxtLocksmithDetails.Text = "Поиск блокирующих процессов...";
         _lockingProcesses.Clear();
 
+        _locksmithCts?.Cancel();
+        _locksmithCts = new CancellationTokenSource();
+        var token = _locksmithCts.Token;
+
         try
         {
-            var result = await _pipeClient.FindFileLockingProcessesAsync(path);
+            var result = await _pipeClient.FindFileLockingProcessesAsync(path, token);
+            if (token.IsCancellationRequested) return;
+
             if (!string.IsNullOrEmpty(result.ErrorMessage))
             {
                 TxtLocksmithDetails.Text = $"Ошибка: {result.ErrorMessage}";
@@ -117,6 +127,10 @@ public partial class ToolboxView : UserControl
                 TxtLocksmithDetails.Text = $"Обнаружено процессов: {result.LockingProcesses.Count}";
                 SetLockBadge($"Заблокирован ({result.LockingProcesses.Count})", false);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            TxtLocksmithDetails.Text = "Поиск отменен (уход с вкладки).";
         }
         catch (Exception ex)
         {
@@ -269,7 +283,9 @@ public partial class ToolboxView : UserControl
         {
             _junkCts?.Cancel();
             _junkCts = new CancellationTokenSource();
-            var result = await _pipeClient.ScanJunkFilesAsync(_junkCts.Token);
+            var token = _junkCts.Token;
+            var result = await _pipeClient.ScanJunkFilesAsync(token);
+            if (token.IsCancellationRequested) return;
 
             foreach (var cat in result.Categories)
             {
@@ -314,7 +330,9 @@ public partial class ToolboxView : UserControl
         {
             _junkCts?.Cancel();
             _junkCts = new CancellationTokenSource();
-            var result = await _pipeClient.CleanJunkFilesAsync(selected, _junkCts.Token);
+            var token = _junkCts.Token;
+            var result = await _pipeClient.CleanJunkFilesAsync(selected, token);
+            if (token.IsCancellationRequested) return;
 
             TxtCleanerResultStatus.Text = $"Очистка завершена! Освобождено: {FormatBytes(result.FreedSizeBytes)}, удалено файлов: {result.DeletedFilesCount:N0} (пропущено заблокированных: {result.ErrorsCount}).";
             // Автоматически обновляем сканирование
@@ -401,17 +419,28 @@ public partial class ToolboxView : UserControl
         TxtHashSha1.Text = "Вычисление...";
         TxtHashMd5.Text = "Вычисление...";
 
+        _hashCts?.Cancel();
+        _hashCts = new CancellationTokenSource();
+        var token = _hashCts.Token;
+
         try
         {
-            var sha256 = await Task.Run(() => HashAndSecurityHelper.ComputeFileSha256(path));
-            var sha1 = await Task.Run(() => HashAndSecurityHelper.ComputeFileSha1(path));
-            var md5 = await Task.Run(() => HashAndSecurityHelper.ComputeFileMd5(path));
+            // Все три контрольные суммы считаются параллельно на всех ядрах процессора
+            // за один проход по файлу (одно чтение с диска).
+            var hashes = await HashAndSecurityHelper.ComputeAllHashesAsync(path, token);
+            if (token.IsCancellationRequested) return;
 
-            TxtHashSha256.Text = sha256;
-            TxtHashSha1.Text = sha1;
-            TxtHashMd5.Text = md5;
+            TxtHashSha256.Text = hashes.Sha256;
+            TxtHashSha1.Text = hashes.Sha1;
+            TxtHashMd5.Text = hashes.Md5;
 
             ValidateHashMatch();
+        }
+        catch (OperationCanceledException)
+        {
+            TxtHashSha256.Text = "Отменено";
+            TxtHashSha1.Text = "Отменено";
+            TxtHashMd5.Text = "Отменено";
         }
         catch (Exception ex)
         {

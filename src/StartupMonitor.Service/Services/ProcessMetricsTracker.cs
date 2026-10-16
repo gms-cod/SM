@@ -40,6 +40,10 @@ public class ProcessMetricsTracker : IDisposable
     // Кэш сопоставления PID со службами Windows (обновляется раз в 4 секунды)
     private Dictionary<int, List<string>> _servicePidMap = new();
     private DateTime _lastServicePoll = DateTime.MinValue;
+    // Кэш снимка Toolhelp32 (Parent PID + ThreadCount): снимок тяжёлый (~4 мс),
+    // поэтому обновляем его раз в 5 секунд атомарной подменой ссылки.
+    private Dictionary<int, ProcessStartupLinker.ProcessSnapshotEntry> _processSnapshotMap = new();
+    private DateTime _lastProcessSnapshot = DateTime.MinValue;
     // PID процессов, для которых TotalProcessorTime/StartTime недоступны
     // (системные/PPL процессы, бросающие Win32Exception Access Denied) —
     // не вызываем эти свойства повторно до завершения процесса.
@@ -160,8 +164,15 @@ public class ProcessMetricsTracker : IDisposable
         var (netMap, totalNet, socketCounts) = _networkTracker.CaptureNetworkBandwidth();
         snapshot.TotalNetworkBytesPerSec = totalNet;
 
-        // Карта снимка процессов (Parent PID + ThreadCount) через CreateToolhelp32Snapshot
-        var snapshotMap = ProcessStartupLinker.GetProcessSnapshotMap();
+        // Карта снимка процессов (Parent PID + ThreadCount) через CreateToolhelp32Snapshot.
+        // Тяжёлый вызов (~4 мс, до 41% времени сбора) кэшируется на 5 секунд:
+        // Parent PID и число потоков меняются редко, поэтому свежести раз в 5 с достаточно.
+        if ((now - _lastProcessSnapshot).TotalSeconds > 5.0 || _processSnapshotMap.Count == 0)
+        {
+            _processSnapshotMap = ProcessStartupLinker.GetProcessSnapshotMap();
+            _lastProcessSnapshot = now;
+        }
+        var snapshotMap = _processSnapshotMap;
 
         // 5. Параллельный сбор метрик по ядрам процессора
         Parallel.ForEach(rawProcesses, _parallelOptions, proc =>
@@ -464,6 +475,7 @@ public class ProcessMetricsTracker : IDisposable
     public void Dispose()
     {
         _pollTimer.Dispose();
+        _networkTracker.Dispose();
     }
 }
 

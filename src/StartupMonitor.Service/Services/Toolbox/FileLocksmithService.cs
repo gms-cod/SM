@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using StartupMonitor.Shared.Models.Toolbox;
 using StartupMonitor.Service.Services;
 
@@ -82,8 +84,9 @@ public class FileLocksmithService
     /// <summary>
     /// Находит процессы, удерживающие блокировку файла или папки.
     /// </summary>
-    public FileLockResultDto FindLockingProcesses(string targetPath)
+    public FileLockResultDto FindLockingProcesses(string targetPath, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         var result = new FileLockResultDto { TargetPath = targetPath };
 
         if (string.IsNullOrWhiteSpace(targetPath) || (!File.Exists(targetPath) && !Directory.Exists(targetPath)))
@@ -125,11 +128,17 @@ public class FileLocksmithService
                 res = RmGetList(sessionHandle, out pnProcInfoNeeded, ref pnProcInfo, processInfo, ref rebootReasons);
                 if (res == ERROR_SUCCESS)
                 {
-                    for (int i = 0; i < pnProcInfo; i++)
+                    // Обогащение PID метаданными выполняется параллельно на всех ядрах.
+                    // Индексная запись в массив сохраняет исходный порядок процессов.
+                    var enriched = new FileLockProcessInfo?[pnProcInfo];
+
+                    Parallel.For(0, (int)pnProcInfo, new ParallelOptions { CancellationToken = ct }, i =>
                     {
                         var info = processInfo[i];
                         int pid = info.Process.dwProcessId;
-                        if (pid <= 0) continue;
+                        if (pid <= 0) return;
+
+                        ct.ThrowIfCancellationRequested();
 
                         string procName = info.strAppName;
                         string procPath = string.Empty;
@@ -145,13 +154,19 @@ public class FileLocksmithService
                         }
                         catch { }
 
-                        result.LockingProcesses.Add(new FileLockProcessInfo
+                        enriched[i] = new FileLockProcessInfo
                         {
                             ProcessId = pid,
                             ProcessName = string.IsNullOrEmpty(procName) ? $"PID {pid}" : procName,
                             ProcessPath = procPath,
                             ApplicationType = info.ApplicationType.ToString()
-                        });
+                        };
+                    });
+
+                    foreach (var processInfoItem in enriched)
+                    {
+                        if (processInfoItem is not null)
+                            result.LockingProcesses.Add(processInfoItem);
                     }
 
                     result.IsLocked = result.LockingProcesses.Count > 0;
@@ -166,6 +181,10 @@ public class FileLocksmithService
                 result.ErrorMessage = $"Ошибка получения списка блокирующих процессов (код {res}).";
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             result.ErrorMessage = ex.Message;
@@ -177,5 +196,12 @@ public class FileLocksmithService
 
         return result;
     }
+
+    /// <summary>
+    /// Асинхронная версия <see cref="FindLockingProcesses"/> с поддержкой отмены.
+    /// Позволяет прервать операцию при уходе пользователя с вкладки Toolbox.
+    /// </summary>
+    public Task<FileLockResultDto> FindLockingProcessesAsync(string targetPath, CancellationToken ct = default)
+        => Task.Run(() => FindLockingProcesses(targetPath, ct), ct);
 }
 

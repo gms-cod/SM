@@ -1,10 +1,14 @@
+using System.Collections.Concurrent;
 using System.Management;
+using System.Threading.Channels;
 using System.Xml.Linq;
 using Microsoft.Win32;
 using Microsoft.Win32.TaskScheduler;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Service.Services.Wmi;
+// TaskScheduler приносит собственный тип Task — уточняем, что Task в этом файле — из System.Threading.Tasks
+using Task = System.Threading.Tasks.Task;
 
 namespace StartupMonitor.Service.Services;
 
@@ -57,14 +61,60 @@ public class SystemScannerService
         @"SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Image File Execution Options",
     ];
 
-    /// <summary>Выполняет полное сканирование точек автозапуска. Возвращает снимок системы.</summary>
+    /// <summary>Выполняет полное сканирование точек автозапуска (синхронная обёртка над
+    /// параллельным конвейером <see cref="ScanAllAsync"/>). Возвращает снимок системы.</summary>
     /// <param name="logger">Логгер</param>
     /// <param name="skipRegistry">Пропустить сканирование реестра (при высокой загрузке CPU)</param>
     public List<StartupEntry> ScanAll(Microsoft.Extensions.Logging.ILogger? logger = null, bool skipRegistry = false)
+        => ScanAllAsync(logger, skipRegistry).ConfigureAwait(false).GetAwaiter().GetResult();
+
+    /// <summary>Полное сканирование точек автозапуска через параллельный конвейер
+    /// производитель-потребитель на <see cref="Channel{T}"/>. Быстрые I/O-производители
+    /// (реестр HKLM/HKCU/HKEY_USERS, папки, COM/WMI/AppX) кладут «сырые» записи в
+    /// bounded-канал, а N потребителей (по числу ядер CPU) параллельно выполняют
+    /// <see cref="EntryOperations.ResolveAndEnrichEntry"/> (подпись, PE, язык, хеш).</summary>
+    /// <param name="logger">Логгер</param>
+    /// <param name="skipRegistry">Пропустить сканирование реестра (при высокой загрузке CPU)</param>
+    /// <param name="cancellationToken">Токен отмены сканирования</param>
+    public async Task<List<StartupEntry>> ScanAllAsync(
+        Microsoft.Extensions.Logging.ILogger? logger = null,
+        bool skipRegistry = false,
+        CancellationToken cancellationToken = default)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanAll");
-        var results = new List<StartupEntry>();
         _failedLocations.Clear();
+
+        var dop = Math.Clamp(Environment.ProcessorCount, 2, 16);
+
+        // Bounded-канал обеспечивает backpressure: производители ждут, если потребители
+        // не успевают, что удерживает потребление памяти в пределах dop*8 записей.
+        var channel = Channel.CreateBounded<StartupEntry>(new BoundedChannelOptions(dop * 8)
+        {
+            SingleReader = false,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait
+        });
+
+        // Потокобезопасный накопитель результата (List<T> не потокобезопасен).
+        var collected = new ConcurrentBag<StartupEntry>();
+
+        // ── Потребители: N воркеров по числу ядер — тяжёлая CPU/kernel-валидация ──
+        var consumers = new Task[dop];
+        for (var i = 0; i < dop; i++)
+        {
+            consumers[i] = Task.Run(async () =>
+            {
+                await foreach (var entry in channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    try { EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false); }
+                    catch { /* одна битая запись не должна ронять воркер */ }
+                    collected.Add(entry);
+                }
+            }, cancellationToken);
+        }
+
+        // ── Производители: быстрый I/O-поиск сырых записей (без обогащения) ──
+        var producers = new List<Task>();
 
         if (skipRegistry)
         {
@@ -85,35 +135,35 @@ public class SystemScannerService
         }
         else
         {
-            var beforeReg = results.Count;
-            ScanRegistry(results);
-            logger?.LogDebug("Scanner: реестр (Run/..) — найдено {Count}", results.Count - beforeReg);
-
-            var beforeOther = results.Count;
-            ScanOtherLocations(results);
-            logger?.LogDebug("Scanner: остальные точки реестра — найдено {Count}", results.Count - beforeOther);
+            // Реестр HKLM/HKCU/HKEY_USERS — параллельно (независимые кусты), см. ScanRegistryAsync.
+            producers.Add(ScanRegistryAsync(channel.Writer, cancellationToken));
+            producers.Add(Task.Run(() => ScanOtherLocationsProducer(channel.Writer, cancellationToken), cancellationToken));
         }
 
-        var beforeFolders = results.Count;
-        ScanStartupFolders(results);
-        logger?.LogDebug("Scanner: папки автозапуска — найдено {Count}", results.Count - beforeFolders);
+        producers.Add(Task.Run(() => ScanStartupFoldersProducer(channel.Writer, cancellationToken), cancellationToken));
 
-        var beforeServices = results.Count;
-        ScanServices(results);
-        logger?.LogDebug("Scanner: службы — найдено {Count}", results.Count - beforeServices);
+        // COM (планировщик задач) и WMI не потокобезопасны и плохо масштабируются —
+        // держим их в одной сериализованной producer-группе, параллельной остальным.
+        producers.Add(Task.Run(() =>
+        {
+            ScanServicesProducer(channel.Writer, logger, cancellationToken);
+            ScanWmiSubscriptionsProducer(channel.Writer, logger, cancellationToken);
+            ScanTaskSchedulerProducer(channel.Writer, logger, cancellationToken);
+            ScanAppxStartupTasksProducer(channel.Writer, logger, cancellationToken);
+        }, cancellationToken));
 
-        var beforeWmi = results.Count;
-        ScanWmiSubscriptions(results);
-        logger?.LogDebug("Scanner: WMI-подписки — найдено {Count}", results.Count - beforeWmi);
+        try
+        {
+            await Task.WhenAll(producers).ConfigureAwait(false); // все производители завершились…
+        }
+        finally
+        {
+            channel.Writer.TryComplete(); // …закрываем канал
+        }
 
-        var beforeTasks = results.Count;
-        ScanTaskScheduler(results);
-        logger?.LogDebug("Scanner: планировщик задач — найдено {Count}", results.Count - beforeTasks);
+        await Task.WhenAll(consumers).ConfigureAwait(false); // дожидаемся дренажа канала
 
-        var beforeAppx = results.Count;
-        ScanAppxStartupTasks(results, logger);
-        logger?.LogDebug("Scanner: AppX StartupTask — найдено {Count}", results.Count - beforeAppx);
-
+        var results = collected.ToList();
         logger?.LogInformation("Scanner: всего просканировано {Total} записей", results.Count);
 
         if (logger != null && results.Count > 0)
@@ -150,41 +200,68 @@ public class SystemScannerService
         return results;
     }
 
+    /// <summary>Синхронная запись сырой записи в канал конвейера. Блокируется только при
+    /// backpressure (канал заполнен), что безопасно: каждый производитель выполняется
+    /// на выделенном потоке, а потребители дренируют канал параллельно.</summary>
+    private static void WriteEntry(ChannelWriter<StartupEntry> sink, StartupEntry entry)
+        => sink.WriteAsync(entry).AsTask().GetAwaiter().GetResult();
+
     /// <summary>Возвращает префикс куста реестра для отображения.</summary>
     private static string GetHivePrefix(RegistryHive hive) =>
         hive == RegistryHive.LocalMachine ? "HKLM" : "HKCU";
 
     // ───────── Registry (Run, RunOnce, RunServices, Policies) ─────────
 
-    /// <summary>Сканирует стандартные точки реестра (HKLM + HKCU + все пользовательские кусты).</summary>
-    private static void ScanRegistry(List<StartupEntry> results)
+    /// <summary>Производитель: стандартные точки реестра (HKLM/HKCU/все пользовательские кусты)
+    /// сканируются параллельно через <see cref="Parallel.ForEachAsync"/> — кусты независимы.</summary>
+    private async Task ScanRegistryAsync(ChannelWriter<StartupEntry> sink, CancellationToken ct)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanRegistry");
-        ScanHiveRegistry(Registry.LocalMachine, "HKLM", allowWow64: true, results);
-        ScanHiveRegistry(Registry.CurrentUser, "HKCU", allowWow64: false, results);
-        foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
+        // Снимок профилей — один раз на весь скан (исключает N+1 трансляций SID→имя).
+        var profiles = WatcherHelper.GetUserProfiles();
+        var opts = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 2, 8),
+            CancellationToken = ct
+        };
+
+        var hives = new (RegistryKey Base, string Prefix, bool AllowWow64)[]
+        {
+            (Registry.LocalMachine, "HKLM", true),
+            (Registry.CurrentUser, "HKCU", false),
+        };
+
+        await Parallel.ForEachAsync(hives, opts, async (h, token) =>
+        {
+            await ScanHiveRegistryAsync(h.Base, h.Prefix, h.AllowWow64, sink, token).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+
+        // Все загруженные пользовательские кусты HKEY_USERS\<SID> — параллельно.
+        await Parallel.ForEachAsync(profiles, opts, async (p, token) =>
         {
             try
             {
-                using var userKey = Registry.Users.OpenSubKey(sid);
-                if (userKey == null) continue;
-                ScanHiveRegistry(userKey, $@"HKCU\{name}", allowWow64: false, results);
+                using var userKey = Registry.Users.OpenSubKey(p.Sid);
+                if (userKey == null) return;
+                await ScanHiveRegistryAsync(userKey, $@"HKCU\{p.Name}", allowWow64: false, sink, token)
+                    .ConfigureAwait(false);
             }
             catch
             {
                 // Чужой SID с приватным ACL или выгрузка куста при logoff (TOCTOU) —
                 // пропускаем профиль, не роняя весь ScanAll
-                continue;
             }
-        }
+        }).ConfigureAwait(false);
     }
 
-    /// <summary>Сканирует стандартные точки реестра в указанном базовом ключе.</summary>
-    private static void ScanHiveRegistry(RegistryKey baseKey, string hivePrefix,
-        bool allowWow64, List<StartupEntry> results)
+    /// <summary>Сканирует стандартные точки реестра в указанном базовом ключе, отправляя
+    /// сырые записи в канал конвейера (обогащение выполняют потребители).</summary>
+    private static async Task ScanHiveRegistryAsync(RegistryKey baseKey, string hivePrefix,
+        bool allowWow64, ChannelWriter<StartupEntry> sink, CancellationToken ct)
     {
         foreach (var (keyPath, location) in RegistryLocations)
         {
+            ct.ThrowIfCancellationRequested();
             if (!allowWow64 && keyPath.Contains("Wow6432Node", StringComparison.OrdinalIgnoreCase))
                 continue;
 
@@ -209,7 +286,7 @@ public class SystemScannerService
                     if (!WatcherHelper.LooksLikeCommand(value)) continue;
 
                     var entry = MakeRegistryEntry(valueName, value, location, detailPrefix, keyPath);
-                    results.Add(entry);
+                    await sink.WriteAsync(entry, ct).ConfigureAwait(false);
                 }
             }
             catch
@@ -221,7 +298,8 @@ public class SystemScannerService
         }
     }
 
-    /// <summary>Создаёт запись автозапуска из значения реестра.</summary>
+    /// <summary>Создаёт «сырую» запись автозапуска из значения реестра (без обогащения —
+    /// обогащение выполняется потребителями конвейера).</summary>
     private static StartupEntry MakeRegistryEntry(string valueName, string value, EntryLocation location,
         string detailPrefix, string keyPath)
     {
@@ -235,14 +313,20 @@ public class SystemScannerService
             LocationDetail = $@"{detailPrefix}\{valueName}",
         };
         entry.Id = WatcherHelper.ComputeStableId(entry);
-        EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
         return entry;
     }
 
     // ───────── Other Registry Locations (Winlogon, AppInitDll, etc.) ─────────
 
-    /// <summary>Сканирует прочие точки реестра, включая подразделы и CLSID.</summary>
-    private static void ScanOtherLocations(List<StartupEntry> results)
+    /// <summary>Производитель: прочие точки реестра (Winlogon, AppInitDll, IFEO, Active Setup) и CLSID.</summary>
+    private static void ScanOtherLocationsProducer(ChannelWriter<StartupEntry> sink, CancellationToken ct)
+    {
+        ScanOtherLocations(sink, ct);
+        ScanClsidEntries(sink, ct);
+    }
+
+    /// <summary>Сканирует прочие точки реестра, включая подразделы.</summary>
+    private static void ScanOtherLocations(ChannelWriter<StartupEntry> sink, CancellationToken ct)
     {
         foreach (var hives in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
         using (var baseKey = hives == RegistryHive.LocalMachine
@@ -250,6 +334,7 @@ public class SystemScannerService
         {
             foreach (var (keyPath, location) in OtherLocations)
             {
+                ct.ThrowIfCancellationRequested();
                 if (hives == RegistryHive.CurrentUser && !IsHkcuOtherKey(keyPath))
                     continue;
 
@@ -259,7 +344,7 @@ public class SystemScannerService
                     if (key == null) continue;
 
                     var hivePrefix = GetHivePrefix(hives);
-                    ScanKeyValues(key, keyPath, location, hivePrefix, results);
+                    ScanKeyValues(key, keyPath, location, hivePrefix, sink);
 
                     // Winlogon: подразделы (GPExtensions, UserDefaults) — это системные
                     // расширения, а не автозапуск; BootExecute: подразделы (DOS Devices,
@@ -271,12 +356,12 @@ public class SystemScannerService
                     // (без '>'), а не его значения-метаданные (ComponentID, Locale, Version)
                     if (location == EntryLocation.ActiveSetup)
                     {
-                        ScanActiveSetupSubKeys(key, keyPath, location, hivePrefix, results);
+                        ScanActiveSetupSubKeys(key, keyPath, location, hivePrefix, sink);
                         continue;
                     }
 
                     // Subkeys: 1 уровень для всех локаций (как в OtherStartupLocationsWatcher)
-                    ScanSubKeyValues(key, keyPath, location, hivePrefix, results);
+                    ScanSubKeyValues(key, keyPath, location, hivePrefix, sink);
 
                 }
                 catch
@@ -296,8 +381,8 @@ public class SystemScannerService
 
                     var loc = keyPath.Contains("Image File Execution Options", StringComparison.OrdinalIgnoreCase)
                         ? EntryLocation.ImageFileExecutionOptions : EntryLocation.AppInitDll;
-                    ScanKeyValues(key, keyPath, loc, "HKLM", results);
-                    ScanSubKeyValues(key, keyPath, loc, "HKLM", results);
+                    ScanKeyValues(key, keyPath, loc, "HKLM", sink);
+                    ScanSubKeyValues(key, keyPath, loc, "HKLM", sink);
                 }
                 catch
                 {
@@ -305,9 +390,6 @@ public class SystemScannerService
                 }
             }
         }
-
-        // Shell extensions: scan HKCR\CLSID for entries referenced in ContextMenuHandler
-        ScanClsidEntries(results);
     }
 
     /// <summary>Сканирует прямые значения ключа реестра.
@@ -315,7 +397,7 @@ public class SystemScannerService
     /// конфигурации, не автозапуск). BootExecute: только значение BootExecute
     /// (autochk) — остальное (BootShell и пр.) не является точкой автозапуска.</summary>
     private static void ScanKeyValues(RegistryKey key, string keyPath, EntryLocation location,
-        string hivePrefix, List<StartupEntry> results)
+        string hivePrefix, ChannelWriter<StartupEntry> sink)
     {
         var detailPrefix = $@"{hivePrefix}\{keyPath}";
 
@@ -342,14 +424,13 @@ public class SystemScannerService
                 LocationDetail = $@"{detailPrefix}\{valueName}",
             };
             entry.Id = WatcherHelper.ComputeStableId(entry);
-            EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-            results.Add(entry);
+            WriteEntry(sink, entry);
         }
     }
 
     /// <summary>Сканирует подразделы 1-го уровня ключа реестра.</summary>
     private static void ScanSubKeyValues(RegistryKey parentKey, string keyPath, EntryLocation location,
-        string hivePrefix, List<StartupEntry> results)
+        string hivePrefix, ChannelWriter<StartupEntry> sink)
     {
         string[] subKeyNames;
         try { subKeyNames = parentKey.GetSubKeyNames(); }
@@ -379,8 +460,7 @@ public class SystemScannerService
                         LocationDetail = $@"{hivePrefix}\{keyPath}\{subKeyName}\{valueName}",
                     };
                     entry.Id = WatcherHelper.ComputeStableId(entry);
-                    EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-                    results.Add(entry);
+                    WriteEntry(sink, entry);
                 }
             }
             catch
@@ -394,7 +474,7 @@ public class SystemScannerService
     /// StubPath (не деактивированный '>'). Значения-метаданные (ComponentID, Locale, Version)
     /// и ключи без StubPath не выполняются при входе — пропускаются.</summary>
     private static void ScanActiveSetupSubKeys(RegistryKey parentKey, string keyPath,
-        EntryLocation location, string hivePrefix, List<StartupEntry> results)
+        EntryLocation location, string hivePrefix, ChannelWriter<StartupEntry> sink)
     {
         string[] subKeyNames;
         try { subKeyNames = parentKey.GetSubKeyNames(); }
@@ -422,8 +502,7 @@ public class SystemScannerService
                     LocationDetail = $@"{hivePrefix}\{keyPath}\{subKeyName}",
                 };
                 entry.Id = WatcherHelper.ComputeStableId(entry);
-                EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-                results.Add(entry);
+                WriteEntry(sink, entry);
             }
             catch
             {
@@ -435,7 +514,7 @@ public class SystemScannerService
     /// <summary>Сканирует ТОЛЬКО реально зарегистрированные в системе Shell Context Menu Handlers:
     /// собирает активные GUID из *\shellex\ContextMenuHandlers и родственных веток HKCR,
     /// затем читает путь к DLL/EXE только для этого множества из HKCR\CLSID\{GUID}\InprocServer32|LocalServer32.</summary>
-    private static void ScanClsidEntries(List<StartupEntry> results)
+    private static void ScanClsidEntries(ChannelWriter<StartupEntry> sink, CancellationToken ct)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanClsid");
         // Ветки HKCR, где регистрируются активные обработчики контекстного меню
@@ -542,8 +621,7 @@ public class SystemScannerService
                                 LocationDetail = guid,
                             };
                             entry.Id = WatcherHelper.ComputeStableId(entry);
-                            EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-                            results.Add(entry);
+                            WriteEntry(sink, entry);
                             break; // достаточно одного сервера (InprocServer32 приоритетнее)
                         }
                         catch
@@ -573,20 +651,26 @@ public class SystemScannerService
 
     // ───────── Startup Folders ─────────
 
+    /// <summary>Производитель: папки автозапуска всех пользователей.</summary>
+    private static void ScanStartupFoldersProducer(ChannelWriter<StartupEntry> sink, CancellationToken ct)
+        => ScanStartupFolders(sink, ct);
+
     /// <summary>Сканирует папки автозапуска всех пользователей.</summary>
-    private static void ScanStartupFolders(List<StartupEntry> results)
+    private static void ScanStartupFolders(ChannelWriter<StartupEntry> sink, CancellationToken ct)
     {
         var scanned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Общая папка (All Users)
         var commonStartup = Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup);
         if (!string.IsNullOrEmpty(commonStartup) && Directory.Exists(commonStartup))
-            ScanFolder(commonStartup, results, scanned);
+            ScanFolder(commonStartup, sink, scanned);
+
+        ct.ThrowIfCancellationRequested();
 
         // Текущий пользователь
         var userStartup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
         if (!string.IsNullOrEmpty(userStartup) && Directory.Exists(userStartup))
-            ScanFolder(userStartup, results, scanned);
+            ScanFolder(userStartup, sink, scanned);
 
         // Все остальные профили
         var profilesDir = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -604,14 +688,14 @@ public class SystemScannerService
                     var startup = Path.Combine(userDir, "AppData", "Roaming", "Microsoft",
                         "Windows", "Start Menu", "Programs", "Startup");
                     if (Directory.Exists(startup))
-                        ScanFolder(startup, results, scanned);
+                        ScanFolder(startup, sink, scanned);
                 }
             }
         }
     }
 
-    /// <summary>Сканирует одну папку автозапуска, добавляя файлы в результаты.</summary>
-    private static void ScanFolder(string folder, List<StartupEntry> results, HashSet<string> scanned)
+    /// <summary>Сканирует одну папку автозапуска, отправляя сырые записи в канал.</summary>
+    private static void ScanFolder(string folder, ChannelWriter<StartupEntry> sink, HashSet<string> scanned)
     {
         string[] files;
         try { files = Directory.GetFiles(folder); }
@@ -637,15 +721,15 @@ public class SystemScannerService
                 LocationDetail = fileInfo.DirectoryName ?? string.Empty,
             };
             entry.Id = WatcherHelper.ComputeStableId(entry);
-            EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-            results.Add(entry);
+            WriteEntry(sink, entry);
         }
     }
 
     // ───────── Services ─────────
 
-    /// <summary>Сканирует автоматические службы через WMI.</summary>
-    private void ScanServices(List<StartupEntry> results)
+    /// <summary>Производитель: автоматические службы через WMI (обогащение — потребителями).</summary>
+    private void ScanServicesProducer(ChannelWriter<StartupEntry> sink,
+        Microsoft.Extensions.Logging.ILogger? logger, CancellationToken ct)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanServices");
         try
@@ -655,6 +739,7 @@ public class SystemScannerService
 
             foreach (var obj in searcher.Get())
             {
+                ct.ThrowIfCancellationRequested();
                 var name = obj["Name"]?.ToString() ?? string.Empty;
                 var path = obj["PathName"]?.ToString() ?? string.Empty;
                 var displayName = obj["DisplayName"]?.ToString() ?? string.Empty;
@@ -673,8 +758,7 @@ public class SystemScannerService
                         ? EntryStatus.Enabled : EntryStatus.Disabled,
                 };
                 entry.Id = WatcherHelper.ComputeStableId(entry);
-                EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-                results.Add(entry);
+                WriteEntry(sink, entry);
             }
         }
         catch
@@ -689,7 +773,8 @@ public class SystemScannerService
 
     /// <summary>Сканирует подписки на события WMI (root\subscription) — постоянная точка
     /// автозапуска (EventFilter → CommandLineEventConsumer / ActiveScriptEventConsumer).</summary>
-    private void ScanWmiSubscriptions(List<StartupEntry> results)
+    private void ScanWmiSubscriptionsProducer(ChannelWriter<StartupEntry> sink,
+        Microsoft.Extensions.Logging.ILogger? logger, CancellationToken ct)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanWmi");
         try
@@ -697,8 +782,8 @@ public class SystemScannerService
             var subs = WmiSubscriptionHelper.ScanSubscriptions();
             foreach (var sub in subs)
             {
-                EntryOperations.ResolveAndEnrichEntry(sub, computeHash: false);
-                results.Add(sub);
+                ct.ThrowIfCancellationRequested();
+                WriteEntry(sink, sub);
             }
         }
         catch
@@ -710,8 +795,9 @@ public class SystemScannerService
 
     // ───────── Task Scheduler ─────────
 
-    /// <summary>Сканирует задания в планировщике задач.</summary>
-    private void ScanTaskScheduler(List<StartupEntry> results)
+    /// <summary>Производитель: задания в планировщике задач (COM, сериализовано).</summary>
+    private void ScanTaskSchedulerProducer(ChannelWriter<StartupEntry> sink,
+        Microsoft.Extensions.Logging.ILogger? logger, CancellationToken ct)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanTaskScheduler");
         try
@@ -722,6 +808,7 @@ public class SystemScannerService
 
             foreach (var task in tasks)
             {
+                ct.ThrowIfCancellationRequested();
                 var taskCmd = FormatTaskAction(task);
 
                 var entry = new StartupEntry
@@ -734,8 +821,7 @@ public class SystemScannerService
                     Status = task.Enabled ? EntryStatus.Enabled : EntryStatus.Disabled,
                 };
                 entry.Id = WatcherHelper.ComputeStableId(entry);
-                EntryOperations.ResolveAndEnrichEntry(entry, computeHash: false);
-                results.Add(entry);
+                WriteEntry(sink, entry);
             }
         }
         catch
@@ -767,8 +853,8 @@ public class SystemScannerService
     /// <summary>Сканирует автозапуск UWP/AppX-приложений: перебирает манифесты пакетов
     /// в WindowsApps, находит StartupTask-расширения и читает состояние (State) из
     /// реестра SystemAppData для текущего пользователя.</summary>
-    private void ScanAppxStartupTasks(List<StartupEntry> results,
-        Microsoft.Extensions.Logging.ILogger? logger = null)
+    private void ScanAppxStartupTasksProducer(ChannelWriter<StartupEntry> sink,
+        Microsoft.Extensions.Logging.ILogger? logger, CancellationToken ct)
     {
         using var _prof = ExecutionProfiler.Measure("Service.ScanAppx");
         try
@@ -804,7 +890,7 @@ public class SystemScannerService
                     logger?.LogInformation("Scanner: AppX StartupTask — найден {TaskId} в {Pkg} (exe={Exe}, state={State})",
                         taskId, Path.GetFileName(pkgDir), exeFile, state);
 
-                    results.Add(new StartupEntry
+                    WriteEntry(sink, new StartupEntry
                     {
                         Name = displayName,
                         FilePath = filePath,

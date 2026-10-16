@@ -43,6 +43,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Флаг глубокого покоя CPU-таймера (окно скрыто в трей). 1 = приостановлен.</summary>
     private volatile bool _cpuTimerSuspended;
 
+    /// <summary>Флаг полной заморозки фоновых таймеров UI (окно скрыто в трей). 1 = приостановлено (Interlocked).</summary>
+    private int _allBackgroundSuspended;
+
+    /// <summary>Была ли активна подписка Диспетчера задач на момент заморозки (для симметричной разморозки).</summary>
+    private bool _taskManagerWasActive;
+
     /// <summary>Флаг защиты от реэнтрантного входа в LoadDataIfChanged (Interlocked).</summary>
     private int _isLoading;
 
@@ -454,6 +460,82 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Приостановлен ли CPU-таймер (окно скрыто в трей).</summary>
     public bool IsCpuTimerSuspended => _cpuTimerSuspended;
+
+    /// <summary>Полностью ли приостановлена фоновая активность UI (окно скрыто в трей).</summary>
+    public bool IsAllBackgroundSuspended => _allBackgroundSuspended == 1;
+
+    /// <summary>
+    /// Полная заморозка фоновой активности UI при уходе окна в трей (0% CPU от таймеров):
+    /// останавливает polling, опрос системной темы, замер CPU и watch логов,
+    /// отменяет фоновые циклы рейтингов/хешей и отписывается от потока метрик процессов службы.
+    /// Идемпотентно (повторный вызов безвреден).
+    /// </summary>
+    public void SuspendAllBackgroundActivity()
+    {
+        if (Interlocked.Exchange(ref _allBackgroundSuspended, 1) == 1) return;
+
+        try { _pollingTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+        try { _themePollTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+        try { _logWatchTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+
+        // Глубокий покой CPU-таймера: флаг + остановка (двойная защита от срабатывания in-flight тика)
+        _cpuTimerSuspended = true;
+        try { _cpuUsageTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+
+        // Останавливаем фоновые циклы рейтингов AI и дозагрузки хешей
+        try { _backgroundCts?.Cancel(); } catch { }
+
+        // Отписка от потока метрик процессов службы (UnsubscribeProcessMetricsAsync):
+        // служба перестаёт собирать снапшоты и рассылать метрики (0% CPU).
+        _taskManagerWasActive = TaskManager.IsActive;
+        _ = TaskManager.DeactivateAsync();
+    }
+
+    /// <summary>
+    /// Симметричная разморозка фоновой активности UI при восстановлении окна из трея:
+    /// мгновенно перезапускает все таймеры, возобновляет фоновые циклы и обновляет данные.
+    /// Идемпотентно (повторный вызов безвреден).
+    /// </summary>
+    public void ResumeAllBackgroundActivity()
+    {
+        if (Interlocked.Exchange(ref _allBackgroundSuspended, 0) == 0) return;
+
+        // Polling: возобновляем только если мониторинг не на паузе
+        if (!IsMonitoringPaused)
+            try { _pollingTimer?.Change(TimeSpan.Zero, TimeSpan.FromSeconds(5)); } catch { }
+
+        // Опрос системной темы: только если watcher реально создан (тема = system)
+        if (_themePollTimer != null)
+            try { _themePollTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(2)); } catch { }
+
+        // Watch логов: только если страница «Логи» была активна
+        if (_logWatchTimer != null)
+            try { _logWatchTimer.Change(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3)); } catch { }
+
+        _cpuTimerSuspended = false;
+        try { _cpuUsageTimer?.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)); } catch { }
+
+        // Возобновляем подписку Диспетчера задач, если она была активна до заморозки
+        if (_taskManagerWasActive)
+        {
+            _taskManagerWasActive = false;
+            _ = TaskManager.ActivateAsync();
+        }
+
+        // Перезапускаем фоновые циклы рейтингов/хешей новым токеном
+        _backgroundCts?.Dispose();
+        _backgroundCts = new CancellationTokenSource();
+        List<StartupEntry> entries;
+        lock (_entriesLock) { entries = _allEntries.ToList(); }
+        if (entries.Count > 0)
+        {
+            _ = LoadRatingsAsync(entries, _backgroundCts.Token);
+            _ = LoadHashDataAsync(entries, _backgroundCts.Token);
+        }
+
+        // Однократный немедленный запрос актуального состояния после разморозки
+        _ = LoadDataIfChanged();
+    }
 
     /// <summary>Включены ли уведомления о новых записях.</summary>
     [ObservableProperty]

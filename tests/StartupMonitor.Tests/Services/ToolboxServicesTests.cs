@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using StartupMonitor.Service.Services.Toolbox;
 using StartupMonitor.Shared.Models.Toolbox;
@@ -135,6 +137,47 @@ public class ToolboxServicesTests
         Assert.Contains("ГБ", gb.SizeFormatted);
     }
 
+    [Fact]
+    public async Task JunkCleanerService_ScanJunkAsync_ReturnsAllCategories()
+    {
+        // Arrange
+        var service = new JunkCleanerService();
+
+        // Act
+        var scanResult = await service.ScanJunkAsync(CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(scanResult);
+        Assert.True(scanResult.Categories.Count >= 5);
+        Assert.Contains(scanResult.Categories, c => c.Id == JunkCleanerService.CategoryUserTemp);
+        Assert.Contains(scanResult.Categories, c => c.Id == JunkCleanerService.CategoryRecycleBin);
+    }
+
+    [Fact]
+    public async Task JunkCleanerService_ScanJunkAsync_CancelledToken_Throws()
+    {
+        // Arrange
+        var service = new JunkCleanerService();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act / Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ScanJunkAsync(cts.Token));
+    }
+
+    [Fact]
+    public async Task JunkCleanerService_CleanJunkAsync_CancelledToken_Throws()
+    {
+        // Arrange
+        var service = new JunkCleanerService();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act / Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.CleanJunkAsync(new List<string> { JunkCleanerService.CategoryUserTemp }, cts.Token));
+    }
+
     #endregion
 
     #region 3. FileLocksmithService Tests
@@ -196,6 +239,43 @@ public class ToolboxServicesTests
             // После освобождения дескриптора файл не должен быть заблокирован
             var releasedResult = service.FindLockingProcesses(tempFile);
             Assert.False(releasedResult.IsLocked);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public void FileLocksmithService_FindLockingProcesses_WithLiveToken_StillWorks()
+    {
+        // Arrange
+        var service = new FileLocksmithService();
+
+        // Act
+        var result = service.FindLockingProcesses(string.Empty, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.False(result.IsLocked);
+    }
+
+    [Fact]
+    public async Task FileLocksmithService_FindLockingProcessesAsync_CancelledToken_Throws()
+    {
+        // Arrange
+        var service = new FileLocksmithService();
+        var tempFile = Path.Combine(Path.GetTempPath(), $"locksmith_cancel_{Guid.NewGuid():N}.tmp");
+        File.WriteAllText(tempFile, "cancel");
+
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Act / Assert
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => service.FindLockingProcessesAsync(tempFile, cts.Token));
         }
         finally
         {
@@ -295,6 +375,82 @@ public class ToolboxServicesTests
         // Assert
         Assert.True(score >= minScore);
         Assert.Equal(expectedRating, rating);
+    }
+
+    [Fact]
+    public async Task HashAndSecurityHelper_ComputeAllHashesAsync_MatchesSingleHashMethods()
+    {
+        // Arrange
+        var tempFile = Path.Combine(Path.GetTempPath(), $"hash_all_{Guid.NewGuid():N}.txt");
+        File.WriteAllText(tempFile, "Parallel multi-hash verification payload", Encoding.UTF8);
+
+        try
+        {
+            // Act
+            var expectedSha256 = HashAndSecurityHelper.ComputeFileSha256(tempFile);
+            var expectedSha1 = HashAndSecurityHelper.ComputeFileSha1(tempFile);
+            var expectedMd5 = HashAndSecurityHelper.ComputeFileMd5(tempFile);
+
+            var result = await HashAndSecurityHelper.ComputeAllHashesAsync(tempFile, CancellationToken.None);
+
+            // Assert
+            Assert.Equal(expectedSha256, result.Sha256);
+            Assert.Equal(expectedSha1, result.Sha1);
+            Assert.Equal(expectedMd5, result.Md5);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task HashAndSecurityHelper_ComputeAllHashesAsync_CancelledToken_Throws()
+    {
+        // Arrange
+        var tempFile = Path.Combine(Path.GetTempPath(), $"hash_cancel_{Guid.NewGuid():N}.txt");
+        File.WriteAllText(tempFile, new string('x', 4096), Encoding.UTF8);
+
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Act / Assert
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => HashAndSecurityHelper.ComputeAllHashesAsync(tempFile, cts.Token));
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task HashAndSecurityHelper_ComputeFilesHashesAsync_ProcessesEveryFile()
+    {
+        // Arrange
+        var fileA = Path.Combine(Path.GetTempPath(), $"hash_multi_a_{Guid.NewGuid():N}.txt");
+        var fileB = Path.Combine(Path.GetTempPath(), $"hash_multi_b_{Guid.NewGuid():N}.txt");
+        File.WriteAllText(fileA, "alpha-content", Encoding.UTF8);
+        File.WriteAllText(fileB, "beta-content-2", Encoding.UTF8);
+
+        try
+        {
+            // Act
+            var results = await HashAndSecurityHelper.ComputeFilesHashesAsync(
+                new[] { fileA, fileB }, CancellationToken.None);
+
+            // Assert
+            Assert.Equal(2, results.Count);
+            Assert.Equal(HashAndSecurityHelper.ComputeFileSha256(fileA), results[fileA].Sha256);
+            Assert.Equal(HashAndSecurityHelper.ComputeFileSha256(fileB), results[fileB].Sha256);
+        }
+        finally
+        {
+            try { File.Delete(fileA); } catch { }
+            try { File.Delete(fileB); } catch { }
+        }
     }
 
     #endregion

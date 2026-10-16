@@ -38,6 +38,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     /// <summary>Событие показа всплывающего уведомления.</summary>
     public event Action<string, string>? StatusMessageRequested;
 
+    /// <summary>Активна ли в данный момент подписка на поток метрик процессов службы.</summary>
+    public bool IsActive => _isActive;
+
     [ObservableProperty]
     private SystemPerformanceSnapshot? _performanceSnapshot;
 
@@ -219,7 +222,10 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         HashSet<int>? windowPids = null;
         try
         {
-            windowPids = WindowHelper.GetProcessIdsWithWindows();
+            // EnumWindows НЕ вызывается здесь (UI-поток): читаем потокобезопасный кэш,
+            // а обновление кэша запускается фоном (RefreshProcessIdsWithWindowsInBackground).
+            windowPids = WindowHelper.CachedProcessIdsWithWindows;
+            WindowHelper.RefreshProcessIdsWithWindowsInBackground(ReapplyWindowFlags);
         }
         catch { }
 
@@ -303,6 +309,29 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         }
 
         ApplyFilterAndSort();
+    }
+
+    /// <summary>
+    /// Повторно применяет флаги наличия видимого окна к уже отображённым процессам
+    /// после завершения фонового <see cref="WindowHelper.GetProcessIdsWithWindows"/>.
+    /// Вызывается на фоновом потоке — переключается на Dispatcher при необходимости.
+    /// </summary>
+    private void ReapplyWindowFlags()
+    {
+        var windowPids = WindowHelper.CachedProcessIdsWithWindows;
+        if (windowPids.Count == 0) return;
+
+        if (Application.Current?.Dispatcher != null && !Application.Current.Dispatcher.CheckAccess())
+        {
+            Application.Current.Dispatcher.InvokeAsync(ReapplyWindowFlags, DispatcherPriority.Background);
+            return;
+        }
+
+        foreach (var p in _processMap.Values)
+        {
+            if (!p.HasWindow && windowPids.Contains(p.Pid))
+                p.HasWindow = true;
+        }
     }
 
     /// <summary>Проверяет, относится ли процесс к категории пользовательских приложений (Apps).</summary>

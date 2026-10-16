@@ -206,17 +206,15 @@ public partial class MainWindow
         {
             if (!IsVisible)
             {
-                // Глубокий покой UI в трее (п. 2.1): останавливаем замер CPU
-                _viewModel.SuspendCpuTimer();
-                if (_selectedNavIndex == 6)
-                    _ = _viewModel.TaskManager.DeactivateAsync();
+                // Глубокий покой UI в трее (п. 4.1): замораживаем ВСЕ фоновые таймеры и метрики
+                _viewModel.SuspendAllBackgroundActivity();
                 try { FirewallHubView?.Deactivate(); } catch { }
                 try { ToolboxMainView?.Deactivate(); } catch { }
             }
             else
             {
                 if (WindowState != WindowState.Minimized)
-                    _viewModel.ResumeCpuTimer();
+                    _viewModel.ResumeAllBackgroundActivity();
                 if (_selectedNavIndex == 6 && _isStartupComplete && WindowState != WindowState.Minimized)
                     _ = _viewModel.TaskManager.ActivateAsync();
                 if (_selectedNavIndex == 8 && _isStartupComplete && WindowState != WindowState.Minimized)
@@ -234,9 +232,8 @@ public partial class MainWindow
         {
             if (WindowState == WindowState.Minimized)
             {
-                // Окно свернуто/ушло в трей — приостанавливаем CPU-таймер (0% CPU)
-                _viewModel.SuspendCpuTimer();
-                _ = _viewModel.TaskManager.DeactivateAsync();
+                // Окно свернуто/ушло в трей — полная заморозка фоновых таймеров (0% CPU)
+                _viewModel.SuspendAllBackgroundActivity();
                 try { FirewallHubView?.Deactivate(); } catch { }
                 try { ToolboxMainView?.Deactivate(); } catch { }
                 if (_hasShown && _viewModel.MinimizeToTray)
@@ -246,7 +243,7 @@ public partial class MainWindow
             {
                 _lastNonMinimizedState = WindowState;
                 if (IsVisible)
-                    _viewModel.ResumeCpuTimer();
+                    _viewModel.ResumeAllBackgroundActivity();
                 if (_selectedNavIndex == 6 && _isStartupComplete && IsVisible)
                     _ = _viewModel.TaskManager.ActivateAsync();
                 if (_selectedNavIndex == 8 && _isStartupComplete && IsVisible)
@@ -766,7 +763,7 @@ public partial class MainWindow
     {
         Show();
         WindowState = _lastNonMinimizedState;
-        _viewModel.ResumeCpuTimer();
+        _viewModel.ResumeAllBackgroundActivity();
         Activate();
         Focus();
         if (_selectedNavIndex == 6 && _isStartupComplete)

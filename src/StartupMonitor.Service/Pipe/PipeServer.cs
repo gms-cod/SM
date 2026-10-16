@@ -86,6 +86,12 @@ public class PipeServer : BackgroundService
     private int _lastRatingCount;
     // Ревизия записей автозапуска для дельта-протокола GetEntriesDelta
     private static long _entriesRevision = 1;
+    // Число активных UI-клиентов (named pipe). Interlocked-счётчик: пока 0 —
+    // служба находится в режиме 0% CPU Idle (фоновые подсистемы заглушены).
+    private int _activeUiClients;
+
+    /// <summary>Текущее число подключённых UI-клиентов (для диагностики/тестов).</summary>
+    public int ActiveUiClients => Volatile.Read(ref _activeUiClients);
 
     /// <summary>
     /// Увеличивает ревизию записей при внешних мутациях (вотчеры, BlacklistManager).
@@ -231,6 +237,8 @@ public class PipeServer : BackgroundService
     /// <param name="ct">Токен отмены</param>
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
+        // Учёт активного UI-клиента: пока счётчик > 0, фоновые подсистемы активны.
+        OnUiClientConnected();
         try
         {
             var reader = new StreamReader(pipe);
@@ -247,7 +255,7 @@ public class PipeServer : BackgroundService
                     var message = JsonSerializer.Deserialize<PipeMessage>(line, JsonOptions);
                     if (message == null) continue;
 
-                    var response = await ProcessMessage(message);
+                    var response = await ProcessMessage(message, ct);
                     var json = JsonSerializer.Serialize(response, JsonOptions);
                     await writer.WriteLineAsync(json);
                 }
@@ -272,6 +280,40 @@ public class PipeServer : BackgroundService
         {
             _logger.LogError(ex, "Ошибка обработки клиента PipeServer");
         }
+        finally
+        {
+            OnUiClientDisconnected();
+        }
+    }
+
+    /// <summary>
+    /// Регистрирует подключение UI-клиента. При переходе 0→1 служба выходит из режима
+    /// 0% CPU Idle: пробуждаются подсистемы порт-защиты и сетевых алертов.
+    /// </summary>
+    private void OnUiClientConnected()
+    {
+        var count = Interlocked.Increment(ref _activeUiClients);
+        if (count != 1) return;
+
+        _logger.LogInformation("Первый UI-клиент подключён: выход из режима Idle");
+        try { _alertService?.SetMonitorWindowActive(true); } catch { }
+        try { _portDefenderService?.SetUiActive(true); } catch { }
+    }
+
+    /// <summary>
+    /// Снимает UI-клиента с учёта. При переходе к нулю служба уходит в режим
+    /// 0% CPU Idle: фоновые таймеры порт-защиты и сетевых алертов полностью заглушаются.
+    /// </summary>
+    private void OnUiClientDisconnected()
+    {
+        var count = Interlocked.Decrement(ref _activeUiClients);
+        if (count > 0) return;
+
+        // Защита от «ухода в минус» при двойном вызове.
+        Interlocked.Exchange(ref _activeUiClients, 0);
+        _logger.LogInformation("Все UI-клиенты отключены: переход в режим 0% CPU Idle");
+        try { _alertService?.SetMonitorWindowActive(false); } catch { }
+        try { _portDefenderService?.SetUiActive(false); } catch { }
     }
 
     /// <summary>
@@ -279,8 +321,9 @@ public class PipeServer : BackgroundService
     /// CRUD записей, управление чёрным списком, AI-рейтинги, очистка устаревших и т.д.
     /// </summary>
     /// <param name="message">Входящее сообщение от UI</param>
+    /// <param name="ct">Токен отмены (жизненный цикл службы/соединения) для длительных операций Toolbox</param>
     /// <returns>Ответное сообщение с результатом выполнения</returns>
-    private async Task<PipeMessage> ProcessMessage(PipeMessage message)
+    private async Task<PipeMessage> ProcessMessage(PipeMessage message, CancellationToken ct = default)
     {
         using var _profPipe = ExecutionProfiler.Profile("Service.PipeProcessMessage");
         // По умолчанию — успешный ответ
@@ -1915,7 +1958,7 @@ public class PipeServer : BackgroundService
                             targetPath = message.Payload.Trim().Trim('"');
                         }
 
-                        var lockResult = _fileLocksmithService.FindLockingProcesses(targetPath);
+                        var lockResult = await _fileLocksmithService.FindLockingProcessesAsync(targetPath, ct);
                         response.Type = PipeMessageTypes.FindFileLockingProcessesResponse;
                         response.Payload = JsonSerializer.Serialize(lockResult, JsonOptions);
                     }
@@ -1967,7 +2010,7 @@ public class PipeServer : BackgroundService
                 case PipeMessageTypes.ScanJunkFiles:
                     try
                     {
-                        var scanResult = await Task.Run(() => _junkCleanerService.ScanJunk());
+                        var scanResult = await _junkCleanerService.ScanJunkAsync(ct);
                         response.Type = PipeMessageTypes.ScanJunkFilesResponse;
                         response.Payload = JsonSerializer.Serialize(scanResult, JsonOptions);
                     }
@@ -1993,7 +2036,7 @@ public class PipeServer : BackgroundService
                             try { categoryIds = JsonSerializer.Deserialize<List<string>>(message.Payload, JsonOptions); } catch { }
                         }
 
-                        var cleanResult = await Task.Run(() => _junkCleanerService.Clean(categoryIds));
+                        var cleanResult = await _junkCleanerService.CleanJunkAsync(categoryIds ?? new System.Collections.Generic.List<string>(), ct);
                         response.Type = PipeMessageTypes.CleanJunkFilesResponse;
                         response.Payload = JsonSerializer.Serialize(cleanResult, JsonOptions);
                     }
@@ -2007,7 +2050,7 @@ public class PipeServer : BackgroundService
                 case PipeMessageTypes.ScanLanDevices:
                     try
                     {
-                        var devices = await _lanScannerService.ScanLocalNetworkAsync();
+                        var devices = await _lanScannerService.ScanLocalNetworkAsync(ct);
                         response.Type = PipeMessageTypes.ScanLanDevicesResponse;
                         response.Payload = JsonSerializer.Serialize(devices, JsonOptions);
                     }
@@ -2136,11 +2179,16 @@ public class PipeServer : BackgroundService
                     continue;
                 }
 
-                // 1. Всегда и изолированно завершаем запрещенные процессы по правилам ЧС
+                // 1. Завершаем запрещённые процессы по правилам ЧС ТОЛЬКО если такие
+                //    активные правила есть (иначе — режим 0% CPU Idle без обхода процессов).
+                var needsKillSweep = false;
+                AppConfig? cfg = null;
                 try
                 {
-                    var cfg = _store.Load();
-                    EntryOperations.KillProcessesByRules(cfg.Blacklist, _logger);
+                    cfg = _store.Load();
+                    needsKillSweep = EntryOperations.HasActiveKillRules(cfg.Blacklist);
+                    if (needsKillSweep)
+                        EntryOperations.KillProcessesByRules(cfg.Blacklist, _logger);
                 }
                 catch (Exception ex)
                 {
@@ -2153,7 +2201,7 @@ public class PipeServer : BackgroundService
                     lastFullScan = DateTime.UtcNow;
                     try
                     {
-                        var cfg = _store.Load();
+                        cfg ??= _store.Load();
                         var scanTime = DateTime.UtcNow;
                         var skipReg = cfg.Settings.CpuThrottleEnabled
                             && CpuUsageHelper.GetCpuUsage(excludeSelf: true) >= cfg.Settings.CpuThrottleThreshold;
@@ -2172,8 +2220,10 @@ public class PipeServer : BackgroundService
                     }
                 }
 
-                // Интервал 10 секунд для мгновенного реагирования на запуск процессов из ЧС (напр. ms-teams)
-                await Task.Delay(TimeSpan.FromSeconds(10), ct);
+                // 0% CPU Idle: при отсутствии активных правил ЧС интервал увеличивается
+                // с 10 секунд до 5 минут — обход процессов не выполняется вовсе.
+                var interval = needsKillSweep ? TimeSpan.FromSeconds(10) : TimeSpan.FromMinutes(5);
+                await Task.Delay(interval, ct);
             }
         }
         catch (OperationCanceledException) { }

@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace StartupMonitor.UI.Services;
 
 /// <summary>
 /// Помощник для быстрого определения PID процессов, имеющих видимые окна на рабочем столе пользователя.
+/// Для UI-потока предусмотрен потокобезопасный кэш с фоновым обновлением (без блокировки Dispatcher).
 /// </summary>
 public static class WindowHelper
 {
@@ -94,6 +97,57 @@ public static class WindowHelper
         }
 
         return pids;
+    }
+
+    // ─────────────────────────── Фоновый кэш (UI Dispatcher Offload) ───────────────────────────
+
+    /// <summary>Потокобезопасный кэш PID процессов с видимыми окнами (обновляется в фоне).</summary>
+    private static HashSet<int> _cachedPids = [];
+
+    /// <summary>Момент времени (UTC), до которого кэш считается свежим.</summary>
+    private static DateTime _cacheExpiryUtc = DateTime.MinValue;
+
+    /// <summary>Флаг «обновление кэша уже выполняется» (защита от параллельных EnumWindows).</summary>
+    private static int _refreshInFlight;
+
+    /// <summary>Время жизни кэша PID с видимыми окнами (EnumWindows не чаще 1 раза в 2 с).</summary>
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Последний кэшированный набор PID процессов с видимыми окнами.
+    /// Не выполняет EnumWindows — безопасно вызывать с UI-потока.
+    /// </summary>
+    public static HashSet<int> CachedProcessIdsWithWindows => _cachedPids;
+
+    /// <summary>
+    /// Обновляет кэш PID с видимыми окнами в фоновом потоке (EnumWindows вне UI-потока),
+    /// устраняя задержки отрисовки кадров WPF. При истечении TTL запускается не более одного
+    /// обновления; по завершении вызывается <paramref name="onRefreshed"/> (на фоновом потоке).
+    /// </summary>
+    /// <param name="onRefreshed">Необязательный колбэк, выполняемый после успешного обновления кэша.</param>
+    public static void RefreshProcessIdsWithWindowsInBackground(Action? onRefreshed = null)
+    {
+        if (DateTime.UtcNow < _cacheExpiryUtc) return;
+        if (Interlocked.CompareExchange(ref _refreshInFlight, 1, 0) != 0) return;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var fresh = GetProcessIdsWithWindows();
+                _cachedPids = fresh;
+                _cacheExpiryUtc = DateTime.UtcNow.Add(CacheTtl);
+                onRefreshed?.Invoke();
+            }
+            catch
+            {
+                // Игнорируем сбои P/Invoke — оставляем прежний кэш
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshInFlight, 0);
+            }
+        });
     }
 }
 

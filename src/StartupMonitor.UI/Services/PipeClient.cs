@@ -32,6 +32,13 @@ public class PipeClient : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <summary>
+    /// Десериализует JSON на фоновом потоке, чтобы парсинг крупных полезных нагрузок
+    /// (снимок процессов ~195 КБ, список записей автозапуска) не блокировал UI Dispatcher.
+    /// </summary>
+    private static Task<T?> DeserializeInBackgroundAsync<T>(string json, JsonSerializerOptions options)
+        => Task.Run(() => JsonSerializer.Deserialize<T>(json, options));
+
     /// <summary>Событие подключения к каналу.</summary>
     public event EventHandler? Connected;
 
@@ -120,7 +127,7 @@ public class PipeClient : IDisposable
                     List<PipeMessage>? batch = null;
                     try
                     {
-                        batch = JsonSerializer.Deserialize<List<PipeMessage>>(line, JsonOptions);
+                        batch = await DeserializeInBackgroundAsync<List<PipeMessage>>(line, JsonOptions);
                     }
                     catch
                     {
@@ -136,7 +143,7 @@ public class PipeClient : IDisposable
                             {
                                 try
                                 {
-                                    var snapshot = JsonSerializer.Deserialize<SystemPerformanceSnapshot>(msg.Payload, JsonOptions);
+                                    var snapshot = await DeserializeInBackgroundAsync<SystemPerformanceSnapshot>(msg.Payload, JsonOptions);
                                     if (snapshot != null)
                                         ProcessSnapshotReceived?.Invoke(this, snapshot);
                                 }
@@ -235,7 +242,7 @@ public class PipeClient : IDisposable
 
         if (response?.Type == PipeMessageTypes.GetAllEntriesResponse && !string.IsNullOrEmpty(response.Payload))
         {
-            return JsonSerializer.Deserialize<List<StartupEntry>>(response.Payload, JsonOptions) ?? [];
+            return await DeserializeInBackgroundAsync<List<StartupEntry>>(response.Payload, JsonOptions) ?? [];
         }
 
         return [];
@@ -269,7 +276,7 @@ public class PipeClient : IDisposable
             {
                 try
                 {
-                    var delta = JsonSerializer.Deserialize<EntriesDeltaResponse>(response.Payload, JsonOptions);
+                    var delta = await DeserializeInBackgroundAsync<EntriesDeltaResponse>(response.Payload, JsonOptions);
                     if (delta != null && delta.IsModified)
                         return (true, delta.NewRevision, delta.Entries);
                     if (delta != null && !delta.IsModified)
@@ -678,7 +685,7 @@ public class PipeClient : IDisposable
 
         if (response?.Type == PipeMessageTypes.ProcessesSnapshot && !string.IsNullOrEmpty(response.Payload))
         {
-            return JsonSerializer.Deserialize<SystemPerformanceSnapshot>(response.Payload, JsonOptions);
+            return await DeserializeInBackgroundAsync<SystemPerformanceSnapshot>(response.Payload, JsonOptions);
         }
 
         return null;

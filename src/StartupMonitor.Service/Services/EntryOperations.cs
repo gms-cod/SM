@@ -710,6 +710,22 @@ public static class EntryOperations
         }
     }
 
+    /// <summary>Проверяет наличие в ЧС хотя бы одного активного правила немедленного
+    /// уничтожения процессов (Path/PathWildcard + NotifyAndRemove). Не аллоцирует.
+    /// Используется для пропуска тяжёлого обхода процессов в режиме 0% CPU Idle.</summary>
+    public static bool HasActiveKillRules(IEnumerable<BlacklistRule>? rules)
+    {
+        if (rules == null) return false;
+        foreach (var r in rules)
+        {
+            if (r is not null &&
+                r.Action == BlacklistAction.NotifyAndRemove &&
+                r.MatchType is BlacklistMatchType.Path or BlacklistMatchType.PathWildcard)
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>Завершает процессы, чей путь к образу совпадает с правилом ЧС
     /// (Path/PathWildcard). Срабатывает даже если записи в списке нет — проблема ms-teams,
     /// когда правило в ЧС есть, а запись удалена из системы.</summary>
@@ -717,6 +733,10 @@ public static class EntryOperations
     {
         using var _prof = ExecutionProfiler.Measure("Service.EntryOps.KillByRules");
         if (rules == null) return;
+
+        // 0% CPU Idle: если активных правил немедленного уничтожения нет,
+        // полностью пропускаем системный вызов Process.GetProcesses().
+        if (!HasActiveKillRules(rules)) return;
 
         var activeRules = rules
             .Where(r => r.Action == BlacklistAction.NotifyAndRemove &&
@@ -818,6 +838,10 @@ public static class EntryOperations
     /// <summary>Потокобезопасный кэш обогащения: ключ — "Id\0CommandLine\0FilePath".</summary>
     private static readonly ConcurrentDictionary<string, EnrichCacheValue> _enrichCache = new(StringComparer.Ordinal);
 
+    /// <summary>Очередь вытеснения: (ключ, метка времени записи) в порядке добавления.
+    /// Позволяет вытеснять устаревшие записи за O(1) без сортировки всего словаря.</summary>
+    private static readonly ConcurrentQueue<(string Key, DateTime Timestamp)> _enrichCacheEvictionQueue = new();
+
     /// <summary>Строит ключ кэша обогащения из идентификатора и исходных путей записи.</summary>
     private static string BuildEnrichCacheKey(StartupEntry entry) =>
         string.Concat(entry.Id, "\0", entry.CommandLine ?? string.Empty, "\0", entry.FilePath ?? string.Empty);
@@ -833,23 +857,28 @@ public static class EntryOperations
             Indicators = new List<string>(src.Indicators)
         };
 
-    /// <summary>Сохраняет значение в кэш с eviction самых старых записей при переполнении.</summary>
+    /// <summary>Сохраняет значение в кэш с O(1)-амортизированным вытеснением устаревших записей
+    /// при переполнении (FIFO-очередь вместо OrderBy по всему словарю).</summary>
     private static void AddToEnrichCache(string key, EnrichCacheValue value)
     {
         _enrichCache[key] = value;
-        if (_enrichCache.Count > EnrichCacheCapacity)
+        _enrichCacheEvictionQueue.Enqueue((key, value.CacheTimestamp));
+
+        if (_enrichCache.Count <= EnrichCacheCapacity)
+            return;
+
+        // Вытесняем пачку (~10% ёмкости) без сортировок. Запись считается устаревшей,
+        // только если её метка времени совпадает с моментом постановки в очередь:
+        // обновлённые (переобогащённые) записи имеют более свежий CacheTimestamp
+        // и потому сохраняются, а устаревшая копия в очереди просто отбрасывается.
+        var evictCount = Math.Max(EnrichCacheCapacity / 10, 1);
+        for (var i = 0; i < evictCount && _enrichCacheEvictionQueue.TryDequeue(out var item); i++)
         {
-            try
+            if (_enrichCache.TryGetValue(item.Key, out var current)
+                && current.CacheTimestamp == item.Timestamp)
             {
-                var oldest = _enrichCache
-                    .OrderBy(kv => kv.Value.CacheTimestamp)
-                    .Take(500)
-                    .Select(kv => kv.Key)
-                    .ToList();
-                foreach (var k in oldest)
-                    _enrichCache.TryRemove(k, out _);
+                _enrichCache.TryRemove(item.Key, out _);
             }
-            catch { }
         }
     }
 

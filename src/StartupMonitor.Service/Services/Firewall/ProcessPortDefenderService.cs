@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using StartupMonitor.Service.Services.Runtime;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
@@ -48,8 +49,13 @@ public sealed class ProcessPortDefenderService : IDisposable
     // Конфигурация службы
     private PortDefenderConfigDto _config = new();
 
-    // Фоновый периодический опрос сетевых сокетов
-    private readonly Timer? _pollTimer;
+    // ── Фоновый цикл в режиме 0% CPU Idle ──
+    // Опрос сокетов выполняется только при наличии активного UI-клиента И включённых
+    // правил. Во всех остальных случаях цикл спит неограниченно долго (0% CPU).
+    private readonly ActivityGate _wake = new();
+    private CancellationTokenSource? _cts;
+    private Task? _loop;
+    private volatile bool _uiActive;
     private bool _disposed;
 
     /// <summary>
@@ -75,8 +81,77 @@ public sealed class ProcessPortDefenderService : IDisposable
         LoadConfig();
         LoadActiveBans();
 
-        // Запуск периодического снимка сетевых соединений (интервал 3 сек для минимизации нагрузки на CPU)
-        _pollTimer = new Timer(OnPollTimerTick, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
+        // Запуск адаптивного цикла опроса: активен только при UI-клиенте и правилах,
+        // иначе — глубокий сон (0% CPU) до Pulse/смены конфигурации.
+        StartLoop();
+    }
+
+    /// <summary>Регистрирует наличие/отсутствие активного UI-клиента (вызывается PipeServer).</summary>
+    public void SetUiActive(bool active)
+    {
+        if (_uiActive == active) return;
+        _uiActive = active;
+        _wake.Pulse();
+    }
+
+    /// <summary>Есть ли работа: активен UI-клиент И включён хотя бы один порт-правило.</summary>
+    private bool HasWork()
+    {
+        if (!_uiActive) return false;
+        lock (_sync)
+        {
+            return _config.IsGloballyEnabled && _config.Rules.Any(r => r.IsEnabled);
+        }
+    }
+
+    private void StartLoop()
+    {
+        if (_loop is { IsCompleted: false }) return;
+        try { _cts?.Dispose(); } catch { }
+        _cts = new CancellationTokenSource();
+        _loop = RunAsync(_cts.Token);
+    }
+
+    private void StopLoop()
+    {
+        var cts = _cts;
+        _cts = null;
+        _loop = null;
+        if (cts == null) return;
+        try { cts.Cancel(); } catch { }
+        cts.Dispose();
+    }
+
+    /// <summary>
+    /// Адаптивный цикл: при наличии работы опрос каждые 3 секунды, иначе — глубокий
+    /// сон до смены конфигурации (<see cref="SaveConfig"/>) или подключения UI-клиента.
+    /// </summary>
+    private async Task RunAsync(CancellationToken ct)
+    {
+        // Первоначальная задержка — не мешаем старту службы.
+        try { await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return; }
+
+        await SleepAwareLoop.RunAsync(
+            _wake,
+            HasWork,
+            activeInterval: TimeSpan.FromSeconds(3),
+            idleInterval: Timeout.InfiniteTimeSpan, // 0% CPU: сон до события/отмены
+            body: _ =>
+            {
+                try
+                {
+                    var sockets = _networkTracker.GetSockets();
+                    if (sockets != null && sockets.Count > 0)
+                        ProcessSocketSnapshot(sockets);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "PortDefender: Ошибка при периодическом сканировании сокетов");
+                }
+                return Task.CompletedTask;
+            },
+            ct).ConfigureAwait(false);
     }
 
     // ───────────────────────────── Конфигурация ─────────────────────────────
@@ -128,6 +203,9 @@ public sealed class ProcessPortDefenderService : IDisposable
         }
         _logger.LogInformation("PortDefender: Конфигурация обновлена. Правил: {Count}, Активен: {Enabled}",
             config.Rules?.Count ?? 0, config.IsGloballyEnabled);
+
+        // Смена правил → немедленный пересчёт режима сна (активный опрос либо 0% CPU Idle).
+        _wake.Pulse();
     }
 
     // ───────────────────────────── Активные баны ─────────────────────────────
@@ -573,32 +651,7 @@ public sealed class ProcessPortDefenderService : IDisposable
 
     // ───────────────────────────── Опрос и таймеры ─────────────────────────────
 
-    private void OnPollTimerTick(object? state)
-    {
-        if (_disposed) return;
-        try
-        {
-            // Быстрый выход ДО тяжёлого опроса IP Helper API, когда защита не активна.
-            PortDefenderConfigDto cfg;
-            lock (_sync)
-            {
-                cfg = _config;
-            }
-
-            if (!cfg.IsGloballyEnabled || cfg.Rules.Count == 0 || !cfg.Rules.Any(r => r.IsEnabled))
-                return;
-
-            var sockets = _networkTracker.GetSockets();
-            if (sockets != null && sockets.Count > 0)
-            {
-                ProcessSocketSnapshot(sockets);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "PortDefender: Ошибка при периодическом сканировании сокетов");
-        }
-    }
+    // (цикл опроса — см. RunAsync/HasWork/SetUiActive выше)
 
     // ───────────────────────────── Персистентность файлов ─────────────────────────────
 
@@ -729,6 +782,7 @@ public sealed class ProcessPortDefenderService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _pollTimer?.Dispose();
+        StopLoop();
+        _wake.Dispose();
     }
 }
