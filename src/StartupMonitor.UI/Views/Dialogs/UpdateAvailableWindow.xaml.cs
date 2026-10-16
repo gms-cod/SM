@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.UI.Services;
@@ -98,6 +100,26 @@ public partial class UpdateAvailableWindow : FluentWindow
                 System.Windows.MessageBox.Show(this, msg, "Startup Monitor", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                 BtnUpdateAction.IsEnabled = true;
                 return;
+            }
+
+            // Запускаем watchdog в интерактивной сессии пользователя:
+            // ждём завершения инсталлятора StartupMonitorSetup и перезапускаем UI
+            try
+            {
+                var uiExe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "StartupMonitor.UI.exe");
+                var restartCmd = $"/c timeout /t 2 /nobreak >nul & :loop & tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && (timeout /t 2 /nobreak >nul & goto loop) & start \"\" \"{uiExe}\" --minimized";
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = restartCmd,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                });
+            }
+            catch
+            {
+                // Игнорируем ошибки запуска сторожевого процесса
             }
 
             Close();
