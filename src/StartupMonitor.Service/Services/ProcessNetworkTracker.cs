@@ -454,6 +454,18 @@ public class ProcessNetworkTracker : IDisposable
             var sockets = new List<ProcessNetworkSocket>(64);
             var now = DateTime.UtcNow;
 
+            // Периодическая очистка устаревших PID из кэша имён для предотвращения утечек памяти
+            if (_procNameCache.Count > 128)
+            {
+                foreach (var kvp in _procNameCache)
+                {
+                    if (kvp.Value.ExpiresAt <= now)
+                    {
+                        _procNameCache.TryRemove(kvp.Key, out _);
+                    }
+                }
+            }
+
             string GetProcName(int pid)
             {
                 if (pid <= 0) return string.Empty;

@@ -444,19 +444,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient?.Dispose();
     }
 
-    /// <summary>Приостанавливает замер CPU (глубокий покой UI в трее, п. 2.1): 0% CPU от таймера.</summary>
+    /// <summary>Приостанавливает замер CPU и фоновые таймеры (глубокий покой UI в трее): 0% CPU от таймеров.</summary>
     public void SuspendCpuTimer()
     {
         _cpuTimerSuspended = true;
         try { _cpuUsageTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+        try { _pollingTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
+        try { _themePollTimer?.Change(Timeout.Infinite, Timeout.Infinite); } catch { }
     }
 
-    /// <summary>Возобновляет замер CPU при восстановлении окна из трея.</summary>
+    /// <summary>Возобновляет замер CPU и фоновые таймеры при восстановлении окна из трея.</summary>
     public void ResumeCpuTimer()
     {
         _cpuTimerSuspended = false;
         try { _cpuUsageTimer?.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)); } catch { }
+        if (!IsMonitoringPaused)
+            try { _pollingTimer?.Change(TimeSpan.Zero, TimeSpan.FromSeconds(5)); } catch { }
+        if (_themePollTimer != null)
+            try { _themePollTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(2)); } catch { }
     }
+
+    /// <summary>Приостанавливает всю фоновую активность UI при сворачивании в трей.</summary>
+    public void SuspendBackgroundActivity() => SuspendCpuTimer();
+
+    /// <summary>Возобновляет фоновую активность UI при разворачивании окна из трея.</summary>
+    public void ResumeBackgroundActivity() => ResumeCpuTimer();
 
     /// <summary>Приостановлен ли CPU-таймер (окно скрыто в трей).</summary>
     public bool IsCpuTimerSuspended => _cpuTimerSuspended;
@@ -1471,6 +1483,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.Connected += OnPipeClientConnected;
         _pipeClient.EventsReceived += OnPipeClientEventsReceived;
         _pipeClient.Disconnected += OnPipeClientDisconnected;
+        AppIconService.IconLoaded += OnIconLoaded;
+    }
+
+    /// <summary>
+    /// Обработчик события асинхронной загрузки иконки: уведомляет привязки UI для обновления строки без сброса скролла.
+    /// </summary>
+    private void OnIconLoaded(string path, System.Windows.Media.ImageSource icon)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null) return;
+
+        dispatcher.BeginInvoke(() =>
+        {
+            lock (_entriesLock)
+            {
+                foreach (var entry in _allEntries)
+                {
+                    if (string.Equals(entry.FilePath, path, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(AppIconService.FastCleanPath(entry.FilePath), path, StringComparison.OrdinalIgnoreCase))
+                    {
+                        entry.RefreshIcon();
+                    }
+                }
+            }
+        });
     }
 
     /// <summary>OnPipeClientConnected: Обрабатывает событие OnPipeClientConnected.</summary>

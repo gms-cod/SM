@@ -43,6 +43,12 @@ public class StartupEntry : INotifyPropertyChanged
         set { if (Set(ref _filePath, value)) OnPropertyChanged(nameof(DisplayPath)); }
     }
 
+    /// <summary>Уведомляет UI об обновлении иконки программы (перепривязка FilePath).</summary>
+    public void RefreshIcon()
+    {
+        OnPropertyChanged(nameof(FilePath));
+    }
+
     /// <summary>Издатель (цифровая подпись).</summary>
     /// <summary>Издатель (цифровая подпись или PE CompanyName).</summary>
     private string _publisher = string.Empty;

@@ -131,17 +131,61 @@ public static class HashAndSecurityHelper
 
         length = Math.Clamp(length, 4, 128);
 
-        var result = new StringBuilder(length);
-        byte[] randomBytes = new byte[length];
-        RandomNumberGenerator.Fill(randomBytes);
+        var result = new char[length];
+        var requiredChars = new List<char>();
 
-        for (int i = 0; i < length; i++)
+        // Обязательно добавляем минимум по 1 символу из каждого запрошенного набора
+        if (useUpper)
         {
-            int index = randomBytes[i] % pool.Length;
-            result.Append(pool[index]);
+            byte[] b = new byte[1];
+            RandomNumberGenerator.Fill(b);
+            requiredChars.Add(upper[b[0] % upper.Length]);
+        }
+        if (useDigits)
+        {
+            byte[] b = new byte[1];
+            RandomNumberGenerator.Fill(b);
+            requiredChars.Add(digits[b[0] % digits.Length]);
+        }
+        if (useSymbols)
+        {
+            byte[] b = new byte[1];
+            RandomNumberGenerator.Fill(b);
+            requiredChars.Add(symbols[b[0] % symbols.Length]);
         }
 
-        return result.ToString();
+        // Заполняем обязательные позиции
+        int pos = 0;
+        foreach (var ch in requiredChars)
+        {
+            if (pos < length)
+            {
+                result[pos++] = ch;
+            }
+        }
+
+        // Остальные позиции заполняем случайными символами из общего пула
+        int remaining = length - pos;
+        if (remaining > 0)
+        {
+            byte[] randomBytes = new byte[remaining];
+            RandomNumberGenerator.Fill(randomBytes);
+            for (int i = 0; i < remaining; i++)
+            {
+                result[pos++] = pool[randomBytes[i] % pool.Length];
+            }
+        }
+
+        // Перемешиваем символы алгоритмом Фишера-Йетса для равномерного распределения
+        byte[] shuffleBytes = new byte[length];
+        RandomNumberGenerator.Fill(shuffleBytes);
+        for (int i = length - 1; i > 0; i--)
+        {
+            int j = shuffleBytes[i] % (i + 1);
+            (result[i], result[j]) = (result[j], result[i]);
+        }
+
+        return new string(result);
     }
 
     /// <summary>

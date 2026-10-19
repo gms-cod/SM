@@ -40,3 +40,7 @@ __pycache__/
 
 # Local deleted / clean up folder
 delete/
+
+# Website compiled binaries
+www/downloads/*.exe
+www/downloads/*.zip

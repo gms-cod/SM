@@ -351,7 +351,7 @@ public class PipeServer : BackgroundService
                     // при каждом 5-сек опросе UI не нужно (дисковый жор).
                     foreach (var e in config.Entries.ToList())
                         EntryOperations.ResolveAndEnrichEntry(e, computeHash: false);
-                    _store.Save(config);
+                    // _store.Save(config); — УДАЛЕНО: Чтение не должно перезаписывать файлы на диске (ликвидация паразитного I/O)
                     _linker.UpdateIndex(config.Entries);
                     var entriesCount = config.Entries.Count;
                     if (entriesCount != _lastGetAllCount)
@@ -392,7 +392,7 @@ public class PipeServer : BackgroundService
                     var deltaConfig = _store.Load();
                     foreach (var e in deltaConfig.Entries.ToList())
                         EntryOperations.ResolveAndEnrichEntry(e, computeHash: false);
-                    _store.Save(deltaConfig);
+                    // _store.Save(deltaConfig); — УДАЛЕНО: Чтение не должно перезаписывать файлы на диске (ликвидация паразитного I/O)
                     _linker.UpdateIndex(deltaConfig.Entries);
                     var curRev = Volatile.Read(ref _entriesRevision);
                     response = new PipeMessage

@@ -20,7 +20,7 @@ public class FilePathToIconConverter : IValueConverter
     {
         if (value is string path && !string.IsNullOrWhiteSpace(path))
         {
-            return AppIconService.GetIcon(path);
+            return AppIconService.GetIconOrPlaceholder(path);
         }
         return null;
     }

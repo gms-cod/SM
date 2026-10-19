@@ -214,9 +214,29 @@ public class PipeClient : IDisposable
                 }
                 return null;
             }
-            if (response == null) return null;
+            if (response == null)
+            {
+                // Поток разорван со стороны службы (EOF, служба закрыла соединение)
+                try { _pipe?.Dispose(); } catch { }
+                Disconnected?.Invoke(this, EventArgs.Empty);
+                return null;
+            }
 
             return JsonSerializer.Deserialize<PipeMessage>(response, JsonOptions);
+        }
+        catch (IOException)
+        {
+            // Обрыв канала связи со службой (перезапуск службы или сбой IPC)
+            try { _pipe?.Dispose(); } catch { }
+            Disconnected?.Invoke(this, EventArgs.Empty);
+            return null;
+        }
+        catch (ObjectDisposedException)
+        {
+            // Попытка операции с уже закрытым каналом
+            try { _pipe?.Dispose(); } catch { }
+            Disconnected?.Invoke(this, EventArgs.Empty);
+            return null;
         }
         catch (OperationCanceledException)
         {

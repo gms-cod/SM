@@ -22,8 +22,33 @@ public class EventPipeServer : BackgroundService
     private readonly NotificationService _notificationService;
     // Логгер
     private readonly ILogger<EventPipeServer> _logger;
-    // Словарь подключённых клиентов: ID → StreamWriter
-    private readonly ConcurrentDictionary<int, StreamWriter> _clients = new();
+    /// <summary>
+    /// Обертка подключенного клиента с собственным асинхронным семафором для исключения блокировок потоков ОС.
+    /// </summary>
+    private sealed class ConnectedClient : IDisposable
+    {
+        public int Id { get; }
+        public NamedPipeServerStream Pipe { get; }
+        public StreamWriter Writer { get; }
+        public SemaphoreSlim Lock { get; } = new(1, 1);
+
+        public ConnectedClient(int id, NamedPipeServerStream pipe, StreamWriter writer)
+        {
+            Id = id;
+            Pipe = pipe;
+            Writer = writer;
+        }
+
+        public void Dispose()
+        {
+            try { Writer.Dispose(); } catch { }
+            try { Pipe.Dispose(); } catch { }
+            try { Lock.Dispose(); } catch { }
+        }
+    }
+
+    // Словарь подключённых клиентов: ID → ConnectedClient
+    private readonly ConcurrentDictionary<int, ConnectedClient> _clients = new();
     // Настройки JSON-сериализации
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -61,7 +86,7 @@ public class EventPipeServer : BackgroundService
         {
             try
             {
-                // Создаём pipe только на запись (out) — клиенты только слушают
+                // Создаём pipe только на запись (out) — клиенты только слушают (буфер 64 КБ)
                 var pipe = NamedPipeServerStreamAcl.Create(
                     EventPipeName,
                     PipeDirection.Out,
@@ -69,7 +94,7 @@ public class EventPipeServer : BackgroundService
                     PipeTransmissionMode.Message,
                     PipeOptions.Asynchronous,
                     inBufferSize: 0,
-                    outBufferSize: 0,
+                    outBufferSize: 65536,
                     PipeSecurityFactory.CreateDefault());
 
                 await pipe.WaitForConnectionAsync(stoppingToken);
@@ -77,17 +102,15 @@ public class EventPipeServer : BackgroundService
 
                 var writer = new StreamWriter(pipe) { AutoFlush = true };
                 var id = pipe.GetHashCode();
-                _clients[id] = writer;
+                var client = new ConnectedClient(id, pipe, writer);
+                _clients[id] = client;
 
-                // Фоновая задача отслеживает отключение клиента (его невозможно
-                // детектировать напрямую на out-pipe — только при попытке записи).
-                // Heartbeat-записи (см. HeartbeatLoop) переводят мёртвого клиента
-                // в dead и RemoveClient освобождает его слот.
+                // Фоновая задача отслеживает отмену службы для освобождения ресурсов
                 _ = Task.Run(async () =>
                 {
-                    try { await Task.Delay(-1, stoppingToken); }
+                    try { await Task.Delay(Timeout.Infinite, stoppingToken); }
                     catch (OperationCanceledException) { }
-                    RemoveClient(pipe, id);
+                    RemoveClient(id);
                 }, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
@@ -109,10 +132,7 @@ public class EventPipeServer : BackgroundService
     }
 
     /// <summary>
-    /// Периодическая проверка живучести клиентов: запись пустого батча мёртвому
-    /// клиенту бросает IOException — клиент попадает в dead и освобождает слот
-    /// канала. Без этого отключившиеся клиенты занимают инстансы навсегда,
-    /// и после 10 подключений сервер перестаёт принимать новых.
+    /// Периодическая проверка живучести клиентов: неблокирующая отправка пустого батча.
     /// </summary>
     private void StartHeartbeat(CancellationToken stoppingToken)
     {
@@ -128,49 +148,89 @@ public class EventPipeServer : BackgroundService
     }
 
     /// <summary>
-    /// Удаляет клиента из словаря и освобождает pipe.
+    /// Удаляет клиента из словаря и освобождает связанные ресурсы.
     /// </summary>
-    /// <param name="pipe">Экземпляр pipe для освобождения</param>
-    /// <param name="id">Идентификатор клиента</param>
-    private void RemoveClient(NamedPipeServerStream pipe, int id)
+    private void RemoveClient(int id)
     {
-        _clients.TryRemove(id, out _);
-        try { pipe.Dispose(); } catch { }
+        if (_clients.TryRemove(id, out var client))
+        {
+            client.Dispose();
+        }
     }
 
     /// <summary>
-    /// Обработчик события MessagesBatchReady. Сериализует батч в JSON
-    /// и отправляет всем подключённым клиентам. Мёртвые клиенты удаляются.
+    /// Обработчик события MessagesBatchReady: асинхронно рассылает батч всем клиентам
+    /// без блокировки потока таймера NotificationService (защита от ThreadPool Starvation).
     /// </summary>
-    /// <param name="sender">Источник события (NotificationService)</param>
-    /// <param name="batch">Список сообщений для рассылки</param>
     private void OnMessagesBatchReady(object? sender, List<PipeMessage> batch)
     {
-        var json = JsonSerializer.Serialize(batch, JsonOptions);
-        var dead = new List<int>();
+        _ = BroadcastBatchAsync(batch);
+    }
 
-        // Рассылаем всем живым клиентам
-        foreach (var (id, writer) in _clients)
+    /// <summary>
+    /// Неблокирующая параллельная широковещательная рассылка батча клиентам с жестким таймаутом 2 секунды.
+    /// </summary>
+    private async Task BroadcastBatchAsync(List<PipeMessage> batch)
+    {
+        if (_clients.IsEmpty) return;
+
+        string json;
+        try
         {
-            try
-            {
-                lock (writer)
-                {
-                    writer.WriteLine(json);
-                    writer.Flush();
-                }
-            }
-            catch
-            {
-                dead.Add(id);
-            }
+            json = JsonSerializer.Serialize(batch, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка сериализации батча уведомлений");
+            return;
         }
 
-        // Мёртвого клиента удаляем и освобождаем pipe
+        var dead = new List<int>();
+
+        // Рассылаем параллельно всем подключенным клиентам с таймаутом на каждого
+        var sendTasks = _clients.Select(async kvp =>
+        {
+            var id = kvp.Key;
+            var client = kvp.Value;
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            try
+            {
+                // Защита от одновременной записи в один стрим с таймаутом ожидания
+                if (!await client.Lock.WaitAsync(TimeSpan.FromSeconds(2), cts.Token))
+                {
+                    _logger.LogWarning("Event-клиент {Id} не освободил лок записи за 2 сек — клиент завис", id);
+                    return (id, false);
+                }
+
+                try
+                {
+                    await client.Writer.WriteLineAsync(json.AsMemory(), cts.Token);
+                    await client.Writer.FlushAsync(cts.Token);
+                    return (id, true);
+                }
+                finally
+                {
+                    client.Lock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Ошибка отправки батча клиенту {Id} (клиент отключен или завис)", id);
+                return (id, false);
+            }
+        });
+
+        var results = await Task.WhenAll(sendTasks);
+        foreach (var (id, success) in results)
+        {
+            if (!success) dead.Add(id);
+        }
+
+        // Мёртвых и зависших клиентов удаляем и освобождаем ресурсы pipe
         foreach (var id in dead)
         {
-            if (_clients.TryRemove(id, out var deadWriter))
-                try { deadWriter.Dispose(); } catch { }
+            RemoveClient(id);
         }
     }
 }

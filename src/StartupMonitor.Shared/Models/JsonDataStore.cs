@@ -110,7 +110,20 @@ public class JsonDataStore
             }
 
             TrimHistoryFile();
-            return _cache;
+
+            // Возвращаем защищенный изолированный снимок конфигурации с копиями списков,
+            // чтобы параллельная итерация в PipeServer не падала с InvalidOperationException
+            // при одновременных операциях добавления/удаления из фоновых вотчеров.
+            return new AppConfig
+            {
+                Language = _cache.Language,
+                Theme = _cache.Theme,
+                Entries = _cache.Entries.ToArray().ToList(),
+                Blacklist = _cache.Blacklist.ToArray().ToList(),
+                RemovedEntries = _cache.RemovedEntries.ToArray().ToList(),
+                History = _cache.History.ToArray().ToList(),
+                Settings = _cache.Settings
+            };
         }
     }
 
@@ -451,8 +464,9 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
-            config.Entries.RemoveAll(e => e.Id == entryId);
+            Load();
+            if (_cache == null) return;
+            _cache.Entries.RemoveAll(e => e.Id == entryId);
             SaveEntries();
         }
     }
@@ -462,11 +476,12 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
-            var idx = config.Entries.FindIndex(e => e.Id == entry.Id);
+            Load();
+            if (_cache == null) return;
+            var idx = _cache.Entries.FindIndex(e => e.Id == entry.Id);
             if (idx >= 0)
             {
-                config.Entries[idx] = entry;
+                _cache.Entries[idx] = entry;
                 SaveEntries();
             }
         }
@@ -516,10 +531,11 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
+            Load();
+            if (_cache == null) return;
             // Один бэкап на запись: повторное срабатывание правила не плодит дубликаты
-            config.RemovedEntries.RemoveAll(r => r.OriginalEntryId == entry.OriginalEntryId);
-            config.RemovedEntries.Add(entry);
+            _cache.RemovedEntries.RemoveAll(r => r.OriginalEntryId == entry.OriginalEntryId);
+            _cache.RemovedEntries.Add(entry);
             SaveRemoved();
         }
     }
@@ -539,8 +555,9 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
-            var count = config.RemovedEntries.RemoveAll(r => string.Equals(r.RemovalReason, reason, StringComparison.OrdinalIgnoreCase));
+            Load();
+            if (_cache == null) return 0;
+            var count = _cache.RemovedEntries.RemoveAll(r => string.Equals(r.RemovalReason, reason, StringComparison.OrdinalIgnoreCase));
             if (count > 0)
             {
                 SaveRemoved();
@@ -554,8 +571,9 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
-            var count = config.RemovedEntries.RemoveAll(r => r.OriginalEntryId == entryId);
+            Load();
+            if (_cache == null) return;
+            var count = _cache.RemovedEntries.RemoveAll(r => r.OriginalEntryId == entryId);
             if (count > 0)
             {
                 SaveRemoved();
@@ -568,8 +586,9 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
-            config.RemovedEntries.RemoveAll(r => r.Id == removedId);
+            Load();
+            if (_cache == null) return;
+            _cache.RemovedEntries.RemoveAll(r => r.Id == removedId);
             SaveRemoved();
         }
     }

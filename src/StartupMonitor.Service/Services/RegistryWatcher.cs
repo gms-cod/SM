@@ -226,82 +226,148 @@ public class RegistryWatcher : BackgroundService
         }
     }
 
-    /// <summary>Запускает цикл уведомлений об изменениях ключа реестра через P/Invoke.</summary>
-    private void StartRegNotify(SafeHandle regHandle, string keyPath, RegistryHive hive, CancellationToken ct)
+    /// <summary>
+    /// Контекст асинхронной подписки на ключ реестра без блокировки системных потоков ThreadPool.
+    /// </summary>
+    private sealed class WatchedKeySubscription : IDisposable
     {
-        _ = Task.Run(async () =>
+        public SafeHandle RegHandle { get; }
+        public string KeyPath { get; }
+        public RegistryHive Hive { get; }
+        public AutoResetEvent NotifyEvent { get; } = new(false);
+        public RegisteredWaitHandle? WaitHandle { get; set; }
+
+        public WatchedKeySubscription(SafeHandle regHandle, string keyPath, RegistryHive hive)
         {
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    // Блокирующий режим: вызов возвращается при изменении ключа или при закрытии handle.
-                    // (async-режим с hEvent=IntPtr.Zero возвращал ERROR_INVALID_HANDLE и крутил цикл вхолостую)
-                    var result = RegNotifyChangeKeyValue(
-                        regHandle,
-                        watchSubtree: true,
-                        notifyFilter: RegNotifyFilter.NAME | RegNotifyFilter.VALUE | RegNotifyFilter.SET_VALUE,
-                        fAsynchronous: false,
-                        hEvent: IntPtr.Zero,
-                        fImmediate: false);
+            RegHandle = regHandle;
+            KeyPath = keyPath;
+            Hive = hive;
+        }
 
-                    if (ct.IsCancellationRequested) break;
-
-                    if (result == 0)
-                    {
-                        if (_coordinator.IsPaused) continue;
-                        await Task.Delay(500, ct);
-                        _logger.LogInformation("Registry change detected: {Key}", keyPath);
-                        if (hive == RegistryHive.LocalMachine)
-                        {
-                            ScanHive(Registry.LocalMachine, "HKLM", allowWow64: true);
-                        }
-                        else
-                        {
-                            ScanHive(Registry.CurrentUser, "HKCU", allowWow64: false);
-                            foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
-                            {
-                                using var userKey = Registry.Users.OpenSubKey(sid);
-                                if (userKey == null) continue;
-                                ScanHive(userKey, $@"HKCU\{name}", allowWow64: false);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Ошибка (напр. handle закрыт при остановке) — не жечь CPU в цикле
-                        await Task.Delay(1000, ct);
-                    }
-                }
-                catch (OperationCanceledException) { break; }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Registry notification error for {Key}", keyPath);
-                    await Task.Delay(5000, ct);
-                }
-            }
-        }, ct);
+        public void Dispose()
+        {
+            try { WaitHandle?.Unregister(null); } catch { }
+            try { NotifyEvent.Dispose(); } catch { }
+        }
     }
 
-    /// <summary>Остановка: закрываем ключи, чтобы разблокировать RegNotifyChangeKeyValue.</summary>
+    /// <summary>Список активных асинхронных подписок на ключи реестра.</summary>
+    private readonly List<WatchedKeySubscription> _subscriptions = [];
+
+    /// <summary>Запускает асинхронную регистрацию уведомлений через пул потоков Windows без постоянного удержания потока.</summary>
+    private void StartRegNotify(SafeHandle regHandle, string keyPath, RegistryHive hive, CancellationToken ct)
+    {
+        var sub = new WatchedKeySubscription(regHandle, keyPath, hive);
+        lock (_subscriptions)
+        {
+            _subscriptions.Add(sub);
+        }
+
+        // Первичное взведение асинхронного уведомления в ядре Windows
+        ArmWatcher(sub, ct);
+    }
+
+    /// <summary>Взводит асинхронное уведомление ядра Windows и регистрирует дескриптор события в ThreadPool.</summary>
+    private void ArmWatcher(WatchedKeySubscription sub, CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested || sub.RegHandle.IsClosed || sub.RegHandle.IsInvalid)
+            return;
+
+        // Каноничный Win32 P/Invoke: hEvent передается 4-м параметром, fAsynchronous: true — 5-м
+        var status = RegNotifyChangeKeyValue(
+            sub.RegHandle,
+            watchSubtree: true,
+            notifyFilter: RegNotifyFilter.NAME | RegNotifyFilter.VALUE | RegNotifyFilter.SET_VALUE,
+            hEvent: sub.NotifyEvent.SafeWaitHandle,
+            fAsynchronous: true);
+
+        if (status != 0)
+        {
+            _logger.LogDebug("RegNotifyChangeKeyValue вернул статус {Status} для {Key}", status, sub.KeyPath);
+            return;
+        }
+
+        // Регистрируем ожидание события в системном пуле потоков (0 заблокированных потоков)
+        sub.WaitHandle = ThreadPool.RegisterWaitForSingleObject(
+            sub.NotifyEvent,
+            OnRegistryKeyChanged,
+            sub,
+            Timeout.Infinite,
+            executeOnlyOnce: true);
+    }
+
+    /// <summary>Коллбек системного пула потоков при срабатывании изменения в ключе реестра.</summary>
+    private void OnRegistryKeyChanged(object? state, bool timedOut)
+    {
+        if (state is not WatchedKeySubscription sub) return;
+
+        // Немедленно перевзводим наблюдение для непрерывного перехвата следующих изменений
+        ArmWatcher(sub, CancellationToken.None);
+
+        if (_coordinator.IsPaused) return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(500);
+                _logger.LogInformation("Registry change detected: {Key}", sub.KeyPath);
+                if (sub.Hive == RegistryHive.LocalMachine)
+                {
+                    ScanHive(Registry.LocalMachine, "HKLM", allowWow64: true);
+                }
+                else
+                {
+                    ScanHive(Registry.CurrentUser, "HKCU", allowWow64: false);
+                    foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
+                    {
+                        using var userKey = Registry.Users.OpenSubKey(sid);
+                        if (userKey == null) continue;
+                        ScanHive(userKey, $@"HKCU\{name}", allowWow64: false);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка обработки изменения реестра для {Key}", sub.KeyPath);
+            }
+        });
+    }
+
+    /// <summary>Остановка: закрываем ключи и отменяем подписки в пуле потоков.</summary>
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        // Закрытие ключей разблокирует RegNotifyChangeKeyValue в потоках наблюдения
+        lock (_subscriptions)
+        {
+            foreach (var sub in _subscriptions)
+                sub.Dispose();
+            _subscriptions.Clear();
+        }
+
         foreach (var key in _watchedKeys)
             try { key.Dispose(); } catch { }
         _watchedKeys.Clear();
         return base.StopAsync(cancellationToken);
     }
 
-    /// <summary>P/Invoke для отслеживания изменений в реестре.</summary>
+    /// <summary>
+    /// P/Invoke для регистрации асинхронных уведомлений об изменениях в реестре Windows.
+    /// Каноническая сигнатура Win32 API:
+    /// LSTATUS RegNotifyChangeKeyValue(
+    ///   HKEY hKey,
+    ///   BOOL bWatchSubtree,
+    ///   DWORD dwNotifyFilter,
+    ///   HANDLE hEvent,
+    ///   BOOL fAsynchronous
+    /// );
+    /// </summary>
     [DllImport("advapi32.dll", SetLastError = true)]
     private static extern int RegNotifyChangeKeyValue(
         SafeHandle hKey,
         [MarshalAs(UnmanagedType.Bool)] bool watchSubtree,
         RegNotifyFilter notifyFilter,
-        [MarshalAs(UnmanagedType.Bool)] bool fAsynchronous,
-        IntPtr hEvent,
-        [MarshalAs(UnmanagedType.Bool)] bool fImmediate);
+        SafeHandle hEvent,
+        [MarshalAs(UnmanagedType.Bool)] bool fAsynchronous);
 
     /// <summary>Фильтры уведомлений реестра.</summary>
     [Flags]

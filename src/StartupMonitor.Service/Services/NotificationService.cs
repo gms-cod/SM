@@ -92,23 +92,36 @@ public class NotificationService : IDisposable
         catch { }
     }
 
-    /// <summary>Сбрасывает накопленные сообщения одним батчем.</summary>
+    /// <summary>Атомарный флаг предотвращения параллельного сброса батчей таймером при медленной отправке.</summary>
+    private int _isFlushing;
+
+    /// <summary>Сбрасывает накопленные сообщения одним батчем с защитой от реентрантности и переполнения пула потоков.</summary>
     private void FlushBatch(object? state)
     {
         if (!_tracker.IsCompleted) return;
         if (_messageQueue.IsEmpty) return;
 
-        var batch = new List<PipeMessage>();
-        while (_messageQueue.TryDequeue(out var message))
-        {
-            batch.Add(message);
-        }
+        // Предотвращаем накопление тиков таймера 200 мс, если предыдущий батч ещё передаётся в канал
+        if (Interlocked.CompareExchange(ref _isFlushing, 1, 0) != 0) return;
 
-        if (batch.Count > 0)
+        try
         {
-            // Исключение подписчика не должно убивать поток таймера (и весь процесс)
-            try { MessagesBatchReady?.Invoke(this, batch); }
-            catch { }
+            var batch = new List<PipeMessage>();
+            while (_messageQueue.TryDequeue(out var message))
+            {
+                batch.Add(message);
+            }
+
+            if (batch.Count > 0)
+            {
+                // Исключение подписчика не должно убивать поток таймера (и весь процесс службы)
+                try { MessagesBatchReady?.Invoke(this, batch); }
+                catch { }
+            }
+        }
+        finally
+        {
+            Volatile.Write(ref _isFlushing, 0);
         }
     }
 

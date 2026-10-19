@@ -234,12 +234,51 @@ public class AiRatingService : IDisposable
         }
     }
 
-    /// <summary>FetchRatingAsync: Выполняет операцию FetchRatingAsync.</summary>
+    // Предохранитель сетевых сбоев (Circuit Breaker): блокирует вызовы при отсутствии связи с внешним миром
+    private DateTime _networkCooldownUntil = DateTime.MinValue;
+    private int _consecutiveNetworkErrors;
+    private const int NetworkCooldownMinutes = 5;
+    private const int NetworkErrorThreshold = 2;
+
+    /// <summary>
+    /// Проверяет, является ли исключение сетевым сбоем сокета или DNS независимо от системной локализации Windows.
+    /// </summary>
+    private static bool IsNetworkConnectionError(Exception ex)
+    {
+        if (ex is HttpRequestException httpEx)
+        {
+            if (httpEx.HttpRequestError is HttpRequestError.NameResolutionError
+                or HttpRequestError.ConnectionError)
+            {
+                return true;
+            }
+        }
+
+        var cur = ex;
+        while (cur != null)
+        {
+            if (cur is System.Net.Sockets.SocketException)
+                return true;
+            cur = cur.InnerException;
+        }
+
+        return false;
+    }
+
+    /// <summary>FetchRatingAsync: Выполняет операцию FetchRatingAsync с поддержкой Circuit Breaker.</summary>
     /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
     /// <returns>Выходные данные: результирующее значение типа Task<StartupRating?>.</returns>
     private async Task<StartupRating?> FetchRatingAsync(StartupEntry entry)
     {
         using var _prof = ExecutionProfiler.Measure("Service.Ai.FetchRating");
+
+        // Circuit Breaker: если сеть недоступна, не пытаемся слать запросы
+        if (DateTime.UtcNow < _networkCooldownUntil)
+        {
+            _logger.LogWarning("Groq API: запрос отклонён Circuit Breaker (сеть недоступна до {Until} UTC)", _networkCooldownUntil);
+            return null;
+        }
+
         var waitedFor429 = false;
         for (var attempt = 1; attempt <= 5; attempt++)
         {
@@ -309,11 +348,27 @@ public class AiRatingService : IDisposable
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
+                _consecutiveNetworkErrors = 0;
                 return ParseResponse(json, entry.Name);
             }
-            catch (HttpRequestException ex) when (ex.Message.Contains("No connection could be made"))
+            catch (Exception ex) when (IsNetworkConnectionError(ex))
             {
-                _logger.LogWarning("Groq API недоступен. Проверьте подключение к интернету");
+                var errors = Interlocked.Increment(ref _consecutiveNetworkErrors);
+                _logger.LogWarning("Groq API: сетевой сбой подключения ({Attempt}/5): {Message}", attempt, ex.Message);
+
+                if (errors >= NetworkErrorThreshold)
+                {
+                    _networkCooldownUntil = DateTime.UtcNow.AddMinutes(NetworkCooldownMinutes);
+                    _logger.LogWarning("Groq API: зафиксировано {Errors} сетевых ошибок подряд. Включён Circuit Breaker на {Minutes} мин.",
+                        errors, NetworkCooldownMinutes);
+                    return null;
+                }
+
+                if (attempt < 5)
+                {
+                    await Task.Delay(2000);
+                    continue;
+                }
                 return null;
             }
             catch (TaskCanceledException)
