@@ -248,7 +248,8 @@ public class AiRatingService : IDisposable
         if (ex is HttpRequestException httpEx)
         {
             if (httpEx.HttpRequestError is HttpRequestError.NameResolutionError
-                or HttpRequestError.ConnectionError)
+                or HttpRequestError.ConnectionError
+                or HttpRequestError.SecureChannelFailure)
             {
                 return true;
             }
