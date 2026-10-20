@@ -44,3 +44,6 @@ delete/
 # Website compiled binaries
 www/downloads/*.exe
 www/downloads/*.zip
+
+installers/*.zip
+www/downloads/*.sha256
