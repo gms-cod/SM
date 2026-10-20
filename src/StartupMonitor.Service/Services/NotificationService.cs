@@ -5,16 +5,30 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Service.Services;
 
-/// <summary>Сервис уведомлений с объединением сообщений в батчи (coalescing).
+/// <summary>Сервис уведомлений с объединением сообщений в батчи (coalescing)
+/// и интеллектуальной дедупликацией (Smart Notification Deduplication).
+/// Предотвращает циклический спам повторными алертами (например, для блокировок Adobe Updater).
 /// Пока идёт начальный скан — уведомления EntryAdded подавляются.
 /// Батч отправляется раз в 200 мс через событие MessagesBatchReady.
 /// Также отправляет удалённые уведомления в Telegram / Discord после завершения скана.</summary>
 public class NotificationService : IDisposable
 {
     /// <summary>Потокобезопасная очередь сообщений для отправки в UI.</summary>
-    /// <summary>Максимальная емкость буфера уведомлений для предотвращения утечек памяти.</summary>
     public const int MaxQueueCapacity = 10_000;
     private readonly ConcurrentQueue<PipeMessage> _messageQueue = new();
+
+    /// <summary>Окно подавления повторных однотипных уведомлений (Cooldown 30 минут).</summary>
+    private static readonly TimeSpan DeduplicationWindow = TimeSpan.FromMinutes(30);
+
+    /// <summary>Потокобезопасный кэш времени отправки последних алертов (ключ -> время UTC).</summary>
+    private readonly ConcurrentDictionary<string, DateTime> _recentNotifications = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Счётчик операций для периодической очистки устаревших записей кэша дедупликации.</summary>
+    private long _dedupOpCounter;
+
+    /// <summary>Интервал между проходами очистки устаревшего кэша (в операциях).</summary>
+    private const int CleanupEveryOperations = 128;
+
     /// <summary>Таймер для периодического сброса батча.</summary>
     private readonly Timer _timer;
     /// <summary>Интервал объединения сообщений в батч.</summary>
@@ -29,9 +43,9 @@ public class NotificationService : IDisposable
     /// <summary>Событие: готов батч сообщений для отправки через pipe.</summary>
     public event EventHandler<List<PipeMessage>>? MessagesBatchReady;
 
-    /// <summary>NotificationService: Выполняет операцию NotificationService.</summary>
-    /// <param name="tracker">Входные данные: значение параметра tracker (InitialScanTracker).</param>
-    /// <param name="remoteNotifications">Входные данные: значение параметра remoteNotifications (RemoteNotificationService?).</param>
+    /// <summary>Инициализирует сервис уведомлений с таймером сброса батчей.</summary>
+    /// <param name="tracker">Трекер начального сканирования системы.</param>
+    /// <param name="remoteNotifications">Опциональный сервис удаленных уведомлений.</param>
     public NotificationService(InitialScanTracker tracker, RemoteNotificationService? remoteNotifications = null)
     {
         _tracker = tracker;
@@ -39,10 +53,15 @@ public class NotificationService : IDisposable
         _timer = new Timer(FlushBatch, null, _coalesceInterval, _coalesceInterval);
     }
 
-    /// <summary>Добавляет сообщение в очередь. EntryAdded подавляются до завершения скана.</summary>
+    /// <summary>Добавляет сообщение в очередь с проверкой дедупликации.
+    /// Повторные одинаковые уведомления в пределах окна DeduplicationWindow отсекаются.</summary>
     public void Enqueue(PipeMessage message)
     {
         if (!_tracker.IsCompleted && message.Type == PipeMessageTypes.EntryAdded)
+            return;
+
+        // Интеллектуальная дедупликация: отсекаем повторные алерты по неизменившимся сущностям
+        if (!TryRegisterNotification(message))
             return;
 
         if (_messageQueue.Count >= MaxQueueCapacity)
@@ -59,8 +78,106 @@ public class NotificationService : IDisposable
         }
     }
 
-    /// <summary>DispatchRemoteNotification: Выполняет операцию DispatchRemoteNotification.</summary>
-    /// <param name="message">Входные данные: значение параметра message (PipeMessage).</param>
+    /// <summary>Проверяет, является ли уведомление дубликатом в пределах окна охлаждения.
+    /// Возвращает true, если уведомление новое (нужно отправить); false — если дубликат (подавить).</summary>
+    private bool TryRegisterNotification(PipeMessage message)
+    {
+        var dedupKey = BuildDedupKey(message);
+        if (string.IsNullOrEmpty(dedupKey))
+            return true; // Неизвестный тип — отправляем без подавления
+
+        var now = DateTime.UtcNow;
+
+        // Периодическая очистка устаревших записей кэша
+        if (Interlocked.Increment(ref _dedupOpCounter) % CleanupEveryOperations == 0)
+        {
+            CleanupStaleDedupEntries(now);
+        }
+
+        while (true)
+        {
+            if (_recentNotifications.TryGetValue(dedupKey, out var lastSentUtc))
+            {
+                // Если с момента предыдущего уведомления прошло меньше времени, чем DeduplicationWindow — подавляем
+                if (now - lastSentUtc < DeduplicationWindow)
+                {
+                    return false;
+                }
+
+                // Окно истекло: атомарно обновляем временную метку
+                if (_recentNotifications.TryUpdate(dedupKey, now, lastSentUtc))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            // Новая запись: пытаемся добавить в кэш
+            if (_recentNotifications.TryAdd(dedupKey, now))
+            {
+                return true;
+            }
+        }
+    }
+
+    /// <summary>Формирует стабильный дедупликационный ключ на основе типа сообщения и полезной нагрузки.</summary>
+    private static string? BuildDedupKey(PipeMessage message)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(message.Payload))
+                return null;
+
+            switch (message.Type)
+            {
+                case PipeMessageTypes.BlacklistMatch:
+                {
+                    var entry = JsonSerializer.Deserialize<StartupEntry>(message.Payload, JsonOptions);
+                    if (entry == null) return null;
+                    // Ключ включает ID и CommandLine (если аргументы изменились — это новый алерт)
+                    return $"BlacklistMatch:{entry.Id}:{entry.CommandLine}";
+                }
+
+                case PipeMessageTypes.ActionNotice:
+                {
+                    var notice = JsonSerializer.Deserialize<ActionNoticePayload>(message.Payload, JsonOptions);
+                    if (notice == null) return null;
+                    return $"ActionNotice:{notice.Name}:{notice.Action}";
+                }
+
+                case PipeMessageTypes.EntryAdded:
+                {
+                    var entry = JsonSerializer.Deserialize<StartupEntry>(message.Payload, JsonOptions);
+                    if (entry == null) return null;
+                    return $"EntryAdded:{entry.Id}";
+                }
+
+                default:
+                    return null;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Удаляет записи кэша дедупликации, время которых превышает удвоенное окно.</summary>
+    private void CleanupStaleDedupEntries(DateTime now)
+    {
+        var cutoff = now - DeduplicationWindow - DeduplicationWindow;
+        foreach (var pair in _recentNotifications)
+        {
+            if (pair.Value < cutoff)
+            {
+                _recentNotifications.TryRemove(pair.Key, out _);
+            }
+        }
+    }
+
+    /// <summary>Отправляет внешние оповещения в настроенные каналы (Telegram/Discord).</summary>
+    /// <param name="message">Сообщение для отправки.</param>
     private void DispatchRemoteNotification(PipeMessage message)
     {
         try
@@ -132,7 +249,7 @@ public class NotificationService : IDisposable
         }
     }
 
-    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
+    /// <summary>Освобождает занятые ресурсы объекта (таймер батчинга).</summary>
     public void Dispose()
     {
         _timer.Dispose();

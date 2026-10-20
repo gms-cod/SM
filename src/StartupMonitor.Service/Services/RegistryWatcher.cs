@@ -152,7 +152,13 @@ public class RegistryWatcher : BackgroundService
                 {
                     if (!isInitial && matched.Action == BlacklistAction.NotifyAndRemove)
                     {
-                        _blacklist.ApplyBlacklistAction(entry, matched, _store, _notifications);
+                        var existingBlocked = _store.FindEntry(e => e.Id == entry.Id);
+                        // Защита от спама: если запись уже заблокирована в хранилище и параметры командной строки
+                        // не изменились, повторное воздействие и спам алертами пропускаются
+                        if (existingBlocked == null || existingBlocked.CommandLine != entry.CommandLine || !existingBlocked.FromBlacklist)
+                        {
+                            _blacklist.ApplyBlacklistAction(entry, matched, _store, _notifications);
+                        }
                         continue;
                     }
                     entry.Status = EntryStatus.Blocked;

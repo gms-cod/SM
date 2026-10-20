@@ -7,6 +7,8 @@ namespace StartupMonitor.UI.Services;
 /// Агрегатор всплывающих уведомлений (балунов) в системном трее.
 /// При одновременном поступлении множества уведомлений объединяет их по смыслу
 /// (батчинг со скользящим окном дебаунса 400 мс) вместо непрерывного спама одиночными окнами.
+/// Включает клиентское окно охлаждения (Cooldown 15 минут) для исключения повторного показа
+/// одинаковых уведомлений по одной и той же программе.
 /// Критичные предупреждения (SystemDanger) выводятся немедленно вне очереди.
 /// </summary>
 public sealed class TrayNotificationAggregator : IDisposable
@@ -17,14 +19,24 @@ public sealed class TrayNotificationAggregator : IDisposable
     private readonly DispatcherTimer _timer;
     private readonly Action<string, string, IReadOnlyList<string>> _showBalloonAction;
 
+    /// <summary>Окно охлаждения для одинаковых уведомлений (Cooldown 15 минут).</summary>
+    private static readonly TimeSpan NotificationCooldown = TimeSpan.FromMinutes(15);
+
+    /// <summary>Кэш времени показа последних уведомлений (ключ -> время UTC).</summary>
+    private readonly Dictionary<string, DateTime> _recentShown = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Максимальное количество отдельных строк, перечисляемых в одном балуне.</summary>
     public const int MaxItemsPerCategory = 3;
 
     /// <summary>Безопасный лимит символов для текста подсказки Win32 Shell Balloon Tip.</summary>
     public const int MaxBalloonChars = 255;
 
+    /// <summary>Интервал дебаунса для агрегации пачки уведомлений.</summary>
     public TimeSpan DebounceInterval { get; set; } = TimeSpan.FromMilliseconds(400);
 
+    /// <summary>Инициализирует агрегатор уведомлений трея.</summary>
+    /// <param name="dispatcher">UI-диспетчер WPF.</param>
+    /// <param name="showBalloonAction">Делегат вызова WinForms NotifyIcon.ShowBalloonTip.</param>
     public TrayNotificationAggregator(
         Dispatcher dispatcher,
         Action<string, string, IReadOnlyList<string>> showBalloonAction)
@@ -42,6 +54,7 @@ public sealed class TrayNotificationAggregator : IDisposable
     /// <summary>
     /// Добавляет уведомление в очередь агрегации.
     /// Если уведомление критическое (SystemDanger), оно отображается немедленно вне очереди.
+    /// Повторные одинаковые уведомления в пределах NotificationCooldown отсекаются.
     /// </summary>
     public void Enqueue(string title, string text, string? entryId, TrayNotificationKind kind)
     {
@@ -51,16 +64,35 @@ public sealed class TrayNotificationAggregator : IDisposable
         if (kind == TrayNotificationKind.Auto)
             kind = Classify(title);
 
-        // Критичные предупреждения доставляются мгновенно
+        // Критичные предупреждения доставляются мгновенно без фильтрации Cooldown
         if (kind == TrayNotificationKind.SystemDanger)
         {
             _showBalloonAction(title, text, entryId != null ? new[] { entryId } : Array.Empty<string>());
             return;
         }
 
+        var now = DateTime.UtcNow;
+        var dedupKey = $"{title}:{entryId ?? text}";
+
         lock (_lock)
         {
-            _buffer.Add(new PendingTrayNotification(title, text, entryId, DateTime.UtcNow, kind));
+            // Проверка Cooldown на стороне клиента: не показываем одинаковое сообщение чаще 1 раза в 15 минут
+            if (_recentShown.TryGetValue(dedupKey, out var lastShown) && now - lastShown < NotificationCooldown)
+            {
+                return; // Подавление дубликата
+            }
+
+            _recentShown[dedupKey] = now;
+            _buffer.Add(new PendingTrayNotification(title, text, entryId, now, kind));
+
+            // Периодическая очистка устаревших ключей Cooldown
+            if (_recentShown.Count > 256)
+            {
+                var cutoff = now - NotificationCooldown - NotificationCooldown;
+                var staleKeys = _recentShown.Where(kv => kv.Value < cutoff).Select(kv => kv.Key).ToList();
+                foreach (var k in staleKeys)
+                    _recentShown.Remove(k);
+            }
         }
 
         // Перезапускаем скользящий таймер дебаунса в UI-потоке
@@ -207,11 +239,11 @@ public sealed class TrayNotificationAggregator : IDisposable
         return TrayNotificationKind.Info;
     }
 
-    /// <summary>FormatCategoryTitle: Выполняет операцию FormatCategoryTitle.</summary>
-    /// <param name="kind">Входные данные: значение параметра kind (TrayNotificationKind).</param>
-    /// <param name="count">Входные данные: значение параметра count (int).</param>
-    /// <param name="loc">Входные данные: значение параметра loc (LocalizationService).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Форматирует локализованный заголовок категории уведомлений.</summary>
+    /// <param name="kind">Тип уведомления.</param>
+    /// <param name="count">Количество сообщений в пачке.</param>
+    /// <param name="loc">Сервис локализации интерфейса.</param>
+    /// <returns>Строка заголовка для трея.</returns>
     private static string FormatCategoryTitle(TrayNotificationKind kind, int count, LocalizationService loc) =>
         kind switch
         {
@@ -228,21 +260,20 @@ public sealed class TrayNotificationAggregator : IDisposable
             _ => $"{loc.AppName} ({count})"
         };
 
-    /// <summary>Truncate: Выполняет операцию Truncate.</summary>
-    /// <param name="s">Входные данные: значение параметра s (string).</param>
-    /// <param name="max">Входные данные: значение параметра max (int).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Обрезает строку по максимальной длине с добавлением многоточия.</summary>
+    /// <param name="s">Исходный текст.</param>
+    /// <param name="max">Максимальное допустимое количество символов.</param>
+    /// <returns>Обрезанная безопасная строка.</returns>
     private static string Truncate(string s, int max)
     {
         if (string.IsNullOrEmpty(s) || s.Length <= max) return s;
         return s.Substring(0, max - 1) + "…";
     }
 
-    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
+    /// <summary>Освобождает ресурсы таймера и сбрасывает оставшиеся уведомления.</summary>
     public void Dispose()
     {
         _timer.Stop();
         Flush();
     }
 }
-
