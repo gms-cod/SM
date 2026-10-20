@@ -654,9 +654,7 @@ public partial class MainWindow
             try { FirewallHubView?.Deactivate(); } catch { }
         }
 
-        // Набор инструментов (9): останавливаем длительные операции при уходе
-
-        if (idx == 6)
+                if (idx == 6)
             _ = _viewModel.TaskManager.ActivateAsync();
         else
             _ = _viewModel.TaskManager.DeactivateAsync();

@@ -380,7 +380,8 @@ public class JsonDataStore
         using var _prof = ExecutionProfiler.Measure("Shared.Store.Save");
         lock (_lock)
         {
-            _cache = config;
+            // Сохраняем изолированный снимок для исключения внешних мутаций кэша
+            _cache = CloneSnapshot(config);
             SaveEntries();
             SaveBlacklist();
             SaveRemoved();

@@ -1505,7 +1505,7 @@ public class PipeClient : IDisposable
                 }
             }
 
-            return response.Type == PipeMessageTypes.Success;
+            return response?.Type == PipeMessageTypes.Success;
         }
         catch
         {
@@ -1751,7 +1751,7 @@ public class PipeClient : IDisposable
         try
         {
             var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallSilentPid0 }, ct);
-            if (response.Type == PipeMessageTypes.GetFirewallSilentPid0Response && !string.IsNullOrEmpty(response.Payload))
+            if (response?.Type == PipeMessageTypes.GetFirewallSilentPid0Response && !string.IsNullOrEmpty(response.Payload))
             {
                 var payload = JsonSerializer.Deserialize<FirewallSilentPid0Payload>(response.Payload, JsonOptions);
                 return payload?.Silent ?? true;
@@ -1772,7 +1772,7 @@ public class PipeClient : IDisposable
                 Type = PipeMessageTypes.SetFirewallSilentPid0,
                 Payload = payload
             }, ct);
-            return response.Type == PipeMessageTypes.Success;
+            return response?.Type == PipeMessageTypes.Success;
         }
         catch { return false; }
     }

@@ -236,6 +236,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
             // P0: GetAllRules() вызывается ровно один раз за скан (дорогой COM-перебор
             // всех правил), а в цикле проверка идёт за O(1) через HashSet путей.
             var rulePaths = BuildFirewallRulePathSet();
+            // Загружаем флаг тихого режима один раз перед обходом сокетов (оптимизация I/O)
+            var isSilentPid0 = _store?.Load().Settings.FirewallSilentPid0 ?? true;
             foreach (var socket in sockets)
             {
                 if (socket is null)
@@ -246,7 +248,6 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     continue;
 
                 // 0. Тихий режим: сокеты без определенного процесса (PID = 0) не создают всплывающих окон при включенной опции
-                var isSilentPid0 = _store?.Load().Settings.FirewallSilentPid0 ?? true;
                 if (socket.ProcessId == 0 && isSilentPid0)
                     continue;
 

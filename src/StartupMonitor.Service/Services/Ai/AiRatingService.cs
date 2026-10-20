@@ -22,7 +22,6 @@ public class AiRatingService : IDisposable
     private static readonly SemaphoreSlim _prefetchLock = new(1, 1);
     private string _apiUrl = "https://api.groq.com/openai/v1/chat/completions";
     private string _model = "openai/gpt-oss-120b";
-    private const int MinDelayMs = 5000;
     private const int CooldownMinutes = 5;
     private static readonly Random _jitter = new();
     private static readonly string WindowsVersion = RuntimeInformation.OSDescription;

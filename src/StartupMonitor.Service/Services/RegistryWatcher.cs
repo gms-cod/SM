@@ -30,7 +30,7 @@ public class RegistryWatcher : BackgroundService
     /// <summary>Атомарный индикатор выполнения активного сканирования (0 - свободно, 1 - занято).</summary>
     private int _isScanning = 0;
     /// <summary>Флаг необходимости повторного прохода, если во время сканирования поступили новые события.</summary>
-    private volatile bool _rescanRequired = false;
+    private int _rescanRequired = 0;
 
     /// <summary>Пути ключей реестра для стандартных точек автозапуска.</summary>
     private static readonly string[] WatchKeys =
@@ -358,7 +358,7 @@ public class RegistryWatcher : BackgroundService
     {
         if (Interlocked.CompareExchange(ref _isScanning, 1, 0) != 0)
         {
-            _rescanRequired = true;
+            Interlocked.Exchange(ref _rescanRequired, 1);
             return;
         }
 
@@ -366,7 +366,7 @@ public class RegistryWatcher : BackgroundService
         {
             do
             {
-                _rescanRequired = false;
+                Interlocked.Exchange(ref _rescanRequired, 0);
                 await Task.Run(() =>
                 {
                     try
@@ -374,11 +374,18 @@ public class RegistryWatcher : BackgroundService
                         _logger.LogInformation("Агрегированное сканирование реестра начато");
                         ScanHive(Registry.LocalMachine, "HKLM", allowWow64: true);
                         ScanHive(Registry.CurrentUser, "HKCU", allowWow64: false);
-                        foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
+                        try
                         {
-                            using var userKey = Registry.Users.OpenSubKey(sid);
-                            if (userKey == null) continue;
-                            ScanHive(userKey, $@"HKCU\{name}", allowWow64: false);
+                            foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
+                            {
+                                using var userKey = Registry.Users.OpenSubKey(sid);
+                                if (userKey == null) continue;
+                                ScanHive(userKey, $@"HKCU\{name}", allowWow64: false);
+                            }
+                        }
+                        catch (Exception exProf)
+                        {
+                            _logger.LogWarning(exProf, "Не удалось опросить профили пользователей");
                         }
                     }
                     catch (Exception ex)
@@ -386,11 +393,16 @@ public class RegistryWatcher : BackgroundService
                         _logger.LogError(ex, "Ошибка агрегированного сканирования реестра");
                     }
                 });
-            } while (_rescanRequired);
+            } while (Interlocked.CompareExchange(ref _rescanRequired, 0, 0) != 0);
         }
         finally
         {
             Interlocked.Exchange(ref _isScanning, 0);
+            // Ликвидация lost-wakeup: если запрос на рескан поступил в момент завершения цикла, перезапускаем скан
+            if (Interlocked.Exchange(ref _rescanRequired, 0) != 0)
+            {
+                _ = RunSingleFlightScanAsync();
+            }
         }
     }
 
