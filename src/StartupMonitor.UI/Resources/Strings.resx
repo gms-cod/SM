@@ -468,7 +468,7 @@
     <value>Scan completion timeout (60s)</value>
   </data>
   <data name="StatusEnabledShort" xml:space="preserve">
-    <value />
+    <value>On</value>
   </data>
   <data name="LocAppPaths" xml:space="preserve">
     <value>AppPaths</value>
@@ -2032,7 +2032,7 @@ Continue?</value>
     <value>Delete confirmation</value>
   </data>
   <data name="NetDeleteRuleConfirmFormat" xml:space="preserve">
-    <value>Delete rule &quot;{0}&quot; ({1})?</value>
+    <value>Delete rule "{0}" ({1})?</value>
   </data>
   <data name="NetClearBansConfirmTitle" xml:space="preserve">
     <value>Reset all bans</value>
@@ -2044,7 +2044,7 @@ Continue?</value>
     <value>Termination confirmation</value>
   </data>
   <data name="NetKillProcessConfirmFormat" xml:space="preserve">
-    <value>Terminate process &quot;{0}&quot; (PID {1})?</value>
+    <value>Terminate process "{0}" (PID {1})?</value>
   </data>
   <data name="NetImportConfirmTitle" xml:space="preserve">
     <value>Import confirmation</value>
@@ -2057,7 +2057,7 @@ Import with overwrite of existing rules?</value>
     <value>Exported {0} rules to {1}.</value>
   </data>
   <data name="NetStatusPresetAppliedFormat" xml:space="preserve">
-    <value>Preset &quot;{0}&quot; applied (rules: {1}).</value>
+    <value>Preset "{0}" applied (rules: {1}).</value>
   </data>
   <data name="NetPresetAppliedTitle" xml:space="preserve">
     <value>Security preset</value>
@@ -2101,4 +2101,4 @@ Import with overwrite of existing rules?</value>
   <data name="ToolboxTabSecurity" xml:space="preserve">
     <value>Hash &amp; Passwords</value>
   </data>
-</root>
+<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Allow this port</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Allow connections on this port and suppress future alerts for it</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Silent mode for system sockets (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Suppress pop-up alerts for kernel sockets and terminating connections</value></data></root>

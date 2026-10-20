@@ -97,6 +97,11 @@
                               Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged"
                               VerticalAlignment="Center"
                               ToolTip="{Binding NetInteractiveAlertsTip, Source={StaticResource Loc}}" />
+                    <CheckBox x:Name="ChkSilentPid0"
+                              Content="{Binding FirewallSilentPid0Label, Source={StaticResource Loc}}"
+                              Checked="OnSilentPid0Changed" Unchecked="OnSilentPid0Changed"
+                              VerticalAlignment="Center" Margin="0,6,0,0"
+                              ToolTip="{Binding FirewallSilentPid0Hint, Source={StaticResource Loc}}" />
                 </StackPanel>
             </Grid>
         </ui:Card>

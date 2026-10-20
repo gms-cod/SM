@@ -185,9 +185,50 @@ public class AppSettings
     /// <summary>Список активных банов Port Defender.</summary>
     [JsonPropertyName("active_bans")]
     public List<ActiveBanDto> ActiveBans { get; set; } = new();
-}
 
-/// <summary>Запись истории изменений: добавление, удаление, блокировка и т.д.</summary>
+    /// <summary>Тихий режим для сокетов без определенного процесса (PID = 0): подавлять всплывающие алерты брандмауэра.</summary>
+    [JsonPropertyName("firewall_silent_pid0")]
+    public bool FirewallSilentPid0 { get; set; } = true;
+
+    /// <summary>Список портов, разрешенных пользователем для исключения повторных всплывающих алертов.</summary>
+    [JsonPropertyName("firewall_allowed_ports")]
+    public List<int> FirewallAllowedPorts { get; set; } = [];
+
+    /// <summary>Список приложений в белом списке сетевого брандмауэра (любые соединения разрешены без алертов).</summary>
+    [JsonPropertyName("firewall_whitelisted_apps")]
+    public List<string> FirewallWhitelistedApps { get; set; } = [];
+
+    /// <summary>Создает глубокую независимую копию настроек приложения.</summary>
+    public AppSettings Clone()
+    {
+        var copy = (AppSettings)MemberwiseClone();
+        copy.PortDefender = new PortDefenderConfigDto
+        {
+            Enabled = PortDefender.Enabled,
+            MaxAttempts = PortDefender.MaxAttempts,
+            WindowUnit = PortDefender.WindowUnit,
+            WindowSeconds = PortDefender.WindowSeconds,
+            BanDurationMinutes = PortDefender.BanDurationMinutes,
+            AutoEscalate = PortDefender.AutoEscalate,
+            TrustPrivateNetworks = PortDefender.TrustPrivateNetworks,
+            ProtectedPorts = [..PortDefender.ProtectedPorts],
+            WhitelistIps = [..PortDefender.WhitelistIps],
+            Rules = PortDefender.Rules.Select(r => new PortDefenderRuleConfig(
+                r.LocalPort, r.ProcessPath, r.IsEnabled, r.ThresholdCount, r.WindowUnit, r.BanDurationMinutes, r.AutoEscalate, [..r.WhitelistIps])).ToList()
+        };
+        copy.ActiveBans = ActiveBans.Select(b => new ActiveBanDto
+        {
+            Ip = b.Ip,
+            TargetPort = b.TargetPort,
+            TargetProcess = b.TargetProcess,
+            Protocol = b.Protocol,
+            BanStartedUtc = b.BanStartedUtc
+        }).ToList();
+        copy.FirewallAllowedPorts = [..FirewallAllowedPorts];
+        copy.FirewallWhitelistedApps = [..FirewallWhitelistedApps];
+        return copy;
+    }
+}
 public class HistoryEntry
 {
     /// <summary>Уникальный идентификатор записи.</summary>
@@ -225,4 +266,7 @@ public class HistoryEntry
     /// <summary>Выполненное действие (описание).</summary>
     [JsonPropertyName("action")]
     public string Action { get; set; } = string.Empty;
+
+    /// <summary>Создает независимую копию записи истории.</summary>
+    public HistoryEntry Clone() => (HistoryEntry)MemberwiseClone();
 }

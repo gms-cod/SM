@@ -25,12 +25,13 @@ public class FilePathToIconConverterTests
     }
 
     [Fact]
-    public void Convert_NonExistentFile_ReturnsNull()
+    public void Convert_NonExistentFile_ReturnsPlaceholder()
     {
+        // Несуществующий или еще не загруженный файл возвращает прозрачный плейсхолдер для плавной отрисовки WPF
         var fakePath = @"C:\NonExistentDirectory\FakeApp_12345.exe";
         var res = _converter.Convert(fakePath, typeof(object), null, CultureInfo.InvariantCulture);
 
-        Assert.Null(res);
+        Assert.Equal(AppIconService.Placeholder, res);
     }
 
     [Fact]

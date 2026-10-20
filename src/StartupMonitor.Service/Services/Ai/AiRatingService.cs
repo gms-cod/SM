@@ -249,7 +249,7 @@ public class AiRatingService : IDisposable
         {
             if (httpEx.HttpRequestError is HttpRequestError.NameResolutionError
                 or HttpRequestError.ConnectionError
-                or HttpRequestError.SecureChannelFailure)
+)
             {
                 return true;
             }
@@ -313,7 +313,8 @@ public class AiRatingService : IDisposable
                     var retryAfter = response.Headers.RetryAfter?.Delta?.TotalMilliseconds;
                     // Не ждём Retry-After больше 2 минут — запись останется неоценённой
                     // и подхватится следующим проходом (иначе цикл виснет на 10-15 минут)
-                    var delay = Math.Min((int)(retryAfter ?? 60_000), 120_000);
+                    var delayMs = retryAfter.HasValue ? Math.Clamp((long)retryAfter.Value, 1000L, 120_000L) : 60_000L;
+                    var delay = (int)delayMs;
                     if (waitedFor429)
                     {
                         _cooldownUntil = DateTime.UtcNow.AddMinutes(CooldownMinutes);
@@ -392,10 +393,7 @@ public class AiRatingService : IDisposable
                 }
                 return null;
             }
-            finally
-            {
-                await Task.Delay(MinDelayMs + _jitter.Next(0, 500));
-            }
+
         }
 
         return null;
@@ -406,10 +404,17 @@ public class AiRatingService : IDisposable
     /// <returns>Выходные данные: результирующее значение типа string.</returns>
     internal string BuildPrompt(StartupEntry entry)
     {
-        var fileInfo = !string.IsNullOrEmpty(entry.FilePath) && File.Exists(entry.FilePath)
-            ? new FileInfo(entry.FilePath) : null;
-        var fv = fileInfo?.Exists == true
-            ? FileVersionInfo.GetVersionInfo(entry.FilePath!) : null;
+        FileInfo? fileInfo = null;
+        FileVersionInfo? fv = null;
+        try
+        {
+            if (!string.IsNullOrEmpty(entry.FilePath) && !entry.FilePath.StartsWith(@"\\") && File.Exists(entry.FilePath))
+            {
+                fileInfo = new FileInfo(entry.FilePath);
+                fv = FileVersionInfo.GetVersionInfo(entry.FilePath);
+            }
+        }
+        catch { }
 
         // Язык ответа — язык интерфейса пользователя ("ru" или "en")
         var isRu = _uiLang == "ru";

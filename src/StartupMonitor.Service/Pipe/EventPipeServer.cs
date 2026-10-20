@@ -49,6 +49,7 @@ public class EventPipeServer : BackgroundService
 
     // Словарь подключённых клиентов: ID → ConnectedClient
     private readonly ConcurrentDictionary<int, ConnectedClient> _clients = new();
+    private static int _nextClientId;
     // Настройки JSON-сериализации
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -84,10 +85,11 @@ public class EventPipeServer : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            NamedPipeServerStream? pipe = null;
             try
             {
                 // Создаём pipe только на запись (out) — клиенты только слушают (буфер 64 КБ)
-                var pipe = NamedPipeServerStreamAcl.Create(
+                pipe = NamedPipeServerStreamAcl.Create(
                     EventPipeName,
                     PipeDirection.Out,
                     maxNumberOfServerInstances: 10,
@@ -101,9 +103,10 @@ public class EventPipeServer : BackgroundService
                 _logger.LogInformation("Event-клиент подключился");
 
                 var writer = new StreamWriter(pipe) { AutoFlush = true };
-                var id = pipe.GetHashCode();
+                var id = Interlocked.Increment(ref _nextClientId);
                 var client = new ConnectedClient(id, pipe, writer);
                 _clients[id] = client;
+                pipe = null; // Владение стримом передано в ConnectedClient
 
                 // Фоновая задача отслеживает отмену службы для освобождения ресурсов
                 _ = Task.Run(async () =>
@@ -113,15 +116,21 @@ public class EventPipeServer : BackgroundService
                     RemoveClient(id);
                 }, stoppingToken);
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException)
+            {
+                try { pipe?.Dispose(); } catch { }
+                break;
+            }
             catch (IOException ex)
             {
+                try { pipe?.Dispose(); } catch { }
                 // Все инстансы заняты (клиенты не успели отключиться) — не спамим Error
                 _logger.LogDebug(ex, "EventPipeServer: канал временно занят");
                 await Task.Delay(1000, stoppingToken);
             }
             catch (Exception ex)
             {
+                try { pipe?.Dispose(); } catch { }
                 _logger.LogError(ex, "Ошибка EventPipeServer");
                 await Task.Delay(1000, stoppingToken);
             }

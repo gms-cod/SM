@@ -53,7 +53,10 @@ public enum NetworkAlertResolution
     BlockAlways = 2,
 
     /// <summary>Добавить программу в белый список: создать глобальное разрешающее правило в Windows Firewall для программы и перманентно доверять.</summary>
-    WhitelistProgram = 3
+    WhitelistProgram = 3,
+
+    /// <summary>Разрешить порт: прекратить всплывающие алерты по данному удаленному порту.</summary>
+    AllowPort = 4
 }
 
 /// <summary>Запрос резолва сетевого алерта (Pipe: ResolveNetworkAlert).</summary>
@@ -74,6 +77,10 @@ public class ResolveNetworkAlertRequest
     /// <summary>Удалённый IP-адрес из алерта.</summary>
     [JsonPropertyName("remoteAddress")]
     public string RemoteAddress { get; set; } = string.Empty;
+
+    /// <summary>Удалённый порт из алерта.</summary>
+    [JsonPropertyName("remotePort")]
+    public int RemotePort { get; set; }
 
     /// <summary>Выбранное решение.</summary>
     [JsonPropertyName("resolution")]

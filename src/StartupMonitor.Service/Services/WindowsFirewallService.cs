@@ -460,24 +460,27 @@ public sealed class WindowsFirewallService
     /// </summary>
     public IReadOnlyList<FirewallRuleDto> GetAllRules()
     {
-        object? policyObj = null;
-        object? rulesObj = null;
-        try
+        lock (_sync)
         {
-            dynamic policy = CreatePolicy(out policyObj);
-            dynamic rules = policy.Rules;
-            rulesObj = rules;
-            return EnumerateRules((object)rules);
-        }
-        catch (Exception ex) when (IsFirewallDown(ex))
-        {
-            Log.Warning(ex, "Firewall недоступен при перечислении правил");
-            return Array.Empty<FirewallRuleDto>();
-        }
-        finally
-        {
-            Release(rulesObj);
-            Release(policyObj);
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+                return EnumerateRules((object)rules);
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                Log.Warning(ex, "Firewall недоступен при перечислении правил");
+                return Array.Empty<FirewallRuleDto>();
+            }
+            finally
+            {
+                Release(rulesObj);
+                Release(policyObj);
+            }
         }
     }
 

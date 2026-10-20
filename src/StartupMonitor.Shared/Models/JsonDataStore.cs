@@ -21,7 +21,14 @@ public class JsonDataStore
     /// <summary>Настройки сериализации для history.jsonl (строго в одну строку).</summary>
     private readonly JsonSerializerOptions _historyOptions;
     /// <summary>Кэш загруженного конфига (чтобы не перечитывать секции каждый раз).</summary>
+    /// <summary>Кэш загруженного конфига (чтобы не перечитывать секции каждый раз).</summary>
     private AppConfig? _cache;
+    /// <summary>Монотонно возрастающая ревизия данных для оптимизации передачи по IPC (P1-04).</summary>
+    private long _revision;
+    /// <summary>Текущая ревизия данных хранилища.</summary>
+    public long Revision => Interlocked.Read(ref _revision);
+    /// <summary>Принудительное увеличение номера ревизии.</summary>
+    public void IncrementRevision() => Interlocked.Increment(ref _revision);
     /// <summary>Базовая директория файлов конфигурации и данных.</summary>
     public string BaseDirectory => _dir;
 
@@ -84,47 +91,58 @@ public class JsonDataStore
     // ───────────────────────────── Load / Migrate ─────────────────────────────
 
     /// <summary>Загружает и возвращает полный конфиг из секционных файлов. Мигрирует legacy при необходимости.</summary>
+    /// <summary>Гарантирует загрузку данных в _cache под объектом блокировки _lock.</summary>
+    private void EnsureLoadedLocked()
+    {
+        if (_cache != null) return;
+
+        MigrateLegacyIfNeeded();
+
+        _cache = new AppConfig
+        {
+            Entries = ReadSection<List<StartupEntry>>(EntriesPath) ?? [],
+            Blacklist = ReadSection<List<BlacklistRule>>(BlacklistPath) ?? [],
+            RemovedEntries = ReadSection<List<RemovedEntry>>(RemovedPath) ?? [],
+            History = ReadHistory(),
+        };
+        var settings = ReadSection<SettingsSection>(SettingsPath);
+        if (settings != null)
+        {
+            _cache.Language = settings.Language;
+            _cache.Theme = settings.Theme;
+            _cache.Settings = settings.Settings;
+        }
+
+        TrimHistoryFile();
+    }
+
+    /// <summary>Загружает и возвращает изолированный глубокий снимок конфигурации (P0-02).</summary>
     public AppConfig Load()
     {
         using var _profLoad = ExecutionProfiler.Profile("Service.JsonDataStoreLoad");
         using var _prof = ExecutionProfiler.Measure("Shared.Store.Load");
         lock (_lock)
         {
-            if (_cache != null) return _cache;
-
-            MigrateLegacyIfNeeded();
-
-            _cache = new AppConfig
-            {
-                Entries = ReadSection<List<StartupEntry>>(EntriesPath) ?? [],
-                Blacklist = ReadSection<List<BlacklistRule>>(BlacklistPath) ?? [],
-                RemovedEntries = ReadSection<List<RemovedEntry>>(RemovedPath) ?? [],
-                History = ReadHistory(),
-            };
-            var settings = ReadSection<SettingsSection>(SettingsPath);
-            if (settings != null)
-            {
-                _cache.Language = settings.Language;
-                _cache.Theme = settings.Theme;
-                _cache.Settings = settings.Settings;
-            }
-
-            TrimHistoryFile();
-
-            // Возвращаем защищенный изолированный снимок конфигурации с копиями списков,
-            // чтобы параллельная итерация в PipeServer не падала с InvalidOperationException
-            // при одновременных операциях добавления/удаления из фоновых вотчеров.
-            return new AppConfig
-            {
-                Language = _cache.Language,
-                Theme = _cache.Theme,
-                Entries = _cache.Entries.ToArray().ToList(),
-                Blacklist = _cache.Blacklist.ToArray().ToList(),
-                RemovedEntries = _cache.RemovedEntries.ToArray().ToList(),
-                History = _cache.History.ToArray().ToList(),
-                Settings = _cache.Settings
-            };
+            EnsureLoadedLocked();
+            return CloneSnapshot(_cache!);
         }
+    }
+
+    /// <summary>
+    /// Создает изолированную глубокую копию всей конфигурации для безопасной параллельной работы.
+    /// </summary>
+    private static AppConfig CloneSnapshot(AppConfig source)
+    {
+        return new AppConfig
+        {
+            Language = source.Language,
+            Theme = source.Theme,
+            Entries = source.Entries.Select(e => e.Clone()).ToList(),
+            Blacklist = source.Blacklist.Select(b => b.Clone()).ToList(),
+            RemovedEntries = source.RemovedEntries.Select(r => r.Clone()).ToList(),
+            History = source.History.Select(h => h.Clone()).ToList(),
+            Settings = source.Settings.Clone()
+        };
     }
 
     /// <summary>Старый единый файл раскладывается по секционным и переименовывается в .migrated.</summary>
@@ -163,10 +181,30 @@ public class JsonDataStore
 
     // ───────────────────────────── Section IO ─────────────────────────────
 
-    /// <summary>Читает секцию; битый файл переименовывается в .corrupt и возвращается default.</summary>
+    /// <summary>Читает секцию с защитой от сбоев: при повреждении восстанавливает из .backup (P0-03).</summary>
     private T? ReadSection<T>(string path) where T : class
     {
-        if (!File.Exists(path)) return null;
+        var backup = path + ".backup";
+        if (!File.Exists(path))
+        {
+            if (File.Exists(backup))
+            {
+                try
+                {
+                    var backupJson = File.ReadAllText(backup);
+                    var restored = JsonSerializer.Deserialize<T>(backupJson, _options);
+                    if (restored != null)
+                    {
+                        File.Copy(backup, path, overwrite: true);
+                        _writtenHashes[path] = ContentHash(backupJson);
+                        return restored;
+                    }
+                }
+                catch { }
+            }
+            return null;
+        }
+
         try
         {
             var json = File.ReadAllText(path);
@@ -176,6 +214,21 @@ public class JsonDataStore
         catch (Exception)
         {
             try { File.Move(path, path + ".corrupt", overwrite: true); } catch { }
+            if (File.Exists(backup))
+            {
+                try
+                {
+                    var backupJson = File.ReadAllText(backup);
+                    var restored = JsonSerializer.Deserialize<T>(backupJson, _options);
+                    if (restored != null)
+                    {
+                        File.Copy(backup, path, overwrite: true);
+                        _writtenHashes[path] = ContentHash(backupJson);
+                        return restored;
+                    }
+                }
+                catch { }
+            }
             return null;
         }
     }
@@ -257,16 +310,31 @@ public class JsonDataStore
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(content)));
 
-    /// <summary>Атомарная запись секции; пропускается, если содержимое не изменилось.</summary>
+    /// <summary>Атомарная запись секции с принудительным сбросом кэша диска (fsync) и ротируемым бэкапом (P0-03).</summary>
     private void WriteSectionAtomic(string path, string json)
     {
         var hash = ContentHash(json);
         if (_writtenHashes.TryGetValue(path, out var old) && old == hash)
             return;
+
         var tmp = path + ".tmp";
-        File.WriteAllText(tmp, json);
+        using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+        using (var writer = new StreamWriter(fs, System.Text.Encoding.UTF8))
+        {
+            writer.Write(json);
+            writer.Flush();
+            fs.Flush(flushToDisk: true);
+        }
+
+        var backup = path + ".backup";
+        if (File.Exists(path))
+        {
+            try { File.Copy(path, backup, overwrite: true); } catch { }
+        }
+
         File.Move(tmp, path, overwrite: true);
         _writtenHashes[path] = hash;
+        Interlocked.Increment(ref _revision);
     }
 
     /// <summary>Дописывает одну запись истории в конец history.jsonl в одну строку.</summary>
@@ -325,11 +393,14 @@ public class JsonDataStore
     /// <summary>Очищает все записи автозапуска и историю.</summary>
     public void ClearEntries()
     {
-        var config = Load();
-        config.Entries.Clear();
-        config.History.Clear();
-        SaveEntries();
-        WriteSectionAtomic(HistoryPath, "");
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            _cache!.Entries.Clear();
+            _cache.History.Clear();
+            SaveEntries();
+            WriteSectionAtomic(HistoryPath, "");
+        }
     }
 
     /// <summary>Добавляет запись автозапуска с проверкой на дубликат по Id.</summary>
@@ -340,11 +411,11 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return false;
             if (checkDuplicate && _cache.Entries.Any(e => e.Id == entry.Id))
                 return false;
-            _cache.Entries.Add(entry);
+            _cache.Entries.Add(entry.Clone());
             SaveEntries();
             return true;
         }
@@ -367,7 +438,7 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
             if (clearFirst)
             {
@@ -375,7 +446,7 @@ public class JsonDataStore
                 _cache.History.Clear();
                 WriteSectionAtomic(HistoryPath, "");
             }
-            _cache.Entries.AddRange(entries);
+            _cache.Entries.AddRange(entries.Select(e => e.Clone()));
             SaveEntries();
         }
     }
@@ -464,10 +535,13 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
-            _cache.Entries.RemoveAll(e => e.Id == entryId);
-            SaveEntries();
+            var removed = _cache.Entries.RemoveAll(e => e.Id == entryId);
+            if (removed > 0)
+            {
+                SaveEntries();
+            }
         }
     }
 
@@ -476,12 +550,12 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
             var idx = _cache.Entries.FindIndex(e => e.Id == entry.Id);
             if (idx >= 0)
             {
-                _cache.Entries[idx] = entry;
+                _cache.Entries[idx] = entry.Clone();
                 SaveEntries();
             }
         }
@@ -494,13 +568,15 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            var config = Load();
-            config.History.Add(entry);
+            EnsureLoadedLocked();
+            if (_cache == null) return;
+            _cache.History.Add(entry.Clone());
 
-            var cutoff = DateTime.UtcNow.AddDays(-config.Settings.HistoryDays);
-            config.History.RemoveAll(h => h.Timestamp < cutoff);
+            var cutoff = DateTime.UtcNow.AddDays(-_cache.Settings.HistoryDays);
+            _cache.History.RemoveAll(h => h.Timestamp < cutoff);
 
             AppendHistoryLine(entry);
+            Interlocked.Increment(ref _revision);
         }
     }
 

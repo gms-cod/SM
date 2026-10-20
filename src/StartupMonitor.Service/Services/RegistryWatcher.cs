@@ -22,7 +22,15 @@ public class RegistryWatcher : BackgroundService
     /// <summary>Трекер начального сканирования.</summary>
     private readonly InitialScanTracker _tracker;
     /// <summary>Список открытых ключей реестра (удерживаем, чтобы GC не закрыл handle).</summary>
+    /// <summary>Список открытых ключей реестра (удерживаем, чтобы GC не закрыл handle).</summary>
     private readonly List<RegistryKey> _watchedKeys = [];
+
+    /// <summary>Таймер отложенного агрегированного сканирования (Debounce 500ms) для защиты от шторма событий.</summary>
+    private readonly Timer _debounceTimer;
+    /// <summary>Атомарный индикатор выполнения активного сканирования (0 - свободно, 1 - занято).</summary>
+    private int _isScanning = 0;
+    /// <summary>Флаг необходимости повторного прохода, если во время сканирования поступили новые события.</summary>
+    private volatile bool _rescanRequired = false;
 
     /// <summary>Пути ключей реестра для стандартных точек автозапуска.</summary>
     private static readonly string[] WatchKeys =
@@ -39,6 +47,7 @@ public class RegistryWatcher : BackgroundService
     /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public override void Dispose()
     {
+        try { _debounceTimer?.Dispose(); } catch { }
         foreach (var key in _watchedKeys)
             key?.Dispose();
         _watchedKeys.Clear();
@@ -61,6 +70,7 @@ public class RegistryWatcher : BackgroundService
         _logger = logger;
         _tracker = tracker;
         _coordinator = coordinator;
+        _debounceTimer = new Timer(OnDebounceTimerFired, null, Timeout.Infinite, Timeout.Infinite);
     }
 
     /// <summary>Основной цикл: начальное сканирование → наблюдение.</summary>
@@ -296,42 +306,92 @@ public class RegistryWatcher : BackgroundService
             executeOnlyOnce: true);
     }
 
-    /// <summary>Коллбек системного пула потоков при срабатывании изменения в ключе реестра.</summary>
+    /// <summary>Коллбек системного пула потоков при срабатывании изменения в ключе реестра (Zero-Crash изоляция P0-04).</summary>
     private void OnRegistryKeyChanged(object? state, bool timedOut)
     {
-        if (state is not WatchedKeySubscription sub) return;
-
-        // Немедленно перевзводим наблюдение для непрерывного перехвата следующих изменений
-        ArmWatcher(sub, CancellationToken.None);
-
-        if (_coordinator.IsPaused) return;
-
-        _ = Task.Run(async () =>
+        try
         {
+            if (state is not WatchedKeySubscription sub) return;
+
+            // Немедленно перевзводим наблюдение для непрерывного перехвата следующих изменений
             try
             {
-                await Task.Delay(500);
-                _logger.LogInformation("Registry change detected: {Key}", sub.KeyPath);
-                if (sub.Hive == RegistryHive.LocalMachine)
-                {
-                    ScanHive(Registry.LocalMachine, "HKLM", allowWow64: true);
-                }
-                else
-                {
-                    ScanHive(Registry.CurrentUser, "HKCU", allowWow64: false);
-                    foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
-                    {
-                        using var userKey = Registry.Users.OpenSubKey(sid);
-                        if (userKey == null) continue;
-                        ScanHive(userKey, $@"HKCU\{name}", allowWow64: false);
-                    }
-                }
+                ArmWatcher(sub, CancellationToken.None);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка обработки изменения реестра для {Key}", sub.KeyPath);
+                _logger.LogWarning(ex, "Ошибка перевзвода подписки реестра для {Key}", sub.KeyPath);
             }
-        });
+
+            if (_coordinator.IsPaused) return;
+
+            // Агрегация через Debounce таймер для подавления шторма событий (P1-06)
+            TriggerDebouncedScan();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Необработанная ошибка в пуле потоков RegistryWatcher (Zero-Crash защита)");
+        }
+    }
+
+    /// <summary>Сбрасывает таймер агрегации (500 мс) для объединения пачки изменений в единый проход.</summary>
+    private void TriggerDebouncedScan()
+    {
+        try
+        {
+            _debounceTimer?.Change(500, Timeout.Infinite);
+        }
+        catch { }
+    }
+
+    /// <summary>Коллбек таймера агрегации изменений реестра.</summary>
+    private void OnDebounceTimerFired(object? state)
+    {
+        _ = RunSingleFlightScanAsync();
+    }
+
+    /// <summary>
+    /// Выполняет единственный проход сканирования (Single-Flight). Если в процессе сканирования поступили
+    /// новые события, выполняет строго один дополнительный финальный проход.
+    /// </summary>
+    private async Task RunSingleFlightScanAsync()
+    {
+        if (Interlocked.CompareExchange(ref _isScanning, 1, 0) != 0)
+        {
+            _rescanRequired = true;
+            return;
+        }
+
+        try
+        {
+            do
+            {
+                _rescanRequired = false;
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        _logger.LogInformation("Агрегированное сканирование реестра начато");
+                        ScanHive(Registry.LocalMachine, "HKLM", allowWow64: true);
+                        ScanHive(Registry.CurrentUser, "HKCU", allowWow64: false);
+                        foreach (var (sid, name) in WatcherHelper.GetUserProfiles())
+                        {
+                            using var userKey = Registry.Users.OpenSubKey(sid);
+                            if (userKey == null) continue;
+                            ScanHive(userKey, $@"HKCU\{name}", allowWow64: false);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Ошибка агрегированного сканирования реестра");
+                    }
+                });
+            } while (_rescanRequired);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isScanning, 0);
+        }
     }
 
     /// <summary>Остановка: закрываем ключи и отменяем подписки в пуле потоков.</summary>

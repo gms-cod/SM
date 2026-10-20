@@ -15,14 +15,14 @@ internal static class PipeSecurityFactory
     /// Создаёт PipeSecurity с правилами:
     /// — SYSTEM: полный доступ
     /// — Администраторы: полный доступ
-    /// — Интерактивные пользователи: чтение/запись
+    /// — Интерактивные пользователи: чтение/запись без создания новых инстансов (предотвращение LPE)
     /// </summary>
     /// <returns>Настроенный PipeSecurity</returns>
     public static PipeSecurity CreateDefault()
     {
         var security = new PipeSecurity();
 
-        // SYSTEM — полный контроль (хост-процесс)
+        // SYSTEM — полный контроль (хост-процесс службы)
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
             PipeAccessRights.FullControl, AccessControlType.Allow));
@@ -32,15 +32,11 @@ internal static class PipeSecurityFactory
             new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null),
             PipeAccessRights.FullControl, AccessControlType.Allow));
 
-        // Интерактивные пользователи (UI) — чтение/запись
+        // Интерактивные пользователи (UI) — строго чтение и запись без права создания экземпляров канала (LPE & Pipe Squatting защита)
+        var clientRights = (PipeAccessRights.Read | PipeAccessRights.Write) & ~PipeAccessRights.CreateNewInstance;
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
-            PipeAccessRights.ReadWrite, AccessControlType.Allow));
-
-        // Аутентифицированные пользователи (UI при входе через RDP / Fast User Switching) — чтение/запись
-        security.AddAccessRule(new PipeAccessRule(
-            new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
-            PipeAccessRights.ReadWrite, AccessControlType.Allow));
+            clientRights, AccessControlType.Allow));
 
         // Текущий пользователь процесса (для создания экземпляров пайпа при запуске в сессии пользователя)
         var currentUser = WindowsIdentity.GetCurrent().User;

@@ -11,10 +11,8 @@ using StartupMonitor.Service.Services.ProcessInspector;
 using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
-using StartupMonitor.Shared.Models.Toolbox;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Service.Services.Firewall;
-using StartupMonitor.Service.Services.Toolbox;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace StartupMonitor.Service.Pipe;
@@ -71,11 +69,6 @@ public class PipeServer : BackgroundService
     private readonly ProcessPortDefenderService? _portDefenderService;
     // Детектор новых сетевых подключений программ (сетевые алерты)
     private readonly NetworkConnectionAlertService? _alertService;
-    // Службы набора повседневных инструментов (Toolbox)
-    private readonly FileLocksmithService _fileLocksmithService = new();
-    private readonly AwakeService _awakeService = new();
-    private readonly JunkCleanerService _junkCleanerService = new();
-    private readonly LanScannerService _lanScannerService = new();
     // Управление жизненным циклом хоста (для штатной остановки по запросу UI)
     private readonly IHostApplicationLifetime _lifetime;
     // Токен отмены для фоновых задач
@@ -321,7 +314,7 @@ public class PipeServer : BackgroundService
     /// CRUD записей, управление чёрным списком, AI-рейтинги, очистка устаревших и т.д.
     /// </summary>
     /// <param name="message">Входящее сообщение от UI</param>
-    /// <param name="ct">Токен отмены (жизненный цикл службы/соединения) для длительных операций Toolbox</param>
+    /// <param name="ct">Токен отмены (жизненный цикл службы/соединения)</param>
     /// <returns>Ответное сообщение с результатом выполнения</returns>
     private async Task<PipeMessage> ProcessMessage(PipeMessage message, CancellationToken ct = default)
     {
@@ -1916,7 +1909,25 @@ public class PipeServer : BackgroundService
                     }
                     break;
 
-                case PipeMessageTypes.GetAlertsEnabled:
+                case PipeMessageTypes.GetFirewallSilentPid0:
+                var isSilent = _store.Load().Settings.FirewallSilentPid0;
+                return new PipeMessage
+                {
+                    Type = PipeMessageTypes.GetFirewallSilentPid0Response,
+                    Payload = JsonSerializer.Serialize(new FirewallSilentPid0Payload(isSilent), JsonOptions)
+                };
+
+            case PipeMessageTypes.SetFirewallSilentPid0:
+                var silentReq = JsonSerializer.Deserialize<FirewallSilentPid0Payload>(message.Payload ?? "{}", JsonOptions);
+                if (silentReq != null)
+                {
+                    var cfg = _store.Load();
+                    cfg.Settings.FirewallSilentPid0 = silentReq.Silent;
+                    _store.Save(cfg);
+                }
+                return new PipeMessage { Type = PipeMessageTypes.Success };
+
+            case PipeMessageTypes.GetAlertsEnabled:
                     try
                     {
                         var isEnabled = _alertService?.AlertsEnabled ?? false;
@@ -1939,126 +1950,6 @@ public class PipeServer : BackgroundService
                         try { await Task.Delay(200); } catch { }
                         try { _lifetime.StopApplication(); } catch { }
                     });
-                    break;
-
-                // --- Toolbox (Повседневные инструменты) ---
-                case PipeMessageTypes.FindFileLockingProcesses:
-                    try
-                    {
-                        string targetPath = string.Empty;
-                        try
-                        {
-                            var req = JsonSerializer.Deserialize<FindFileLockRequest>(message.Payload, JsonOptions);
-                            if (req != null && !string.IsNullOrWhiteSpace(req.TargetPath))
-                                targetPath = req.TargetPath;
-                        }
-                        catch { }
-                        if (string.IsNullOrWhiteSpace(targetPath) && !string.IsNullOrWhiteSpace(message.Payload))
-                        {
-                            targetPath = message.Payload.Trim().Trim('"');
-                        }
-
-                        var lockResult = await _fileLocksmithService.FindLockingProcessesAsync(targetPath, ct);
-                        response.Type = PipeMessageTypes.FindFileLockingProcessesResponse;
-                        response.Payload = JsonSerializer.Serialize(lockResult, JsonOptions);
-                    }
-                    catch (Exception ex)
-                    {
-                        response.Type = PipeMessageTypes.Error;
-                        response.Payload = ex.Message;
-                    }
-                    break;
-
-                case PipeMessageTypes.SetAwakeState:
-                    try
-                    {
-                        SetAwakeRequest? awakeReq = null;
-                        try { awakeReq = JsonSerializer.Deserialize<SetAwakeRequest>(message.Payload, JsonOptions); } catch { }
-                        AwakeStatusDto status;
-                        if (awakeReq != null && awakeReq.Enable)
-                        {
-                            status = _awakeService.Activate(awakeReq.DurationMinutes, awakeReq.KeepDisplayOn);
-                        }
-                        else
-                        {
-                            status = _awakeService.Deactivate();
-                        }
-                        response.Type = PipeMessageTypes.SetAwakeStateResponse;
-                        response.Payload = JsonSerializer.Serialize(status, JsonOptions);
-                    }
-                    catch (Exception ex)
-                    {
-                        response.Type = PipeMessageTypes.Error;
-                        response.Payload = ex.Message;
-                    }
-                    break;
-
-                case PipeMessageTypes.GetAwakeState:
-                    try
-                    {
-                        var status = _awakeService.GetStatus();
-                        response.Type = PipeMessageTypes.GetAwakeStateResponse;
-                        response.Payload = JsonSerializer.Serialize(status, JsonOptions);
-                    }
-                    catch (Exception ex)
-                    {
-                        response.Type = PipeMessageTypes.Error;
-                        response.Payload = ex.Message;
-                    }
-                    break;
-
-                case PipeMessageTypes.ScanJunkFiles:
-                    try
-                    {
-                        var scanResult = await _junkCleanerService.ScanJunkAsync(ct);
-                        response.Type = PipeMessageTypes.ScanJunkFilesResponse;
-                        response.Payload = JsonSerializer.Serialize(scanResult, JsonOptions);
-                    }
-                    catch (Exception ex)
-                    {
-                        response.Type = PipeMessageTypes.Error;
-                        response.Payload = ex.Message;
-                    }
-                    break;
-
-                case PipeMessageTypes.CleanJunkFiles:
-                    try
-                    {
-                        List<string>? categoryIds = null;
-                        try
-                        {
-                            var cleanReq = JsonSerializer.Deserialize<CleanJunkRequest>(message.Payload, JsonOptions);
-                            if (cleanReq != null) categoryIds = cleanReq.CategoryIds;
-                        }
-                        catch { }
-                        if (categoryIds == null && !string.IsNullOrWhiteSpace(message.Payload))
-                        {
-                            try { categoryIds = JsonSerializer.Deserialize<List<string>>(message.Payload, JsonOptions); } catch { }
-                        }
-
-                        var cleanResult = await _junkCleanerService.CleanJunkAsync(categoryIds ?? new System.Collections.Generic.List<string>(), ct);
-                        response.Type = PipeMessageTypes.CleanJunkFilesResponse;
-                        response.Payload = JsonSerializer.Serialize(cleanResult, JsonOptions);
-                    }
-                    catch (Exception ex)
-                    {
-                        response.Type = PipeMessageTypes.Error;
-                        response.Payload = ex.Message;
-                    }
-                    break;
-
-                case PipeMessageTypes.ScanLanDevices:
-                    try
-                    {
-                        var devices = await _lanScannerService.ScanLocalNetworkAsync(ct);
-                        response.Type = PipeMessageTypes.ScanLanDevicesResponse;
-                        response.Payload = JsonSerializer.Serialize(devices, JsonOptions);
-                    }
-                    catch (Exception ex)
-                    {
-                        response.Type = PipeMessageTypes.Error;
-                        response.Payload = ex.Message;
-                    }
                     break;
 
                 default:
@@ -2273,7 +2164,6 @@ public class PipeServer : BackgroundService
     public override void Dispose()
     {
         _cts.Cancel();
-        _awakeService.Dispose();
         _aiRating.Dispose();
         base.Dispose();
     }

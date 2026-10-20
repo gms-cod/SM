@@ -246,6 +246,13 @@ public static class PipeMessageTypes
     public const string GetAlertsEnabled = "GetAlertsEnabled";
     /// <summary>Ответ службы с состоянием детектора новых сетевых подключений.</summary>
     public const string GetAlertsEnabledResponse = "GetAlertsEnabledResponse";
+
+    /// <summary>Установка тихого режима для сокетов без определенного процесса (PID = 0).</summary>
+    public const string SetFirewallSilentPid0 = "SetFirewallSilentPid0";
+    /// <summary>Запрос статуса тихого режима для PID = 0.</summary>
+    public const string GetFirewallSilentPid0 = "GetFirewallSilentPid0";
+    /// <summary>Ответ со статусом тихого режима для PID = 0.</summary>
+    public const string GetFirewallSilentPid0Response = "GetFirewallSilentPid0Response";
     /// <summary>Запрос экспорта правил брандмауэра в бэкап.</summary>
     public const string ExportFirewallRules = "ExportFirewallRules";
     /// <summary>Ответ службы с бэкапом правил брандмауэра.</summary>
@@ -259,31 +266,6 @@ public static class PipeMessageTypes
     /// <summary>Ответ службы с результатом применения пресета безопасности.</summary>
     public const string ApplySecurityPresetResponse = "ApplySecurityPresetResponse";
 
-    // --- Toolbox (Повседневные инструменты) ---
-    /// <summary>Поиск процессов, удерживающих файл или папку (File Locksmith).</summary>
-    public const string FindFileLockingProcesses = "FindFileLockingProcesses";
-    /// <summary>Ответ со списком процессов, удерживающих файл.</summary>
-    public const string FindFileLockingProcessesResponse = "FindFileLockingProcessesResponse";
-    /// <summary>Управление режимом бодрствования (Keep-Awake).</summary>
-    public const string SetAwakeState = "SetAwakeState";
-    /// <summary>Ответ на изменение режима бодрствования.</summary>
-    public const string SetAwakeStateResponse = "SetAwakeStateResponse";
-    /// <summary>Запрос текущего статуса режима бодрствования.</summary>
-    public const string GetAwakeState = "GetAwakeState";
-    /// <summary>Ответ со статусом режима бодрствования.</summary>
-    public const string GetAwakeStateResponse = "GetAwakeStateResponse";
-    /// <summary>Запрос сканирования дискового мусора (Quick Junk Cleaner).</summary>
-    public const string ScanJunkFiles = "ScanJunkFiles";
-    /// <summary>Ответ службы с результатами анализа мусора.</summary>
-    public const string ScanJunkFilesResponse = "ScanJunkFilesResponse";
-    /// <summary>Запрос очистки выбранных категорий мусора.</summary>
-    public const string CleanJunkFiles = "CleanJunkFiles";
-    /// <summary>Ответ службы с результатом очистки мусора.</summary>
-    public const string CleanJunkFilesResponse = "CleanJunkFilesResponse";
-    /// <summary>Запрос сканирования устройств локальной сети (LAN Device Scanner).</summary>
-    public const string ScanLanDevices = "ScanLanDevices";
-    /// <summary>Ответ службы со списком найденных устройств в локальной сети.</summary>
-    public const string ScanLanDevicesResponse = "ScanLanDevicesResponse";
 }
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>
@@ -531,6 +513,9 @@ public record NetworkAlertsPayload(List<NetworkConnectionAlertDto> Alerts);
 
 /// <summary>Полезная нагрузка состояния детектора новых сетевых подключений.</summary>
 public record AlertsEnabledPayload(bool Enabled);
+
+/// <summary>Полезная нагрузка тихого режима для PID = 0.</summary>
+public record FirewallSilentPid0Payload(bool Silent);
 
 /// <summary>Полезная нагрузка ответа на решение по сетевому алерту.</summary>
 public record ResolveNetworkAlertResultPayload(bool Success, string Message);

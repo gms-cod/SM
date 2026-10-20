@@ -468,7 +468,9 @@ public class ProcessNetworkTracker : IDisposable
 
             string GetProcName(int pid)
             {
-                if (pid <= 0) return string.Empty;
+                if (pid == 0) return "System (Kernel/Idle)";
+                if (pid == 4) return "System";
+                if (pid < 0) return string.Empty;
                 if (_procNameCache.TryGetValue(pid, out var cached) && cached.ExpiresAt > now)
                     return cached.Name;
 

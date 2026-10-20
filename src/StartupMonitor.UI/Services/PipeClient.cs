@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
-using StartupMonitor.Shared.Models.Toolbox;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models.Snapshot;
 
@@ -1727,143 +1726,6 @@ public class PipeClient : IDisposable
         return null;
     }
 
-    #region Toolbox (Повседневные инструменты)
-
-    /// <summary>Выполняет поиск процессов, удерживающих файл или папку (File Locksmith).</summary>
-    public async Task<FileLockResultDto> FindFileLockingProcessesAsync(string targetPath, CancellationToken ct = default)
-    {
-        var empty = new FileLockResultDto { TargetPath = targetPath };
-        if (string.IsNullOrWhiteSpace(targetPath)) return empty;
-
-        try
-        {
-            var req = new FindFileLockRequest { TargetPath = targetPath };
-            var response = await SendAsync(new PipeMessage
-            {
-                Type = PipeMessageTypes.FindFileLockingProcesses,
-                Payload = JsonSerializer.Serialize(req, JsonOptions)
-            }, ct);
-
-            if (response?.Type == PipeMessageTypes.FindFileLockingProcessesResponse && !string.IsNullOrWhiteSpace(response.Payload))
-            {
-                var dto = JsonSerializer.Deserialize<FileLockResultDto>(response.Payload, JsonOptions);
-                return dto ?? empty;
-            }
-            if (response?.Type == PipeMessageTypes.Error)
-            {
-                return new FileLockResultDto { TargetPath = targetPath, ErrorMessage = response.Payload ?? "Ошибка при поиске блокировок." };
-            }
-        }
-        catch (Exception ex)
-        {
-            return new FileLockResultDto { TargetPath = targetPath, ErrorMessage = ex.Message };
-        }
-        return empty;
-    }
-
-    /// <summary>Управляет режимом бодрствования (Keep-Awake).</summary>
-    public async Task<AwakeStatusDto> SetAwakeStateAsync(bool enable, int durationMinutes = 0, bool keepDisplayOn = true, CancellationToken ct = default)
-    {
-        var fallback = new AwakeStatusDto { IsActive = false, ModeText = "Disabled" };
-        try
-        {
-            var req = new SetAwakeRequest
-            {
-                Enable = enable,
-                DurationMinutes = durationMinutes,
-                KeepDisplayOn = keepDisplayOn
-            };
-            var response = await SendAsync(new PipeMessage
-            {
-                Type = PipeMessageTypes.SetAwakeState,
-                Payload = JsonSerializer.Serialize(req, JsonOptions)
-            }, ct);
-
-            if (response?.Type == PipeMessageTypes.SetAwakeStateResponse && !string.IsNullOrWhiteSpace(response.Payload))
-            {
-                var dto = JsonSerializer.Deserialize<AwakeStatusDto>(response.Payload, JsonOptions);
-                return dto ?? fallback;
-            }
-        }
-        catch { }
-        return fallback;
-    }
-
-    /// <summary>Запрашивает актуальный статус режима бодрствования.</summary>
-    public async Task<AwakeStatusDto> GetAwakeStateAsync(CancellationToken ct = default)
-    {
-        var fallback = new AwakeStatusDto { IsActive = false, ModeText = "Disabled" };
-        try
-        {
-            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAwakeState }, ct);
-            if (response?.Type == PipeMessageTypes.GetAwakeStateResponse && !string.IsNullOrWhiteSpace(response.Payload))
-            {
-                var dto = JsonSerializer.Deserialize<AwakeStatusDto>(response.Payload, JsonOptions);
-                return dto ?? fallback;
-            }
-        }
-        catch { }
-        return fallback;
-    }
-
-    /// <summary>Выполняет экспресс-сканирование дискового мусора.</summary>
-    public async Task<JunkScanResultDto> ScanJunkFilesAsync(CancellationToken ct = default)
-    {
-        var empty = new JunkScanResultDto();
-        try
-        {
-            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.ScanJunkFiles }, ct);
-            if (response?.Type == PipeMessageTypes.ScanJunkFilesResponse && !string.IsNullOrWhiteSpace(response.Payload))
-            {
-                var dto = JsonSerializer.Deserialize<JunkScanResultDto>(response.Payload, JsonOptions);
-                return dto ?? empty;
-            }
-        }
-        catch { }
-        return empty;
-    }
-
-    /// <summary>Запускает безопасную очистку выбранных категорий мусора.</summary>
-    public async Task<JunkCleanResultDto> CleanJunkFilesAsync(List<string>? categoryIds = null, CancellationToken ct = default)
-    {
-        var empty = new JunkCleanResultDto();
-        try
-        {
-            var req = new CleanJunkRequest { CategoryIds = categoryIds ?? new List<string>() };
-            var response = await SendAsync(new PipeMessage
-            {
-                Type = PipeMessageTypes.CleanJunkFiles,
-                Payload = JsonSerializer.Serialize(req, JsonOptions)
-            }, ct);
-
-            if (response?.Type == PipeMessageTypes.CleanJunkFilesResponse && !string.IsNullOrWhiteSpace(response.Payload))
-            {
-                var dto = JsonSerializer.Deserialize<JunkCleanResultDto>(response.Payload, JsonOptions);
-                return dto ?? empty;
-            }
-        }
-        catch { }
-        return empty;
-    }
-
-    /// <summary>Выполняет параллельное сканирование локальной сети для обнаружения устройств (LAN/Wi-Fi).</summary>
-    public async Task<List<LanDeviceDto>> ScanLanDevicesAsync(CancellationToken ct = default)
-    {
-        var empty = new List<LanDeviceDto>();
-        try
-        {
-            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.ScanLanDevices }, ct);
-            if (response?.Type == PipeMessageTypes.ScanLanDevicesResponse && !string.IsNullOrWhiteSpace(response.Payload))
-            {
-                var dto = JsonSerializer.Deserialize<List<LanDeviceDto>>(response.Payload, JsonOptions);
-                return dto ?? empty;
-            }
-        }
-        catch { }
-        return empty;
-    }
-
-    #endregion
 
     /// <summary>Освобождает все ресурсы: каналы, читатели, писатели, токены отмены.</summary>
     public void Dispose()
@@ -1881,5 +1743,37 @@ public class PipeClient : IDisposable
         _writer = null;
         _eventPipe = null;
         _eventReader = null;
+    }
+
+    /// <summary>Получает текущий статус тихого режима для сокетов PID = 0.</summary>
+    public async Task<bool> GetFirewallSilentPid0Async(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallSilentPid0 }, ct);
+            if (response.Type == PipeMessageTypes.GetFirewallSilentPid0Response && !string.IsNullOrEmpty(response.Payload))
+            {
+                var payload = JsonSerializer.Deserialize<FirewallSilentPid0Payload>(response.Payload, JsonOptions);
+                return payload?.Silent ?? true;
+            }
+        }
+        catch { }
+        return true;
+    }
+
+    /// <summary>Устанавливает статус тихого режима для сокетов PID = 0.</summary>
+    public async Task<bool> SetFirewallSilentPid0Async(bool silent, CancellationToken ct = default)
+    {
+        try
+        {
+            var payload = JsonSerializer.Serialize(new FirewallSilentPid0Payload(silent), JsonOptions);
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetFirewallSilentPid0,
+                Payload = payload
+            }, ct);
+            return response.Type == PipeMessageTypes.Success;
+        }
+        catch { return false; }
     }
 }

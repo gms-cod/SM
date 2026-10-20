@@ -41,6 +41,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
     private readonly ProcessNetworkTracker _tracker;
     private readonly WindowsFirewallService _firewall;
+    private readonly JsonDataStore? _store;
+    private readonly HashSet<string> _whitelistedApps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _allowedPorts = [];
 
     // ── Тестовые швы (test seams): в проде null → реальное поведение ──
 
@@ -101,10 +104,34 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// </summary>
     public NetworkConnectionAlertService(
         ProcessNetworkTracker tracker,
-        WindowsFirewallService firewall)
+        WindowsFirewallService firewall,
+        JsonDataStore? store = null)
     {
         _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
         _firewall = firewall ?? throw new ArgumentNullException(nameof(firewall));
+        _store = store;
+
+        if (_store != null)
+        {
+            try
+            {
+                var cfg = _store.Load();
+                foreach (var app in cfg.Settings.FirewallWhitelistedApps)
+                {
+                    if (!string.IsNullOrWhiteSpace(app))
+                        _whitelistedApps.Add(app.Trim());
+                }
+                foreach (var p in cfg.Settings.FirewallAllowedPorts)
+                {
+                    if (p > 0)
+                        _allowedPorts.Add(p);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "NetworkAlerts: не удалось инициализировать белый список из хранилища");
+            }
+        }
     }
 
     /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).
@@ -218,12 +245,25 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 if (string.IsNullOrEmpty(remote) || socket.RemotePort <= 0)
                     continue;
 
+                // 0. Тихий режим: сокеты без определенного процесса (PID = 0) не создают всплывающих окон при включенной опции
+                var isSilentPid0 = _store?.Load().Settings.FirewallSilentPid0 ?? true;
+                if (socket.ProcessId == 0 && isSilentPid0)
+                    continue;
+
+                // 0.1 Пропускаем порты, разрешенные пользователем (подавление всплывающих окон по этому порту)
+                if (IsPortAllowed(socket.RemotePort) || IsPortAllowed(socket.LocalPort))
+                    continue;
+
                 // 1. Игнорируем LAN / Loopback / unspecified.
                 if (socket.IsRemotePrivate || ProcessNetworkSocket.CheckIsPrivateAddress(remote))
                     continue;
 
                 var processName = (socket.ProcessName ?? string.Empty).Trim();
                 var processPath = ResolveProcessPath(socket.ProcessId, processName);
+
+                // 1.1 Пропускаем программы из белого списка (любые соединения разрешены без алертов)
+                if (IsWhitelistedApp(processPath, processName))
+                    continue;
 
                 // 2. Игнорируем доверенные системные процессы.
                 if (IsTrustedProcess(processName, processPath))
@@ -305,6 +345,58 @@ public sealed class NetworkConnectionAlertService : IDisposable
         switch (request.Resolution)
         {
             case NetworkAlertResolution.WhitelistProgram:
+                _sessionDecisions[sessionKey] = NetworkAlertResolution.WhitelistProgram;
+                var appKey = !string.IsNullOrWhiteSpace(path) ? path : name;
+                if (!string.IsNullOrWhiteSpace(appKey))
+                {
+                    _whitelistedApps.Add(appKey);
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        ApplyRule(BuildAppRule(path, name, FirewallAction.Allow));
+                    }
+                    if (_store != null)
+                    {
+                        try
+                        {
+                            var cfg = _store.Load();
+                            if (!cfg.Settings.FirewallWhitelistedApps.Contains(appKey, StringComparer.OrdinalIgnoreCase))
+                            {
+                                cfg.Settings.FirewallWhitelistedApps.Add(appKey);
+                                _store.Save(cfg);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "NetworkAlerts: ошибка сохранения белого списка программы");
+                        }
+                    }
+                }
+                break;
+
+            case NetworkAlertResolution.AllowPort:
+                var targetPort = request.RemotePort > 0 ? request.RemotePort : alert.RemotePort;
+                if (targetPort > 0)
+                {
+                    _allowedPorts.Add(targetPort);
+                    if (_store != null)
+                    {
+                        try
+                        {
+                            var cfg = _store.Load();
+                            if (!cfg.Settings.FirewallAllowedPorts.Contains(targetPort))
+                            {
+                                cfg.Settings.FirewallAllowedPorts.Add(targetPort);
+                                _store.Save(cfg);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "NetworkAlerts: ошибка сохранения разрешенного порта");
+                        }
+                    }
+                }
+                break;
+
             case NetworkAlertResolution.AllowAlways:
                 _sessionDecisions[sessionKey] = request.Resolution;
                 if (!string.IsNullOrWhiteSpace(path))
@@ -329,6 +421,19 @@ public sealed class NetworkConnectionAlertService : IDisposable
     // ── Вспомогательная логика ──
 
     /// <summary>Проверяет, является ли процесс доверенным системным (алерты не создаются).</summary>
+    /// <summary>Проверяет, находится ли программа в постоянном белом списке (любые соединения разрешены).</summary>
+    public bool IsWhitelistedApp(string? processPath, string? processName)
+    {
+        if (!string.IsNullOrWhiteSpace(processPath) && _whitelistedApps.Contains(processPath.Trim()))
+            return true;
+        if (!string.IsNullOrWhiteSpace(processName) && _whitelistedApps.Contains(processName.Trim()))
+            return true;
+        return false;
+    }
+
+    /// <summary>Проверяет, разрешен ли порт пользователем для подавления повторных всплывающих алертов.</summary>
+    public bool IsPortAllowed(int port) => port > 0 && _allowedPorts.Contains(port);
+
     public static bool IsTrustedProcess(string? processName, string? processPath)
     {
         string? fileName = null;

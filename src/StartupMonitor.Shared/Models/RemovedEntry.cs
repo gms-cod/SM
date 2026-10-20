@@ -25,4 +25,6 @@ public class RemovedEntry
     public string RestorePayload { get; set; } = string.Empty;
     /// <summary>Причина удаления: "UserRemoved", "LockdownBlocked", "Blacklist".</summary>
     public string RemovalReason { get; set; } = "UserRemoved";
+    /// <summary>Создает независимую копию бэкапа удаленной записи.</summary>
+    public RemovedEntry Clone() => (RemovedEntry)MemberwiseClone();
 }

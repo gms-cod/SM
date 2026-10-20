@@ -15,4 +15,6 @@ public class BlacklistRule
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     /// <summary>Комментарий (опционально, для чего добавлено правило).</summary>
     public string Comment { get; set; } = string.Empty;
+    /// <summary>Создает независимую копию правила.</summary>
+    public BlacklistRule Clone() => (BlacklistRule)MemberwiseClone();
 }

@@ -174,6 +174,9 @@ public partial class NetworkConnectionAlertWindow : Window
     private async void OnAllowAlwaysClick(object sender, RoutedEventArgs e) =>
         await ResolveAndCloseAsync(NetworkAlertResolution.AllowAlways).ConfigureAwait(true);
 
+        private async void OnAllowPortClick(object sender, RoutedEventArgs e) =>
+        await ResolveAndCloseAsync(NetworkAlertResolution.AllowPort).ConfigureAwait(true);
+
     private async void OnAllowSessionClick(object sender, RoutedEventArgs e) =>
         await ResolveAndCloseAsync(NetworkAlertResolution.AllowSession).ConfigureAwait(true);
 
@@ -205,6 +208,7 @@ public partial class NetworkConnectionAlertWindow : Window
                 ProcessPath = _alert.ProcessPath ?? string.Empty,
                 ProcessName = _alert.ProcessName ?? string.Empty,
                 RemoteAddress = _alert.RemoteAddress ?? string.Empty,
+                RemotePort = _alert.RemotePort,
                 Resolution = resolution
             };
 
@@ -223,6 +227,7 @@ public partial class NetworkConnectionAlertWindow : Window
         try
         {
             BtnWhitelist.IsEnabled = enabled;
+            BtnAllowPort.IsEnabled = enabled;
             BtnAllowAlways.IsEnabled = enabled;
             BtnAllowSession.IsEnabled = enabled;
             BtnBlockAlways.IsEnabled = enabled;

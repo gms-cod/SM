@@ -28,8 +28,6 @@ public partial class MainWindow
     private int _selectedNavIndex;
     /// <summary>Флаг замены дизайнерского экземпляра хаба сетевой безопасности на подключённый к <see cref="_pipeClient"/>.</summary>
     private bool _firewallHubInitialized;
-    /// <summary>Флаг замены дизайнерского экземпляра панели инструментов на подключённый к <see cref="_pipeClient"/>.</summary>
-    private bool _toolboxHubInitialized;
 
     /// <summary>Время последнего клика мышью для определения двойного клика.</summary>
     private DateTime _lastClickTime;
@@ -209,7 +207,6 @@ public partial class MainWindow
                 // Глубокий покой UI в трее (п. 4.1): замораживаем ВСЕ фоновые таймеры и метрики
                 _viewModel.SuspendAllBackgroundActivity();
                 try { FirewallHubView?.Deactivate(); } catch { }
-                try { ToolboxMainView?.Deactivate(); } catch { }
             }
             else
             {
@@ -221,10 +218,6 @@ public partial class MainWindow
                 {
                     try { FirewallHubView?.Activate(); } catch { }
                 }
-                if (_selectedNavIndex == 9 && _isStartupComplete && WindowState != WindowState.Minimized)
-                {
-                    try { _ = ToolboxMainView?.ActivateAsync(); } catch { }
-                }
             }
         };
 
@@ -235,7 +228,6 @@ public partial class MainWindow
                 // Окно свернуто/ушло в трей — полная заморозка фоновых таймеров (0% CPU)
                 _viewModel.SuspendAllBackgroundActivity();
                 try { FirewallHubView?.Deactivate(); } catch { }
-                try { ToolboxMainView?.Deactivate(); } catch { }
                 if (_hasShown && _viewModel.MinimizeToTray)
                     Hide();
             }
@@ -249,10 +241,6 @@ public partial class MainWindow
                 if (_selectedNavIndex == 8 && _isStartupComplete && IsVisible)
                 {
                     try { FirewallHubView?.Activate(); } catch { }
-                }
-                if (_selectedNavIndex == 9 && _isStartupComplete && IsVisible)
-                {
-                    try { _ = ToolboxMainView?.ActivateAsync(); } catch { }
                 }
             }
         };
@@ -641,10 +629,9 @@ public partial class MainWindow
         TaskManagerPage.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;
         BootTimePage.Visibility = idx == 7 ? Visibility.Visible : Visibility.Collapsed;
         FirewallPage.Visibility = idx == 8 ? Visibility.Visible : Visibility.Collapsed;
-        ToolboxPage.Visibility = idx == 9 ? Visibility.Visible : Visibility.Collapsed;
 
-        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8, NavItem9 };
-        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8, NavBar9 };
+        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8 };
+        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8 };
         Brush selected;
         try { selected = (Brush)FindResource("ControlFillColorSecondaryBrush"); }
         catch { selected = Brushes.Transparent; }
@@ -668,10 +655,6 @@ public partial class MainWindow
         }
 
         // Набор инструментов (9): останавливаем длительные операции при уходе
-        if (previousNavIndex == 9 && idx != 9)
-        {
-            try { ToolboxMainView?.Deactivate(); } catch { }
-        }
 
         if (idx == 6)
             _ = _viewModel.TaskManager.ActivateAsync();
@@ -698,29 +681,9 @@ public partial class MainWindow
             _ = _viewModel.LoadBootTimeAsync();
         else if (idx == 8)
             _ = RefreshFirewallHubAsync();
-        else if (idx == 9)
-        {
-            EnsureToolboxHub();
-            _ = ToolboxMainView?.ActivateAsync();
-        }
     }
 
-    /// <summary>Гарантирует, что панель инструментов использует общий подключённый <see cref="_pipeClient"/>.</summary>
-    private void EnsureToolboxHub()
-    {
-        if (_toolboxHubInitialized) return;
-        _toolboxHubInitialized = true;
-        try
-        {
-            ToolboxPage.Children.Clear();
-            ToolboxMainView = new ToolboxView(_pipeClient);
-            ToolboxPage.Children.Add(ToolboxMainView);
-        }
-        catch (Exception ex)
-        {
-            App.Log($"MainWindow: Error initializing ToolboxHub: {ex.Message}");
-        }
-    }
+
 
     /// <summary>Гарантирует, что хаб сетевой безопасности использует общий подключённый <see cref="_pipeClient"/>.</summary>
     /// <remarks>XAML создаёт <see cref="NetworkSecurityHubView"/> через конструктор без параметров

@@ -957,7 +957,6 @@ public class LocalizationService : INotifyPropertyChanged
     // ──── Центр сетевой безопасности (NetworkSecurityHubView / FirewallPage) ────
     /// <summary>Название пункта навигации «Сетевой экран».</summary>
     public string NavFirewall => this["NavFirewall"];
-    public string NavToolbox => this["NavToolbox"];
     public string NetAlertBtnWhitelist => this["NetAlertBtnWhitelist"];
     public string NetAlertWhitelistTip => this["NetAlertWhitelistTip"];
     /// <summary>Заголовок хаба сетевой безопасности.</summary>
@@ -1331,4 +1330,13 @@ public class LocalizationService : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(""));
     }
+
+    /// <summary>Текст кнопки разрешения порта.</summary>
+    public string NetAlertBtnAllowPort => this["NetAlertBtnAllowPort"];
+    /// <summary>Подсказка кнопки разрешения порта.</summary>
+    public string NetAlertAllowPortTip => this["NetAlertAllowPortTip"];
+    /// <summary>Метка тихого режима для PID 0.</summary>
+    public string FirewallSilentPid0Label => this["FirewallSilentPid0Label"];
+    /// <summary>Подсказка тихого режима для PID 0.</summary>
+    public string FirewallSilentPid0Hint => this["FirewallSilentPid0Hint"];
 }

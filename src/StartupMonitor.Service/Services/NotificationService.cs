@@ -12,6 +12,8 @@ namespace StartupMonitor.Service.Services;
 public class NotificationService : IDisposable
 {
     /// <summary>Потокобезопасная очередь сообщений для отправки в UI.</summary>
+    /// <summary>Максимальная емкость буфера уведомлений для предотвращения утечек памяти.</summary>
+    public const int MaxQueueCapacity = 10_000;
     private readonly ConcurrentQueue<PipeMessage> _messageQueue = new();
     /// <summary>Таймер для периодического сброса батча.</summary>
     private readonly Timer _timer;
@@ -43,6 +45,11 @@ public class NotificationService : IDisposable
         if (!_tracker.IsCompleted && message.Type == PipeMessageTypes.EntryAdded)
             return;
 
+        if (_messageQueue.Count >= MaxQueueCapacity)
+        {
+            // Drop oldest некритичных сообщений для предотвращения неконтролируемого роста памяти (P1-07)
+            _messageQueue.TryDequeue(out _);
+        }
         _messageQueue.Enqueue(message);
 
         // Отправка удалённых оповещений (только после завершения начального сканирования)

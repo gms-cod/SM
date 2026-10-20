@@ -478,6 +478,12 @@ public partial class NetworkSecurityHubView : UserControl
         try
         {
             ChkInteractiveAlerts.IsChecked = _alertsEnabled;
+            try
+            {
+                var silentPid0 = await _pipeClient.GetFirewallSilentPid0Async();
+                ChkSilentPid0.IsChecked = silentPid0;
+            }
+            catch { }
         }
         catch { }
         finally
@@ -487,6 +493,23 @@ public partial class NetworkSecurityHubView : UserControl
     }
 
     /// <summary>Обработчик тумблера интерактивных уведомлений: отправляет состояние службе.</summary>
+    private async void OnSilentPid0Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+        var silent = ChkSilentPid0.IsChecked == true;
+        try
+        {
+            var ok = await _pipeClient.SetFirewallSilentPid0Async(silent);
+            SetStatus(silent
+                ? "Тихий режим PID=0 включен (алерты ядра подавлены)."
+                : "Тихий режим PID=0 выключен.");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка переключения тихого режима PID=0: {ex.Message}");
+        }
+    }
+
     private async void OnInteractiveAlertsChanged(object sender, RoutedEventArgs e)
     {
         if (_suppressAlertsToggle || _isLoading)

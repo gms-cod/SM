@@ -251,4 +251,24 @@ public class StartupEntry : INotifyPropertyChanged
 
     /// <summary>Строка для отображения: командная строка или путь к файлу.</summary>
     public string DisplayPath => string.IsNullOrEmpty(CommandLine) ? FilePath : CommandLine;
+    /// <summary>
+    /// Создает изолированную глубокую копию записи для предотвращения гонок данных (Data Race) и повреждения кэша.
+    /// </summary>
+    public StartupEntry Clone()
+    {
+        var copy = (StartupEntry)MemberwiseClone();
+        copy.RawData = new Dictionary<string, string>(RawData);
+        if (ThreatInfo != null)
+        {
+            copy.ThreatInfo = new CliThreatInfo
+            {
+                HasThreat = ThreatInfo.HasThreat,
+                ThreatLevel = ThreatInfo.ThreatLevel,
+                BadgeText = ThreatInfo.BadgeText,
+                Description = ThreatInfo.Description,
+                Indicators = [..ThreatInfo.Indicators]
+            };
+        }
+        return copy;
+    }
 }

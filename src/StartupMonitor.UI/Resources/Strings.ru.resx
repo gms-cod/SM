@@ -468,7 +468,7 @@
     <value>Таймаут ожидания завершения сканирования (60с)</value>
   </data>
   <data name="StatusEnabledShort" xml:space="preserve">
-    <value />
+    <value>Вкл</value>
   </data>
   <data name="LocAppPaths" xml:space="preserve">
     <value>AppPaths</value>
@@ -2101,4 +2101,4 @@
   <data name="ToolboxTabSecurity" xml:space="preserve">
     <value>Хеши и пароли</value>
   </data>
-</root>
+<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Разрешить этот порт</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Разрешить сетевые подключения по данному порту и больше не показывать по нему уведомления</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Тихий режим для системных сокетов (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Подавлять всплывающие уведомления о сетевой активности сокетов ядра и завершающихся соединений</value></data></root>
