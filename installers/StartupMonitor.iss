@@ -3,7 +3,7 @@
 ; =====================================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.7.6"
+  #define MyAppVersion "1.9.4"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -35,8 +35,13 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=commandline
+; Закрытие запущенных процессов StartupMonitor*.exe перед установкой (через Restart Manager)
 CloseApplications=yes
 CloseApplicationsFilter=StartupMonitor*.exe
+; Попытка автоматического перезапуска приложений, закрытых инсталлятором, после установки.
+; Работает только для приложений, зарегистрированных в Restart Manager; для UI служит
+; резервный механизм watchdog (см. GitHubUpdateService.InstallUpdate и UpdateAvailableWindow).
+RestartApplications=yes
 UsedUserAreasWarning=no
 
 [Languages]
@@ -79,10 +84,16 @@ Filename: "sc.exe"; Parameters: "create {#MyServiceName} binPath= """"{app}\{#My
 Filename: "sc.exe"; Parameters: "config {#MyServiceName} binPath= """"{app}\{#MyServiceExeName}"""" start= auto DisplayName= """"Startup Monitor Service"""""; Flags: runhidden
 Filename: "sc.exe"; Parameters: "description {#MyServiceName} """"Мониторинг автозагрузки Windows в реальном времени и защита от нежелательных программ."""""; Flags: runhidden
 Filename: "sc.exe"; Parameters: "failure {#MyServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/60000"; Flags: runhidden
-; Запуск службы
+; Запуск службы после установки/обновления (важно при тихой установке, т.к. служба могла быть
+; остановлена/убита инсталлятором через CloseApplications). Выполняется в контексте установщика (admin).
 Filename: "sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden; StatusMsg: "Запуск службы Startup Monitor..."
-; Опциональный запуск UI для пользователя при интерактивной установке
-Filename: "{app}\{#MyAppExeName}"; Description: "Запустить Startup Monitor сейчас"; Flags: nowait postinstall skipifsilent
+; Опциональный запуск UI для пользователя при интерактивной установке.
+; runasoriginaluser — запуск в контексте пользователя, запустившего установщик (не admin),
+; чтобы окно появилось на его рабочем столе, а не в Session 0.
+; ВАЖНО: при тихой установке (/SILENT, /VERYSILENT) записи с флагом postinstall НЕ выполняются
+; (финальный экран не показывается), поэтому перезапуск UI при автообновлении обеспечивается
+; службой через UserSessionLauncher (watchdog в пользовательской сессии).
+Filename: "{app}\{#MyAppExeName}"; Description: "Запустить Startup Monitor сейчас"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
 ; Остановка и удаление службы при удалении программы

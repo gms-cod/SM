@@ -485,6 +485,62 @@ public sealed class GitHubUpdateService : IDisposable
 
             try
             {
+                // Запускаем надежный скрипт-сторож (Watchdog) в интерактивной сессии пользователя
+                // перед стартом установки, чтобы гарантировать перезапуск UI после обновления.
+                try
+                {
+                    var baseDir = AppContext.BaseDirectory;
+                    var uiExe = Path.Combine(baseDir, "StartupMonitor.UI.exe");
+                    if (!File.Exists(uiExe))
+                    {
+                        var parentDir = Path.GetDirectoryName(filePath);
+                        if (!string.IsNullOrEmpty(parentDir))
+                        {
+                            var alt = Path.Combine(parentDir, "StartupMonitor.UI.exe");
+                            if (File.Exists(alt)) uiExe = alt;
+                        }
+                    }
+
+                    var tempScriptPath = Path.Combine(Path.GetTempPath(), $"StartupMonitor_UpdateWatchdog_{Environment.TickCount}.cmd");
+                    var batchContent =
+                        "@echo off\r\n" +
+                        "rem Сторожевой скрипт службы для перезапуска UI после фонового обновления\r\n" +
+                        "setlocal\r\n" +
+                        "for /l %%i in (1,1,60) do (\r\n" +
+                        "    tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && goto found\r\n" +
+                        "    timeout /t 1 /nobreak >nul\r\n" +
+                        ")\r\n" +
+                        "goto launch\r\n" +
+                        ":found\r\n" +
+                        ":loop\r\n" +
+                        "tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && (\r\n" +
+                        "    timeout /t 2 /nobreak >nul\r\n" +
+                        "    goto loop\r\n" +
+                        ")\r\n" +
+                        "timeout /t 3 /nobreak >nul\r\n" +
+                        ":launch\r\n" +
+                        "tasklist /fi \"imagename eq StartupMonitor.UI.exe\" | find /i \"StartupMonitor.UI.exe\" >nul || start \"\" \"" + uiExe + "\" --minimized\r\n" +
+                        "rem Самоудаление временного файла скрипта\r\n" +
+                        "(goto) 2>nul & del \"%~f0\"\r\n";
+
+                    File.WriteAllText(tempScriptPath, batchContent, System.Text.Encoding.ASCII);
+
+                    var cmdExe = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+                    var (wdOk, wdMsg, _) = Delayed.UserSessionLauncher.Launch(cmdExe, $"\"{cmdExe}\" /c \"{tempScriptPath}\"", _logger);
+                    if (wdOk)
+                    {
+                        _logger.LogInformation("Сторож перезапуска UI запущен в сессии пользователя: {Msg}", wdMsg);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Не удалось запустить сторож UI через UserSessionLauncher: {Msg}", wdMsg);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Ошибка при подготовке сторожевого скрипта перезапуска UI.");
+                }
+
                 _logger.LogInformation("Launching silent installer: {Path} /SILENT /NORESTART /SUPPRESSMSGBOXES", filePath);
 
                 var psi = new ProcessStartInfo

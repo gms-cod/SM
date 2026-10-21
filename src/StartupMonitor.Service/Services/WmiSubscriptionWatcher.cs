@@ -65,7 +65,7 @@ public class WmiSubscriptionWatcher : BackgroundService
             // Создание консьюмера или биндинга
             var createQuery = new WqlEventQuery(
                 "__InstanceCreationEvent",
-                TimeSpan.FromSeconds(3),
+                TimeSpan.FromSeconds(30),
                 "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
             createWatcher = new ManagementEventWatcher(scope, createQuery);
             createWatcher.EventArrived += (s, e) => ScheduleRescan("Creation");
@@ -74,7 +74,7 @@ public class WmiSubscriptionWatcher : BackgroundService
             // Модификация существующего консьюмера или биндинга
             var modQuery = new WqlEventQuery(
                 "__InstanceModificationEvent",
-                TimeSpan.FromSeconds(3),
+                TimeSpan.FromSeconds(30),
                 "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
             modWatcher = new ManagementEventWatcher(scope, modQuery);
             modWatcher.EventArrived += (s, e) => ScheduleRescan("Modification");
@@ -83,7 +83,7 @@ public class WmiSubscriptionWatcher : BackgroundService
             // Удаление консьюмера или биндинга
             var delQuery = new WqlEventQuery(
                 "__InstanceDeletionEvent",
-                TimeSpan.FromSeconds(3),
+                TimeSpan.FromSeconds(30),
                 "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
             delWatcher = new ManagementEventWatcher(scope, delQuery);
             delWatcher.EventArrived += (s, e) => ScheduleRescan("Deletion");

@@ -107,11 +107,36 @@ public partial class UpdateAvailableWindow : FluentWindow
             try
             {
                 var uiExe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "StartupMonitor.UI.exe");
-                var restartCmd = $"/c timeout /t 2 /nobreak >nul & :loop & tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && (timeout /t 2 /nobreak >nul & goto loop) & start \"\" \"{uiExe}\" --minimized";
+                // Создаем надежный временный .cmd скрипт-сторож в сессии пользователя.
+                // ВАЖНО: В командной строке 'cmd /c' переходы 'goto' не поддерживаются и ведут к вылету процесса.
+                var watchdogScript = Path.Combine(Path.GetTempPath(), $"StartupMonitor_UI_Watchdog_{Environment.TickCount}.cmd");
+                var batchContent =
+                    "@echo off\r\n" +
+                    "rem Сторожевой скрипт для ожидания завершения обновления и перезапуска StartupMonitor.UI\r\n" +
+                    "setlocal\r\n" +
+                    "for /l %%i in (1,1,60) do (\r\n" +
+                    "    tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && goto found\r\n" +
+                    "    timeout /t 1 /nobreak >nul\r\n" +
+                    ")\r\n" +
+                    "goto launch\r\n" +
+                    ":found\r\n" +
+                    ":loop\r\n" +
+                    "tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && (\r\n" +
+                    "    timeout /t 2 /nobreak >nul\r\n" +
+                    "    goto loop\r\n" +
+                    ")\r\n" +
+                    "timeout /t 3 /nobreak >nul\r\n" +
+                    ":launch\r\n" +
+                    "tasklist /fi \"imagename eq StartupMonitor.UI.exe\" | find /i \"StartupMonitor.UI.exe\" >nul || start \"\" \"" + uiExe + "\" --minimized\r\n" +
+                    "rem Самоудаление временного файла скрипта\r\n" +
+                    "(goto) 2>nul & del \"%~f0\"\r\n";
+
+                File.WriteAllText(watchdogScript, batchContent, System.Text.Encoding.ASCII);
+
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = restartCmd,
+                    Arguments = $"/c \"{watchdogScript}\"",
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden

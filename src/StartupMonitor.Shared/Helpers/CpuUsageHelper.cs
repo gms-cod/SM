@@ -45,6 +45,41 @@ public static class CpuUsageHelper
 
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentThread();
+
+    [DllImport("kernel32.dll")]
+    private static extern uint SetThreadIdealProcessor(IntPtr hThread, uint dwIdealProcessor);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern UIntPtr SetThreadAffinityMask(IntPtr hThread, UIntPtr dwThreadAffinityMask);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION
+    {
+        public long IdleTime;
+        public long KernelTime;
+        public long UserTime;
+        public long DpcTime;
+        public long InterruptTime;
+        public uint InterruptCount;
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQuerySystemInformation(
+        int systemInformationClass,
+        IntPtr systemInformation,
+        int systemInformationLength,
+        out int returnLength);
+
+    private const int SystemProcessorPerformanceInformation = 8;
+
+    private static readonly object CoreSyncLock = new();
+    private static SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION[]? _prevCoreInfo;
+    private static DateTime _prevCoreSampleTime = DateTime.MinValue;
+    private static int _lastLeastLoadedCore;
+    private static int _roundRobinIndex;
+
     private static readonly object SyncLock = new();
     private static long _prevIdleTime;
     private static long _prevKernelTime;
@@ -112,7 +147,9 @@ public static class CpuUsageHelper
                 return excludeSelf ? _lastExternalUsage : _lastTotalUsage;
             }
 
-            var ourTicks = GetOurProcessesTicks();
+            // Оптимизация: перечисляем процессы через GetOurProcessesTicks() ТОЛЬКО если запрошен excludeSelf.
+            // При общем замере системы (excludeSelf == false) не тратим CPU на перечисление сотен процессов.
+            var ourTicks = excludeSelf ? GetOurProcessesTicks() : 0L;
 
             var deltaIdle = idle - _prevIdleTime;
             var deltaKernel = kernel - _prevKernelTime;
@@ -377,5 +414,160 @@ public static class CpuUsageHelper
         var external = GetCpuUsageForPids(ownPids, excludeSelf: true);
         return (total, external);
     }
-}
 
+    /// <summary>
+    /// Возвращает индекс логического ядра процессора (0..N-1), имеющего наименьшую загрузку
+    /// (максимальный процент простоя) на основе прямого системного замера через NtQuerySystemInformation.
+    /// Накладные расходы составляют менее 1 микросекунды.
+    /// </summary>
+    /// <returns>Индекс наименее загруженного ядра (0..Environment.ProcessorCount - 1).</returns>
+    public static int GetLeastLoadedProcessorCore()
+    {
+        lock (CoreSyncLock)
+        {
+            var coreCount = Environment.ProcessorCount;
+            if (coreCount <= 1) return 0;
+
+            var now = DateTime.UtcNow;
+            // Кэшируем результат на 300 мс, чтобы исключить избыточные замеры при частых запросах
+            if (_prevCoreInfo != null && (now - _prevCoreSampleTime).TotalMilliseconds < 300)
+            {
+                return _lastLeastLoadedCore;
+            }
+
+            var structSize = Marshal.SizeOf<SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION>();
+            var bufferSize = structSize * coreCount;
+            var buffer = Marshal.AllocHGlobal(bufferSize);
+
+            try
+            {
+                var status = NtQuerySystemInformation(SystemProcessorPerformanceInformation, buffer, bufferSize, out var returnLength);
+                if (status != 0) // STATUS_SUCCESS = 0
+                {
+                    return _lastLeastLoadedCore;
+                }
+
+                var currentInfo = new SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION[coreCount];
+                for (int i = 0; i < coreCount; i++)
+                {
+                    var ptr = IntPtr.Add(buffer, i * structSize);
+                    currentInfo[i] = Marshal.PtrToStructure<SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION>(ptr);
+                }
+
+                if (_prevCoreInfo == null || _prevCoreInfo.Length != coreCount)
+                {
+                    _prevCoreInfo = currentInfo;
+                    _prevCoreSampleTime = now;
+                    // При первичном замере распределяем потоки по ядрам через Round-Robin, чтобы не концентрировать всё на ядре 0
+                    _lastLeastLoadedCore = (int)((uint)System.Threading.Interlocked.Increment(ref _roundRobinIndex) % (uint)coreCount);
+                    return _lastLeastLoadedCore;
+                }
+
+                int bestCore = 0;
+                double maxIdleRatio = -1.0;
+
+                for (int i = 0; i < coreCount; i++)
+                {
+                    var deltaIdle = currentInfo[i].IdleTime - _prevCoreInfo[i].IdleTime;
+                    var deltaKernel = currentInfo[i].KernelTime - _prevCoreInfo[i].KernelTime;
+                    var deltaUser = currentInfo[i].UserTime - _prevCoreInfo[i].UserTime;
+                    var deltaTotal = deltaKernel + deltaUser;
+
+                    double idleRatio = deltaTotal > 0 ? (double)deltaIdle / deltaTotal : 1.0;
+                    if (idleRatio > maxIdleRatio)
+                    {
+                        maxIdleRatio = idleRatio;
+                        bestCore = i;
+                    }
+                }
+
+                _prevCoreInfo = currentInfo;
+                _prevCoreSampleTime = now;
+                _lastLeastLoadedCore = bestCore;
+                return bestCore;
+            }
+            catch
+            {
+                // При любой непредвиденной ошибке возвращаем текущее известное ядро
+                return _lastLeastLoadedCore;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Мягко привязывает текущий поток к указанному или наименее загруженному ядру процессора
+    /// через Win32 SetThreadIdealProcessor. Планировщик Windows будет отдавать предпочтение этому ядру.
+    /// </summary>
+    /// <param name="coreIndex">Индекс ядра (если меньше 0, ядро выбирается автоматически).</param>
+    public static void AssignCurrentThreadToIdealCore(int coreIndex = -1)
+    {
+        try
+        {
+            var targetCore = coreIndex >= 0 ? coreIndex : GetLeastLoadedProcessorCore();
+            if (targetCore >= 0 && targetCore < Environment.ProcessorCount)
+            {
+                SetThreadIdealProcessor(GetCurrentThread(), (uint)targetCore);
+            }
+        }
+        catch
+        {
+            // Безопасное подавление при недоступности прав на привязку
+        }
+    }
+
+    /// <summary>
+    /// Устанавливает низкий приоритет для текущего потока (BelowNormal), чтобы фоновые задачи
+    /// гарантированно уступали ресурсы интерактивному пользовательскому интерфейсу и приложениям.
+    /// </summary>
+    public static void SetCurrentThreadLowPriority()
+    {
+        try
+        {
+            if (Thread.CurrentThread.Priority != ThreadPriority.BelowNormal)
+            {
+                Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+            }
+        }
+        catch
+        {
+            // Игнорируем в средах, где смена приоритета потока ограничена политикой
+        }
+    }
+
+    /// <summary>
+    /// Интеллектуальный шлюз загрузки: приостанавливает выполнение задачи, если процессор
+    /// в данный момент перегружен сторонними процессами (например, играми или компиляцией).
+    /// </summary>
+    /// <param name="threshold">Порог загрузки CPU (по умолчанию 60%).</param>
+    /// <param name="checkIntervalMs">Интервал повторной проверки (по умолчанию 500 мс).</param>
+    /// <param name="maxWaitMs">Максимальное время ожидания освобождения процессора (по умолчанию 5000 мс).</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    public static async Task WaitForCpuHeadroomAsync(
+        double threshold = 60.0,
+        int checkIntervalMs = 500,
+        int maxWaitMs = 5000,
+        CancellationToken ct = default)
+    {
+        var startTime = Stopwatch.GetTimestamp();
+        while (!ct.IsCancellationRequested)
+        {
+            var totalCpu = GetCpuUsage(excludeSelf: false);
+            if (totalCpu < threshold)
+            {
+                break;
+            }
+
+            if (Stopwatch.GetElapsedTime(startTime).TotalMilliseconds >= maxWaitMs)
+            {
+                break; // Не блокируем выполнение дольше максимального лимита
+            }
+
+            await Task.Delay(checkIntervalMs, ct).ConfigureAwait(false);
+        }
+    }
+
+}

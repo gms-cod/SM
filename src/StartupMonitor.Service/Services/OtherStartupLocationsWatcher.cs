@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using StartupMonitor.Shared.Diagnostics;
+using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Service.Services;
@@ -24,6 +25,11 @@ public class OtherStartupLocationsWatcher : BackgroundService
     private readonly MonitoringStateCoordinator _coordinator;
     // Ключи держим в поле — иначе GC соберёт их и закроет handle под P/Invoke
     private readonly List<RegistryKey> _watchedKeys = [];
+    // Шлюз одиночного прогона и таймеры тишины (Debounce) для предотвращения шторма ресканов
+    private readonly SemaphoreSlim _scanGate = new(1, 1);
+    private readonly object _debounceLock = new();
+    private Timer? _debounceHklm;
+    private Timer? _debounceHkcu;
 
     /// <summary>Список точек реестра для сканирования и наблюдения.</summary>
     /// Drivers32 (кодеки), NetworkProvider, PrintMonitors, LSA и IE Extensions — библиотеки
@@ -381,53 +387,135 @@ public class OtherStartupLocationsWatcher : BackgroundService
     {
         _ = Task.Run(async () =>
         {
+            // Назначаем поток наблюдения на наименее загруженное ядро с заниженным приоритетом
+            CpuUsageHelper.AssignCurrentThreadToIdealCore();
+            CpuUsageHelper.SetCurrentThreadLowPriority();
+
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
-                    // Блокирующий режим: возврат при изменении ключа или закрытии handle
+                    // Блокирующий синхронный вызов RegNotifyChangeKeyValue (5 параметров)
                     var result = RegNotifyChangeKeyValue(
                         regHandle,
                         watchSubtree: true,
                         notifyFilter: RegNotifyFilter.NAME | RegNotifyFilter.VALUE | RegNotifyFilter.SET_VALUE,
-                        fAsynchronous: false,
                         hEvent: IntPtr.Zero,
-                        fImmediate: false);
+                        fAsynchronous: false);
 
                     if (ct.IsCancellationRequested) break;
 
                     if (result == 0)
                     {
                         if (_coordinator.IsPaused) continue;
-                        // Изменение обнаружено — пересканируем ключ после небольшой паузы
-                        await Task.Delay(500, ct);
-                        _logger.LogInformation("Registry change detected: {Key}", keyPath);
-                        ScanHive(hive);
+                        // При изменении не сканируем сразу, а взводим таймер тишины (Debounce 2 сек)
+                        _logger.LogInformation("Registry change signal for {Key}, scheduling debounced scan...", keyPath);
+                        ScheduleDebouncedHiveScan(hive);
                     }
                     else
                     {
                         // Ошибка нотификации — пауза перед повтором
-                        await Task.Delay(1000, ct);
+                        await Task.Delay(1500, ct).ConfigureAwait(false);
                     }
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Registry notification error for {Key}", keyPath);
-                    await Task.Delay(5000, ct);
+                    await Task.Delay(5000, ct).ConfigureAwait(false);
                 }
             }
         }, ct);
     }
 
-    /// <summary>Остановка: закрываем ключи реестра, чтобы разблокировать RegNotifyChangeKeyValue.</summary>
-    public override Task StopAsync(CancellationToken cancellationToken)
+    /// <summary>Взводит таймер окна тишины (Debounce 2 секунды) для куста реестра.</summary>
+    private void ScheduleDebouncedHiveScan(RegistryHive hive)
     {
-        // Закрытие ключей разблокирует RegNotifyChangeKeyValue в потоках наблюдения
-        foreach (var key in _watchedKeys)
-            try { key.Dispose(); } catch { }
-        _watchedKeys.Clear();
-        return base.StopAsync(cancellationToken);
+        lock (_debounceLock)
+        {
+            if (hive == RegistryHive.LocalMachine)
+            {
+                _debounceHklm ??= new Timer(_ => ExecuteDebouncedScan(RegistryHive.LocalMachine), null, Timeout.Infinite, Timeout.Infinite);
+                _debounceHklm.Change(2000, Timeout.Infinite);
+            }
+            else
+            {
+                _debounceHkcu ??= new Timer(_ => ExecuteDebouncedScan(RegistryHive.CurrentUser), null, Timeout.Infinite, Timeout.Infinite);
+                _debounceHkcu.Change(2000, Timeout.Infinite);
+            }
+        }
+    }
+
+    /// <summary>Выполняет одиночное потокобезопасное сканирование куста с контролем загрузки CPU.</summary>
+    private void ExecuteDebouncedScan(RegistryHive hive)
+    {
+        _ = Task.Run(async () =>
+        {
+            // Если мониторинг приостановлен пользователем — пропускаем сканирование
+            if (_coordinator.IsPaused) return;
+
+            // Ожидаем нормализации процессора, если система нагружена сторонними процессами
+            await CpuUsageHelper.WaitForCpuHeadroomAsync(60.0).ConfigureAwait(false);
+
+            if (_coordinator.IsPaused) return;
+
+            try
+            {
+                if (!await _scanGate.WaitAsync(0).ConfigureAwait(false))
+                {
+                    // Если сканирование уже выполняется — планируем отложенный повтор
+                    ScheduleDebouncedHiveScan(hive);
+                    return;
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                return; // Служба останавливается
+            }
+
+            try
+            {
+                CpuUsageHelper.AssignCurrentThreadToIdealCore();
+                CpuUsageHelper.SetCurrentThreadLowPriority();
+                _logger.LogInformation("Executing debounced scan for hive {Hive}", hive);
+                ScanHive(hive);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing debounced hive scan {Hive}", hive);
+            }
+            finally
+            {
+                try { _scanGate.Release(); } catch { }
+            }
+        });
+    }
+
+    /// <summary>Остановка: закрываем ключи реестра, чтобы разблокировать RegNotifyChangeKeyValue.</summary>
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        // 1. Сначала уведомляем базовый BackgroundService об отмене токена
+        await base.StopAsync(cancellationToken).ConfigureAwait(false);
+
+        // 2. Отменяем и освобождаем таймеры задержки
+        lock (_debounceLock)
+        {
+            _debounceHklm?.Dispose();
+            _debounceHklm = null;
+            _debounceHkcu?.Dispose();
+            _debounceHkcu = null;
+        }
+
+        // 3. Закрытие ключей реестра разблокирует RegNotifyChangeKeyValue в потоках наблюдения
+        lock (_watchedKeys)
+        {
+            foreach (var key in _watchedKeys)
+                try { key.Dispose(); } catch { }
+            _watchedKeys.Clear();
+        }
+
+        // 4. Освобождаем шлюз сканирования
+        try { _scanGate.Dispose(); } catch { }
     }
 
     /// <summary>Извлекает путь к файлу из командной строки (поддерживает кавычки и .exe/.dll/.com/.bat).</summary>
@@ -459,15 +547,14 @@ public class OtherStartupLocationsWatcher : BackgroundService
         return trimmed[..spaceIdx];
     }
 
-    /// <summary>P/Invoke для отслеживания изменений в реестре.</summary>
+    /// <summary>P/Invoke для отслеживания изменений в реестре (каноничный 5-параметровый Win32 вызов).</summary>
     [DllImport("advapi32.dll", SetLastError = true)]
     private static extern int RegNotifyChangeKeyValue(
         SafeHandle hKey,
         [MarshalAs(UnmanagedType.Bool)] bool watchSubtree,
         RegNotifyFilter notifyFilter,
-        [MarshalAs(UnmanagedType.Bool)] bool fAsynchronous,
         IntPtr hEvent,
-        [MarshalAs(UnmanagedType.Bool)] bool fImmediate);
+        [MarshalAs(UnmanagedType.Bool)] bool fAsynchronous);
 
     /// <summary>Фильтры уведомлений реестра.</summary>
     [Flags]

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32.TaskScheduler;
 using StartupMonitor.Shared.Diagnostics;
+using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared.Models;
 using Task = System.Threading.Tasks.Task;
 
@@ -132,52 +133,77 @@ public class TaskSchedulerWatcher : BackgroundService
         }, ct);
     }
 
-    /// <summary>Периодический опрос (каждые 30 с) для обнаружения новых задач.</summary>
+    /// <summary>Адаптивный опрос планировщика с затуханием в покое, кооперативными микропаузами и контролем CPU.</summary>
     private async Task PollForChanges(CancellationToken ct)
     {
+        int quietCycles = 0;
+
         while (!ct.IsCancellationRequested)
         {
             if (_coordinator.IsPaused)
             {
-                await Task.Delay(5000, ct);
+                await Task.Delay(5000, ct).ConfigureAwait(false);
                 continue;
             }
 
+            // Ожидаем нормализации процессора, если система загружена сторонними приложениями
+            await CpuUsageHelper.WaitForCpuHeadroomAsync(60.0, ct: ct).ConfigureAwait(false);
+            CpuUsageHelper.AssignCurrentThreadToIdealCore();
+            CpuUsageHelper.SetCurrentThreadLowPriority();
+
             List<Microsoft.Win32.TaskScheduler.Task>? tasks = null;
+            bool changesDetectedInCycle = false;
+
             try
             {
                 // Получаем все задачи (включая скрытые)
                 tasks = GetAllTasksWithHidden();
                 if (tasks == null)
                 {
-                    await Task.Delay(30000, ct);
+                    await Task.Delay(30000, ct).ConfigureAwait(false);
                     continue;
                 }
 
-                var startupTasks = tasks.Where(IsStartupTask);
+                int processedCount = 0;
 
-                foreach (var task in startupTasks)
+                // Time-Slicing обход: применяем кооперативные микропаузы на всем множестве задач,
+                // включая фазу чтения Definition, исключая 100% утилизацию ядра на тяжелых COM-запросах.
+                foreach (var task in tasks)
                 {
+                    ct.ThrowIfCancellationRequested();
+
+                    processedCount++;
+                    if (processedCount % 20 == 0)
+                    {
+                        await Task.Delay(5, ct).ConfigureAwait(false);
+                    }
+
+                    if (!IsStartupTask(task)) continue;
+
                     var existing = FindByTaskPath(task.Path);
                     if (existing == null)
+                    {
                         ProcessTask(task);
+                        changesDetectedInCycle = true;
+                    }
                     else if (string.IsNullOrEmpty(existing.CommandLine))
                     {
-                        // Обновляем CommandLine, если он пустой (дозаполняем)
                         var taskCmd = FormatTaskAction(task);
                         existing.CommandLine = taskCmd;
                         existing.FilePath = taskCmd;
                         _store.UpdateEntry(existing);
+                        changesDetectedInCycle = true;
                     }
                     else if (string.IsNullOrEmpty(existing.FilePath) || existing.FilePath == existing.Name)
                     {
-                        // Обновляем FilePath, если это просто имя задачи
                         var taskCmd = FormatTaskAction(task);
                         existing.FilePath = taskCmd;
                         _store.UpdateEntry(existing);
+                        changesDetectedInCycle = true;
                     }
                 }
             }
+            catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Task Scheduler poll failed");
@@ -195,7 +221,19 @@ public class TaskSchedulerWatcher : BackgroundService
                 }
             }
 
-            await Task.Delay(30000, ct);
+            // Адаптивное затухание опроса при отсутствии изменений
+            if (changesDetectedInCycle)
+            {
+                quietCycles = 0;
+            }
+            else
+            {
+                quietCycles++;
+            }
+
+            // Если изменений нет: 30 с -> 60 с -> 180 с (3 минуты)
+            int delayMs = quietCycles < 3 ? 30000 : (quietCycles < 8 ? 60000 : 180000);
+            await Task.Delay(delayMs, ct).ConfigureAwait(false);
         }
     }
 
@@ -261,9 +299,11 @@ public class TaskSchedulerWatcher : BackgroundService
     {
         try
         {
-            if (!task.Definition.Actions.OfType<ExecAction>().Any()) return false;
-            return task.Definition.Triggers.Any(tr =>
-                tr is LogonTrigger or BootTrigger);
+            // Однократное чтение COM-свойства Definition с локальным кэшированием
+            var def = task.Definition;
+            if (def == null) return false;
+            if (!def.Actions.OfType<ExecAction>().Any()) return false;
+            return def.Triggers.Any(tr => tr is LogonTrigger or BootTrigger);
         }
         catch { return false; }
     }

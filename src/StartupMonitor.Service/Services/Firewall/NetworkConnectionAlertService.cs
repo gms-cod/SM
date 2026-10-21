@@ -587,26 +587,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
         try
         {
-            var rules = _firewall.GetAllRules();
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var rule in rules)
-            {
-                var app = rule.ApplicationPath ?? rule.ApplicationName;
-                if (string.IsNullOrWhiteSpace(app))
-                    continue;
-                var appTrimmed = app.Trim();
-                if (appTrimmed.Length == 0)
-                    continue;
-                set.Add(appTrimmed.ToLowerInvariant());
-                try
-                {
-                    var fileName = Path.GetFileName(appTrimmed);
-                    if (!string.IsNullOrWhiteSpace(fileName))
-                        set.Add(fileName.ToLowerInvariant());
-                }
-                catch { }
-            }
-
+            // Высокоскоростное точечное чтение путей без COM-reflection на 12 неиспользуемых свойств
+            var set = _firewall.GetApplicationRulePaths();
             _cachedRulePaths = set;
             _cachedRulePathsTime = now;
             return set;
@@ -666,44 +648,11 @@ public sealed class NetworkConnectionAlertService : IDisposable
             catch { return false; }
         }
 
-        if (string.IsNullOrWhiteSpace(processPath))
+        if (string.IsNullOrWhiteSpace(processPath) && string.IsNullOrWhiteSpace(processName))
             return false;
 
-        try
-        {
-            var rules = _firewall.GetAllRules();
-            var wantedPath = processPath.Trim();
-            string? wantedFile = null;
-            try { wantedFile = Path.GetFileName(wantedPath); }
-            catch { }
-
-            foreach (var rule in rules)
-            {
-                var app = rule.ApplicationPath ?? rule.ApplicationName;
-                if (string.IsNullOrWhiteSpace(app))
-                    continue;
-                var appTrimmed = app.Trim();
-                if (string.Equals(appTrimmed, wantedPath, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (!string.IsNullOrWhiteSpace(wantedFile) &&
-                    !string.IsNullOrWhiteSpace(processName) &&
-                    string.Equals(appTrimmed, processName.Trim(), StringComparison.OrdinalIgnoreCase))
-                    return true;
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(wantedFile) &&
-                        string.Equals(Path.GetFileName(appTrimmed), wantedFile, StringComparison.OrdinalIgnoreCase))
-                        return true;
-                }
-                catch { }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "NetworkAlerts: не удалось проверить правила Firewall");
-        }
-
-        return false;
+        var set = BuildFirewallRulePathSet();
+        return HasExistingFirewallRuleCached(processPath, processName, set);
     }
 
     private void ApplyRule(FirewallRuleDto rule)
