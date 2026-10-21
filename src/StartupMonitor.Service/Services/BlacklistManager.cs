@@ -18,18 +18,10 @@ public class BlacklistManager
         _store = store;
     }
 
-    /// <summary>Ищет первое подходящее правило ЧС для указанной записи.</summary>
+    /// <summary>Ищет первое подходящее правило ЧС для указанной записи без тяжелого клонирования хранилища.</summary>
     public BlacklistRule? MatchEntry(StartupEntry entry)
     {
-        var config = _store.Load();
-
-        foreach (var rule in config.Blacklist)
-        {
-            if (IsMatchStatic(rule, entry))
-                return rule;
-        }
-
-        return null;
+        return _store.FindBlacklistRule(rule => IsMatchStatic(rule, entry));
     }
 
     /// <summary>Применяет действие правила ЧС к записи: блокировка + удаление или только уведомление.</summary>

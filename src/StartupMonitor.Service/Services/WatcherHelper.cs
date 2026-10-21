@@ -61,8 +61,9 @@ public static class WatcherHelper
         BlacklistRule? matchedRule = null,
         BlacklistManager? blacklist = null)
     {
-        // Если мониторинг приостановлен, не обрабатываем фоновые обновления
-        if (store.Load().Settings.IsMonitoringPaused) return false;
+        // Легковесное чтение настроек один раз без клонирования всего хранилища и истории
+        var settings = store.GetSettings();
+        if (settings.IsMonitoringPaused) return false;
 
         // 0. Защита программы: собственные компоненты StartupMonitor всегда разрешены и никогда не блокируются
         if (EntryOperations.IsSelfEntry(entry))
@@ -82,7 +83,7 @@ public static class WatcherHelper
             // Если запись была удалена режимом Lockdown (StrictMode), но сейчас строгий режим выключен:
             // НЕ блокируем её повторно, а удаляем из бэкапа и разрешаем штатное добавление
             if (string.Equals(existingRemoved.RemovalReason, "LockdownBlocked", StringComparison.OrdinalIgnoreCase)
-                && !store.Load().Settings.StrictMode)
+                && !settings.StrictMode)
             {
                 store.RemoveRemovedEntryByOriginalId(entry.Id);
             }
@@ -99,7 +100,7 @@ public static class WatcherHelper
                     EntryOperations.KillProcess(entry);
                 }
                 else if (string.Equals(existingRemoved.RemovalReason, "LockdownBlocked", StringComparison.OrdinalIgnoreCase)
-                    && store.Load().Settings.StrictMode)
+                    && settings.StrictMode)
                 {
                     EntryOperations.KillProcess(entry);
                 }
@@ -129,7 +130,8 @@ public static class WatcherHelper
         // Если включён строгий режим (блокировка любых новых записей автозапуска):
         // новая запись не добавляется, а сразу стирается из системы с завершением процесса и балуном.
         // Исключение: собственные компоненты программы и системные службы/задачи ОС Windows.
-        if (store.FindEntry(e => e.Id == entry.Id) == null && store.Load().Settings.StrictMode)
+        var isNewEntry = !store.EntryExists(entry.Id);
+        if (isNewEntry && settings.StrictMode)
         {
             if (EntryOperations.IsProtectedSystemEntry(entry))
             {
@@ -180,12 +182,12 @@ public static class WatcherHelper
         }
 
         // Проверка автоматических политик защиты Auto-Guards для новых записей
-        if (store.FindEntry(e => e.Id == entry.Id) == null)
+        if (isNewEntry)
         {
-            var policyMatch = Guards.AutoGuardEngine.Evaluate(entry, store.Load().Settings);
+            var policyMatch = Guards.AutoGuardEngine.Evaluate(entry, settings);
             if (policyMatch != null)
             {
-                var isEnforce = string.Equals(store.Load().Settings.AutoGuardMode, "EnforceBlock", StringComparison.OrdinalIgnoreCase);
+                var isEnforce = string.Equals(settings.AutoGuardMode, "EnforceBlock", StringComparison.OrdinalIgnoreCase);
                 if (isEnforce)
                 {
                     // Режим активной блокировки: завершаем процесс, нейтрализуем точку старта и изолируем в бэкап

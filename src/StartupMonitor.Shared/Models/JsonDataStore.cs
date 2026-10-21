@@ -422,13 +422,77 @@ public class JsonDataStore
         }
     }
 
-    /// <summary>Находит запись по предикату.</summary>
+    /// <summary>
+    /// Находит запись по предикату напрямую из закэшированного снимка без тяжелого клонирования всего хранилища и истории (P0-01).
+    /// </summary>
     public StartupEntry? FindEntry(Func<StartupEntry, bool> predicate)
     {
         lock (_lock)
         {
-            var cfg = Load();
-            return cfg.Entries.FirstOrDefault(predicate);
+            EnsureLoadedLocked();
+            var entry = _cache?.Entries.FirstOrDefault(predicate);
+            return entry?.Clone(); // Клонируем исключительно найденную запись для изоляции
+        }
+    }
+
+    /// <summary>
+    /// Проверяет наличие записи по Id напрямую в кэше без выделения памяти в куче (P0-02).
+    /// </summary>
+    public bool EntryExists(string id)
+    {
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            return _cache?.Entries.Any(e => e.Id == id) ?? false;
+        }
+    }
+
+    /// <summary>
+    /// Проверяет наличие записи по произвольному предикату без выделения памяти (P0-02).
+    /// </summary>
+    public bool EntryExists(Func<StartupEntry, bool> predicate)
+    {
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            return _cache?.Entries.Any(predicate) ?? false;
+        }
+    }
+
+    /// <summary>
+    /// Возвращает изолированную копию настроек без дорогостоящего клонирования коллекций записей и истории (P0-03).
+    /// </summary>
+    public AppSettings GetSettings()
+    {
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            return _cache?.Settings.Clone() ?? new AppSettings();
+        }
+    }
+
+    /// <summary>
+    /// Находит первое подходящее правило черного списка без клонирования всего снимка конфигурации (P0-04).
+    /// </summary>
+    public BlacklistRule? FindBlacklistRule(Func<BlacklistRule, bool> predicate)
+    {
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            var rule = _cache?.Blacklist.FirstOrDefault(predicate);
+            return rule?.Clone();
+        }
+    }
+
+    /// <summary>
+    /// Возвращает изолированную копию записей истории для отображения в интерфейсе без клонирования всех остальных сущностей.
+    /// </summary>
+    public List<HistoryEntry> GetHistoryEntries()
+    {
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            return _cache?.History.Select(h => h.Clone()).ToList() ?? [];
         }
     }
 
