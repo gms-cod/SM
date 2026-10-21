@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -14,6 +14,8 @@ using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.UI.Services;
+using StartupMonitor.Shared.Models.Firewall;
+using StartupMonitor.UI.Views.Dialogs;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
@@ -27,6 +29,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Публичный доступ к клиенту именованного канала.</summary>
     public PipeClient PipeClient => _pipeClient;
+
+    /// <summary>Глобальный таймер опроса сетевых алертов брандмауэра (работает автономно).</summary>
+    private System.Threading.Timer? _networkAlertPollerTimer;
+
+    /// <summary>Флаг активности отображаемого окна сетевого алерта (предотвращает повторные окна).</summary>
+    private bool _isAlertWindowOpen;
+
+    /// <summary>Флаг защиты от повторного входа в поллер сетевых алертов.</summary>
+    private int _isPollingNetworkAlerts;
 
     /// <summary>Таймер периодического опроса изменений данных (polling).</summary>
     private System.Threading.Timer? _pollingTimer;
@@ -434,6 +445,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.EventsReceived -= OnPipeClientEventsReceived;
         _pipeClient.Disconnected -= OnPipeClientDisconnected;
         StopSystemThemeWatcher();
+        _networkAlertPollerTimer?.Dispose();
+        _networkAlertPollerTimer = null;
         _pollingTimer?.Dispose();
         _cpuUsageTimer?.Dispose();
         _logWatchTimer?.Dispose();
@@ -1536,11 +1549,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             App.Log("MainViewModel: Connected → IsDataLoaded=true, запускаю polling");
         }
+        _networkAlertPollerTimer?.Dispose();
+        _networkAlertPollerTimer = null;
         _pollingTimer?.Dispose();
         if (!IsMonitoringPaused)
         {
             _pollingTimer = new Timer(async _ => await LoadDataIfChanged(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
         }
+        StartNetworkAlertPoller();
         App.Log("MainViewModel: Connected handler завершён");
     }
 
@@ -1645,8 +1661,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         App.Log("MainViewModel: Disconnected event");
         IsConnected = false;
+        _networkAlertPollerTimer?.Dispose();
+        _networkAlertPollerTimer = null;
         _pollingTimer?.Dispose();
         _pollingTimer = null;
+        StopNetworkAlertPoller();
         UpdateServiceStatusText();
         await Task.Delay(3000);
         App.Log("MainViewModel: Disconnected → ConnectAsync");
@@ -2972,5 +2991,67 @@ public partial class MainViewModel : ObservableObject, IDisposable
             IsBootTimeLoading = false;
         }
     }
-}
 
+    /// <summary>Запускает глобальный опрос сетевых алертов брандмауэра (каждые 2 секунды).</summary>
+    public void StartNetworkAlertPoller()
+    {
+        _networkAlertPollerTimer?.Dispose();
+        _networkAlertPollerTimer = new Timer(async _ => await PollNetworkAlertsAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+    }
+
+    /// <summary>Останавливает глобальный опрос сетевых алертов брандмауэра.</summary>
+    public void StopNetworkAlertPoller()
+    {
+        _networkAlertPollerTimer?.Dispose();
+        _networkAlertPollerTimer = null;
+    }
+
+    /// <summary>
+    /// Неблокирующий глобальный опрос ожидающих сетевых подключений.
+    /// Показывает ненавязчивое окно без перехвата фокуса.
+    /// </summary>
+    private async Task PollNetworkAlertsAsync()
+    {
+        if (Interlocked.CompareExchange(ref _isPollingNetworkAlerts, 1, 0) != 0)
+            return;
+
+        try
+        {
+            if (!IsConnected || _isAlertWindowOpen)
+                return;
+
+            List<NetworkConnectionAlertDto>? alerts = null;
+            try
+            {
+                alerts = await _pipeClient.GetPendingNetworkAlertsAsync();
+            }
+            catch
+            {
+                return;
+            }
+
+            if (alerts == null || alerts.Count == 0 || _isAlertWindowOpen)
+                return;
+
+            var alert = alerts[0];
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (_isAlertWindowOpen || alert == null)
+                    return;
+
+                _isAlertWindowOpen = true;
+                var window = new NetworkConnectionAlertWindow(alert, _pipeClient, countdownSeconds: 30);
+                window.Closed += (_, _) => { _isAlertWindowOpen = false; };
+                window.Show();
+            });
+        }
+        catch (Exception ex)
+        {
+            App.Log($"MainViewModel.PollNetworkAlerts: {ex.Message}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isPollingNetworkAlerts, 0);
+        }
+    }
+}

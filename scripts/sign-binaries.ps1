@@ -23,10 +23,13 @@ Write-Host "Thumbprint: $($cert.Thumbprint)" -ForegroundColor Green
 
 # 2. Fajly dlja podpisi
 if ($Files.Count -eq 0) {
+    [xml]$propsXml = Get-Content (Join-Path $repoRoot "Directory.Build.props")
+    $ver = $propsXml.Project.PropertyGroup.Version
+    if (-not $ver) { $ver = "1.9.2" }
     $Files = @(
         (Join-Path $repoRoot "SMon2\StartupMonitor.Service.exe"),
         (Join-Path $repoRoot "SMon2\StartupMonitor.UI.exe"),
-        (Join-Path $repoRoot "installers\StartupMonitorSetup-1.9.1.exe")
+        (Join-Path $repoRoot "installers\StartupMonitorSetup-$ver.exe")
     )
 }
 

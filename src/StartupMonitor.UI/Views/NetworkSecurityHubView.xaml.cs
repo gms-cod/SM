@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -1959,6 +1959,36 @@ public partial class NetworkSecurityHubView : UserControl
                 return;
             }
             TxtStatus.Text = message ?? string.Empty;
+        }
+        catch { }
+    }
+
+    /// <summary>Динамически выделяет активную радиокнопку фильтра правил брандмауэра.</summary>
+    private void UpdateRuleFilterVisuals()
+    {
+        try
+        {
+            if (FilterAll == null) return;
+            FilterAll.FontWeight = FilterAll.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            FilterInbound.FontWeight = FilterInbound.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            FilterOutbound.FontWeight = FilterOutbound.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            FilterBlocking.FontWeight = FilterBlocking.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            FilterManaged.FontWeight = FilterManaged.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+        }
+        catch { }
+    }
+
+    /// <summary>Динамически выделяет активную радиокнопку фильтра активных соединений.</summary>
+    private void UpdateConnectionsFilterVisuals()
+    {
+        try
+        {
+            if (RbConnAll == null) return;
+            RbConnAll.FontWeight = RbConnAll.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            RbConnWan.FontWeight = RbConnWan.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            RbConnLan.FontWeight = RbConnLan.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            RbConnEstablished.FontWeight = RbConnEstablished.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
+            RbConnListening.FontWeight = RbConnListening.IsChecked == true ? FontWeights.Bold : FontWeights.Normal;
         }
         catch { }
     }

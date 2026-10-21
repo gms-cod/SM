@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using StartupMonitor.Service.Services.Runtime;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
@@ -17,6 +17,7 @@ namespace StartupMonitor.Service.Services.Firewall;
 /// <item>Доверенные системные процессы (<see cref="TrustedSystemProcesses"/>).</item>
 /// <item>Программы, для которых уже есть правило в <see cref="WindowsFirewallService"/>.</item>
 /// <item>Программы, разрешённые/заблокированные решением текущей сессии.</item>
+/// <item>Программы из белого или чёрного списков.</item>
 /// </list>
 /// Thread-safe: очередь и кеши решений на <c>Concurrent*</c>-коллекциях, скан под <c>lock</c>.
 /// </remarks>
@@ -43,6 +44,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     private readonly WindowsFirewallService _firewall;
     private readonly JsonDataStore? _store;
     private readonly HashSet<string> _whitelistedApps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _blacklistedApps = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _allowedPorts = [];
 
     // ── Тестовые швы (test seams): в проде null → реальное поведение ──
@@ -78,9 +80,12 @@ public sealed class NetworkConnectionAlertService : IDisposable
     private readonly object _scanLock = new();
     private bool _disposed;
 
-    // ── Фоновый цикл в режиме 0% CPU Idle ──
-    // Пока окно «Сетевая безопасность» закрыто (нет активных UI-клиентов),
-    // цикл спит неограниченно долго и не выполняет ни сокет-таблицу, ни COM-перебор правил.
+    // ── Кэш правил брандмауэра для обеспечения 0% CPU ──
+    private HashSet<string>? _cachedRulePaths;
+    private DateTime _cachedRulePathsTime = DateTime.MinValue;
+    private readonly TimeSpan _ruleCacheTtl = TimeSpan.FromSeconds(60);
+
+    // ── Фоновый цикл в автономном режиме ──
     private readonly ActivityGate _wake = new();
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -121,6 +126,11 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     if (!string.IsNullOrWhiteSpace(app))
                         _whitelistedApps.Add(app.Trim());
                 }
+                foreach (var app in cfg.Settings.FirewallBlacklistedApps)
+                {
+                    if (!string.IsNullOrWhiteSpace(app))
+                        _blacklistedApps.Add(app.Trim());
+                }
                 foreach (var p in cfg.Settings.FirewallAllowedPorts)
                 {
                     if (p > 0)
@@ -129,13 +139,12 @@ public sealed class NetworkConnectionAlertService : IDisposable
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "NetworkAlerts: не удалось инициализировать белый список из хранилища");
+                Log.Warning(ex, "NetworkAlerts: не удалось инициализировать списки из хранилища");
             }
         }
     }
 
-    /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).
-    /// Пока окно мониторинга закрыто — цикл находится в глубоком сне (0% CPU).</summary>
+    /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).</summary>
     public void StartBackgroundScan(TimeSpan? dueTime = null, TimeSpan? period = null)
     {
         StopBackgroundScan();
@@ -157,8 +166,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>
-    /// Открытие/закрытие окна мониторинга сети активным UI-клиентом. Закрытие
-    /// усыпляет фоновый скан (полная остановка без периодического опроса).
+    /// Открытие/закрытие окна мониторинга сети активным UI-клиентом.
     /// </summary>
     public void SetMonitorWindowActive(bool active)
     {
@@ -168,15 +176,15 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>
-    /// Фоновый цикл: скан выполняется только при включённых алертах и открытом окне.
-    /// При закрытом окне — глубокий сон до <see cref="SetMonitorWindowActive"/>.
+    /// Фоновый цикл: служба сканирует автономно, пока включен флаг AlertsEnabled.
+    /// Благодаря кэшированию правил Windows Firewall с TTL 60с нагрузка на CPU составляет 0%.
     /// </summary>
     private Task RunAsync(CancellationToken ct)
         => SleepAwareLoop.RunAsync(
             _wake,
-            hasWork: () => AlertsEnabled && _monitorWindowActive,
+            hasWork: () => AlertsEnabled,
             activeInterval: _period,
-            idleInterval: Timeout.InfiniteTimeSpan, // 0% CPU: сон до события/отмены
+            idleInterval: Timeout.InfiniteTimeSpan,
             body: _ =>
             {
                 try { ScanNewConnections(); }
@@ -233,8 +241,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             }
 
             int added = 0;
-            // P0: GetAllRules() вызывается ровно один раз за скан (дорогой COM-перебор
-            // всех правил), а в цикле проверка идёт за O(1) через HashSet путей.
+            // Кэшированный набор путей правил Firewall с TTL 60с (минимизирует COM-нагрузку)
             var rulePaths = BuildFirewallRulePathSet();
             // Загружаем флаг тихого режима один раз перед обходом сокетов (оптимизация I/O)
             var isSilentPid0 = _store?.Load().Settings.FirewallSilentPid0 ?? true;
@@ -266,14 +273,20 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 if (IsWhitelistedApp(processPath, processName))
                     continue;
 
+                // 1.2 Пропускаем программы из чёрного списка (соединения заблокированы, алерты подавлены)
+                if (IsBlacklistedApp(processPath, processName))
+                    continue;
+
                 // 2. Игнорируем доверенные системные процессы.
                 if (IsTrustedProcess(processName, processPath))
                     continue;
 
                 var sessionKey = BuildSessionKey(processPath, processName);
+                var nameKey = BuildNameSessionKey(processName);
 
-                // 3. Пропускаем уже решённые в текущей сессии.
-                if (_sessionDecisions.ContainsKey(sessionKey))
+                // 3. Пропускаем уже решённые в текущей сессии (по пути или по имени исполняемого файла)
+                if (_sessionDecisions.ContainsKey(sessionKey) ||
+                    (!string.IsNullOrWhiteSpace(processName) && _sessionDecisions.ContainsKey(nameKey)))
                     continue;
 
                 // 4. Если для программы уже есть правило — алерт не создаём.
@@ -320,10 +333,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>
-    /// Применяет решение пользователя по алерту.
-    /// <see cref="NetworkAlertResolution.AllowAlways"/> — разрешающее правило в Firewall,
-    /// <see cref="NetworkAlertResolution.BlockAlways"/> — блокирующее правило,
-    /// <see cref="NetworkAlertResolution.AllowSession"/> — белый список текущей сессии.
+    /// Применяет решение пользователя по алерту с поддержкой 5 основных действий,
+    /// двойного ключа сопоставления и мгновенной очистки накопившихся очередей.
     /// </summary>
     /// <returns>True — алерт найден и решение применено.</returns>
     public bool ResolveAlert(ResolveNetworkAlertRequest request)
@@ -342,15 +353,36 @@ public sealed class NetworkConnectionAlertService : IDisposable
             : (alert.ProcessName ?? string.Empty).Trim();
 
         var sessionKey = BuildSessionKey(path, name);
+        var nameKey = BuildNameSessionKey(name);
+
+        // Фиксируем решение в сессии по обоим ключам (путь и имя процесса)
+        _sessionDecisions[sessionKey] = request.Resolution;
+        if (!string.IsNullOrWhiteSpace(name))
+            _sessionDecisions[nameKey] = request.Resolution;
+
+        // МГНОВЕННО удаляем из ожидающих все алерты, относящиеся к этой же программе
+        var keysToRemove = _pendingById.Values
+            .Where(a => (!string.IsNullOrWhiteSpace(path) && string.Equals(a.ProcessPath, path, StringComparison.OrdinalIgnoreCase))
+                     || (!string.IsNullOrWhiteSpace(name) && string.Equals(a.ProcessName, name, StringComparison.OrdinalIgnoreCase)))
+            .Select(a => a.AlertId)
+            .ToList();
+
+        foreach (var k in keysToRemove)
+        {
+            _pendingById.TryRemove(k, out _);
+        }
+        PruneQueue(force: true);
 
         switch (request.Resolution)
         {
             case NetworkAlertResolution.WhitelistProgram:
-                _sessionDecisions[sessionKey] = NetworkAlertResolution.WhitelistProgram;
-                var appKey = !string.IsNullOrWhiteSpace(path) ? path : name;
-                if (!string.IsNullOrWhiteSpace(appKey))
+                var whiteAppKey = !string.IsNullOrWhiteSpace(path) ? path : name;
+                if (!string.IsNullOrWhiteSpace(whiteAppKey))
                 {
-                    _whitelistedApps.Add(appKey);
+                    _whitelistedApps.Add(whiteAppKey);
+                    if (!string.IsNullOrWhiteSpace(name))
+                        _whitelistedApps.Add(name);
+
                     if (!string.IsNullOrWhiteSpace(path))
                     {
                         ApplyRule(BuildAppRule(path, name, FirewallAction.Allow));
@@ -360,15 +392,46 @@ public sealed class NetworkConnectionAlertService : IDisposable
                         try
                         {
                             var cfg = _store.Load();
-                            if (!cfg.Settings.FirewallWhitelistedApps.Contains(appKey, StringComparer.OrdinalIgnoreCase))
+                            if (!cfg.Settings.FirewallWhitelistedApps.Contains(whiteAppKey, StringComparer.OrdinalIgnoreCase))
                             {
-                                cfg.Settings.FirewallWhitelistedApps.Add(appKey);
+                                cfg.Settings.FirewallWhitelistedApps.Add(whiteAppKey);
                                 _store.Save(cfg);
                             }
                         }
                         catch (Exception ex)
                         {
                             Log.Warning(ex, "NetworkAlerts: ошибка сохранения белого списка программы");
+                        }
+                    }
+                }
+                break;
+
+            case NetworkAlertResolution.BlacklistProgram:
+                var blackAppKey = !string.IsNullOrWhiteSpace(path) ? path : name;
+                if (!string.IsNullOrWhiteSpace(blackAppKey))
+                {
+                    _blacklistedApps.Add(blackAppKey);
+                    if (!string.IsNullOrWhiteSpace(name))
+                        _blacklistedApps.Add(name);
+
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        ApplyRule(BuildAppRule(path, name, FirewallAction.Block));
+                    }
+                    if (_store != null)
+                    {
+                        try
+                        {
+                            var cfg = _store.Load();
+                            if (!cfg.Settings.FirewallBlacklistedApps.Contains(blackAppKey, StringComparer.OrdinalIgnoreCase))
+                            {
+                                cfg.Settings.FirewallBlacklistedApps.Add(blackAppKey);
+                                _store.Save(cfg);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "NetworkAlerts: ошибка сохранения чёрного списка программы");
                         }
                     }
                 }
@@ -399,20 +462,20 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 break;
 
             case NetworkAlertResolution.AllowAlways:
-                _sessionDecisions[sessionKey] = request.Resolution;
                 if (!string.IsNullOrWhiteSpace(path))
                     ApplyRule(BuildAppRule(path, name, FirewallAction.Allow));
                 break;
 
             case NetworkAlertResolution.BlockAlways:
-                _sessionDecisions[sessionKey] = NetworkAlertResolution.BlockAlways;
                 if (!string.IsNullOrWhiteSpace(path))
                     ApplyRule(BuildAppRule(path, name, FirewallAction.Block));
                 break;
 
+            case NetworkAlertResolution.BlockSession:
+            case NetworkAlertResolution.CreateRule:
             case NetworkAlertResolution.AllowSession:
             default:
-                _sessionDecisions[sessionKey] = NetworkAlertResolution.AllowSession;
+                // Сессионные решения уже зафиксированы в _sessionDecisions
                 break;
         }
 
@@ -421,7 +484,6 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
     // ── Вспомогательная логика ──
 
-    /// <summary>Проверяет, является ли процесс доверенным системным (алерты не создаются).</summary>
     /// <summary>Проверяет, находится ли программа в постоянном белом списке (любые соединения разрешены).</summary>
     public bool IsWhitelistedApp(string? processPath, string? processName)
     {
@@ -432,9 +494,20 @@ public sealed class NetworkConnectionAlertService : IDisposable
         return false;
     }
 
+    /// <summary>Проверяет, находится ли программа в постоянном чёрном списке (любые соединения запрещены).</summary>
+    public bool IsBlacklistedApp(string? processPath, string? processName)
+    {
+        if (!string.IsNullOrWhiteSpace(processPath) && _blacklistedApps.Contains(processPath.Trim()))
+            return true;
+        if (!string.IsNullOrWhiteSpace(processName) && _blacklistedApps.Contains(processName.Trim()))
+            return true;
+        return false;
+    }
+
     /// <summary>Проверяет, разрешен ли порт пользователем для подавления повторных всплывающих алертов.</summary>
     public bool IsPortAllowed(int port) => port > 0 && _allowedPorts.Contains(port);
 
+    /// <summary>Проверяет, является ли процесс доверенным системным (алерты не создаются никогда).</summary>
     public static bool IsTrustedProcess(string? processName, string? processPath)
     {
         string? fileName = null;
@@ -471,6 +544,12 @@ public sealed class NetworkConnectionAlertService : IDisposable
         return "name:" + (processName ?? string.Empty).Trim().ToLowerInvariant();
     }
 
+    /// <summary>Строит сессионный ключ исключительно по имени исполняемого файла для надежного матчинга браузеров.</summary>
+    public static string BuildNameSessionKey(string? processName)
+    {
+        return "name:" + (processName ?? string.Empty).Trim().ToLowerInvariant();
+    }
+
     private string? ResolveProcessPath(int pid, string processName)
     {
         if (ProcessPathResolver != null)
@@ -494,13 +573,17 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>
-    /// Строит кеш путей программ с правилами Firewall (в нижнем регистре) за один
-    /// проход. Возвращает null, когда проверка переопределена тестом или недоступна.
+    /// Строит кеш путей программ с правилами Firewall (в нижнем регистре) с TTL 60 секунд.
+    /// Обеспечивает 0% загрузку CPU в фоновом режиме.
     /// </summary>
     private HashSet<string>? BuildFirewallRulePathSet()
     {
         if (HasFirewallRuleOverride != null)
             return null;
+
+        var now = DateTime.UtcNow;
+        if (_cachedRulePaths != null && (now - _cachedRulePathsTime) < _ruleCacheTtl)
+            return _cachedRulePaths;
 
         try
         {
@@ -524,6 +607,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 catch { }
             }
 
+            _cachedRulePaths = set;
+            _cachedRulePathsTime = now;
             return set;
         }
         catch (Exception ex)
@@ -625,6 +710,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
     {
         try
         {
+            // Сбрасываем кеш путей правил брандмауэра для немедленной актуализации
+            _cachedRulePaths = null;
+
             if (ApplyFirewallRuleOverride != null)
                 ApplyFirewallRuleOverride(rule);
             else

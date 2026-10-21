@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Shared.Models;
@@ -198,6 +198,10 @@ public class AppSettings
     [JsonPropertyName("firewall_whitelisted_apps")]
     public List<string> FirewallWhitelistedApps { get; set; } = [];
 
+    /// <summary>Список приложений в чёрном списке сетевого брандмауэра (сетевая активность полностью заблокирована).</summary>
+    [JsonPropertyName("firewall_blacklisted_apps")]
+    public List<string> FirewallBlacklistedApps { get; set; } = [];
+
     /// <summary>Создает глубокую независимую копию настроек приложения.</summary>
     public AppSettings Clone()
     {
@@ -226,6 +230,7 @@ public class AppSettings
         }).ToList();
         copy.FirewallAllowedPorts = [..FirewallAllowedPorts];
         copy.FirewallWhitelistedApps = [..FirewallWhitelistedApps];
+        copy.FirewallBlacklistedApps = [..FirewallBlacklistedApps];
         return copy;
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -11,7 +11,8 @@ namespace StartupMonitor.UI.Views.Dialogs;
 
 /// <summary>
 /// Всплывающее Toast/Flyout окно уведомления о новом сетевом подключении.
-/// Безрамочная карточка в правом нижнем углу экрана с обратным отсчётом (15 сек).
+/// Не забирает фокус ввода (ShowActivated = false, Focusable = false).
+/// Поддерживает 5 действий, 30-секундный таймер с интеллектуальной паузой при наведении курсора.
 /// </summary>
 public partial class NetworkConnectionAlertWindow : Window
 {
@@ -21,6 +22,7 @@ public partial class NetworkConnectionAlertWindow : Window
     private readonly int _totalSeconds;
     private int _remainingSeconds;
     private bool _isResolved;
+    private bool _isPausedByHover;
 
     /// <summary>Решение, выбранное пользователем (или применённое по таймауту).</summary>
     public NetworkAlertResolution? Resolution { get; private set; }
@@ -28,11 +30,11 @@ public partial class NetworkConnectionAlertWindow : Window
     public NetworkConnectionAlertWindow(
         NetworkConnectionAlertDto alert,
         PipeClient pipeClient,
-        int countdownSeconds = 15)
+        int countdownSeconds = 30)
     {
         _alert = alert ?? throw new ArgumentNullException(nameof(alert));
         _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
-        _totalSeconds = countdownSeconds > 0 ? countdownSeconds : 15;
+        _totalSeconds = countdownSeconds > 0 ? countdownSeconds : 30;
         _remainingSeconds = _totalSeconds;
 
         InitializeComponent();
@@ -49,6 +51,10 @@ public partial class NetworkConnectionAlertWindow : Window
         Loaded += OnWindowLoaded;
         Closed += OnWindowClosed;
         MouseLeftButtonDown += OnDragMove;
+
+        // Интеллектуальная пауза при наведении курсора мыши
+        MouseEnter += OnWindowMouseEnter;
+        MouseLeave += OnWindowMouseLeave;
     }
 
     private void OnWindowLoaded(object sender, RoutedEventArgs e)
@@ -65,6 +71,26 @@ public partial class NetworkConnectionAlertWindow : Window
     {
         try { _countdownTimer.Stop(); } catch { }
         _countdownTimer.Tick -= OnCountdownTick;
+    }
+
+    private void OnWindowMouseEnter(object sender, MouseEventArgs e)
+    {
+        if (_isResolved) return;
+        _isPausedByHover = true;
+        _countdownTimer.Stop();
+        try
+        {
+            TxtCountdown.Text = "Обратный отсчёт приостановлен (курсор мыши)";
+        }
+        catch { }
+    }
+
+    private void OnWindowMouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_isResolved) return;
+        _isPausedByHover = false;
+        UpdateCountdownText();
+        _countdownTimer.Start();
     }
 
     private void OnDragMove(object sender, MouseButtonEventArgs e)
@@ -117,18 +143,18 @@ public partial class NetworkConnectionAlertWindow : Window
         {
             UpdateLayout();
             var workArea = SystemParameters.WorkArea;
-            const double margin = 8.0;
+            const double margin = 10.0;
 
             var width = double.IsNaN(Width) || Width <= 0 ? ActualWidth : Width;
-            if (width <= 0) width = 400;
-            var height = ActualHeight > 0 ? ActualHeight : 420;
+            if (width <= 0) width = 420;
+            var height = ActualHeight > 0 ? ActualHeight : 460;
 
             Left = Math.Max(workArea.Left, workArea.Right - width - margin);
             Top = Math.Max(workArea.Top, workArea.Bottom - height - margin);
         }
         catch
         {
-            // Игнорируем ошибки позиционирования — окно останется где разместил WPF.
+            // Игнорируем ошибки позиционирования
         }
     }
 
@@ -149,7 +175,10 @@ public partial class NetworkConnectionAlertWindow : Window
     {
         try
         {
-            TxtCountdown.Text = $"Автоматическое решение через {_remainingSeconds} сек...";
+            if (!_isPausedByHover)
+            {
+                TxtCountdown.Text = $"Автоматическое решение через {_remainingSeconds} сек...";
+            }
             CountdownBar.Value = Math.Max(0, _remainingSeconds);
         }
         catch { }
@@ -157,11 +186,13 @@ public partial class NetworkConnectionAlertWindow : Window
 
     private async void OnCountdownTick(object? sender, EventArgs e)
     {
+        if (_isPausedByHover) return;
+
         _remainingSeconds--;
         if (_remainingSeconds <= 0)
         {
-            // По умолчанию — щадящее временное решение без создания правила в Firewall.
-            await ResolveAndCloseAsync(NetworkAlertResolution.AllowSession).ConfigureAwait(true);
+            // По умолчанию по таймауту — безопасная сессионная блокировка
+            await ResolveAndCloseAsync(NetworkAlertResolution.BlockSession).ConfigureAwait(true);
             return;
         }
 
@@ -171,24 +202,24 @@ public partial class NetworkConnectionAlertWindow : Window
     private async void OnWhitelistClick(object sender, RoutedEventArgs e) =>
         await ResolveAndCloseAsync(NetworkAlertResolution.WhitelistProgram).ConfigureAwait(true);
 
-    private async void OnAllowAlwaysClick(object sender, RoutedEventArgs e) =>
-        await ResolveAndCloseAsync(NetworkAlertResolution.AllowAlways).ConfigureAwait(true);
-
-        private async void OnAllowPortClick(object sender, RoutedEventArgs e) =>
-        await ResolveAndCloseAsync(NetworkAlertResolution.AllowPort).ConfigureAwait(true);
-
     private async void OnAllowSessionClick(object sender, RoutedEventArgs e) =>
         await ResolveAndCloseAsync(NetworkAlertResolution.AllowSession).ConfigureAwait(true);
 
+    private async void OnBlockSessionClick(object sender, RoutedEventArgs e) =>
+        await ResolveAndCloseAsync(NetworkAlertResolution.BlockSession).ConfigureAwait(true);
+
     private async void OnBlockAlwaysClick(object sender, RoutedEventArgs e) =>
-        await ResolveAndCloseAsync(NetworkAlertResolution.BlockAlways).ConfigureAwait(true);
+        await ResolveAndCloseAsync(NetworkAlertResolution.BlacklistProgram).ConfigureAwait(true);
+
+    private async void OnAllowPortClick(object sender, RoutedEventArgs e) =>
+        await ResolveAndCloseAsync(NetworkAlertResolution.AllowPort).ConfigureAwait(true);
 
     private async void OnCloseClick(object sender, RoutedEventArgs e) =>
-        await ResolveAndCloseAsync(NetworkAlertResolution.AllowSession).ConfigureAwait(true);
+        await ResolveAndCloseAsync(NetworkAlertResolution.BlockSession).ConfigureAwait(true);
 
     /// <summary>
     /// Отправляет решение службе через <see cref="PipeClient.ResolveNetworkAlertAsync"/>
-    /// и закрывает окно с анимацией затухания.
+    /// и закрывает окно с плавной анимацией затухания.
     /// </summary>
     private async Task ResolveAndCloseAsync(NetworkAlertResolution resolution)
     {
@@ -216,7 +247,7 @@ public partial class NetworkConnectionAlertWindow : Window
         }
         catch
         {
-            // Не блокируем закрытие тоста при недоступности службы.
+            // Не блокируем закрытие окна при временной недоступности службы
         }
 
         FadeOutAndClose();
@@ -227,21 +258,21 @@ public partial class NetworkConnectionAlertWindow : Window
         try
         {
             BtnWhitelist.IsEnabled = enabled;
-            BtnAllowPort.IsEnabled = enabled;
-            BtnAllowAlways.IsEnabled = enabled;
             BtnAllowSession.IsEnabled = enabled;
+            BtnBlockSession.IsEnabled = enabled;
             BtnBlockAlways.IsEnabled = enabled;
+            BtnAllowPort.IsEnabled = enabled;
             BtnClose.IsEnabled = enabled;
         }
         catch { }
     }
 
-    /// <summary>Плавное затухание перед закрытием (250 мс).</summary>
+    /// <summary>Плавное затухание перед закрытием (200 мс).</summary>
     private void FadeOutAndClose()
     {
         try
         {
-            var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(250));
+            var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(200));
             anim.Completed += (_, _) =>
             {
                 try { Close(); } catch { }

@@ -40,13 +40,13 @@ public class NetworkConnectionAlertDto
     public DateTime DetectedAt { get; set; } = DateTime.UtcNow;
 }
 
-/// <summary>Решение пользователя по сетевому алерту.</summary>
+/// <summary>Решение пользователя по сетевому алерту с поддержкой ненавязчивых и постоянных политик.</summary>
 public enum NetworkAlertResolution
 {
     /// <summary>Всегда разрешать: создать разрешающее правило в Windows Firewall.</summary>
     AllowAlways = 0,
 
-    /// <summary>Разрешить на текущую сессию (без создания правила в Firewall).</summary>
+    /// <summary>Разрешить на текущую сессию (без создания постоянного правила в Firewall).</summary>
     AllowSession = 1,
 
     /// <summary>Всегда блокировать: создать блокирующее правило в Windows Firewall.</summary>
@@ -56,7 +56,16 @@ public enum NetworkAlertResolution
     WhitelistProgram = 3,
 
     /// <summary>Разрешить порт: прекратить всплывающие алерты по данному удаленному порту.</summary>
-    AllowPort = 4
+    AllowPort = 4,
+
+    /// <summary>Добавить программу в чёрный список: создать глобальное блокирующее правило в Windows Firewall и перманентно запретить любые сетевые соединения.</summary>
+    BlacklistProgram = 5,
+
+    /// <summary>Запретить на текущую сессию (временная блокировка соединения без создания постоянного правила в реестре).</summary>
+    BlockSession = 6,
+
+    /// <summary>Создать детальное правило для приложения с ручным выбором направления, портов и протоколов.</summary>
+    CreateRule = 7
 }
 
 /// <summary>Запрос резолва сетевого алерта (Pipe: ResolveNetworkAlert).</summary>
@@ -82,7 +91,7 @@ public class ResolveNetworkAlertRequest
     [JsonPropertyName("remotePort")]
     public int RemotePort { get; set; }
 
-    /// <summary>Выбранное решение.</summary>
+    /// <summary>Выбранное пользователем решение.</summary>
     [JsonPropertyName("resolution")]
     public NetworkAlertResolution Resolution { get; set; }
 }
