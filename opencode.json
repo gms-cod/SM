@@ -11,6 +11,12 @@
             "context": 16000,
             "output": 4096
           }
+        },
+        "google/gemini-4-argon": {
+          "limit": {
+            "context": 8000,
+            "output": 1500
+          }
         }
       }
     }
