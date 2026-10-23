@@ -358,3 +358,29 @@ powershell -ExecutionPolicy Bypass -File installers/build-setup.ps1
 
 Проект распространяется под открытой лицензией **MIT License**.  
 Векторные пиктограммы: [Fluent UI System Icons](https://github.com/microsoft/fluentui-system-icons) (MIT © Microsoft Corporation).
+
+---
+
+## Использование гетерогенного роя субагентов (Swarm Framework)
+
+Проект интегрирован с гетерогенным роем бесплатных субагентов OpenCode & OpenRouter (0$ Cost).
+Запуск параллельного консилиума, рефакторинга и генерации тестов выполняется через глобальную команду `swarm` в терминале проекта:
+
+- **Архитектурный консилиум 3 независимых движков (TRIAD-REVIEW)**:
+  ```powershell
+  swarm --profile TRIAD-REVIEW --task "Аудит архитектуры, выявление багов и пограничных условий"
+  ```
+- **Параллельный шардинг и пакетный рефакторинг пула файлов (MASS-SHARDING)**:
+  ```powershell
+  swarm --profile MASS-SHARDING --task "Оптимизация производительности и устранение дублирования"
+  ```
+- **Молниеносный спринт генерации тестов (SPRINT-TESTS)**:
+  ```powershell
+  swarm --profile SPRINT-TESTS --task "Генерация полного набора модульных тестов"
+  ```
+- **Сквозной аудит всей кодовой базы со сверхдлинным контекстом (MEGA-CONTEXT-1M)**:
+  ```powershell
+  swarm --profile MEGA-CONTEXT-1M
+  ```
+
+Мониторинг прогресса в реальном времени фиксируется в `logs/live_status.json`, а итоговые согласованные решения сводятся в `logs/SWARM_CONSENSUS_REPORT.md`.
