@@ -828,8 +828,9 @@ public class PipeServer : BackgroundService
                     break;
 
                 case PipeMessageTypes.ReRateEntry:
-                    // Принудительная переоценка одной записи: очищаем кеш и запускаем prefetch
+                    // Принудительная немедленная переоценка одной записи: очищаем кеш, запрашиваем AI и возвращаем обновленную запись
                     var reRateId = JsonSerializer.Deserialize<string>(message.Payload, JsonOptions);
+                    StartupEntry? updatedEntry = null;
                     if (reRateId != null)
                     {
                         var cfg = _store.Load();
@@ -838,13 +839,22 @@ public class PipeServer : BackgroundService
                         if (entry != null)
                         {
                             _ratingsCache.Remove(entry);
-                            NotifyExternalEntriesChanged();
-                            _logger.LogInformation("ReRateEntry: очищен кеш для {Name} (Lang={Lang}), запускаю переоценку",
+                            _logger.LogInformation("ReRateEntry: очищен кеш для {Name} (Lang={Lang}), запускаю принудительный расчет AI",
                                 entry.Name, cfg.Language);
-                            _ = _aiRating.PrefetchAsync(entry);
+                            
+                            // Мгновенный запрос к AI без фонового ожидания
+                            await _aiRating.ForceFetchRatingAsync(entry);
+                            NotifyExternalEntriesChanged();
+
+                            var refreshedCfg = _store.Load();
+                            updatedEntry = refreshedCfg.Entries.Find(e => e.Id == reRateId) ?? entry;
                         }
                     }
                     response.Type = PipeMessageTypes.Success;
+                    if (updatedEntry != null)
+                    {
+                        response.Payload = JsonSerializer.Serialize(updatedEntry, JsonOptions);
+                    }
                     break;
 
                 case PipeMessageTypes.SubscribeProcessMetrics:

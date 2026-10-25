@@ -79,10 +79,45 @@ public partial class EntryDetailWindow
         Close();
     }
 
-    /// <summary>Обрабатывает нажатие кнопки переоценки AI-рейтинга.</summary>
+    /// <summary>Обрабатывает нажатие кнопки переоценки AI-рейтинга с мгновенным сбросом в окне и моментальным запросом к AI.</summary>
     private async void OnRefreshRatingClick(object sender, System.Windows.RoutedEventArgs e)
     {
-        await _vm.ReRateEntryAsync(_entryId);
+        BtnRefreshAi.IsEnabled = false;
+        var prevContent = BtnRefreshAi.Content;
+        BtnRefreshAi.Content = "Оценка AI...";
+
+        // Мгновенный сброс текущего рейтинга прямо в окне для моментального визуального отклика
+        _entry.AiRating = 0;
+        _entry.AiCategory = "Подключение к AI...";
+        _entry.AiRisk = "Отправлен прямой запрос нейросети. Ожидание вердикта...";
+        _entry.AiRecommendation = "Идёт расчет рейтинга безопасности...";
+
+        // Принудительное обновление интерфейса окна
+        DataContext = null;
+        DataContext = _entry;
+
+        try
+        {
+            var updated = await _vm.ReRateEntryAsync(_entryId);
+            if (updated != null)
+            {
+                _entry.AiRating = updated.AiRating;
+                _entry.AiCategory = updated.AiCategory;
+                _entry.AiRisk = updated.AiRisk;
+                _entry.AiRecommendation = updated.AiRecommendation;
+            }
+        }
+        catch (System.Exception ex)
+        {
+            _entry.AiRisk = $"Ошибка запроса к AI: {ex.Message}";
+        }
+        finally
+        {
+            DataContext = null;
+            DataContext = _entry;
+            BtnRefreshAi.IsEnabled = true;
+            BtnRefreshAi.Content = prevContent;
+        }
     }
 
     /// <summary>Обрабатывает нажатие кнопки проверки в Kaspersky OpenTIP.</summary>

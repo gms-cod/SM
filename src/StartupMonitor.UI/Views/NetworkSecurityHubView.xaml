@@ -48,6 +48,7 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -146,8 +147,51 @@
             </Grid>
         </ui:Card>
 
-        <!-- ===== Вкладки ===== -->
-        <TabControl Grid.Row="1" x:Name="MainTabs">
+        <!-- ===== Навигационные вкладки брандмауэра в едином стиле страницы «Обзор» ===== -->
+        <Border Grid.Row="1" Margin="0,0,0,10" Padding="4"
+                Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1" CornerRadius="8">
+            <WrapPanel Orientation="Horizontal">
+                <ui:Button x:Name="TabBtnConnections" Content="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon Globe24}" Margin="0,0,6,0"
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Primary"
+                           Click="OnTabNavClick" Tag="0" />
+
+                <ui:Button x:Name="TabBtnWhitelist" Content="Белый список"
+                           Icon="{ui:SymbolIcon ShieldCheckmark24}" Margin="0,0,6,0"
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+                           Click="OnTabNavClick" Tag="1" />
+
+                <ui:Button x:Name="TabBtnBlacklist" Content="Чёрный список"
+                           Icon="{ui:SymbolIcon ShieldDismiss24}" Margin="0,0,6,0"
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+                           Click="OnTabNavClick" Tag="2" />
+
+                <ui:Button x:Name="TabBtnRules" Content="{Binding NetRulesTabHeader, Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon DocumentBulletList24}" Margin="0,0,6,0"
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+                           Click="OnTabNavClick" Tag="3" />
+
+                <ui:Button x:Name="TabBtnPortDefender" Content="Port Defender"
+                           Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,6,0"
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+                           Click="OnTabNavClick" Tag="4" />
+
+                <ui:Button x:Name="TabBtnAttackLog" Content="{Binding NetAttackLogTabHeader, Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon Shield24}" Margin="0,0,6,0"
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+                           Click="OnTabNavClick" Tag="5" />
+            </WrapPanel>
+        </Border>
+
+        <!-- ===== Вкладки (переключаются через навигационную панель) ===== -->
+        <TabControl Grid.Row="2" x:Name="MainTabs">
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Style>
+            </TabControl.ItemContainerStyle>
 
             <!-- Вкладка 0: Активные соединения (Live) -->
             <TabItem>
@@ -801,7 +845,7 @@
         </TabControl>
 
         <!-- ===== Статусная строка ===== -->
-        <Grid Grid.Row="2" Margin="0,8,0,0">
+        <Grid Grid.Row="3" Margin="0,8,0,0">
             <TextBlock x:Name="TxtStatus" Text="{Binding NetStatusReady, Source={StaticResource Loc}}" FontSize="12"
                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

@@ -2783,10 +2783,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LogEntries = new ObservableCollection<LogEntry>(_allLogEntries);
     }
 
-    /// <summary>Запрашивает переоценку AI-рейтинга для указанной записи.</summary>
-    public async Task ReRateEntryAsync(string entryId)
+    /// <summary>Запрашивает немедленную переоценку AI-рейтинга для указанной записи и обновляет локальную модель.</summary>
+    public async Task<StartupEntry?> ReRateEntryAsync(string entryId)
     {
-        await _pipeClient.ReRateEntryAsync(entryId);
+        var updated = await _pipeClient.ReRateEntryAsync(entryId);
+        if (updated != null)
+        {
+            var existing = Entries.FirstOrDefault(e => e.Id == entryId);
+            if (existing != null)
+            {
+                existing.AiRating = updated.AiRating;
+                existing.AiCategory = updated.AiCategory;
+                existing.AiRisk = updated.AiRisk;
+                existing.AiRecommendation = updated.AiRecommendation;
+            }
+        }
+        return updated;
     }
 
     // ───────── Живое обновление логов ─────────

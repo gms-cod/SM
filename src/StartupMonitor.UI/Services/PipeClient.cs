@@ -655,14 +655,27 @@ public class PipeClient : IDisposable
         });
     }
 
-    /// <summary>Запрашивает переоценку AI-рейтинга для указанной записи.</summary>
-    public async Task ReRateEntryAsync(string entryId)
+    /// <summary>Запрашивает немедленную переоценку AI-рейтинга для указанной записи и возвращает обновленные данные.</summary>
+    public async Task<StartupEntry?> ReRateEntryAsync(string entryId)
     {
-        await SendAsync(new PipeMessage
+        var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.ReRateEntry,
             Payload = JsonSerializer.Serialize(entryId, JsonOptions)
         });
+
+        if (response?.Payload != null)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        return null;
     }
 
     /// <summary>Восстанавливает удалённую запись в системе.</summary>

@@ -90,6 +90,32 @@ public class AiRatingService : IDisposable
             _cache.Set(entry, rating);
     }
 
+    /// <summary>
+    /// Принудительно запрашивает свежий AI-рейтинг для записи, сбрасывая сетевой предохранитель Circuit Breaker.
+    /// </summary>
+    /// <param name="entry">Оцениваемая запись автозапуска.</param>
+    /// <returns>Полученный рейтинг или null в случае ошибки.</returns>
+    public async Task<StartupRating?> ForceFetchRatingAsync(StartupEntry entry)
+    {
+        // Немедленно сбрасываем Circuit Breaker при ручном запросе пользователя
+        _networkCooldownUntil = DateTime.MinValue;
+        _consecutiveNetworkErrors = 0;
+
+        _logger.LogInformation("ForceFetchRatingAsync: немедленный запрос к AI для {Name} ({Model})", entry.Name, _model);
+        var rating = await FetchRatingAsync(entry);
+        if (rating != null)
+        {
+            _cache.Set(entry, rating);
+            _logger.LogInformation("ForceFetchRatingAsync: успешно получен рейтинг {Score} для {Name}", rating.Score, entry.Name);
+        }
+        else
+        {
+            _logger.LogWarning("ForceFetchRatingAsync: AI не вернул рейтинг для {Name}", entry.Name);
+        }
+
+        return rating;
+    }
+
     public async Task<(bool Success, string Message)> TestConnectionAsync(string? apiKey, string? apiUrl, string? model)
     {
         var url = string.IsNullOrWhiteSpace(apiUrl) ? _apiUrl : apiUrl.Trim();
@@ -268,9 +294,43 @@ public class AiRatingService : IDisposable
     /// <summary>FetchRatingAsync: Выполняет операцию FetchRatingAsync с поддержкой Circuit Breaker.</summary>
     /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
     /// <returns>Выходные данные: результирующее значение типа Task<StartupRating?>.</returns>
+    /// <summary>
+    /// Проверяет, является ли запись компонентом нашего собственного проекта StartupMonitor.
+    /// </summary>
+    private static bool IsSelfProjectEntry(StartupEntry entry)
+    {
+        var name = entry.Name ?? "";
+        var path = entry.FilePath ?? "";
+        var pub = entry.Publisher ?? "";
+        var cmd = entry.CommandLine ?? "";
+
+        return name.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("Startup Monitor", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase)
+            || pub.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase)
+            || cmd.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task<StartupRating?> FetchRatingAsync(StartupEntry entry)
     {
         using var _prof = ExecutionProfiler.Measure("Service.Ai.FetchRating");
+
+        // Собственные файлы проекта StartupMonitor всегда получают высшую оценку 5 звёзд (Score=1)
+        if (IsSelfProjectEntry(entry))
+        {
+            var isRu = _uiLang == "ru";
+            return new StartupRating
+            {
+                Score = 1,
+                Category = isRu ? "Безопасность и мониторинг" : "Security & Monitoring",
+                Risk = isRu
+                    ? "Абсолютно доверенное ПО: официальный компонент защитного комплекса Startup Monitor. Обеспечивает непрерывный мониторинг реестра, контроль автозагрузки, сетевой экран и защиту от вредоносных модулей."
+                    : "Fully trusted software: official Startup Monitor component. Provides continuous registry monitoring, startup security, firewall filtering, and protection against unauthorized persistence.",
+                Recommendation = isRu
+                    ? "Разрешить автозапуск. Критически важный компонент для мониторинга системы и предотвращения угроз."
+                    : "Allow startup. Vital component for system defense and persistence monitoring."
+            };
+        }
 
         // Circuit Breaker: если сеть недоступна, не пытаемся слать запросы
         if (DateTime.UtcNow < _networkCooldownUntil)

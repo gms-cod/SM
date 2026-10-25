@@ -311,6 +311,14 @@ public partial class NetworkSecurityHubView : UserControl
         _alertPollerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         _alertPollerTimer.Tick += async (_, _) => await PollNetworkAlertsAsync();
 
+        MainTabs.SelectionChanged += (s, e) =>
+        {
+            if (e.Source == MainTabs)
+            {
+                UpdateTabButtons(MainTabs.SelectedIndex);
+            }
+        };
+
         Loaded += async (_, _) =>
         {
             await RefreshAllAsync();
@@ -338,6 +346,31 @@ public partial class NetworkSecurityHubView : UserControl
         try { _bansRefreshTimer?.Stop(); } catch { }
         try { _liveConnTimer?.Stop(); } catch { }
         try { _alertPollerTimer?.Stop(); } catch { }
+    }
+
+    /// <summary>Обрабатывает клик по навигационным кнопкам вкладок брандмауэра.</summary>
+    private void OnTabNavClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.Tag is string tagStr && int.TryParse(tagStr, out var idx))
+        {
+            MainTabs.SelectedIndex = idx;
+            UpdateTabButtons(idx);
+        }
+    }
+
+    /// <summary>Синхронизирует активное состояние (Primary/Secondary) кнопок вкладок со стилем FilterTabButtonStyle.</summary>
+    private void UpdateTabButtons(int selectedIdx)
+    {
+        var buttons = new[] { TabBtnConnections, TabBtnWhitelist, TabBtnBlacklist, TabBtnRules, TabBtnPortDefender, TabBtnAttackLog };
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            if (buttons[i] != null)
+            {
+                buttons[i].Appearance = (i == selectedIdx)
+                    ? Wpf.Ui.Controls.ControlAppearance.Primary
+                    : Wpf.Ui.Controls.ControlAppearance.Secondary;
+            }
+        }
     }
 
     /// <summary>
