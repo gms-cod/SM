@@ -932,6 +932,9 @@
   <data name="NavBootTime" xml:space="preserve">
     <value>Загрузка</value>
   </data>
+  <data name="NavSnapshots" xml:space="preserve">
+    <value>Снимки системы</value>
+  </data>
   <data name="BootTimeTitle" xml:space="preserve">
     <value>Анализатор времени загрузки Windows</value>
   </data>

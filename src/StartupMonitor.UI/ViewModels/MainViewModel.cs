@@ -1557,6 +1557,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _pollingTimer = new Timer(async _ => await LoadDataIfChanged(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
         }
         StartNetworkAlertPoller();
+        // Автообновление счётчика сохранённых снимков при подключении к службе
+        _ = RefreshSavedSnapshotsCountAsync();
         App.Log("MainViewModel: Connected handler завершён");
     }
 
@@ -1946,6 +1948,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _activeSnapshotComparisonText;
 
+    /// <summary>Количество сохранённых контрольных снимков системы (для бейджа в навигации).</summary>
+    [ObservableProperty]
+    private int _savedSnapshotsCount;
+
     /// <summary>Список Id новых записей со снимка.</summary>
     public HashSet<string> SnapshotAddedEntryIds { get; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -1976,6 +1982,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void OpenSnapshots()
     {
         OpenSnapshotsRequested?.Invoke();
+    }
+
+    /// <summary>Обновляет счётчик сохранённых снимков через службу (для бейджа в левой навигации).</summary>
+    public async Task RefreshSavedSnapshotsCountAsync()
+    {
+        try
+        {
+            var snapshots = await _pipeClient.GetSnapshotsAsync();
+            SavedSnapshotsCount = snapshots?.Count ?? 0;
+        }
+        catch
+        {
+            // Счётчик некритичен: при недоступности службы оставляем предыдущее значение.
+        }
     }
 
     /// <summary>Сбрасывает режим сравнения со снимком, очищая бейджи и восстанавливая стандартную фильтрацию.</summary>

@@ -1776,4 +1776,102 @@ public class PipeClient : IDisposable
         }
         catch { return false; }
     }
+
+    // ===== Белый список сетевых приложений брандмауэра (AppSettings.FirewallWhitelistedApps) =====
+
+    /// <summary>Запрашивает белый список сетевых приложений брандмауэра со стороны службы.</summary>
+    public async Task<List<string>> GetFirewallWhitelistAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallWhitelist }, ct);
+            if (response?.Type == PipeMessageTypes.GetFirewallWhitelistResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<List<string>>(response.Payload, JsonOptions) ?? new List<string>();
+            }
+        }
+        catch { }
+        return new List<string>();
+    }
+
+    /// <summary>Добавляет путь к приложению в белый список брандмауэра.</summary>
+    public async Task<bool> AddToFirewallWhitelistAsync(string path, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.AddToFirewallWhitelist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim()), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Удаляет путь к приложению из белого списка брандмауэра.</summary>
+    public async Task<bool> RemoveFromFirewallWhitelistAsync(string path, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.RemoveFromFirewallWhitelist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim()), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch { return false; }
+    }
+
+    // ===== Чёрный список сетевых приложений брандмауэра (AppSettings.FirewallBlacklistedApps) =====
+
+    /// <summary>Запрашивает чёрный список сетевых приложений брандмауэра со стороны службы.</summary>
+    public async Task<List<string>> GetFirewallBlacklistAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallBlacklist }, ct);
+            if (response?.Type == PipeMessageTypes.GetFirewallBlacklistResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<List<string>>(response.Payload, JsonOptions) ?? new List<string>();
+            }
+        }
+        catch { }
+        return new List<string>();
+    }
+
+    /// <summary>Добавляет путь к приложению в чёрный список брандмауэра.</summary>
+    public async Task<bool> AddToFirewallBlacklistAsync(string path, string? reason = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.AddToFirewallBlacklist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim(), reason), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Удаляет путь к приложению из чёрного списка брандмауэра (снимает блокирующее правило).</summary>
+    public async Task<bool> RemoveFromFirewallBlacklistAsync(string path, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.RemoveFromFirewallBlacklist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim()), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch { return false; }
+    }
 }

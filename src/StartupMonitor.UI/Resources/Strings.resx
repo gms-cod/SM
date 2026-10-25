@@ -932,6 +932,9 @@
   <data name="NavBootTime" xml:space="preserve">
     <value>Boot Time</value>
   </data>
+  <data name="NavSnapshots" xml:space="preserve">
+    <value>Snapshots</value>
+  </data>
   <data name="BootTimeTitle" xml:space="preserve">
     <value>Windows Boot Time Analyzer</value>
   </data>

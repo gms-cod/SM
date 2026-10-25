@@ -34,6 +34,8 @@ public partial class SnapshotsWindow
             var snapshots = await _pipeClient.GetSnapshotsAsync();
             GridSnapshots.ItemsSource = snapshots;
             TxtNoSnapshots.Visibility = (snapshots.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
+            // Обновляем счётчик сохранённых снимков в бейдже левой навигации главного окна
+            _vm.SavedSnapshotsCount = snapshots.Count;
         }
         catch (Exception ex)
         {

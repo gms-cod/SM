@@ -77,3 +77,4 @@ python scripts/test_gemini4_openrouter.py
 Модель `openrouter/google/gemini-4-argon` добавлена в белый список архитектурного консилиума роя:
 1. **Профиль `TRIAD-REVIEW`**: используется в качестве 3-го независимого движка консилиума (наряду с `deepseek-v4.1-flash-free` и `beam-free`).
 2. **Пресет `csharp_concurrency_audit`**: глубокая проверка блокировок и низкоуровневых Win32-структур.
+

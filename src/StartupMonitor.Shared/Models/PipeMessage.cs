@@ -266,7 +266,27 @@ public static class PipeMessageTypes
     /// <summary>Ответ службы с результатом применения пресета безопасности.</summary>
     public const string ApplySecurityPresetResponse = "ApplySecurityPresetResponse";
 
+    /// <summary>Запрос белого списка сетевых приложений брандмауэра.</summary>
+    public const string GetFirewallWhitelist = "GetFirewallWhitelist";
+    /// <summary>Ответ со списком путей белого списка.</summary>
+    public const string GetFirewallWhitelistResponse = "GetFirewallWhitelistResponse";
+    /// <summary>Добавить приложение в белый список брандмауэра.</summary>
+    public const string AddToFirewallWhitelist = "AddToFirewallWhitelist";
+    /// <summary>Удалить приложение из белого списка брандмауэра.</summary>
+    public const string RemoveFromFirewallWhitelist = "RemoveFromFirewallWhitelist";
+    /// <summary>Запрос чёрного списка сетевых приложений брандмауэра.</summary>
+    public const string GetFirewallBlacklist = "GetFirewallBlacklist";
+    /// <summary>Ответ со списком путей чёрного списка.</summary>
+    public const string GetFirewallBlacklistResponse = "GetFirewallBlacklistResponse";
+    /// <summary>Добавить приложение в чёрный список брандмауэра.</summary>
+    public const string AddToFirewallBlacklist = "AddToFirewallBlacklist";
+    /// <summary>Удалить приложение из чёрного списка брандмауэра.</summary>
+    public const string RemoveFromFirewallBlacklist = "RemoveFromFirewallBlacklist";
+
 }
+
+/// <summary>Полезная нагрузка для добавления/удаления приложения в списки брандмауэра.</summary>
+public record FirewallAppActionPayload(string Path, string? Reason = null);
 
 /// <summary>Полезная нагрузка для сообщения SetAiConfig: ключ API, URL эндпоинта и имя модели.</summary>
 public record AiConfigPayload(string ApiKey, string? ApiUrl = null, string? Model = null);

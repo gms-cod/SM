@@ -634,6 +634,8 @@ public class LocalizationService : INotifyPropertyChanged
     // ──── Boot Time Tracer ────
     /// <summary>Название пункта навигации «Загрузка» (Boot Time).</summary>
     public string NavBootTime => this["NavBootTime"];
+    /// <summary>Пункт навигации: снимки системы.</summary>
+    public string NavSnapshots => this["NavSnapshots"];
     /// <summary>Заголовок страницы анализатора времени загрузки.</summary>
     public string BootTimeTitle => this["BootTimeTitle"];
     /// <summary>Подзаголовок страницы анализатора времени загрузки.</summary>
@@ -1081,6 +1083,36 @@ public class LocalizationService : INotifyPropertyChanged
     public string NetBtnAntiTelemetryTip => this["NetBtnAntiTelemetryTip"];
     /// <summary>Локализованная строка «NetTabPortDefender».</summary>
     public string NetTabPortDefender => this["NetTabPortDefender"];
+    /// <summary>Локализованная строка «NetTabWhitelist».</summary>
+    public string NetTabWhitelist => this["NetTabWhitelist"];
+    /// <summary>Локализованная строка «NetTabBlacklist».</summary>
+    public string NetTabBlacklist => this["NetTabBlacklist"];
+    /// <summary>Локализованная строка «NetSearchWhitelistHint».</summary>
+    public string NetSearchWhitelistHint => this["NetSearchWhitelistHint"];
+    /// <summary>Локализованная строка «NetSearchBlacklistHint».</summary>
+    public string NetSearchBlacklistHint => this["NetSearchBlacklistHint"];
+    /// <summary>Кнопка «Добавить программу» в белый список.</summary>
+    public string NetBtnAddToWhitelist => this["NetBtnAddToWhitelist"];
+    /// <summary>Кнопка «Удалить из списка» из белого списка.</summary>
+    public string NetBtnRemoveFromWhitelist => this["NetBtnRemoveFromWhitelist"];
+    /// <summary>Кнопка «Добавить программу» в чёрный список.</summary>
+    public string NetBtnAddToBlacklist => this["NetBtnAddToBlacklist"];
+    /// <summary>Кнопка «Убрать из списка» из чёрного списка.</summary>
+    public string NetBtnRemoveFromBlacklist => this["NetBtnRemoveFromBlacklist"];
+    /// <summary>Заголовок колонки «Полный путь».</summary>
+    public string NetColFullPath => this["NetColFullPath"];
+    /// <summary>Заголовок колонки «Добавлено».</summary>
+    public string NetColAddedAt => this["NetColAddedAt"];
+    /// <summary>Заголовок колонки «Заблокировано».</summary>
+    public string NetColBlockedAt => this["NetColBlockedAt"];
+    /// <summary>Заголовок «Белый список пуст».</summary>
+    public string NetNoWhitelistTitle => this["NetNoWhitelistTitle"];
+    /// <summary>Подзаголовок белого списка.</summary>
+    public string NetNoWhitelistSubtitle => this["NetNoWhitelistSubtitle"];
+    /// <summary>Заголовок «Чёрный список пуст».</summary>
+    public string NetNoBlacklistTitle => this["NetNoBlacklistTitle"];
+    /// <summary>Подзаголовок чёрного списка.</summary>
+    public string NetNoBlacklistSubtitle => this["NetNoBlacklistSubtitle"];
     /// <summary>Локализованная строка «NetTabAttackBans».</summary>
     public string NetTabAttackBans => this["NetTabAttackBans"];
     /// <summary>Локализованная строка «NetBtnUnbanSelectedIp».</summary>

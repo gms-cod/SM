@@ -115,6 +115,9 @@ public partial class MainWindow
 
             _isStartupComplete = true;
 
+            // Обновляем счётчик сохранённых снимков для бейджа в левой навигации
+            _ = _viewModel.RefreshSavedSnapshotsCountAsync();
+
             if (savedTab != 0)
             {
                 // Для вкладок, требующих соединения со службой, обновляем данные после инициализации pipe
@@ -178,6 +181,8 @@ public partial class MainWindow
                 App.Log("MainWindow: Opening SnapshotsWindow");
                 var win = new Dialogs.SnapshotsWindow(_pipeClient, _viewModel) { Owner = this };
                 win.ShowDialog();
+                // После закрытия диалога обновляем счётчик сохранённых снимков
+                _ = _viewModel.RefreshSavedSnapshotsCountAsync();
             }
             catch (Exception ex)
             {
@@ -603,8 +608,18 @@ public partial class MainWindow
     /// <summary>Обрабатывает клик по элементу навигации для переключения страниц.</summary>
     private void OnNavClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (sender is FrameworkElement fe && fe.Tag is string tag && int.TryParse(tag, out var idx))
-            NavigateToPage(idx);
+        if (sender is FrameworkElement fe && fe.Tag is string tag)
+        {
+            // Числовые теги — переключение страниц; «Snapshots» — открытие диалога снимков системы.
+            if (int.TryParse(tag, out var idx))
+            {
+                NavigateToPage(idx);
+            }
+            else if (tag == "Snapshots")
+            {
+                _viewModel.OpenSnapshotsCommand.Execute(null);
+            }
+        }
     }
 
     /// <summary>Обрабатывает клик по кнопке выхода из приложения.</summary>

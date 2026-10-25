@@ -14,6 +14,7 @@
   - Все субагенты роя запускаются строго через единый стандарт скрипта:
     - **Режим запуска**: headless CLI `opencode run --pure --dir <work_dir> -m <model>`.
     - **Передача входного потока (STDIN)**: строго `proc.stdin.write(prompt)` и `proc.stdin.close()` (категорически запрещено передавать тело длинного промпта через аргументы командной строки в Windows из-за лимита 8191 символ).
+    - **Изолированные песочницы субагентов (Sandbox Isolation)**: каждому параллельному субагенту создается персональная изолированная временная среда (временный каталог пользователя `tempfile.mkdtemp` с копированием `auth.json` и подменой переменных среды `USERPROFILE`, `HOME`, `OPENCODE_DIR`, `APPDATA`, `LOCALAPPDATA`), что полностью устраняет состояние гонки и ошибку `database is locked` в SQLite OpenCode.
     - **Потокобезопасная параллельность**: `concurrent.futures.ThreadPoolExecutor(max_workers=len(AGENTS))` без взаимных блокировок между агентами.
     - **Атомарный живой JSON-мониторинг**: `logs/live_status.json` с потокобезопасной сериализацией и фиксацией полей: `status`, `task`, `last_line`, `elapsed_seconds`, `char_count`.
     - **Кодировка вывода Windows**: обязательная принудительная инициализация `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`.

@@ -75,18 +75,34 @@
 
                 <!-- Навигация -->
                 <StackPanel Grid.Row="1" Margin="8 0">
-                     <Border x:Name="NavItem0" Tag="0" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                         <Grid>
-                             <Rectangle x:Name="NavBar0" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                 <Viewbox Width="16" Height="16">
-                                     <Path Data="{StaticResource IconHome}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                 </Viewbox>
-                                 <TextBlock Text="{Binding NavOverview, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                             </StackPanel>
-                         </Grid>
-                     </Border>
+                      <Border x:Name="NavItem0" Tag="0" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+                          <Grid>
+                              <Rectangle x:Name="NavBar0" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                  <Viewbox Width="16" Height="16">
+                                      <Path Data="{StaticResource IconHome}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                  </Viewbox>
+                                  <TextBlock Text="{Binding NavOverview, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                              </StackPanel>
+                          </Grid>
+                      </Border>
+                      <!-- Пункт навигации: Снимки системы (контрольные снимки «Было — Стало») -->
+                      <Border x:Name="NavItemSnapshots" Tag="Snapshots" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+                          <Grid>
+                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                  <Viewbox Width="16" Height="16">
+                                      <Path Data="{StaticResource IconCamera}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                  </Viewbox>
+                                  <TextBlock Text="{Binding NavSnapshots, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                                  <!-- Счётчик сохранённых снимков -->
+                                  <Border Margin="8 0 0 0" Padding="6 1" CornerRadius="8" Background="{DynamicResource BadgeBluePill}">
+                                      <TextBlock Text="{Binding SavedSnapshotsCount}" FontSize="10.5" FontWeight="700"
+                                                 Foreground="{DynamicResource BadgeBlueTextBrush}" />
+                                  </Border>
+                              </StackPanel>
+                          </Grid>
+                      </Border>
                      <Border x:Name="NavItem6" Tag="6" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
                          <Grid>
                              <Rectangle x:Name="NavBar6" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"

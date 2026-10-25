@@ -1952,6 +1952,120 @@ public class PipeServer : BackgroundService
                     });
                     break;
 
+                // ===== Белый список сетевых приложений брандмауэра =====
+                case PipeMessageTypes.GetFirewallWhitelist:
+                    try
+                    {
+                        var whitelist = _store.Load().Settings.FirewallWhitelistedApps;
+                        response.Type = PipeMessageTypes.GetFirewallWhitelistResponse;
+                        response.Payload = JsonSerializer.Serialize(whitelist, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.AddToFirewallWhitelist:
+                    try
+                    {
+                        var addPayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        if (addPayload != null && !string.IsNullOrWhiteSpace(addPayload.Path))
+                        {
+                            var cfg = _store.Load();
+                            if (!cfg.Settings.FirewallWhitelistedApps.Contains(addPayload.Path, StringComparer.OrdinalIgnoreCase))
+                            {
+                                cfg.Settings.FirewallWhitelistedApps.Add(addPayload.Path);
+                                _store.Save(cfg);
+                            }
+                        }
+                        response.Type = PipeMessageTypes.Success;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.RemoveFromFirewallWhitelist:
+                    try
+                    {
+                        var removePayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        if (removePayload != null)
+                        {
+                            var cfg = _store.Load();
+                            cfg.Settings.FirewallWhitelistedApps.RemoveAll(p =>
+                                string.Equals(p, removePayload.Path, StringComparison.OrdinalIgnoreCase));
+                            _store.Save(cfg);
+                        }
+                        response.Type = PipeMessageTypes.Success;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                // ===== Чёрный список сетевых приложений брандмауэра =====
+                case PipeMessageTypes.GetFirewallBlacklist:
+                    try
+                    {
+                        var blacklist = _store.Load().Settings.FirewallBlacklistedApps;
+                        response.Type = PipeMessageTypes.GetFirewallBlacklistResponse;
+                        response.Payload = JsonSerializer.Serialize(blacklist, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.AddToFirewallBlacklist:
+                    try
+                    {
+                        var addPayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        if (addPayload != null && !string.IsNullOrWhiteSpace(addPayload.Path))
+                        {
+                            var cfg = _store.Load();
+                            if (!cfg.Settings.FirewallBlacklistedApps.Contains(addPayload.Path, StringComparer.OrdinalIgnoreCase))
+                            {
+                                cfg.Settings.FirewallBlacklistedApps.Add(addPayload.Path);
+                                _store.Save(cfg);
+                            }
+                        }
+                        response.Type = PipeMessageTypes.Success;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.RemoveFromFirewallBlacklist:
+                    try
+                    {
+                        var removePayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        if (removePayload != null)
+                        {
+                            var cfg = _store.Load();
+                            cfg.Settings.FirewallBlacklistedApps.RemoveAll(p =>
+                                string.Equals(p, removePayload.Path, StringComparison.OrdinalIgnoreCase));
+                            _store.Save(cfg);
+                        }
+                        response.Type = PipeMessageTypes.Success;
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
                 default:
                     response.Type = PipeMessageTypes.Error;
                     response.Payload = $"Неизвестный тип сообщения: {message.Type}";
