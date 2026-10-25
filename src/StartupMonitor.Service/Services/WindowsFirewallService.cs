@@ -522,10 +522,22 @@ public sealed class WindowsFirewallService
                             set.Add(trimmed);
                             try
                             {
+                                var expanded = Environment.ExpandEnvironmentVariables(trimmed);
+                                if (!string.Equals(expanded, trimmed, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    set.Add(expanded);
+                                }
+                            }
+                            catch { }
+                            try
+                            {
                                 var fileName = System.IO.Path.GetFileName(trimmed);
                                 if (!string.IsNullOrWhiteSpace(fileName))
                                 {
                                     set.Add(fileName);
+                                    var withoutExt = System.IO.Path.GetFileNameWithoutExtension(trimmed);
+                                    if (!string.IsNullOrWhiteSpace(withoutExt))
+                                        set.Add(withoutExt);
                                 }
                             }
                             catch { }

@@ -96,7 +96,7 @@
                                   </Viewbox>
                                   <TextBlock Text="{Binding NavSnapshots, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
                                   <!-- Счётчик сохранённых снимков -->
-                                  <Border Margin="8 0 0 0" Padding="6 1" CornerRadius="8" Background="{DynamicResource BadgeBluePill}">
+                                  <Border Margin="8 0 0 0" Style="{DynamicResource BadgeBluePill}">
                                       <TextBlock Text="{Binding SavedSnapshotsCount}" FontSize="10.5" FontWeight="700"
                                                  Foreground="{DynamicResource BadgeBlueTextBrush}" />
                                   </Border>
