@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using StartupMonitor.Shared;
 using StartupMonitor.Shared.Models;
+using StartupMonitor.Shared.Models.Snapshot;
 using StartupMonitor.UI.Services;
 using StartupMonitor.UI.ViewModels;
 
@@ -28,6 +29,8 @@ public partial class MainWindow
     private int _selectedNavIndex;
     /// <summary>Флаг замены дизайнерского экземпляра хаба сетевой безопасности на подключённый к <see cref="_pipeClient"/>.</summary>
     private bool _firewallHubInitialized;
+    /// <summary>Текущий результат сравнения снимка (для применения фильтра).</summary>
+    private SnapshotComparisonResult? _currentDiff;
 
     /// <summary>Время последнего клика мышью для определения двойного клика.</summary>
     private DateTime _lastClickTime;
@@ -108,7 +111,7 @@ public partial class MainWindow
         {
             _hasShown = true;
             var savedTab = MainViewModel.LoadSetting("lastActiveTab", 0);
-            if (savedTab < 0 || savedTab > 8) savedTab = 0;
+            if (savedTab < 0 || savedTab > 9) savedTab = 0;
             App.Log($"MainWindow: Loaded, savedTab={savedTab}, WindowState={WindowState}, IsMinimized={App.IsMinimized}");
             NavigateToPage(savedTab);
             await StartupSequence();
@@ -131,6 +134,7 @@ public partial class MainWindow
                 }
                 else if (savedTab == 7) _ = _viewModel.LoadBootTimeAsync();
                 else if (savedTab == 8) _ = RefreshFirewallHubAsync();
+                else if (savedTab == 9) _ = LoadSnapshotsAsync();
             }
 
             if (App.IsMinimized)
@@ -178,16 +182,13 @@ public partial class MainWindow
         {
             try
             {
-                App.Log("MainWindow: Opening SnapshotsWindow");
-                var win = new Dialogs.SnapshotsWindow(_pipeClient, _viewModel) { Owner = this };
-                win.ShowDialog();
-                // После закрытия диалога обновляем счётчик сохранённых снимков
+                App.Log("MainWindow: Navigating to SnapshotsPage");
+                NavigateToPage(9);
                 _ = _viewModel.RefreshSavedSnapshotsCountAsync();
             }
             catch (Exception ex)
             {
-                App.Log($"MainWindow: Error opening SnapshotsWindow: {ex}");
-                MessageBox.Show($"Не удалось открыть окно снимков: {ex.Message}", "Startup Monitor", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Log($"MainWindow: Error navigating to SnapshotsPage: {ex}");
             }
         };
         _viewModel.OpenSystemInfoRequested += () =>
@@ -644,9 +645,10 @@ public partial class MainWindow
         TaskManagerPage.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;
         BootTimePage.Visibility = idx == 7 ? Visibility.Visible : Visibility.Collapsed;
         FirewallPage.Visibility = idx == 8 ? Visibility.Visible : Visibility.Collapsed;
+        SnapshotsPage.Visibility = idx == 9 ? Visibility.Visible : Visibility.Collapsed;
 
-        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8 };
-        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8 };
+        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8, NavItemSnapshots };
+        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8, NavBarSnapshots };
         Brush selected;
         try { selected = (Brush)FindResource("ControlFillColorSecondaryBrush"); }
         catch { selected = Brushes.Transparent; }
@@ -694,6 +696,8 @@ public partial class MainWindow
             _ = _viewModel.LoadBootTimeAsync();
         else if (idx == 8)
             _ = RefreshFirewallHubAsync();
+        else if (idx == 9)
+            _ = LoadSnapshotsAsync();
     }
 
 
@@ -753,6 +757,137 @@ public partial class MainWindow
     }
 
     /// <summary>Проверяет, попадает ли прямоугольник окна хотя бы частично на видимую область подключенных мониторов.</summary>
+
+    /// <summary>Загружает список сохраненных снимков системы в интерфейс вкладки.</summary>
+    private async Task LoadSnapshotsAsync()
+    {
+        try
+        {
+            var snapshots = await _pipeClient.GetSnapshotsAsync();
+            GridSnapshots.ItemsSource = snapshots;
+            TxtNoSnapshots.Visibility = (snapshots == null || snapshots.Count == 0) ? Visibility.Visible : Visibility.Collapsed;
+            _viewModel.SavedSnapshotsCount = snapshots?.Count ?? 0;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка загрузки снимков: {ex.Message}", "Startup Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnCreateSnapshotClick(object sender, RoutedEventArgs e)
+    {
+        var name = TxtSnapshotName.Text.Trim();
+        var desc = TxtSnapshotDesc.Text.Trim();
+
+        BtnCreateSnapshot.IsEnabled = false;
+        try
+        {
+            var (success, error, snapshot) = await _pipeClient.CreateSnapshotAsync(
+                string.IsNullOrEmpty(name) ? null : name,
+                string.IsNullOrEmpty(desc) ? null : desc);
+
+            if (success && snapshot != null)
+            {
+                TxtSnapshotName.Text = string.Empty;
+                TxtSnapshotDesc.Text = string.Empty;
+                await LoadSnapshotsAsync();
+                await CompareSnapshotInternalAsync(snapshot.Id);
+            }
+            else
+            {
+                MessageBox.Show(error ?? "Не удалось создать снимок.", "Startup Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка: {ex.Message}", "Startup Monitor", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            BtnCreateSnapshot.IsEnabled = true;
+        }
+    }
+
+    private async void OnCompareSnapshotClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BaselineSnapshot snapshot })
+        {
+            await CompareSnapshotInternalAsync(snapshot.Id);
+        }
+    }
+
+    private async Task CompareSnapshotInternalAsync(string snapshotId)
+    {
+        try
+        {
+            var (success, error, diff) = await _pipeClient.CompareSnapshotAsync(snapshotId);
+            if (success && diff != null)
+            {
+                _currentDiff = diff;
+                DisplayDiffResults(diff);
+            }
+            else
+            {
+                MessageBox.Show(error ?? "Ошибка сравнения снимка.", "Startup Monitor", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка: {ex.Message}", "Startup Monitor", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void DisplayDiffResults(SnapshotComparisonResult diff)
+    {
+        TxtDiffHeader.Text = $"Результаты сравнения со снимком «{diff.SnapshotName}»:";
+        BadgeAdded.Text = $"+{diff.AddedEntries.Count} Новых";
+        BadgeModified.Text = $"~{diff.ModifiedEntries.Count} Измененных";
+        BadgeRemoved.Text = $"-{diff.RemovedEntries.Count} Удаленных";
+        BadgeUnchanged.Text = $"{diff.UnchangedCount} Без изменений";
+
+        TabAdded.Header = $"Новые записи (+{diff.AddedEntries.Count})";
+        TabModified.Header = $"Измененные записи (~{diff.ModifiedEntries.Count})";
+        TabRemoved.Header = $"Удаленные записи (-{diff.RemovedEntries.Count})";
+
+        GridAdded.ItemsSource = diff.AddedEntries;
+        GridModified.ItemsSource = diff.ModifiedEntries;
+        GridRemoved.ItemsSource = diff.RemovedEntries;
+
+        BtnApplyFilter.IsEnabled = diff.HasDifferences;
+    }
+
+    private async void OnDeleteSnapshotClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BaselineSnapshot snapshot })
+        {
+            var res = MessageBox.Show(
+                LocalizationService.Instance.SnapshotDeleteConfirm,
+                "Startup Monitor",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res == MessageBoxResult.Yes)
+            {
+                await _pipeClient.DeleteSnapshotAsync(snapshot.Id);
+                await LoadSnapshotsAsync();
+            }
+        }
+    }
+
+    private void OnApplyFilterToMainClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentDiff != null)
+        {
+            _viewModel.ApplySnapshotComparison(_currentDiff);
+            NavigateToPage(0);
+        }
+    }
+
+    private void OnCloseClick(object sender, RoutedEventArgs e)
+    {
+        NavigateToPage(0);
+    }
+
     private static bool IsWindowPlacementVisible(Rect bounds)
     {
         var virtualScreen = new Rect(

@@ -52,6 +52,14 @@ public partial class NetworkSecurityHubView : UserControl
     private string _connSearchText = string.Empty;
     private ConnFilter _activeConnFilter = ConnFilter.All;
     private bool _isLoadingConn;
+
+    private List<FirewallAppEntry> _allWhitelistApps = new();
+    private List<FirewallAppEntry> _allBlacklistApps = new();
+    private string _whitelistSearchText = string.Empty;
+    private string _blacklistSearchText = string.Empty;
+    private bool _isLoadingWhitelist;
+    private bool _isLoadingBlacklist;
+    private readonly Dictionary<int, string?> _processPathCache = new();
     private HashSet<string> _blockedIps = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Фильтр таблицы правил брандмауэра.</summary>
@@ -79,6 +87,57 @@ public partial class NetworkSecurityHubView : UserControl
     /// (<see cref="FirewallRuleDto"/> sealed, поэтому композиция вместо наследования),
     /// добавляет готовые к отображению свойства (без конвертеров в XAML).
     /// </summary>
+
+    /// <summary>
+    /// Элемент приложения в белом или чёрном списке брандмауэра.
+    /// Предоставляет форматированные данные для отображения в DataGrid.
+    /// </summary>
+    public sealed class FirewallAppEntry
+    {
+        public string FullPath { get; set; } = string.Empty;
+        public string ProcessName { get; set; } = string.Empty;
+        public string DateAddedDisplay { get; set; } = "—";
+        public string FileSizeDisplay { get; set; } = "—";
+        public bool ExistsOnDisk { get; set; }
+        public string StatusBadge { get; set; } = string.Empty;
+
+        public static FirewallAppEntry FromPath(string path, bool isBlacklist = false)
+        {
+            var cleanPath = (path ?? string.Empty).Trim().Trim('"');
+            var name = Path.GetFileName(cleanPath);
+            if (string.IsNullOrWhiteSpace(name))
+                name = cleanPath;
+
+            bool exists = false;
+            string dateStr = "—";
+            string sizeStr = "—";
+
+            try
+            {
+                if (File.Exists(cleanPath))
+                {
+                    exists = true;
+                    var fi = new FileInfo(cleanPath);
+                    dateStr = fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm");
+                    sizeStr = $"{fi.Length / 1024.0 / 1024.0:F1} МБ";
+                }
+            }
+            catch { }
+
+            return new FirewallAppEntry
+            {
+                FullPath = cleanPath,
+                ProcessName = name,
+                DateAddedDisplay = dateStr,
+                FileSizeDisplay = sizeStr,
+                ExistsOnDisk = exists,
+                StatusBadge = isBlacklist
+                    ? "🚫 Заблокирован"
+                    : (exists ? "🛡️ Доверен" : "⚠️ Не найден")
+            };
+        }
+    }
+
     public sealed class FirewallRuleRow
     {
         public FirewallRuleRow(FirewallRuleDto dto) => Dto = dto ?? new FirewallRuleDto();
@@ -1945,6 +2004,312 @@ public partial class NetworkSecurityHubView : UserControl
 
     private async void OnApplyPresetResetClick(object sender, RoutedEventArgs e) =>
         await ApplyPresetAsync(SecurityPresetType.ResetToDefaults);
+
+
+    // =========================================================================
+    // БЕЛЫЙ И ЧЁРНЫЙ СПИСКИ ПРИЛОЖЕНИЙ (WHITELIST & BLACKLIST)
+    // =========================================================================
+
+    public async Task LoadWhitelistAsync()
+    {
+        if (_isLoadingWhitelist) return;
+        _isLoadingWhitelist = true;
+        try
+        {
+            var paths = await _pipeClient.GetFirewallWhitelistAsync();
+            _allWhitelistApps = (paths ?? new List<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => FirewallAppEntry.FromPath(p, isBlacklist: false))
+                .OrderBy(e => e.ProcessName)
+                .ToList();
+
+            ApplyWhitelistFilter();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка загрузки белого списка: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingWhitelist = false;
+        }
+    }
+
+    private void ApplyWhitelistFilter()
+    {
+        var filtered = string.IsNullOrWhiteSpace(_whitelistSearchText)
+            ? _allWhitelistApps
+            : _allWhitelistApps.Where(a =>
+                a.ProcessName.Contains(_whitelistSearchText, StringComparison.OrdinalIgnoreCase) ||
+                a.FullPath.Contains(_whitelistSearchText, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        GridWhitelist.ItemsSource = filtered;
+        TxtWhitelistEmpty.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnWhitelistSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        _whitelistSearchText = TxtSearchWhitelist?.Text ?? string.Empty;
+        ApplyWhitelistFilter();
+    }
+
+    private async void OnRefreshWhitelistClick(object sender, RoutedEventArgs e) =>
+        await LoadWhitelistAsync();
+
+    private async void OnAddWhitelistAppClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Выберите исполняемый файл для добавления в белый список",
+                Filter = "Исполняемые файлы (*.exe)|*.exe|Все файлы (*.*)|*.*",
+                CheckFileExists = true
+            };
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FileName))
+            {
+                var filePath = dialog.FileName.Trim();
+                SetStatus($"Добавление в белый список: {Path.GetFileName(filePath)}...");
+                var ok = await _pipeClient.AddToFirewallWhitelistAsync(filePath);
+                if (ok)
+                {
+                    SetStatus($"Программа {Path.GetFileName(filePath)} успешно добавлена в белый список.");
+                    await LoadWhitelistAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка добавления программы в белый список: {ex.Message}");
+        }
+    }
+
+    private async void OnRemoveWhitelistAppClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not FirewallAppEntry item) return;
+            var confirm = MessageBox.Show(
+                $"Удалить «{item.ProcessName}» из белого списка?",
+                "Белый список брандмауэра",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            SetStatus($"Удаление из белого списка: {item.ProcessName}...");
+            var ok = await _pipeClient.RemoveFromFirewallWhitelistAsync(item.FullPath);
+            if (ok)
+            {
+                SetStatus($"Программа {item.ProcessName} удалена из белого списка.");
+                await LoadWhitelistAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка удаления из белого списка: {ex.Message}");
+        }
+    }
+
+    public async Task LoadBlacklistAsync()
+    {
+        if (_isLoadingBlacklist) return;
+        _isLoadingBlacklist = true;
+        try
+        {
+            var paths = await _pipeClient.GetFirewallBlacklistAsync();
+            _allBlacklistApps = (paths ?? new List<string>())
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => FirewallAppEntry.FromPath(p, isBlacklist: true))
+                .OrderBy(e => e.ProcessName)
+                .ToList();
+
+            ApplyBlacklistFilter();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка загрузки чёрного списка: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingBlacklist = false;
+        }
+    }
+
+    private void ApplyBlacklistFilter()
+    {
+        var filtered = string.IsNullOrWhiteSpace(_blacklistSearchText)
+            ? _allBlacklistApps
+            : _allBlacklistApps.Where(a =>
+                a.ProcessName.Contains(_blacklistSearchText, StringComparison.OrdinalIgnoreCase) ||
+                a.FullPath.Contains(_blacklistSearchText, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        GridBlacklist.ItemsSource = filtered;
+        TxtBlacklistEmpty.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnBlacklistSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        _blacklistSearchText = TxtSearchBlacklist?.Text ?? string.Empty;
+        ApplyBlacklistFilter();
+    }
+
+    private async void OnRefreshBlacklistClick(object sender, RoutedEventArgs e) =>
+        await LoadBlacklistAsync();
+
+    private async void OnAddBlacklistAppClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Выберите исполняемый файл для блокировки",
+                Filter = "Исполняемые файлы (*.exe)|*.exe|Все файлы (*.*)|*.*",
+                CheckFileExists = true
+            };
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FileName))
+            {
+                var filePath = dialog.FileName.Trim();
+                SetStatus($"Блокировка программы: {Path.GetFileName(filePath)}...");
+                var ok = await _pipeClient.AddToFirewallBlacklistAsync(filePath);
+                if (ok)
+                {
+                    SetStatus($"Программа {Path.GetFileName(filePath)} заблокирована в брандмауэре.");
+                    await LoadBlacklistAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка добавления в чёрный список: {ex.Message}");
+        }
+    }
+
+    private async void OnRemoveBlacklistAppClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not FirewallAppEntry item) return;
+            var confirm = MessageBox.Show(
+                $"Разблокировать «{item.ProcessName}» и удалить из чёрного списка?",
+                "Чёрный список брандмауэра",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            SetStatus($"Разблокировка программы: {item.ProcessName}...");
+            var ok = await _pipeClient.RemoveFromFirewallBlacklistAsync(item.FullPath);
+            if (ok)
+            {
+                SetStatus($"Программа {item.ProcessName} разблокирована.");
+                await LoadBlacklistAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка разблокировки: {ex.Message}");
+        }
+    }
+
+    // =========================================================================
+    // БЫСТРЫЕ ДЕЙСТВИЯ НАД СОКЕТАМИ (LIVE CONNECTIONS)
+    // =========================================================================
+
+    private string? ResolveProcessPathBySocket(LiveConnectionRow row)
+    {
+        if (row == null || row.Pid <= 0) return null;
+        if (_processPathCache.TryGetValue(row.Pid, out var cached)) return cached;
+
+        try
+        {
+            using var proc = Process.GetProcessById(row.Pid);
+            var path = proc.MainModule?.FileName;
+            _processPathCache[row.Pid] = path;
+            return path;
+        }
+        catch
+        {
+            _processPathCache[row.Pid] = null;
+            return null;
+        }
+    }
+
+    private async void OnRowWhitelistClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not LiveConnectionRow row) return;
+            var path = ResolveProcessPathBySocket(row);
+            var target = !string.IsNullOrWhiteSpace(path) ? path : row.ProcessName;
+
+            SetStatus($"Добавление в белый список: {row.ProcessName}...");
+            var ok = await _pipeClient.AddToFirewallWhitelistAsync(target);
+            if (ok)
+            {
+                SetStatus($"Процесс {row.ProcessName} добавлен в белый список.");
+                await LoadWhitelistAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка добавления сокета в белый список: {ex.Message}");
+        }
+    }
+
+    private async void OnRowBlacklistClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not LiveConnectionRow row) return;
+            var path = ResolveProcessPathBySocket(row);
+            var target = !string.IsNullOrWhiteSpace(path) ? path : row.ProcessName;
+
+            SetStatus($"Блокировка процесса {row.ProcessName}...");
+            var ok = await _pipeClient.AddToFirewallBlacklistAsync(target);
+            if (ok)
+            {
+                SetStatus($"Процесс {row.ProcessName} заблокирован.");
+                await LoadBlacklistAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка блокировки процесса: {ex.Message}");
+        }
+    }
+
+    private void OnRowKillProcessClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not LiveConnectionRow row) return;
+            if (row.Pid <= 4)
+            {
+                MessageBox.Show("Нельзя завершить критический системный процесс Windows.", "Защита системы", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                $"Принудительно завершить процесс \"{row.ProcessName}\" (PID: {row.Pid})?",
+                "Завершение процесса",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes) return;
+
+            using var proc = Process.GetProcessById(row.Pid);
+            proc.Kill();
+            SetStatus($"Процесс \"{row.ProcessName}\" (PID: {row.Pid}) успешно завершён.");
+            _ = LoadLiveConnectionsAsync();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка завершения процесса: {ex.Message}");
+        }
+    }
 
     // ===== Статусная строка =====
 

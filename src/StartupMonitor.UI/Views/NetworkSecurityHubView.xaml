@@ -5,6 +5,46 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Background="{ui:ThemeResource ApplicationBackgroundBrush}">
 
+    <UserControl.Resources>
+        <!-- Неоновые кибер-ресурсы и градиенты высокой контрастности -->
+        <SolidColorBrush x:Key="NeonCyanBrush" Color="#00D2D3" />
+        <SolidColorBrush x:Key="NeonEmeraldBrush" Color="#10B981" />
+        <SolidColorBrush x:Key="NeonCrimsonBrush" Color="#EF4444" />
+        <SolidColorBrush x:Key="NeonAmberBrush" Color="#F59E0B" />
+        <SolidColorBrush x:Key="DarkEmeraldBannerBg" Color="#122620" />
+        <SolidColorBrush x:Key="DarkEmeraldBannerBorder" Color="#10B981" />
+        <SolidColorBrush x:Key="DarkCrimsonBannerBg" Color="#2A1215" />
+        <SolidColorBrush x:Key="DarkCrimsonBannerBorder" Color="#EF4444" />
+
+        <Style x:Key="CyberActionMiniBtn" TargetType="Button">
+            <Setter Property="Background" Value="#18FFFFFF" />
+            <Setter Property="BorderBrush" Value="#30FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#3500D2D3" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#00D2D3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -13,7 +53,7 @@
         </Grid.RowDefinitions>
 
         <!-- ===== Верхняя карточка: статус брандмауэра + профили + режим фильтрации ===== -->
-        <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14">
+        <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -258,6 +298,31 @@
 
                                 <!-- Брандмауэр -->
                                 <DataGridTextColumn Header="{Binding NetColFirewall, Source={StaticResource Loc}}" Binding="{Binding FirewallBadge}" Width="110" />
+                            
+                                <!-- Быстрые действия над активным сокетом -->
+                                <DataGridTemplateColumn Header="Действия" Width="140">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <Button Style="{StaticResource CyberActionMiniBtn}"
+                                                        ToolTip="Разрешить (в белый список)"
+                                                        Click="OnRowWhitelistClick">
+                                                    <TextBlock Text="🛡️" FontSize="11" />
+                                                </Button>
+                                                <Button Style="{StaticResource CyberActionMiniBtn}"
+                                                        ToolTip="Заблокировать (в чёрный список)"
+                                                        Click="OnRowBlacklistClick">
+                                                    <TextBlock Text="🚫" FontSize="11" />
+                                                </Button>
+                                                <Button Style="{StaticResource CyberActionMiniBtn}"
+                                                        ToolTip="Завершить процесс"
+                                                        Click="OnRowKillProcessClick">
+                                                    <TextBlock Text="❌" FontSize="11" Foreground="#EF4444" />
+                                                </Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -272,6 +337,159 @@
                                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                                        HorizontalAlignment="Center" Margin="0,4,0,0" />
                         </StackPanel>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+
+            <!-- Вкладка 1: Белый список приложений (Whitelist) -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="14" Foreground="{StaticResource NeonEmeraldBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="Белый список" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Информационный баннер высокой контрастности -->
+                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{StaticResource DarkEmeraldBannerBg}"
+                            BorderBrush="{StaticResource DarkEmeraldBannerBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="🛡️" FontSize="15" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Доверенные приложения (Белый список)" FontSize="13.5" FontWeight="Bold"
+                                               Foreground="#FFFFFF" VerticalAlignment="Center" />
+                                    <Border Margin="10,0,0,0" Background="#10B981" CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="Разрешено всё • 0 алертов" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Приложениям из белого списка разрешен любой сетевой трафик без интерактивных запросов."
+                                           FontSize="11.5" Foreground="#CBD5E1" Margin="23,3,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:TextBox x:Name="TxtSearchWhitelist" Width="180" Margin="0,0,8,0"
+                                            PlaceholderText="Поиск в белом списке..." TextChanged="OnWhitelistSearchChanged" />
+                                <ui:Button Appearance="Primary" Content="➕ Добавить программу..."
+                                           Click="OnAddWhitelistAppClick" Margin="0,0,6,0" />
+                                <ui:Button Appearance="Secondary" Content="🔄" Click="OnRefreshWhitelistClick" ToolTip="Обновить список" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Таблица белого списка -->
+                    <Grid Grid.Row="1">
+                        <DataGrid x:Name="GridWhitelist"
+                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column"
+                                  BorderThickness="1" BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="36">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Программа" Binding="{Binding ProcessName}" FontWeight="SemiBold" Width="180" />
+                                <DataGridTextColumn Header="Статус" Binding="{Binding StatusBadge}" Width="130" />
+                                <DataGridTextColumn Header="Полный путь" Binding="{Binding FullPath}" Width="*" />
+                                <DataGridTextColumn Header="Размер" Binding="{Binding FileSizeDisplay}" Width="90" />
+                                <DataGridTextColumn Header="Изменен" Binding="{Binding DateAddedDisplay}" Width="130" />
+                                <DataGridTemplateColumn Header="Действие" Width="100">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ui:Button Appearance="Danger" Padding="6,2" Content="Удалить"
+                                                       Click="OnRemoveWhitelistAppClick" HorizontalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock x:Name="TxtWhitelistEmpty" Text="Белый список пуст. Нажмите «Добавить программу...»"
+                                   Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка 2: Чёрный список приложений (Blacklist) -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:SymbolIcon Symbol="ShieldDismiss24" FontSize="14" Foreground="{StaticResource NeonCrimsonBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBlock Text="Чёрный список" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Информационный баннер высокой контрастности -->
+                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{StaticResource DarkCrimsonBannerBg}"
+                            BorderBrush="{StaticResource DarkCrimsonBannerBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="🚫" FontSize="15" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Заблокированные приложения (Чёрный список)" FontSize="13.5" FontWeight="Bold"
+                                               Foreground="#FFFFFF" VerticalAlignment="Center" />
+                                    <Border Margin="10,0,0,0" Background="#EF4444" CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="Заблокировано всё • Брандмауэр Windows" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Приложениям из чёрного списка полностью заблокирован сетевой доступ через правила Windows Firewall."
+                                           FontSize="11.5" Foreground="#CBD5E1" Margin="23,3,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:TextBox x:Name="TxtSearchBlacklist" Width="180" Margin="0,0,8,0"
+                                            PlaceholderText="Поиск в чёрном списке..." TextChanged="OnBlacklistSearchChanged" />
+                                <ui:Button Appearance="Danger" Content="➕ Добавить в чёрный список..."
+                                           Click="OnAddBlacklistAppClick" Margin="0,0,6,0" />
+                                <ui:Button Appearance="Secondary" Content="🔄" Click="OnRefreshBlacklistClick" ToolTip="Обновить список" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Таблица чёрного списка -->
+                    <Grid Grid.Row="1">
+                        <DataGrid x:Name="GridBlacklist"
+                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column"
+                                  BorderThickness="1" BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="36">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Программа" Binding="{Binding ProcessName}" FontWeight="SemiBold" Width="180" />
+                                <DataGridTextColumn Header="Статус" Binding="{Binding StatusBadge}" Width="130" />
+                                <DataGridTextColumn Header="Полный путь" Binding="{Binding FullPath}" Width="*" />
+                                <DataGridTextColumn Header="Размер" Binding="{Binding FileSizeDisplay}" Width="90" />
+                                <DataGridTextColumn Header="Изменен" Binding="{Binding DateAddedDisplay}" Width="130" />
+                                <DataGridTemplateColumn Header="Действие" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <ui:Button Appearance="Secondary" Padding="6,2" Content="Разблокировать"
+                                                       Click="OnRemoveBlacklistAppClick" HorizontalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock x:Name="TxtBlacklistEmpty" Text="Чёрный список пуст."
+                                   Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                     </Grid>
                 </Grid>
             </TabItem>
@@ -477,7 +695,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14">
+                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
