@@ -53,9 +53,10 @@ public sealed class NetworkConnectionAlertService : IDisposable
     private readonly ProcessNetworkTracker _tracker;
     private readonly WindowsFirewallService _firewall;
     private readonly JsonDataStore? _store;
-    private readonly HashSet<string> _whitelistedApps = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _blacklistedApps = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<int> _allowedPorts = [];
+    // Потокобезопасные коллекции (ConcurrentDictionary) для исключения гонок потоков и сбоев итерации
+    private readonly ConcurrentDictionary<string, byte> _whitelistedApps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _blacklistedApps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<int, byte> _allowedPorts = new();
 
     // ── Тестовые швы (test seams): в проде null → реальное поведение ──
 
@@ -134,17 +135,21 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 foreach (var app in cfg.Settings.FirewallWhitelistedApps)
                 {
                     if (!string.IsNullOrWhiteSpace(app))
-                        _whitelistedApps.Add(app.Trim());
+                        _whitelistedApps.TryAdd(app.Trim(), 0);
                 }
                 foreach (var app in cfg.Settings.FirewallBlacklistedApps)
                 {
                     if (!string.IsNullOrWhiteSpace(app))
-                        _blacklistedApps.Add(app.Trim());
+                    {
+                        // Приоритет Blacklist > Whitelist: удаляем из белого списка при загрузке чёрного
+                        _whitelistedApps.TryRemove(app.Trim(), out _);
+                        _blacklistedApps.TryAdd(app.Trim(), 0);
+                    }
                 }
                 foreach (var p in cfg.Settings.FirewallAllowedPorts)
                 {
                     if (p > 0)
-                        _allowedPorts.Add(p);
+                        _allowedPorts.TryAdd(p, 0);
                 }
             }
             catch (Exception ex)
@@ -279,12 +284,12 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 var processName = (socket.ProcessName ?? string.Empty).Trim();
                 var processPath = ResolveProcessPath(socket.ProcessId, processName);
 
-                // 1.1 Пропускаем программы из белого списка (любые соединения разрешены без алертов)
-                if (IsWhitelistedApp(processPath, processName))
+                // 1.1 Абсолютный приоритет: Пропускаем программы из чёрного списка (соединения заблокированы, алерты подавлены)
+                if (IsBlacklistedApp(processPath, processName))
                     continue;
 
-                // 1.2 Пропускаем программы из чёрного списка (соединения заблокированы, алерты подавлены)
-                if (IsBlacklistedApp(processPath, processName))
+                // 1.2 Пропускаем программы из белого списка (только если приложение отсутствует в чёрном списке)
+                if (IsWhitelistedApp(processPath, processName))
                     continue;
 
                 // 2. Игнорируем доверенные системные процессы.
@@ -389,9 +394,14 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 var whiteAppKey = !string.IsNullOrWhiteSpace(path) ? path : name;
                 if (!string.IsNullOrWhiteSpace(whiteAppKey))
                 {
-                    _whitelistedApps.Add(whiteAppKey);
+                    // Взаимное исключение: при добавлении в белый список очищаем из чёрного
+                    _blacklistedApps.TryRemove(whiteAppKey, out _);
+                    _whitelistedApps.TryAdd(whiteAppKey, 0);
                     if (!string.IsNullOrWhiteSpace(name))
-                        _whitelistedApps.Add(name);
+                    {
+                        _blacklistedApps.TryRemove(name, out _);
+                        _whitelistedApps.TryAdd(name, 0);
+                    }
 
                     if (!string.IsNullOrWhiteSpace(path))
                     {
@@ -420,9 +430,14 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 var blackAppKey = !string.IsNullOrWhiteSpace(path) ? path : name;
                 if (!string.IsNullOrWhiteSpace(blackAppKey))
                 {
-                    _blacklistedApps.Add(blackAppKey);
+                    // Абсолютный приоритет: при добавлении в чёрный список гарантированно вычищаем из белого
+                    _whitelistedApps.TryRemove(blackAppKey, out _);
+                    _blacklistedApps.TryAdd(blackAppKey, 0);
                     if (!string.IsNullOrWhiteSpace(name))
-                        _blacklistedApps.Add(name);
+                    {
+                        _whitelistedApps.TryRemove(name, out _);
+                        _blacklistedApps.TryAdd(name, 0);
+                    }
 
                     if (!string.IsNullOrWhiteSpace(path))
                     {
@@ -451,7 +466,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 var targetPort = request.RemotePort > 0 ? request.RemotePort : alert.RemotePort;
                 if (targetPort > 0)
                 {
-                    _allowedPorts.Add(targetPort);
+                    _allowedPorts.TryAdd(targetPort, 0);
                     if (_store != null)
                     {
                         try
@@ -497,9 +512,13 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Проверяет, находится ли программа в постоянном белом списке (любые соединения разрешены).</summary>
     public bool IsWhitelistedApp(string? processPath, string? processName)
     {
-        if (!string.IsNullOrWhiteSpace(processPath) && _whitelistedApps.Contains(processPath.Trim()))
+        // Абсолютный приоритет: если приложение есть в чёрном списке — белый список игнорируется
+        if (IsBlacklistedApp(processPath, processName))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(processPath) && _whitelistedApps.ContainsKey(processPath.Trim()))
             return true;
-        if (!string.IsNullOrWhiteSpace(processName) && _whitelistedApps.Contains(processName.Trim()))
+        if (!string.IsNullOrWhiteSpace(processName) && _whitelistedApps.ContainsKey(processName.Trim()))
             return true;
         return false;
     }
@@ -507,15 +526,15 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Проверяет, находится ли программа в постоянном чёрном списке (любые соединения запрещены).</summary>
     public bool IsBlacklistedApp(string? processPath, string? processName)
     {
-        if (!string.IsNullOrWhiteSpace(processPath) && _blacklistedApps.Contains(processPath.Trim()))
+        if (!string.IsNullOrWhiteSpace(processPath) && _blacklistedApps.ContainsKey(processPath.Trim()))
             return true;
-        if (!string.IsNullOrWhiteSpace(processName) && _blacklistedApps.Contains(processName.Trim()))
+        if (!string.IsNullOrWhiteSpace(processName) && _blacklistedApps.ContainsKey(processName.Trim()))
             return true;
         return false;
     }
 
     /// <summary>Проверяет, разрешен ли порт пользователем для подавления повторных всплывающих алертов.</summary>
-    public bool IsPortAllowed(int port) => port > 0 && _allowedPorts.Contains(port);
+    public bool IsPortAllowed(int port) => port > 0 && _allowedPorts.ContainsKey(port);
 
     /// <summary>Проверяет, является ли процесс доверенным системным (алерты не создаются никогда).</summary>
     public static bool IsTrustedProcess(string? processName, string? processPath)

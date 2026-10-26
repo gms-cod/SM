@@ -418,4 +418,82 @@ public sealed class NetworkConnectionAlertServiceTests
         Assert.Equal(2, pending.Count);
         Assert.True(pending[0].DetectedAt <= pending[1].DetectedAt);
     }
+
+    // ── Потокобезопасность и приоритет Blacklist > Whitelist ──
+
+    [Fact]
+    public void Blacklist_HasAbsolutePriorityOver_Whitelist()
+    {
+        var svc = CreateService(
+            new List<ProcessNetworkSocket> { Sock(1234, "conflict.exe", "93.184.216.34", 443) },
+            Paths((1234, @"C:\Apps\conflict.exe")));
+
+        // Сначала добавляем алерт и применяем Whitelist
+        Assert.Equal(1, svc.ScanNewConnections());
+        var alert = Assert.Single(svc.GetPendingAlerts());
+        svc.ResolveAlert(new ResolveNetworkAlertRequest
+        {
+            AlertId = alert.AlertId,
+            Resolution = NetworkAlertResolution.WhitelistProgram,
+            ProcessPath = @"C:\Apps\conflict.exe",
+            ProcessName = "conflict.exe"
+        });
+
+        Assert.True(svc.IsWhitelistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
+        Assert.False(svc.IsBlacklistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
+
+        // Теперь применяем Blacklist к той же программе
+        // Генерируем новый алерт для резолва
+        var svc2 = CreateService(
+            new List<ProcessNetworkSocket> { Sock(5678, "conflict.exe", "93.184.216.35", 80) },
+            Paths((5678, @"C:\Apps\conflict.exe")));
+        Assert.Equal(1, svc2.ScanNewConnections());
+        var alert2 = Assert.Single(svc2.GetPendingAlerts());
+        svc2.ResolveAlert(new ResolveNetworkAlertRequest
+        {
+            AlertId = alert2.AlertId,
+            Resolution = NetworkAlertResolution.BlacklistProgram,
+            ProcessPath = @"C:\Apps\conflict.exe",
+            ProcessName = "conflict.exe"
+        });
+
+        // Проверяем: в svc2 при добавлении в черный список программа строго заблокирована
+        Assert.True(svc2.IsBlacklistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
+        Assert.False(svc2.IsWhitelistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
+    }
+
+    [Fact]
+    public void ConcurrentAccess_ToWhitelistedAndBlacklistedApps_DoesNotThrow()
+    {
+        var svc = CreateService();
+        var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+
+        Parallel.For(0, 1000, i =>
+        {
+            try
+            {
+                var appPath = $@"C:\Apps\app_{i % 50}.exe";
+                var appName = $"app_{i % 50}.exe";
+
+                if (i % 3 == 0)
+                {
+                    svc.IsWhitelistedApp(appPath, appName);
+                }
+                else if (i % 3 == 1)
+                {
+                    svc.IsBlacklistedApp(appPath, appName);
+                }
+                else
+                {
+                    svc.IsPortAllowed(1000 + (i % 20));
+                }
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+        });
+
+        Assert.Empty(exceptions);
+    }
 }

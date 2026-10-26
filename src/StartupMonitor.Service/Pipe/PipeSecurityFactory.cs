@@ -22,6 +22,9 @@ internal static class PipeSecurityFactory
     {
         var security = new PipeSecurity();
 
+        // Отключаем наследование правил доступа от родительских контейнеров ядра
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+
         // SYSTEM — полный контроль (хост-процесс службы)
         security.AddAccessRule(new PipeAccessRule(
             new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null),
