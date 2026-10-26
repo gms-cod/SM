@@ -1,4 +1,4 @@
-; =====================================================================
+﻿; =====================================================================
 ; Inno Setup Script for Startup Monitor
 ; =====================================================================
 
@@ -35,12 +35,11 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=commandline
+ShowLanguageDialog=auto
 ; Закрытие запущенных процессов StartupMonitor*.exe перед установкой (через Restart Manager)
 CloseApplications=yes
 CloseApplicationsFilter=StartupMonitor*.exe
 ; Попытка автоматического перезапуска приложений, закрытых инсталлятором, после установки.
-; Работает только для приложений, зарегистрированных в Restart Manager; для UI служит
-; резервный механизм watchdog (см. GitHubUpdateService.InstallUpdate и UpdateAvailableWindow).
 RestartApplications=yes
 UsedUserAreasWarning=no
 
@@ -48,9 +47,29 @@ UsedUserAreasWarning=no
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+russian.AutoStartTask=Запускать Startup Monitor при входе в систему (рекомендуется)
+english.AutoStartTask=Launch Startup Monitor at Windows startup (recommended)
+russian.AutoStartGroup=Параметры запуска:
+english.AutoStartGroup=Startup options:
+russian.CreateDesktopIcon=Создать ярлык на Рабочем столе
+english.CreateDesktopIcon=Create a desktop shortcut
+russian.AdditionalIcons=Дополнительные значки:
+english.AdditionalIcons=Additional shortcuts:
+russian.UninstallProgram=Удалить {#MyAppName}
+english.UninstallProgram=Uninstall {#MyAppName}
+russian.RegisterService=Регистрация службы Startup Monitor...
+english.RegisterService=Registering Startup Monitor Service...
+russian.ServiceDescription=Мониторинг автозагрузки Windows в реальном времени и защита от нежелательных программ.
+english.ServiceDescription=Real-time Windows startup monitoring and security protection.
+russian.StartService=Запуск службы Startup Monitor...
+english.StartService=Starting Startup Monitor Service...
+russian.LaunchApp=Запустить Startup Monitor сейчас
+english.LaunchApp=Launch Startup Monitor now
+
 [Tasks]
-Name: "autostart"; Description: "Запускать монитор при входе в систему (рекомендуется)"; GroupDescription: "Параметры запуска:"
-Name: "desktopicon"; Description: "Создать ярлык на Рабочем столе"; GroupDescription: "Дополнительные значки:"; Flags: unchecked
+Name: "autostart"; Description: "{cm:AutoStartTask}"; GroupDescription: "{cm:AutoStartGroup}"
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "..\SMon2\StartupMonitor.Service.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
@@ -60,7 +79,7 @@ Source: "..\SMon2\icon.svg"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"
-Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"
+Name: "{group}\{cm:UninstallProgram}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"; Tasks: desktopicon
 
 [Registry]
@@ -80,20 +99,14 @@ Type: files; Name: "{commonstartup}\{#MyAppName}.lnk"
 
 [Run]
 ; Создание или обновление службы Windows
-Filename: "sc.exe"; Parameters: "create {#MyServiceName} binPath= """"{app}\{#MyServiceExeName}"""" start= auto DisplayName= """"Startup Monitor Service"""""; Flags: runhidden; StatusMsg: "Регистрация службы Startup Monitor..."
+Filename: "sc.exe"; Parameters: "create {#MyServiceName} binPath= """"{app}\{#MyServiceExeName}"""" start= auto DisplayName= """"Startup Monitor Service"""""; Flags: runhidden; StatusMsg: "{cm:RegisterService}"
 Filename: "sc.exe"; Parameters: "config {#MyServiceName} binPath= """"{app}\{#MyServiceExeName}"""" start= auto DisplayName= """"Startup Monitor Service"""""; Flags: runhidden
-Filename: "sc.exe"; Parameters: "description {#MyServiceName} """"Мониторинг автозагрузки Windows в реальном времени и защита от нежелательных программ."""""; Flags: runhidden
+Filename: "sc.exe"; Parameters: "description {#MyServiceName} """"{cm:ServiceDescription}"""""; Flags: runhidden
 Filename: "sc.exe"; Parameters: "failure {#MyServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/60000"; Flags: runhidden
-; Запуск службы после установки/обновления (важно при тихой установке, т.к. служба могла быть
-; остановлена/убита инсталлятором через CloseApplications). Выполняется в контексте установщика (admin).
-Filename: "sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden; StatusMsg: "Запуск службы Startup Monitor..."
-; Опциональный запуск UI для пользователя при интерактивной установке.
-; runasoriginaluser — запуск в контексте пользователя, запустившего установщик (не admin),
-; чтобы окно появилось на его рабочем столе, а не в Session 0.
-; ВАЖНО: при тихой установке (/SILENT, /VERYSILENT) записи с флагом postinstall НЕ выполняются
-; (финальный экран не показывается), поэтому перезапуск UI при автообновлении обеспечивается
-; службой через UserSessionLauncher (watchdog в пользовательской сессии).
-Filename: "{app}\{#MyAppExeName}"; Description: "Запустить Startup Monitor сейчас"; Flags: nowait postinstall skipifsilent runasoriginaluser
+; Запуск службы после установки/обновления
+Filename: "sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden; StatusMsg: "{cm:StartService}"
+; Опциональный запуск UI для пользователя при интерактивной установке
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
 ; Остановка и удаление службы при удалении программы
