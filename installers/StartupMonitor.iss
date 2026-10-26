@@ -3,7 +3,7 @@
 ; =====================================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.9.7"
+  #define MyAppVersion "2.0.0"
 #endif
 
 #define MyAppName "Startup Monitor"
