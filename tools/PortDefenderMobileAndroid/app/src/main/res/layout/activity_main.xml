@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Шапка приложения -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/card_bg"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <ImageView
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_shield_bolt"
+                android:contentDescription="Icon"
+                android:layout_marginEnd="12dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/header_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/header_subtitle"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Бейдж обнаружения бана -->
+            <TextView
+                android:id="@+id/badgeBanDetected"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ban_detected"
+                android:textColor="@color/status_red"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:background="#26EF4444"
+                android:padding="6dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Выбор режима -->
+        <RadioGroup
+            android:id="@+id/rgMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="10dp">
+
+            <RadioButton
+                android:id="@+id/rbStress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_stress"
+                android:textColor="@color/text_primary"
+                android:checked="true"
+                android:textSize="12sp"
+                android:layout_marginEnd="8dp" />
+
+            <RadioButton
+                android:id="@+id/rbSweep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_sweep"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:layout_marginEnd="8dp" />
+
+            <RadioButton
+                android:id="@+id/rbProbe"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mode_probe"
+                android:textColor="@color/accent_cyan"
+                android:textSize="12sp" />
+        </RadioGroup>
+
+        <!-- Поля параметров -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/card_bg"
+            android:padding="12dp"
+            android:layout_marginBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <Spinner
+                    android:id="@+id/spnProtocol"
+                    android:layout_width="90dp"
+                    android:layout_height="44dp"
+                    android:background="@color/bg_dark"
+                    android:layout_marginEnd="8dp" />
+
+                <EditText
+                    android:id="@+id/edtIp"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:hint="@string/target_ip"
+                    android:text="192.168.1.100"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:background="@color/bg_dark"
+                    android:padding="8dp"
+                    android:inputType="textUri"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <EditText
+                    android:id="@+id/edtPort"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:hint="@string/target_port"
+                    android:text="445"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:background="@color/bg_dark"
+                    android:padding="8dp"
+                    android:inputType="text"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="6dp" />
+
+                <EditText
+                    android:id="@+id/edtRate"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:hint="@string/rate_sec"
+                    android:text="10"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:background="@color/bg_dark"
+                    android:padding="8dp"
+                    android:inputType="number"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="6dp" />
+
+                <EditText
+                    android:id="@+id/edtTotal"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:hint="@string/total_attempts"
+                    android:text="100"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:background="@color/bg_dark"
+                    android:padding="8dp"
+                    android:inputType="number"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- Быстрые пресеты портов -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnPresetSmb"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="SMB 445"
+                        android:textSize="11sp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetRdp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="RDP 3389"
+                        android:textSize="11sp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetRpc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="RPC 135"
+                        android:textSize="11sp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetHttp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="HTTP 80"
+                        android:textSize="11sp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetDns"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="DNS 53"
+                        android:textSize="11sp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btnPresetWan"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="WAN 1.1.1.1"
+                        android:textSize="11sp"
+                        android:textColor="@color/accent_cyan" />
+                </LinearLayout>
+            </HorizontalScrollView>
+
+            <!-- Расчётное время -->
+            <TextView
+                android:id="@+id/txtCalculatedDuration"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Расчётное время: 10.0 сек (100 попыток при 10 поп/сек)"
+                android:textColor="@color/accent_cyan"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:background="#1000D2D3"
+                android:padding="8dp" />
+        </LinearLayout>
+
+        <!-- Кнопки управления -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <Button
+                android:id="@+id/btnStart"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1.2"
+                android:text="@string/btn_start"
+                android:backgroundTint="@color/accent_cyan"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnStop"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="@string/btn_stop"
+                android:backgroundTint="@color/status_red"
+                android:textColor="#FFFFFF"
+                android:enabled="false"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnExport"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="0.9"
+                android:text="💾 Отчёт"
+                android:backgroundTint="@color/card_border"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Прогресс и статистика -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="@color/accent_cyan"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@color/card_bg"
+            android:padding="10dp"
+            android:layout_marginBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Отправлено" android:textSize="10sp" android:textColor="@color/text_secondary" />
+                <TextView android:id="@+id/txtCountProgress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 / 100" android:textStyle="bold" android:textColor="@color/text_primary" android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Открыт" android:textSize="10sp" android:textColor="@color/text_secondary" />
+                <TextView android:id="@+id/txtCountSuccess" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textColor="@color/status_green" android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Отказ" android:textSize="10sp" android:textColor="@color/text_secondary" />
+                <TextView android:id="@+id/txtCountRefused" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textColor="@color/status_amber" android:textSize="13sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Drop / Бан" android:textSize="10sp" android:textColor="@color/text_secondary" />
+                <TextView android:id="@+id/txtCountTimeout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textColor="@color/status_red" android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Журнал сокетов -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Журнал сетевых испытаний:"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/txtLog"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:background="#101114"
+            android:textColor="@color/text_secondary"
+            android:fontFamily="monospace"
+            android:textSize="10.5sp"
+            android:padding="8dp"
+            android:scrollbars="vertical" />
+    </LinearLayout>
+</ScrollView>

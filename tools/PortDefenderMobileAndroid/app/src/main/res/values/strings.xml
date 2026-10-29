@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Port Defender Tester Mobile</string>
+    <string name="header_title">Стенд Port Defender &amp; Firewall</string>
+    <string name="header_subtitle">Мобильный генератор испытаний сети и атак</string>
+    <string name="ban_detected">🚨 БАН ОБНАРУЖЕН!</string>
+    <string name="mode_stress">Штурм (Stress)</string>
+    <string name="mode_sweep">Скан (Sweep)</string>
+    <string name="mode_probe">Алерт (Probe)</string>
+    <string name="target_ip">IP-адрес цели</string>
+    <string name="target_port">Порт(ы)</string>
+    <string name="rate_sec">Попыток / сек</string>
+    <string name="total_attempts">Всего попыток</string>
+    <string name="btn_start">🚀 Запустить тест</string>
+    <string name="btn_stop">⏹ Остановить</string>
+    <string name="btn_export">💾 Экспорт отчёта</string>
+    <string name="status_ready">Готов к запуску</string>
+</resources>

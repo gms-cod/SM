@@ -13,6 +13,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{E8913875
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StartupMonitor.Tests", "tests\StartupMonitor.Tests\StartupMonitor.Tests.csproj", "{AF267D59-9A6B-4E7A-B9EF-C0D9A45E9C47}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{D4AF8E4F-603B-4CF0-937B-DD82C0D30C27}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PortDefenderTester", "tools\PortDefenderTester\PortDefenderTester.csproj", "{019A53E0-3B90-4DC7-83D6-D1BB79069B90}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,8 +39,13 @@ Global
 		{AF267D59-9A6B-4E7A-B9EF-C0D9A45E9C47}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AF267D59-9A6B-4E7A-B9EF-C0D9A45E9C47}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AF267D59-9A6B-4E7A-B9EF-C0D9A45E9C47}.Release|Any CPU.Build.0 = Release|Any CPU
+		{019A53E0-3B90-4DC7-83D6-D1BB79069B90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{019A53E0-3B90-4DC7-83D6-D1BB79069B90}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{019A53E0-3B90-4DC7-83D6-D1BB79069B90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{019A53E0-3B90-4DC7-83D6-D1BB79069B90}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{AF267D59-9A6B-4E7A-B9EF-C0D9A45E9C47} = {E8913875-11B7-42AF-B4CF-467BCC2FE202}
+		{019A53E0-3B90-4DC7-83D6-D1BB79069B90} = {D4AF8E4F-603B-4CF0-937B-DD82C0D30C27}
 	EndGlobalSection
 EndGlobal
