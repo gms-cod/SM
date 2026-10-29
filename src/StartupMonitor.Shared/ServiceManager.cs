@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.ServiceProcess;
 
@@ -150,22 +150,31 @@ public static class ServiceManager
         if (!File.Exists(status.ExpectedPath))
             throw new FileNotFoundException($"Исполняемый файл службы не найден: {status.ExpectedPath}", status.ExpectedPath);
 
-        // 1. Если служба не установлена или путь устарел — регистрируем заново с start=auto
+        // 1. Если служба не установлена или путь устарел — настраиваем или создаем с start=auto
         if (!status.IsInstalled || !status.IsPathCorrect)
         {
-            if (!status.IsInstalled)
-                reportProgress?.Invoke("Служба не зарегистрирована. Регистрация в автозапуск Windows...");
-            else
-                reportProgress?.Invoke("Путь к службе устарел. Перерегистрация службы в автозапуск...");
-
             if (status.IsInstalled)
             {
-                try { await RunScElevated($"delete \"{ServiceName}\""); } catch { }
-                await Task.Delay(1000);
+                // Служба уже зарегистрирована в SCM, но путь изменился — обновляем конфигурацию атомарно без sc delete!
+                reportProgress?.Invoke("Обновление пути к службе в реестре Windows...");
+                await RunScElevated($"config \"{ServiceName}\" binPath=\"\\\"{status.ExpectedPath}\\\" --windows-service\" start=auto");
             }
-
-            // Создаем службу с автозапуском
-            await RunScElevated($"create \"{ServiceName}\" binPath=\"\\\"{status.ExpectedPath}\\\" --windows-service\" start=auto");
+            else
+            {
+                // Служба не зарегистрирована — создаем её с автозапуском
+                reportProgress?.Invoke("Служба не зарегистрирована. Регистрация в автозапуск Windows...");
+                try
+                {
+                    await RunScElevated($"create \"{ServiceName}\" binPath=\"\\\"{status.ExpectedPath}\\\" --windows-service\" start=auto");
+                }
+                catch (Exception ex) when (ex.Message.Contains("1072"))
+                {
+                    // 1072 = ERROR_SERVICE_MARKED_FOR_DELETE: служба ожидает закрытия дескрипторов после удаления
+                    try { Process.GetProcessesByName("StartupMonitor.Service").ToList().ForEach(p => p.Kill()); } catch { }
+                    await Task.Delay(2000);
+                    await RunScElevated($"create \"{ServiceName}\" binPath=\"\\\"{status.ExpectedPath}\\\" --windows-service\" start=auto");
+                }
+            }
 
             // Настройка перезапуска при сбоях
             await RunScElevated($"failure \"{ServiceName}\" reset=86400 actions=restart/5000/restart/10000/restart/30000", checkExitCode: false);
