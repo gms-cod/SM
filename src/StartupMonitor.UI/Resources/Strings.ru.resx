@@ -1797,6 +1797,12 @@
   <data name="NetConnectionsSummaryFormat" xml:space="preserve">
     <value>Соединений: {0} • WAN: {1} • Процессов: {2}</value>
   </data>
+  <data name="NetRulesTabHeader" xml:space="preserve">
+    <value>Правила</value>
+  </data>
+  <data name="NetAttackLogTabHeader" xml:space="preserve">
+    <value>Журнал атак</value>
+  </data>
   <data name="NetTabFirewallRules" xml:space="preserve">
     <value>Правила брандмауэра</value>
   </data>

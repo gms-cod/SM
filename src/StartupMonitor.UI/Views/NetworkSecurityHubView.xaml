@@ -187,11 +187,6 @@
                            Icon="{ui:SymbolIcon History24}" Margin="0,0,6,0"
                            Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
                            Click="OnTabNavClick" Tag="6" ToolTip="История всех попыток сетевых подключений программ" />
-
-                <ui:Button x:Name="BtnOpenHistoryWindow" Content="Окно истории"
-                           Icon="{ui:SymbolIcon WindowNew24}" Margin="0,0,6,0"
-                           Appearance="Secondary"
-                           Click="OnOpenHistoryWindowClick" ToolTip="Открыть историю подключений в отдельном окне" />
             </WrapPanel>
         </Border>
 
@@ -436,7 +431,7 @@
                                             PlaceholderText="Поиск в белом списке..." TextChanged="OnWhitelistSearchChanged" />
                                 <ui:Button Appearance="Primary" Content="➕ Добавить программу..."
                                            Click="OnAddWhitelistAppClick" Margin="0,0,6,0" />
-                                <ui:Button Appearance="Secondary" Content="🔄" Click="OnRefreshWhitelistClick" ToolTip="Обновить список" />
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" Click="OnRefreshWhitelistClick" ToolTip="Обновить белый список" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -512,7 +507,7 @@
                                             PlaceholderText="Поиск в чёрном списке..." TextChanged="OnBlacklistSearchChanged" />
                                 <ui:Button Appearance="Danger" Content="➕ Добавить в чёрный список..."
                                            Click="OnAddBlacklistAppClick" Margin="0,0,6,0" />
-                                <ui:Button Appearance="Secondary" Content="🔄" Click="OnRefreshBlacklistClick" ToolTip="Обновить список" />
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" Click="OnRefreshBlacklistClick" ToolTip="Обновить чёрный список" />
                             </StackPanel>
                         </Grid>
                     </Border>

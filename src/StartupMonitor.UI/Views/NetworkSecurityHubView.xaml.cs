@@ -2311,23 +2311,6 @@ public partial class NetworkSecurityHubView : UserControl
 
     private List<NetworkConnectionHistoryItem> _hubHistoryAll = new();
 
-    /// <summary>Открывает отдельное окно истории сетевых подключений.</summary>
-    private void OnOpenHistoryWindowClick(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var win = new Dialogs.ConnectionHistoryWindow(_pipeClient)
-            {
-                Owner = Window.GetWindow(this)
-            };
-            win.Show();
-        }
-        catch (Exception ex)
-        {
-            SetStatus($"Ошибка открытия окна истории: {ex.Message}");
-        }
-    }
-
     /// <summary>Загружает историю сетевых подключений для встроенной вкладки.</summary>
     private async Task LoadHubHistoryAsync()
     {

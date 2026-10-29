@@ -1075,6 +1075,10 @@ public class LocalizationService : INotifyPropertyChanged
     public string NetPresetPublicWifi => this["NetPresetPublicWifi"];
     /// <summary>Локализованная строка «NetPresetReset».</summary>
     public string NetPresetReset => this["NetPresetReset"];
+    /// <summary>Заголовок вкладки «Правила» сетевого экрана.</summary>
+    public string NetRulesTabHeader => this["NetRulesTabHeader"];
+    /// <summary>Заголовок вкладки «Журнал атак» сетевого экрана.</summary>
+    public string NetAttackLogTabHeader => this["NetAttackLogTabHeader"];
     /// <summary>Локализованная строка «NetBtnRefreshRules».</summary>
     public string NetBtnRefreshRules => this["NetBtnRefreshRules"];
     /// <summary>Локализованная строка «NetBtnAntiTelemetry».</summary>

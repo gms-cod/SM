@@ -1797,6 +1797,12 @@ Do you really want to proceed?</value>
   <data name="NetConnectionsSummaryFormat" xml:space="preserve">
     <value>Connections: {0} • WAN: {1} • Processes: {2}</value>
   </data>
+  <data name="NetRulesTabHeader" xml:space="preserve">
+    <value>Rules</value>
+  </data>
+  <data name="NetAttackLogTabHeader" xml:space="preserve">
+    <value>Attack Log</value>
+  </data>
   <data name="NetTabFirewallRules" xml:space="preserve">
     <value>Firewall Rules</value>
   </data>

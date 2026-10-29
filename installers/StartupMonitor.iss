@@ -3,7 +3,7 @@
 ; =====================================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.0"
+  #define MyAppVersion "2.0.1"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -36,11 +36,10 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=commandline
 ShowLanguageDialog=auto
-; Закрытие запущенных процессов StartupMonitor*.exe перед установкой (через Restart Manager)
-CloseApplications=yes
-CloseApplicationsFilter=StartupMonitor*.exe
-; Попытка автоматического перезапуска приложений, закрытых инсталлятором, после установки.
-RestartApplications=yes
+; Принудительное закрытие всех блокирующих процессов StartupMonitor перед установкой
+CloseApplications=force
+CloseApplicationsFilter=*StartupMonitor*.exe
+RestartApplications=no
 UsedUserAreasWarning=no
 
 [Languages]
@@ -112,35 +111,62 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait 
 ; Остановка и удаление службы при удалении программы
 Filename: "sc.exe"; Parameters: "stop {#MyServiceName}"; Flags: runhidden; RunOnceId: "StopService"
 Filename: "sc.exe"; Parameters: "delete {#MyServiceName}"; Flags: runhidden; RunOnceId: "DeleteService"
-Filename: "taskkill.exe"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "KillUI"
+Filename: "taskkill.exe"; Parameters: "/F /T /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "KillUI"
+Filename: "taskkill.exe"; Parameters: "/F /IM {#MyServiceExeName}"; Flags: runhidden; RunOnceId: "KillService"
 
 [Code]
-// Функция завершения службы и процессов перед установкой или обновлением
-function PrepareForInstall(): Boolean;
+// Функция гарантированной остановки службы и всех блокирующих процессов
+procedure StopStartupMonitorProcessesAndService();
 var
   ResultCode: Integer;
 begin
-  Result := True;
-  // Останавливаем службу, если она есть
+  // 1. Остановка системной службы Windows
   Exec('sc.exe', 'stop {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  // Принудительно завершаем процессы, если они запущены
-  Exec('taskkill.exe', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // 2. Принудительное завершение всех процессов UI и службы со всеми дочерними процессами
+  Exec('taskkill.exe', '/F /T /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('taskkill.exe', '/F /IM {#MyServiceExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(500);
+  Exec('taskkill.exe', '/F /FI "IMAGENAME eq StartupMonitor*"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  // 3. Пауза для детерминированного закрытия файловых дескрипторов
+  Sleep(750);
 end;
 
+// Вызывается при запуске инсталлятора
 function InitializeSetup(): Boolean;
 begin
-  Result := PrepareForInstall();
+  StopStartupMonitorProcessesAndService();
+  Result := True;
 end;
 
-function InitializeUninstall(): Boolean;
-var
-  ResultCode: Integer;
+// Вызывается непосредственно перед установкой файлов (когда пользователь нажал "Установить")
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  Exec('sc.exe', 'stop {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM {#MyServiceExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(500);
+  StopStartupMonitorProcessesAndService();
+  Result := '';
+end;
+
+// Вызывается на этапе фактического копирования файлов
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
+  begin
+    StopStartupMonitorProcessesAndService();
+  end;
+end;
+
+// Вызывается при запуске деинсталлятора
+function InitializeUninstall(): Boolean;
+begin
+  StopStartupMonitorProcessesAndService();
   Result := True;
+end;
+
+// Вызывается при фактическом удалении файлов
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    StopStartupMonitorProcessesAndService();
+  end;
 end;
