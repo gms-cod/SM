@@ -1,0 +1,305 @@
+<Window x:Class="PortDefenderTester.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Сетевой стенд тестирования Port Defender &amp; Firewall"
+        Width="780" Height="730" MinWidth="740" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        Background="#16171A" Foreground="#EDEDED"
+        FontFamily="Segoe UI">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#00D2D3" />
+        <SolidColorBrush x:Key="CardBgBrush" Color="#202227" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="#31353F" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#10B981" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#EF4444" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#F59E0B" />
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#1A1C20" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#414652" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="0" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#00D2D3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="#1A1C20" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#414652" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#2D313A" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PresetBtnStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#18FFFFFF" />
+            <Setter Property="BorderBrush" Value="#35FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Шапка -->
+        <Border Grid.Row="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Width="42" Height="42" CornerRadius="8" Background="#1A00D2D3"
+                        Margin="0,0,12,0" VerticalAlignment="Center">
+                    <TextBlock Text="🛡️" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="Стенд проверки устойчивости Port Defender &amp; Firewall" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" />
+                    <TextBlock Text="Стресс-тесты порогов обнаружения атак, сканирования портов и валидация интерактивных алертов" FontSize="11.5" Foreground="#94A3B8" Margin="0,2,0,0" />
+                </StackPanel>
+                <!-- Индикатор детекции блокировки/бана -->
+                <Border x:Name="BadgeBanDetected" Grid.Column="2" Background="#26EF4444" BorderBrush="#EF4444"
+                        BorderThickness="1" CornerRadius="6" Padding="10,5" Visibility="Collapsed" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🚨" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="БАН ОБНАРУЖЕН!" FontSize="11.5" FontWeight="Bold" Foreground="#EF4444" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Параметры и режимы -->
+        <Border Grid.Row="1" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,10">
+            <StackPanel>
+                <!-- Выбор режима тестирования -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Режим испытания:" FontSize="12" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <RadioButton x:Name="RbModeStress" Content="Штурм порта (Stress)" IsChecked="True" Checked="OnModeChanged" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <RadioButton x:Name="RbModeScan" Content="Сканирование портов (Sweep)" Checked="OnModeChanged" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,16,0" />
+                        <RadioButton x:Name="RbModeAlert" Content="Проверка алерта (Probe)" Checked="OnModeChanged" Foreground="#00D2D3" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Сетка параметров -->
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="1.4*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                        <TextBlock Text="Протокол:" FontSize="11" Foreground="#94A3B8" Margin="0,0,0,4" />
+                        <ComboBox x:Name="CmbProtocol" SelectionChanged="OnProtocolChanged">
+                            <ComboBoxItem Content="TCP" IsSelected="True" />
+                            <ComboBoxItem Content="UDP" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                        <TextBlock Text="IP-адрес цели:" FontSize="11" Foreground="#94A3B8" Margin="0,0,0,4" />
+                        <TextBox x:Name="TxtIp" Text="127.0.0.1" TextChanged="OnParametersChanged" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Margin="0,0,8,0">
+                        <TextBlock x:Name="LblPort" Text="Порт (цель):" FontSize="11" Foreground="#94A3B8" Margin="0,0,0,4" />
+                        <TextBox x:Name="TxtPort" Text="445" TextChanged="OnParametersChanged" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" Margin="0,0,8,0">
+                        <TextBlock Text="Попыток / сек:" FontSize="11" Foreground="#94A3B8" Margin="0,0,0,4" />
+                        <TextBox x:Name="TxtRate" Text="10" TextChanged="OnParametersChanged" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Всего попыток:" FontSize="11" Foreground="#94A3B8" Margin="0,0,0,4" />
+                        <TextBox x:Name="TxtTotal" Text="100" TextChanged="OnParametersChanged" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Быстрые пресеты портов -->
+                <StackPanel Orientation="Horizontal" Margin="0,2,0,8" VerticalAlignment="Center">
+                    <TextBlock Text="Пресеты портов:" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource PresetBtnStyle}" Content="SMB (445)" Click="OnPresetPortClick" Tag="445" />
+                    <Button Style="{StaticResource PresetBtnStyle}" Content="RDP (3389)" Click="OnPresetPortClick" Tag="3389" />
+                    <Button Style="{StaticResource PresetBtnStyle}" Content="RPC (135)" Click="OnPresetPortClick" Tag="135" />
+                    <Button Style="{StaticResource PresetBtnStyle}" Content="HTTP (80)" Click="OnPresetPortClick" Tag="80" />
+                    <Button Style="{StaticResource PresetBtnStyle}" Content="DNS UDP (53)" Click="OnPresetDnsUdpClick" />
+                    <Button Style="{StaticResource PresetBtnStyle}" Content="WAN Alert (1.1.1.1)" Click="OnPresetWanAlertClick" Foreground="#00D2D3" />
+                </StackPanel>
+
+                <!-- Индикатор расчетного времени -->
+                <Border Padding="10,7" Background="#1000D2D3" BorderBrush="#3000D2D3" BorderThickness="1" CornerRadius="6">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="⏱️" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TxtCalculatedDuration" Text="Расчётное время: 10.0 сек (100 попыток при 10 поп/сек)"
+                                       FontSize="12" FontWeight="SemiBold" Foreground="#00D2D3" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="Таймаут сокета: 350 мс" FontSize="11" Foreground="#64748B" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Кнопки управления и текущий статус -->
+        <Grid Grid.Row="2" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="BtnStart" Grid.Column="0" Content="🚀 Начать тестирование"
+                    Background="#00D2D3" Foreground="#000000" Click="OnStartClick" Margin="0,0,8,0" />
+            <Button x:Name="BtnStop" Grid.Column="1" Content="⏹ Остановить"
+                    Background="#EF4444" Foreground="#FFFFFF" IsEnabled="False" Click="OnStopClick" Margin="0,0,8,0" />
+            <Button x:Name="BtnExportReport" Grid.Column="2" Content="💾 Сохранить отчёт..."
+                    Background="#2D313A" Foreground="#FFFFFF" Click="OnExportReportClick" Margin="0,0,8,0" />
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <TextBlock Text="Статус:" FontSize="11.5" Foreground="#94A3B8" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock x:Name="TxtStatus" Text="Готов к запуску" FontSize="12" FontWeight="SemiBold"
+                           Foreground="#FFFFFF" VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Прогресс и счетчики ответов -->
+        <Border Grid.Row="3" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,10">
+            <StackPanel>
+                <ProgressBar x:Name="PrgProgress" Height="8" Background="#18191C" Foreground="#00D2D3"
+                             BorderThickness="0" Margin="0,0,0,10" Minimum="0" Maximum="100" Value="0" />
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Выполнено:" FontSize="10.5" Foreground="#94A3B8" />
+                        <TextBlock x:Name="TxtProgressCount" Text="0 / 100" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Осталось времени:" FontSize="10.5" Foreground="#94A3B8" />
+                        <TextBlock x:Name="TxtTimeRemaining" Text="—" FontSize="13.5" FontWeight="Bold" Foreground="#00D2D3" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Успешно / Открыт:" FontSize="10.5" Foreground="#94A3B8" />
+                        <TextBlock x:Name="TxtSuccessCount" Text="0" FontSize="13.5" FontWeight="Bold" Foreground="#10B981" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Отказ (Refused):" FontSize="10.5" Foreground="#94A3B8" />
+                        <TextBlock x:Name="TxtRefusedCount" Text="0" FontSize="13.5" FontWeight="Bold" Foreground="#F59E0B" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Таймаут (Drop/Бан):" FontSize="10.5" Foreground="#94A3B8" />
+                        <TextBlock x:Name="TxtTimeoutCount" Text="0" FontSize="13.5" FontWeight="Bold" Foreground="#EF4444" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Журнал логов -->
+        <Border Grid.Row="4" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,6">
+                    <TextBlock Text="Журнал испытаний сокетов:" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                    <Button Content="Очистить лог" Padding="8,3" FontSize="11" HorizontalAlignment="Right" Click="OnClearLogClick" />
+                </Grid>
+
+                <TextBox x:Name="TxtLog" Grid.Row="1" IsReadOnly="True" VerticalScrollBarVisibility="Auto"
+                         FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11"
+                         Background="#131416" Foreground="#94A3B8" BorderThickness="0" TextWrapping="Wrap" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
