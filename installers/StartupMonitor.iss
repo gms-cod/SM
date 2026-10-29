@@ -36,8 +36,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=commandline
 ShowLanguageDialog=auto
-; Принудительное закрытие всех блокирующих процессов StartupMonitor перед установкой
-CloseApplications=force
+; Закрытие запущенных процессов StartupMonitor перед установкой через Restart Manager
+CloseApplications=yes
 CloseApplicationsFilter=*StartupMonitor*.exe
 RestartApplications=no
 UsedUserAreasWarning=no
@@ -115,58 +115,25 @@ Filename: "taskkill.exe"; Parameters: "/F /T /IM {#MyAppExeName}"; Flags: runhid
 Filename: "taskkill.exe"; Parameters: "/F /IM {#MyServiceExeName}"; Flags: runhidden; RunOnceId: "KillService"
 
 [Code]
-// Функция гарантированной остановки службы и всех блокирующих процессов
-procedure StopStartupMonitorProcessesAndService();
+// Остановка службы и процессов
+procedure StopRunningProcesses();
 var
   ResultCode: Integer;
 begin
-  // 1. Остановка системной службы Windows
-  Exec('sc.exe', 'stop {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
-  // 2. Принудительное завершение всех процессов UI и службы со всеми дочерними процессами
-  Exec('taskkill.exe', '/F /T /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM {#MyServiceExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /FI "IMAGENAME eq StartupMonitor*"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
-  // 3. Пауза для детерминированного закрытия файловых дескрипторов
-  Sleep(750);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#MyServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#MyServiceExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(500);
 end;
 
-// Вызывается при запуске инсталлятора
-function InitializeSetup(): Boolean;
-begin
-  StopStartupMonitorProcessesAndService();
-  Result := True;
-end;
-
-// Вызывается непосредственно перед установкой файлов (когда пользователь нажал "Установить")
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  StopStartupMonitorProcessesAndService();
+  StopRunningProcesses();
   Result := '';
 end;
 
-// Вызывается на этапе фактического копирования файлов
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssInstall then
-  begin
-    StopStartupMonitorProcessesAndService();
-  end;
-end;
-
-// Вызывается при запуске деинсталлятора
 function InitializeUninstall(): Boolean;
 begin
-  StopStartupMonitorProcessesAndService();
+  StopRunningProcesses();
   Result := True;
-end;
-
-// Вызывается при фактическом удалении файлов
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-begin
-  if CurUninstallStep = usUninstall then
-  begin
-    StopStartupMonitorProcessesAndService();
-  end;
 end;
