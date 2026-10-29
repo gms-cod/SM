@@ -857,6 +857,68 @@ public class PipeServer : BackgroundService
                     }
                     break;
 
+                case PipeMessageTypes.SetUserRating:
+                    // Ручная установка рейтинга пользователем (1-5 звёзд) или сброс к AI
+                    var setRatingReq = JsonSerializer.Deserialize<SetUserRatingRequest>(message.Payload, JsonOptions);
+                    StartupEntry? ratedEntry = null;
+                    if (setRatingReq != null && !string.IsNullOrWhiteSpace(setRatingReq.EntryId))
+                    {
+                        var cfg = _store.Load();
+                        var entry = cfg.Entries.Find(e => e.Id == setRatingReq.EntryId);
+                        if (entry != null)
+                        {
+                            if (setRatingReq.ResetToAi)
+                            {
+                                entry.IsUserRating = false;
+                                _ratingsCache.Remove(entry);
+                                _logger.LogInformation("SetUserRating: сброс к AI-оценке для {Name}", entry.Name);
+                                await _aiRating.ForceFetchRatingAsync(entry);
+                            }
+                            else
+                            {
+                                int stars = Math.Clamp(setRatingReq.Stars, 1, 5);
+                                int score = stars switch
+                                {
+                                    5 => 1,
+                                    4 => 3,
+                                    3 => 5,
+                                    2 => 7,
+                                    _ => 10
+                                };
+                                entry.IsUserRating = true;
+                                entry.AiRating = score;
+                                entry.AiCategory = "Пользовательская оценка (Ручная)";
+                                entry.AiRisk = stars switch
+                                {
+                                    5 => "Минимальный (доверенный скрипт/приложение)",
+                                    4 => "Низкий",
+                                    3 => "Умеренный",
+                                    2 => "Повышенный",
+                                    _ => "Высокий"
+                                };
+                                entry.AiRecommendation = $"Пользователь вручную установил рейтинг: {stars} из 5 звёзд.";
+                                _ratingsCache.Set(entry, new StartupRating
+                                {
+                                    Score = score,
+                                    Category = entry.AiCategory,
+                                    Risk = entry.AiRisk,
+                                    Recommendation = entry.AiRecommendation
+                                });
+                                _logger.LogInformation("SetUserRating: установлена ручная оценка {Stars}★ (score {Score}) для {Name}",
+                                    stars, score, entry.Name);
+                            }
+                            NotifyExternalEntriesChanged();
+                            var refreshedCfg = _store.Load();
+                            ratedEntry = refreshedCfg.Entries.Find(e => e.Id == setRatingReq.EntryId) ?? entry;
+                        }
+                    }
+                    response.Type = PipeMessageTypes.SetUserRatingResponse;
+                    if (ratedEntry != null)
+                    {
+                        response.Payload = JsonSerializer.Serialize(ratedEntry, JsonOptions);
+                    }
+                    break;
+
                 case PipeMessageTypes.SubscribeProcessMetrics:
                     // Активация периодического сбора метрик процессов для Диспетчера задач (On-Demand)
                     _metricsTracker.Subscribe();
@@ -1879,6 +1941,34 @@ public class PipeServer : BackgroundService
                         response.Payload = JsonSerializer.Serialize(
                             new ResolveNetworkAlertResultPayload(resolved, resolved ? "Решение применено." : "Алерт не найден."),
                             JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.GetConnectionHistory:
+                    try
+                    {
+                        var history = _alertService?.GetConnectionHistory() ?? new List<NetworkConnectionHistoryItem>();
+                        response.Type = PipeMessageTypes.GetConnectionHistoryResponse;
+                        response.Payload = JsonSerializer.Serialize(history, JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = ex.Message;
+                    }
+                    break;
+
+                case PipeMessageTypes.ClearConnectionHistory:
+                    try
+                    {
+                        _alertService?.ClearConnectionHistory();
+                        response.Type = PipeMessageTypes.ClearConnectionHistoryResponse;
+                        response.Payload = JsonSerializer.Serialize(true, JsonOptions);
                     }
                     catch (Exception ex)
                     {

@@ -62,4 +62,39 @@ public class StartupEntryTests
         var values = Enum.GetValues<EntryStatus>();
         Assert.Equal(5, values.Length);
     }
+
+    /// <summary>
+    /// Проверяет свойство IsUserRating по умолчанию и генерацию PropertyChanged при изменении.
+    /// </summary>
+    [Fact]
+    public void IsUserRating_DefaultAndNotification_Works()
+    {
+        var entry = new StartupEntry();
+        Assert.False(entry.IsUserRating);
+
+        var changedProps = new List<string?>();
+        entry.PropertyChanged += (_, e) => changedProps.Add(e.PropertyName);
+
+        entry.IsUserRating = true;
+        Assert.True(entry.IsUserRating);
+        Assert.Contains(nameof(StartupEntry.IsUserRating), changedProps);
+    }
+
+    /// <summary>
+    /// Проверяет создание DTO SetUserRatingRequest и корректность передачи параметров.
+    /// </summary>
+    [Fact]
+    public void SetUserRatingRequest_PropertiesAssignment_Works()
+    {
+        var req = new SetUserRatingRequest
+        {
+            EntryId = "entry-123",
+            Stars = 5,
+            ResetToAi = false
+        };
+
+        Assert.Equal("entry-123", req.EntryId);
+        Assert.Equal(5, req.Stars);
+        Assert.False(req.ResetToAi);
+    }
 }

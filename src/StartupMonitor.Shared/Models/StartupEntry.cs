@@ -134,6 +134,11 @@ public class StartupEntry : INotifyPropertyChanged
     /// <summary>AI-рейтинг (1 — безопасно, 10 — опасно).</summary>
     public int AiRating { get => _aiRating; set => Set(ref _aiRating, value); }
 
+    /// <summary>Флаг: рейтинг установлен пользователем вручную (защита от перезаписи авто-оценкой AI).</summary>
+    private bool _isUserRating;
+    /// <summary>Указывает, был ли рейтинг задан пользователем вручную в окне свойств.</summary>
+    public bool IsUserRating { get => _isUserRating; set => Set(ref _isUserRating, value); }
+
     /// <summary>AI-категория (legitimate, adware, trojan, ...).</summary>
     private string _aiCategory = "";
     /// <summary>Категория угрозы по версии AI.</summary>

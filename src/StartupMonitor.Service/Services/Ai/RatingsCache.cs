@@ -48,7 +48,7 @@ public class RatingsCache
         return null;
     }
 
-    /// <summary>Удаляет рейтинг из кэша и обнуляет поля Ai* в записи.</summary>
+    /// <summary>Удаляет рейтинг из кэша и обнуляет поля Ai* в записи, сбрасывая ручной пользовательский флаг.</summary>
     public void Remove(StartupEntry entry)
     {
         var key = BuildKey(entry);
@@ -58,6 +58,7 @@ public class RatingsCache
         entry.AiCategory = "";
         entry.AiRisk = "";
         entry.AiRecommendation = "";
+        entry.IsUserRating = false;
         _store.UpdateEntry(entry);
     }
 

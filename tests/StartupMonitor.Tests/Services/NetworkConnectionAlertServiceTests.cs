@@ -1,4 +1,4 @@
-using StartupMonitor.Service.Services;
+﻿using StartupMonitor.Service.Services;
 using StartupMonitor.Service.Services.Firewall;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
@@ -495,5 +495,84 @@ public sealed class NetworkConnectionAlertServiceTests
         });
 
         Assert.Empty(exceptions);
+    }
+
+    /// <summary>
+    /// Проверяет ограничение размера истории сетевых подключений (MaxHistoryItems = 2500)
+    /// и вытеснение самых старых записей.
+    /// </summary>
+    [Fact]
+    public void RecordHistory_LimitsMaxItems_AndPrunesOldest()
+    {
+        var svc = CreateService();
+        svc.ClearConnectionHistory();
+
+        for (int i = 0; i < 2600; i++)
+        {
+            svc.RecordHistory(new NetworkConnectionHistoryItem
+            {
+                Id = $"item-{i}",
+                Timestamp = DateTime.UtcNow.AddSeconds(i),
+                ProcessName = $"pp_{i}.exe",
+                RemoteAddress = $"1.1.1.{i % 250}",
+                RemotePort = 80,
+                Verdict = NetworkConnectionVerdict.Allowed
+            });
+        }
+
+        var history = svc.GetConnectionHistory();
+        Assert.Equal(2500, history.Count);
+        Assert.Equal("item-2599", history[0].Id);
+        Assert.Equal("item-100", history[^1].Id);
+    }
+
+    /// <summary>
+    /// Проверяет полную очистку истории сетевых подключений.
+    /// </summary>
+    [Fact]
+    public void ClearConnectionHistory_PurgesAllEntries()
+    {
+        var svc = CreateService();
+        svc.RecordHistory(new NetworkConnectionHistoryItem
+        {
+            Id = "test-1",
+            ProcessName = "test.exe",
+            Verdict = NetworkConnectionVerdict.PendingAlert
+        });
+
+        Assert.NotEmpty(svc.GetConnectionHistory());
+
+        svc.ClearConnectionHistory();
+        Assert.Empty(svc.GetConnectionHistory());
+    }
+
+    /// <summary>
+    /// Проверяет обновление статуса в истории при вызове ResolveAlert.
+    /// </summary>
+    [Fact]
+    public void ResolveAlert_UpdatesHistoryItemVerdict()
+    {
+        var svc = CreateService(
+            sockets: new List<ProcessNetworkSocket> { Sock(1234, "test.exe", "93.184.216.34", 443) },
+            pathsByPid: Paths((1234, @"C:\Apps\test.exe")));
+
+        svc.ScanNewConnections();
+        var alert = Assert.Single(svc.GetPendingAlerts());
+
+        var historyBefore = svc.GetConnectionHistory();
+        var itemBefore = Assert.Single(historyBefore, h => h.Id == alert.AlertId);
+        Assert.Equal(NetworkConnectionVerdict.PendingAlert, itemBefore.Verdict);
+
+        svc.ResolveAlert(new ResolveNetworkAlertRequest
+        {
+            AlertId = alert.AlertId,
+            Resolution = NetworkAlertResolution.AllowAlways,
+            ProcessPath = @"C:\Apps\test.exe",
+            ProcessName = "test.exe"
+        });
+
+        var historyAfter = svc.GetConnectionHistory();
+        var itemAfter = Assert.Single(historyAfter, h => h.Id == alert.AlertId);
+        Assert.Equal(NetworkConnectionVerdict.RuleCreated, itemAfter.Verdict);
     }
 }

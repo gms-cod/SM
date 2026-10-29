@@ -86,6 +86,10 @@ public static class PipeMessageTypes
     public const string TestAiConnectionResponse = "TestAiConnectionResponse";
     /// <summary>Переоценка одной записи AI.</summary>
     public const string ReRateEntry = "ReRateEntry";
+    /// <summary>Ручная установка или сброс пользовательского рейтинга записи (1-5 звёзд).</summary>
+    public const string SetUserRating = "SetUserRating";
+    /// <summary>Ответ на установку пользовательского рейтинга.</summary>
+    public const string SetUserRatingResponse = "SetUserRatingResponse";
     /// <summary>Установка настроек троттлинга процессора.</summary>
     public const string SetCpuThrottle = "SetCpuThrottle";
     /// <summary>Установка строгого режима (блокировка новых записей).</summary>
@@ -240,6 +244,14 @@ public static class PipeMessageTypes
     public const string ResolveNetworkAlert = "ResolveNetworkAlert";
     /// <summary>Ответ на решение по сетевому алерту.</summary>
     public const string ResolveNetworkAlertResponse = "ResolveNetworkAlertResponse";
+    /// <summary>Запрос истории всех сетевых подключений.</summary>
+    public const string GetConnectionHistory = "GetConnectionHistory";
+    /// <summary>Ответ службы со списком записей истории сетевых подключений.</summary>
+    public const string GetConnectionHistoryResponse = "GetConnectionHistoryResponse";
+    /// <summary>Очистка журнала истории сетевых подключений.</summary>
+    public const string ClearConnectionHistory = "ClearConnectionHistory";
+    /// <summary>Ответ службы на очистку истории сетевых подключений.</summary>
+    public const string ClearConnectionHistoryResponse = "ClearConnectionHistoryResponse";
     /// <summary>Включение/выключение детектора новых сетевых подключений.</summary>
     public const string SetAlertsEnabled = "SetAlertsEnabled";
     /// <summary>Запрос состояния детектора новых сетевых подключений.</summary>

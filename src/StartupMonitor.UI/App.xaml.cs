@@ -135,9 +135,14 @@ public partial class App : Application
         var mainWindow = new Views.MainWindow();
         MainWindow = mainWindow;
 
-        if (!IsMinimized)
+        // Всегда вызываем Show(), чтобы окно создало HWND, событие Loaded сработал и
+        // StartupSequence инициализировал Pipe + глобальный опрос сетевых алертов.
+        // При --minimized окно стартует свёрнутым, но жизненный цикл проходит полностью:
+        // без Show() Loaded не возникает, алерты никогда не начинают опрашиваться.
+        mainWindow.Show();
+        if (App.IsMinimized)
         {
-            mainWindow.Show();
+            mainWindow.WindowState = WindowState.Minimized;
         }
 
         Log("OnStartup: создаю иконку трея");

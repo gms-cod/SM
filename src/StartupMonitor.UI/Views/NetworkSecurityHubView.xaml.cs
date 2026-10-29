@@ -32,11 +32,8 @@ public partial class NetworkSecurityHubView : UserControl
     private readonly DispatcherTimer _banTimer;
     private readonly DispatcherTimer _bansRefreshTimer;
     private readonly DispatcherTimer _liveConnTimer;
-    private readonly DispatcherTimer _alertPollerTimer;
     private bool _alertsEnabled;
     private bool _suppressAlertsToggle;
-    private bool _alertWindowOpen;
-    private bool _isPollingAlerts;
 
     private List<FirewallRuleRow> _allRules = new();
     private List<BanRow> _banRows = new();
@@ -308,9 +305,6 @@ public partial class NetworkSecurityHubView : UserControl
         _liveConnTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _liveConnTimer.Tick += async (_, _) => await LoadLiveConnectionsAsync();
 
-        _alertPollerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
-        _alertPollerTimer.Tick += async (_, _) => await PollNetworkAlertsAsync();
-
         MainTabs.SelectionChanged += (s, e) =>
         {
             if (e.Source == MainTabs)
@@ -329,12 +323,6 @@ public partial class NetworkSecurityHubView : UserControl
                     _liveConnTimer.Start();
             }
             catch { }
-            try
-            {
-                if (!_alertPollerTimer.IsEnabled)
-                    _alertPollerTimer.Start();
-            }
-            catch { }
         };
         Unloaded += (_, _) => Deactivate();
     }
@@ -345,7 +333,6 @@ public partial class NetworkSecurityHubView : UserControl
         try { _banTimer?.Stop(); } catch { }
         try { _bansRefreshTimer?.Stop(); } catch { }
         try { _liveConnTimer?.Stop(); } catch { }
-        try { _alertPollerTimer?.Stop(); } catch { }
     }
 
     /// <summary>Обрабатывает клик по навигационным кнопкам вкладок брандмауэра.</summary>
@@ -355,13 +342,17 @@ public partial class NetworkSecurityHubView : UserControl
         {
             MainTabs.SelectedIndex = idx;
             UpdateTabButtons(idx);
+            if (idx == 6)
+            {
+                _ = LoadHubHistoryAsync();
+            }
         }
     }
 
     /// <summary>Синхронизирует активное состояние (Primary/Secondary) кнопок вкладок со стилем FilterTabButtonStyle.</summary>
     private void UpdateTabButtons(int selectedIdx)
     {
-        var buttons = new[] { TabBtnConnections, TabBtnWhitelist, TabBtnBlacklist, TabBtnRules, TabBtnPortDefender, TabBtnAttackLog };
+        var buttons = new[] { TabBtnConnections, TabBtnWhitelist, TabBtnBlacklist, TabBtnRules, TabBtnPortDefender, TabBtnAttackLog, TabBtnHistory };
         for (int i = 0; i < buttons.Length; i++)
         {
             if (buttons[i] != null)
@@ -393,7 +384,6 @@ public partial class NetworkSecurityHubView : UserControl
         try { _banTimer?.Stop(); } catch { }
         try { _bansRefreshTimer?.Stop(); } catch { }
         try { _liveConnTimer?.Stop(); } catch { }
-        try { _alertPollerTimer?.Stop(); } catch { }
     }
 
     /// <summary>
@@ -423,12 +413,6 @@ public partial class NetworkSecurityHubView : UserControl
                 if (_liveConnTimer != null && !_liveConnTimer.IsEnabled
                     && ChkAutoRefreshConn != null && ChkAutoRefreshConn.IsChecked == true)
                     _liveConnTimer.Start();
-            }
-            catch { }
-            try
-            {
-                if (_alertPollerTimer != null && !_alertPollerTimer.IsEnabled && _alertsEnabled)
-                    _alertPollerTimer.Start();
             }
             catch { }
         }
@@ -461,8 +445,6 @@ public partial class NetworkSecurityHubView : UserControl
                 _banTimer.Start();
             if (!_bansRefreshTimer.IsEnabled)
                 _bansRefreshTimer.Start();
-            if (!_alertPollerTimer.IsEnabled)
-                _alertPollerTimer.Start();
         }
         catch (Exception ex)
         {
@@ -638,44 +620,7 @@ public partial class NetworkSecurityHubView : UserControl
     }
 
     /// <summary>
-    /// Фоновый опрос ожидающих сетевых алертов (тик _alertPollerTimer, 2.5 сек).
-    /// Если уведомления включены и есть алерты, а окно ещё не открыто — открывает тост.
-    /// Zero-Crash: любые ошибки подавляются, повторный вход запрещён флагом.
-    /// </summary>
-    private async Task PollNetworkAlertsAsync()
-    {
-        if (_isPollingAlerts)
-            return;
-        _isPollingAlerts = true;
-        try
-        {
-            if (!_alertsEnabled || _alertWindowOpen)
-                return;
-
-            List<NetworkConnectionAlertDto>? alerts = null;
-            try
-            {
-                alerts = await _pipeClient.GetPendingNetworkAlertsAsync();
-            }
-            catch
-            {
-                return;
-            }
-
-            if (!ShouldShowAlertWindow(_alertsEnabled, alerts, _alertWindowOpen))
-                return;
-
-            ShowNetworkAlertWindow(alerts![0]);
-        }
-        catch { }
-        finally
-        {
-            _isPollingAlerts = false;
-        }
-    }
-
-    /// <summary>
-    /// Чистая решающая функция тика поллера (покрыта UI-тестами без WPF-диспетчера):
+    /// Чистая решающая функция (покрыта UI-тестами без WPF-диспетчера):
     /// окно показывается только если уведомления включены, есть алерты и окно ещё не открыто.
     /// </summary>
     public static bool ShouldShowAlertWindow(
@@ -711,35 +656,6 @@ public partial class NetworkSecurityHubView : UserControl
             RemoteAddress = alert.RemoteAddress ?? string.Empty,
             Resolution = resolution
         };
-    }
-
-    /// <summary>
-    /// Открывает <c>NetworkConnectionAlertWindow</c> для первого ожидающего алерта.
-    /// Окно само позиционируется в правом нижнем углу; флаг _alertWindowOpen
-    /// блокирует дубли до закрытия окна.
-    /// </summary>
-    private void ShowNetworkAlertWindow(NetworkConnectionAlertDto alert)
-    {
-        try
-        {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.BeginInvoke(new Action<NetworkConnectionAlertDto>(ShowNetworkAlertWindow), alert);
-                return;
-            }
-
-            if (_alertWindowOpen || alert == null)
-                return;
-
-            _alertWindowOpen = true;
-            var window = new NetworkConnectionAlertWindow(alert, _pipeClient);
-            window.Closed += (_, _) => { _alertWindowOpen = false; };
-            window.Show();
-        }
-        catch
-        {
-            _alertWindowOpen = false;
-        }
     }
 
     /// <summary>Загружает правила через GetAllFirewallRulesAsync и применяет фильтр.</summary>
@@ -2390,4 +2306,281 @@ public partial class NetworkSecurityHubView : UserControl
         }
         catch { }
     }
+
+    #region Вкладка и окно истории сетевых подключений
+
+    private List<NetworkConnectionHistoryItem> _hubHistoryAll = new();
+
+    /// <summary>Открывает отдельное окно истории сетевых подключений.</summary>
+    private void OnOpenHistoryWindowClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var win = new Dialogs.ConnectionHistoryWindow(_pipeClient)
+            {
+                Owner = Window.GetWindow(this)
+            };
+            win.Show();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка открытия окна истории: {ex.Message}");
+        }
+    }
+
+    /// <summary>Загружает историю сетевых подключений для встроенной вкладки.</summary>
+    private async Task LoadHubHistoryAsync()
+    {
+        try
+        {
+            TxtHubHistSummary.Text = "Загрузка истории сетевых подключений...";
+            var items = await _pipeClient.GetConnectionHistoryAsync();
+            _hubHistoryAll = items ?? new List<NetworkConnectionHistoryItem>();
+            ApplyHubHistoryFilter();
+        }
+        catch (Exception ex)
+        {
+            TxtHubHistSummary.Text = $"Ошибка загрузки: {ex.Message}";
+        }
+    }
+
+    /// <summary>Применяет фильтры к встроенной таблице истории сетевых подключений.</summary>
+    private void ApplyHubHistoryFilter()
+    {
+        try
+        {
+            IEnumerable<NetworkConnectionHistoryItem> query = _hubHistoryAll;
+
+            var search = TxtHubHistSearch?.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(item =>
+                    (item.ProcessName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (item.ProcessPath?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (item.RemoteAddress?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    item.RemotePort.ToString().Contains(search) ||
+                    item.ProcessId.ToString().Contains(search));
+            }
+
+            var selectedVerdict = (CmbHubHistVerdict?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            if (!string.IsNullOrWhiteSpace(selectedVerdict) && !selectedVerdict.StartsWith("Все"))
+            {
+                query = selectedVerdict switch
+                {
+                    "Ожидает алерта" => query.Where(i => i.Verdict == NetworkConnectionVerdict.PendingAlert),
+                    "Разрешено" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Allowed || i.Verdict == NetworkConnectionVerdict.AllowSession),
+                    "Заблокировано" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Blocked || i.Verdict == NetworkConnectionVerdict.BlockSession),
+                    "Белый список" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Whitelisted),
+                    "Чёрный список" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Blacklisted),
+                    "Создано правило" => query.Where(i => i.Verdict == NetworkConnectionVerdict.RuleCreated),
+                    _ => query
+                };
+            }
+
+            var selectedPeriod = (CmbHubHistPeriod?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            if (!string.IsNullOrWhiteSpace(selectedPeriod) && !selectedPeriod.StartsWith("Все"))
+            {
+                var now = DateTime.UtcNow;
+                query = selectedPeriod switch
+                {
+                    "Последний час" => query.Where(i => (now - i.Timestamp).TotalHours <= 1),
+                    "Сегодня" => query.Where(i => i.LocalTimestamp.Date == DateTime.Now.Date),
+                    "Последние 24 ч" => query.Where(i => (now - i.Timestamp).TotalHours <= 24),
+                    _ => query
+                };
+            }
+
+            var selectedProtocol = (CmbHubHistProtocol?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            if (!string.IsNullOrWhiteSpace(selectedProtocol) && !selectedProtocol.StartsWith("Все"))
+            {
+                query = query.Where(i => string.Equals(i.Protocol, selectedProtocol, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var filtered = query.ToList();
+            GridHubHistory.ItemsSource = filtered;
+            TxtHubHistSummary.Text = $"Отображено записей: {filtered.Count} из {_hubHistoryAll.Count}";
+            UpdateHubHistButtons();
+        }
+        catch { }
+    }
+
+    private void OnHubHistFilterChanged(object sender, RoutedEventArgs e) => ApplyHubHistoryFilter();
+    private void OnHubHistFilterChanged(object sender, SelectionChangedEventArgs e) => ApplyHubHistoryFilter();
+    private void OnHubHistFilterChanged(object sender, TextChangedEventArgs e) => ApplyHubHistoryFilter();
+
+    private async void OnRefreshHubHistClick(object sender, RoutedEventArgs e) => await LoadHubHistoryAsync();
+
+    private async void OnClearHubHistClick(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            "Вы действительно хотите полностью очистить журнал истории сетевых подключений?",
+            "Подтверждение очистки",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        try
+        {
+            var success = await _pipeClient.ClearConnectionHistoryAsync();
+            if (success)
+            {
+                _hubHistoryAll.Clear();
+                ApplyHubHistoryFilter();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка очистки истории: {ex.Message}");
+        }
+    }
+
+    private void OnHubHistSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateHubHistButtons();
+
+    private void UpdateHubHistButtons()
+    {
+        var item = GridHubHistory.SelectedItem as NetworkConnectionHistoryItem;
+        var hasSelection = item != null;
+        var hasPath = hasSelection && !string.IsNullOrWhiteSpace(item?.ProcessPath);
+
+        BtnHubHistAllow.IsEnabled = hasSelection;
+        BtnHubHistBlock.IsEnabled = hasSelection;
+        BtnHubHistWhitelist.IsEnabled = hasSelection;
+        BtnHubHistBlacklist.IsEnabled = hasSelection;
+        BtnHubHistOpenFile.IsEnabled = hasPath;
+        BtnHubHistCopyIp.IsEnabled = hasSelection;
+    }
+
+    private async void OnHubHistAllowClick(object sender, RoutedEventArgs e)
+    {
+        if (GridHubHistory.SelectedItem is not NetworkConnectionHistoryItem item) return;
+
+        try
+        {
+            var rule = new FirewallRuleDto
+            {
+                Name = $"Allow: {item.ProcessName}",
+                ApplicationName = item.ProcessPath,
+                Direction = FirewallDirection.Outbound,
+                Action = FirewallAction.Allow,
+                Protocol = string.Equals(item.Protocol, "UDP", StringComparison.OrdinalIgnoreCase) ? FirewallProtocol.Udp : FirewallProtocol.Tcp,
+                RemotePorts = item.RemotePort > 0 ? item.RemotePort.ToString() : "*",
+                Enabled = true
+            };
+
+            var res = await _pipeClient.CreateOrUpdateFirewallRuleAsync(rule);
+            if (res?.Success == true)
+            {
+                SetStatus($"Создано разрешающее правило для программы {item.ProcessName}.");
+                await LoadHubHistoryAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка создания правила: {ex.Message}");
+        }
+    }
+
+    private async void OnHubHistBlockClick(object sender, RoutedEventArgs e)
+    {
+        if (GridHubHistory.SelectedItem is not NetworkConnectionHistoryItem item) return;
+
+        try
+        {
+            var rule = new FirewallRuleDto
+            {
+                Name = $"Block: {item.ProcessName}",
+                ApplicationName = item.ProcessPath,
+                Direction = FirewallDirection.Outbound,
+                Action = FirewallAction.Block,
+                Protocol = string.Equals(item.Protocol, "UDP", StringComparison.OrdinalIgnoreCase) ? FirewallProtocol.Udp : FirewallProtocol.Tcp,
+                RemotePorts = item.RemotePort > 0 ? item.RemotePort.ToString() : "*",
+                Enabled = true
+            };
+
+            var res = await _pipeClient.CreateOrUpdateFirewallRuleAsync(rule);
+            if (res?.Success == true)
+            {
+                SetStatus($"Создано блокирующее правило для программы {item.ProcessName}.");
+                await LoadHubHistoryAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка создания правила: {ex.Message}");
+        }
+    }
+
+    private async void OnHubHistWhitelistClick(object sender, RoutedEventArgs e)
+    {
+        if (GridHubHistory.SelectedItem is not NetworkConnectionHistoryItem item) return;
+        var app = !string.IsNullOrWhiteSpace(item.ProcessPath) ? item.ProcessPath : item.ProcessName;
+
+        try
+        {
+            var success = await _pipeClient.AddToFirewallWhitelistAsync(app);
+            if (success)
+            {
+                SetStatus($"Программа «{item.ProcessName}» добавлена в белый список.");
+                await LoadHubHistoryAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка белого списка: {ex.Message}");
+        }
+    }
+
+    private async void OnHubHistBlacklistClick(object sender, RoutedEventArgs e)
+    {
+        if (GridHubHistory.SelectedItem is not NetworkConnectionHistoryItem item) return;
+        var app = !string.IsNullOrWhiteSpace(item.ProcessPath) ? item.ProcessPath : item.ProcessName;
+
+        try
+        {
+            var success = await _pipeClient.AddToFirewallBlacklistAsync(app);
+            if (success)
+            {
+                SetStatus($"Программа «{item.ProcessName}» добавлена в чёрный список.");
+                await LoadHubHistoryAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка чёрного списка: {ex.Message}");
+        }
+    }
+
+    private void OnHubHistOpenFileClick(object sender, RoutedEventArgs e)
+    {
+        if (GridHubHistory.SelectedItem is not NetworkConnectionHistoryItem item || string.IsNullOrWhiteSpace(item.ProcessPath))
+            return;
+
+        try
+        {
+            if (File.Exists(item.ProcessPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{item.ProcessPath}\"",
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch { }
+    }
+
+    private void OnHubHistCopyIpClick(object sender, RoutedEventArgs e)
+    {
+        if (GridHubHistory.SelectedItem is not NetworkConnectionHistoryItem item) return;
+        try
+        {
+            Clipboard.SetText(item.RemoteAddress);
+            SetStatus($"IP-адрес {item.RemoteAddress} скопирован в буфер.");
+        }
+        catch { }
+    }
+
+    #endregion
 }

@@ -50,6 +50,14 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Верхняя граница очереди ожидающих алертов (защита от переполнения памяти).</summary>
     public const int MaxPendingAlerts = 1000;
 
+    /// <summary>Максимальное количество записей в журнале истории подключений.</summary>
+    public const int MaxHistoryItems = 2500;
+
+    /// <summary>Кольцевая очередь истории сетевых подключений.</summary>
+    private readonly ConcurrentQueue<NetworkConnectionHistoryItem> _historyQueue = new();
+    private readonly ConcurrentDictionary<string, NetworkConnectionHistoryItem> _historyById = new();
+    private readonly ConcurrentDictionary<string, DateTime> _historyDedup = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly ProcessNetworkTracker _tracker;
     private readonly WindowsFirewallService _firewall;
     private readonly JsonDataStore? _store;
@@ -84,17 +92,39 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Ожидающие алерты по AlertId (для резолва и дедупликации выдачи).</summary>
     private readonly ConcurrentDictionary<string, NetworkConnectionAlertDto> _pendingById = new();
 
-    /// <summary>Уже виденные связки "программа → remote:port" (защита от спама).</summary>
-    private readonly ConcurrentDictionary<string, byte> _seenKeys =
+    /// <summary>Уже виденные связки "программа → локальный сокет → remote:port" с TTL (защита от спама).</summary>
+    private readonly ConcurrentDictionary<string, DateTime> _seenKeys =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Время жизни записи дедупликации: соединение с тем же remote:port снова даст алерт после TTL.</summary>
+    private static readonly TimeSpan SeenKeyTtl = TimeSpan.FromMinutes(10);
+
+    /// <summary>Последняя очистка устаревших записей дедупликации (не чаще раза в минуту).</summary>
+    private DateTime _lastSeenPrune = DateTime.MinValue;
+
+    /// <summary>
+    /// Срок жизни сессионных решений (<see cref="NetworkAlertResolution.AllowSession"/> /
+    /// <see cref="NetworkAlertResolution.BlockSession"/> / <see cref="NetworkAlertResolution.CreateRule"/>).
+    /// Ограниченный TTL не позволяет одному проигнорированному окну навсегда заглушить программу.
+    /// </summary>
+    private static readonly TimeSpan SessionDecisionTtl = TimeSpan.FromHours(8);
+
+    /// <summary>Срок действия каждого сессионного решения (DateTime.MaxValue — бессрочно).</summary>
+    private readonly ConcurrentDictionary<string, DateTime> _sessionDecisionExpiry =
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly object _scanLock = new();
+    private readonly object _settingsLock = new();
     private bool _disposed;
 
     // ── Кэш правил брандмауэра для обеспечения 0% CPU ──
     private HashSet<string>? _cachedRulePaths;
     private DateTime _cachedRulePathsTime = DateTime.MinValue;
     private readonly TimeSpan _ruleCacheTtl = TimeSpan.FromSeconds(60);
+
+    // ── Кэш настроек из хранилища (обновляется только при изменении ревизии) ──
+    private long _settingsRevision = -1;
+    private volatile bool _silentPid0 = true;
 
     // ── Фоновый цикл в автономном режиме ──
     private readonly ActivityGate _wake = new();
@@ -107,7 +137,10 @@ public sealed class NetworkConnectionAlertService : IDisposable
     private volatile bool _monitorWindowActive;
 
     /// <summary>Включён ли детектор (переключается через Pipe: SetAlertsEnabled).</summary>
-    public bool AlertsEnabled { get; private set; } = true;
+    private volatile bool _alertsEnabled = true;
+
+    /// <summary>Включён ли детектор сетевых алертов (потокобезопасное чтение флага).</summary>
+    public bool AlertsEnabled => _alertsEnabled;
 
     /// <summary>Число ожидающих алертов.</summary>
     public int PendingCount => _pendingById.Count;
@@ -132,6 +165,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
             try
             {
                 var cfg = _store.Load();
+                _silentPid0 = cfg.Settings.FirewallSilentPid0;
+                _settingsRevision = _store.Revision;
                 foreach (var app in cfg.Settings.FirewallWhitelistedApps)
                 {
                     if (!string.IsNullOrWhiteSpace(app))
@@ -160,24 +195,60 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).</summary>
+    /// <param name="dueTime">Задержка перед первым сканом (не блокирует старт службы).</param>
+    /// <param name="period">Интервал между сканами при включённом детекторе.</param>
     public void StartBackgroundScan(TimeSpan? dueTime = null, TimeSpan? period = null)
     {
         StopBackgroundScan();
         _due = dueTime ?? TimeSpan.FromSeconds(5);
         _period = period ?? TimeSpan.FromSeconds(5);
-        _cts = new CancellationTokenSource();
-        _loop = RunAsync(_cts.Token);
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        // Первый скан откладывается на _due: конструктор PipeServer больше не блокируется
+        // на синхронном COM-перечислении правил Firewall при старте службы.
+        _loop = StartLoopAsync(cts.Token);
+    }
+
+    /// <summary>Выдерживает начальную задержку и запускает адаптивный цикл сканирования.</summary>
+    private async Task StartLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (_due > TimeSpan.Zero)
+                await Task.Delay(_due, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await RunAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>Останавливает фоновый опрос (полная остановка цикла).</summary>
     public void StopBackgroundScan()
     {
         var cts = _cts;
+        var loop = _loop;
         _cts = null;
         _loop = null;
         if (cts == null) return;
-        try { cts.Cancel(); } catch { }
-        cts.Dispose();
+
+        try { cts.Cancel(); } catch (ObjectDisposedException) { }
+
+        // CTS нельзя освобождать сразу: цикл может ещё наблюдать токен.
+        // Освобождаем его только после фактического завершения задачи.
+        if (loop != null)
+        {
+            _ = loop.ContinueWith(_ =>
+            {
+                try { cts.Dispose(); } catch (ObjectDisposedException) { }
+            }, TaskScheduler.Default);
+        }
+        else
+        {
+            try { cts.Dispose(); } catch (ObjectDisposedException) { }
+        }
     }
 
     /// <summary>
@@ -202,8 +273,15 @@ public sealed class NetworkConnectionAlertService : IDisposable
             idleInterval: Timeout.InfiniteTimeSpan,
             body: _ =>
             {
-                try { ScanNewConnections(); }
-                catch { /* скан логирует сам */ }
+                try
+                {
+                    ScanNewConnections();
+                }
+                catch (Exception ex)
+                {
+                    // Прозрачность ошибок: сбой скана логируется, цикл не падает.
+                    Log.Warning(ex, "NetworkAlerts: сбой фонового сканирования");
+                }
                 return Task.CompletedTask;
             },
             ct);
@@ -220,16 +298,21 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Включает/выключает детектор. Выключение сбрасывает очередь ожидающих алертов.</summary>
     public void SetAlertsEnabled(bool enabled)
     {
-        AlertsEnabled = enabled;
+        _alertsEnabled = enabled;
         if (!enabled)
             ClearPending();
         _wake.Pulse();
     }
 
-    /// <summary>Очищает очередь ожидающих алертов (сессионные решения сохраняются).</summary>
+    /// <summary>
+    /// Очищает очередь ожидающих алертов и кэш дедупликации.
+    /// Сброс дедупликации обязателен: иначе после повторного включения детектора
+    /// уже «виденные» соединения больше никогда не дадут алерт.
+    /// </summary>
     public void ClearPending()
     {
         _pendingById.Clear();
+        _seenKeys.Clear();
         PruneQueue(force: true);
     }
 
@@ -256,10 +339,13 @@ public sealed class NetworkConnectionAlertService : IDisposable
             }
 
             int added = 0;
-            // Кэшированный набор путей правил Firewall с TTL 60с (минимизирует COM-нагрузку)
+            // Кэш настроек обновляется только при изменении ревизии хранилища:
+            // больше нет глубокого клонирования всего конфига (включая историю) каждые 5 секунд.
+            RefreshSettingsCache();
+            var isSilentPid0 = _silentPid0;
+            // Кэшированный набор путей разрешающих ИСХОДЯЩИХ правил Firewall с TTL 60с.
             var rulePaths = BuildFirewallRulePathSet();
-            // Загружаем флаг тихого режима один раз перед обходом сокетов (оптимизация I/O)
-            var isSilentPid0 = _store?.Load().Settings.FirewallSilentPid0 ?? true;
+            PruneSeenKeys();
             foreach (var socket in sockets)
             {
                 if (socket is null)
@@ -269,11 +355,16 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 if (string.IsNullOrEmpty(remote) || socket.RemotePort <= 0)
                     continue;
 
-                // 0. Тихий режим: сокеты без определенного процесса (PID = 0) не создают всплывающих окон при включенной опции
+                // 0. Учитываем только реальные исходящие TCP-соединения (ESTABLISHED/SYN_SENT).
+                // TIME_WAIT/CLOSE_WAIT/LISTENING — мусорные состояния, они не должны порождать алерты.
+                if (!IsAlertableSocket(socket))
+                    continue;
+
+                // 0.1 Тихий режим: сокеты без определенного процесса (PID = 0) не создают всплывающих окон при включенной опции
                 if (socket.ProcessId == 0 && isSilentPid0)
                     continue;
 
-                // 0.1 Пропускаем порты, разрешенные пользователем (подавление всплывающих окон по этому порту)
+                // 0.2 Пропускаем порты, разрешенные пользователем (подавление всплывающих окон по этому порту)
                 if (IsPortAllowed(socket.RemotePort) || IsPortAllowed(socket.LocalPort))
                     continue;
 
@@ -284,38 +375,53 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 var processName = (socket.ProcessName ?? string.Empty).Trim();
                 var processPath = ResolveProcessPath(socket.ProcessId, processName);
 
+                var sessionKey = BuildSessionKey(processPath, processName);
+                var nameKey = BuildNameSessionKey(processName);
+
                 // 1.1 Абсолютный приоритет: Пропускаем программы из чёрного списка (соединения заблокированы, алерты подавлены)
                 if (IsBlacklistedApp(processPath, processName))
+                {
+                    TryLogHistory(socket, processPath, processName, remote, NetworkConnectionVerdict.Blacklisted, "Заблокировано правилом чёрного списка");
                     continue;
+                }
 
                 // 1.2 Пропускаем программы из белого списка (только если приложение отсутствует в чёрном списке)
                 if (IsWhitelistedApp(processPath, processName))
+                {
+                    TryLogHistory(socket, processPath, processName, remote, NetworkConnectionVerdict.Whitelisted, "Разрешено белым списком");
                     continue;
+                }
 
                 // 2. Игнорируем доверенные системные процессы.
                 if (IsTrustedProcess(processName, processPath))
                     continue;
 
-                var sessionKey = BuildSessionKey(processPath, processName);
-                var nameKey = BuildNameSessionKey(processName);
-
                 // 3. Пропускаем уже решённые в текущей сессии (по пути или по имени исполняемого файла)
-                if (_sessionDecisions.ContainsKey(sessionKey) ||
-                    (!string.IsNullOrWhiteSpace(processName) && _sessionDecisions.ContainsKey(nameKey)))
+                if (HasActiveSessionDecision(sessionKey) ||
+                    (!string.IsNullOrWhiteSpace(processName) && HasActiveSessionDecision(nameKey)))
+                {
+                    var isAllow = (_sessionDecisions.TryGetValue(sessionKey, out var d1) && d1 == NetworkAlertResolution.AllowSession)
+                               || (_sessionDecisions.TryGetValue(nameKey, out var d2) && d2 == NetworkAlertResolution.AllowSession);
+                    TryLogHistory(socket, processPath, processName, remote, isAllow ? NetworkConnectionVerdict.AllowSession : NetworkConnectionVerdict.BlockSession, "Решение текущей сессии");
                     continue;
+                }
 
-                // 4. Если для программы уже есть правило — алерт не создаём.
+                // 4. Если для программы уже есть РАЗРЕШАЮЩЕЕ ИСХОДЯЩЕЕ правило — алерт не создаём.
                 if (HasExistingFirewallRuleCached(processPath, processName, rulePaths))
+                {
+                    TryLogHistory(socket, processPath, processName, remote, NetworkConnectionVerdict.Allowed, "Разрешено правилом Windows Firewall");
                     continue;
+                }
 
-                // 5. Дедупликация повторных обращений к тому же remote:port.
+                // 5. Дедупликация: ключ включает локальный endpoint, поэтому новое TCP-соединение
+                // (новый эфемерный порт) снова даст алерт даже после истечения TTL.
                 if (_pendingById.Count >= MaxPendingAlerts)
                     continue;
-                // Защита от утечки памяти: сбрасываем дедупликационный кеш при переполнении.
-                if (_seenKeys.Count > 10000)
-                    _seenKeys.Clear();
-                var seenKey = sessionKey + "|" + remote.ToLowerInvariant() + ":" + socket.RemotePort;
-                if (!_seenKeys.TryAdd(seenKey, 0))
+                var seenKey = sessionKey + "|" +
+                              (string.IsNullOrWhiteSpace(socket.Protocol) ? "TCP" : socket.Protocol) + "|" +
+                              (socket.LocalAddress ?? string.Empty) + ":" + socket.LocalPort + "|" +
+                              remote.ToLowerInvariant() + ":" + socket.RemotePort;
+                if (!_seenKeys.TryAdd(seenKey, DateTime.UtcNow))
                     continue;
 
                 var alert = new NetworkConnectionAlertDto
@@ -333,6 +439,23 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 {
                     _queue.Enqueue(alert);
                     added++;
+
+                    RecordHistory(new NetworkConnectionHistoryItem
+                    {
+                        Id = alert.AlertId,
+                        Timestamp = alert.DetectedAt,
+                        ProcessId = alert.ProcessId,
+                        ProcessName = alert.ProcessName,
+                        ProcessPath = alert.ProcessPath,
+                        Protocol = alert.Protocol,
+                        LocalAddress = socket.LocalAddress ?? string.Empty,
+                        LocalPort = socket.LocalPort,
+                        RemoteAddress = alert.RemoteAddress,
+                        RemotePort = alert.RemotePort,
+                        Verdict = NetworkConnectionVerdict.PendingAlert,
+                        Direction = "Outbound",
+                        Details = "Ожидает решения пользователя"
+                    });
                 }
             }
 
@@ -341,10 +464,70 @@ public sealed class NetworkConnectionAlertService : IDisposable
         }
     }
 
+    /// <summary>Добавляет запись в кольцевой журнал истории сетевых подключений.</summary>
+    public void RecordHistory(NetworkConnectionHistoryItem item)
+    {
+        if (item is null) return;
+        _historyQueue.Enqueue(item);
+        if (!string.IsNullOrEmpty(item.Id))
+            _historyById[item.Id] = item;
+
+        while (_historyQueue.Count > MaxHistoryItems && _historyQueue.TryDequeue(out var old))
+        {
+            if (!string.IsNullOrEmpty(old.Id))
+                _historyById.TryRemove(old.Id, out _);
+        }
+    }
+
+    /// <summary>Возвращает снимок журнала истории сетевых подключений (по убыванию времени).</summary>
+    public List<NetworkConnectionHistoryItem> GetConnectionHistory()
+    {
+        return _historyQueue.OrderByDescending(h => h.Timestamp).ToList();
+    }
+
+    /// <summary>Очищает журнал истории сетевых подключений.</summary>
+    public void ClearConnectionHistory()
+    {
+        _historyById.Clear();
+        while (_historyQueue.TryDequeue(out _)) { }
+    }
+
     /// <summary>Возвращает снимок ожидающих алертов (по времени обнаружения).</summary>
     public List<NetworkConnectionAlertDto> GetPendingAlerts()
     {
         return _pendingById.Values.OrderBy(a => a.DetectedAt).ToList();
+    }
+
+    private void TryLogHistory(ProcessNetworkSocket socket, string? processPath, string processName, string remote, NetworkConnectionVerdict verdict, string details)
+    {
+        try
+        {
+            var dedupKey = $"{processName}|{remote}:{socket.RemotePort}|{verdict}";
+            var now = DateTime.UtcNow;
+            if (_historyDedup.TryGetValue(dedupKey, out var lastTime) && (now - lastTime).TotalSeconds < 15)
+                return;
+
+            _historyDedup[dedupKey] = now;
+            if (_historyDedup.Count > 1000)
+                _historyDedup.Clear();
+
+            RecordHistory(new NetworkConnectionHistoryItem
+            {
+                Timestamp = now,
+                ProcessId = socket.ProcessId,
+                ProcessName = processName,
+                ProcessPath = processPath ?? string.Empty,
+                Protocol = string.IsNullOrWhiteSpace(socket.Protocol) ? "TCP" : socket.Protocol,
+                LocalAddress = socket.LocalAddress ?? string.Empty,
+                LocalPort = socket.LocalPort,
+                RemoteAddress = remote,
+                RemotePort = socket.RemotePort,
+                Verdict = verdict,
+                Direction = "Outbound",
+                Details = details
+            });
+        }
+        catch { }
     }
 
     /// <summary>
@@ -360,6 +543,23 @@ public sealed class NetworkConnectionAlertService : IDisposable
         if (!_pendingById.TryRemove(request.AlertId, out var alert))
             return false;
 
+        if (_historyById.TryGetValue(request.AlertId, out var hItem))
+        {
+            hItem.Verdict = request.Resolution switch
+            {
+                NetworkAlertResolution.AllowSession => NetworkConnectionVerdict.AllowSession,
+                NetworkAlertResolution.BlockSession => NetworkConnectionVerdict.BlockSession,
+                NetworkAlertResolution.AllowAlways => NetworkConnectionVerdict.RuleCreated,
+                NetworkAlertResolution.BlockAlways => NetworkConnectionVerdict.RuleCreated,
+                NetworkAlertResolution.CreateRule => NetworkConnectionVerdict.RuleCreated,
+                NetworkAlertResolution.WhitelistProgram => NetworkConnectionVerdict.Whitelisted,
+                NetworkAlertResolution.BlacklistProgram => NetworkConnectionVerdict.Blacklisted,
+                NetworkAlertResolution.AllowPort => NetworkConnectionVerdict.AllowSession,
+                _ => NetworkConnectionVerdict.PendingAlert
+            };
+            hItem.Details = $"Решение пользователя: {request.Resolution}";
+        }
+
         var path = !string.IsNullOrWhiteSpace(request.ProcessPath)
             ? request.ProcessPath.Trim()
             : (alert.ProcessPath ?? string.Empty).Trim();
@@ -370,10 +570,12 @@ public sealed class NetworkConnectionAlertService : IDisposable
         var sessionKey = BuildSessionKey(path, name);
         var nameKey = BuildNameSessionKey(name);
 
-        // Фиксируем решение в сессии по обоим ключам (путь и имя процесса)
-        _sessionDecisions[sessionKey] = request.Resolution;
+        // Фиксируем решение в сессии по обоим ключам (путь и имя процесса).
+        // Для сессионных решений задаётся ограниченный срок действия, чтобы одно
+        // проигнорированное окно не заглушало программу навсегда.
+        SetSessionDecision(sessionKey, request.Resolution);
         if (!string.IsNullOrWhiteSpace(name))
-            _sessionDecisions[nameKey] = request.Resolution;
+            SetSessionDecision(nameKey, request.Resolution);
 
         // МГНОВЕННО удаляем из ожидающих все алерты, относящиеся к этой же программе
         var keysToRemove = _pendingById.Values
@@ -536,6 +738,132 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Проверяет, разрешен ли порт пользователем для подавления повторных всплывающих алертов.</summary>
     public bool IsPortAllowed(int port) => port > 0 && _allowedPorts.ContainsKey(port);
 
+    /// <summary>
+    /// Возвращает true для сокета, который действительно отражает исходящее соединение:
+    /// TCP в состоянии ESTABLISHED или SYN_SENT. UDP в этом трекере не несёт удалённую
+    /// конечную точку (RemotePort = 0), LISTENING/TIME_WAIT/CLOSE_WAIT алертов не создают.
+    /// </summary>
+    private static bool IsAlertableSocket(ProcessNetworkSocket socket)
+    {
+        var protocol = socket.Protocol ?? string.Empty;
+        if (!protocol.StartsWith("TCP", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var state = socket.State ?? string.Empty;
+        // Пустое состояние трактуем как установленное соединение (совместимость с тестовыми сокетами).
+        if (string.IsNullOrWhiteSpace(state))
+            return true;
+
+        return state.Equals("ESTABLISHED", StringComparison.OrdinalIgnoreCase)
+            || state.Equals("SYN_SENT", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Удаляет устаревшие записи дедупликации (не чаще раза в минуту).</summary>
+    private void PruneSeenKeys()
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastSeenPrune < TimeSpan.FromMinutes(1))
+            return;
+
+        _lastSeenPrune = now;
+        foreach (var kv in _seenKeys)
+        {
+            if (now - kv.Value > SeenKeyTtl)
+                _seenKeys.TryRemove(kv.Key, out _);
+        }
+    }
+
+    /// <summary>
+    /// Фиксирует решение по программе. Бессрочные решения (правило/списки) не истекают,
+    /// сессионные — действуют ограниченное время <see cref="SessionDecisionTtl"/>.
+    /// </summary>
+    private void SetSessionDecision(string key, NetworkAlertResolution resolution)
+    {
+        _sessionDecisions[key] = resolution;
+
+        var ttl = resolution is NetworkAlertResolution.AllowSession
+            or NetworkAlertResolution.BlockSession
+            or NetworkAlertResolution.CreateRule
+            ? SessionDecisionTtl
+            : TimeSpan.MaxValue;
+
+        _sessionDecisionExpiry[key] = ttl == TimeSpan.MaxValue
+            ? DateTime.MaxValue
+            : DateTime.UtcNow + ttl;
+    }
+
+    /// <summary>
+    /// Проверяет активное (не истёкшее) решение по ключу. Истёкшее решение удаляется,
+    /// чтобы программа снова могла порождать алерты.
+    /// </summary>
+    private bool HasActiveSessionDecision(string key)
+    {
+        if (!_sessionDecisions.ContainsKey(key))
+            return false;
+
+        if (_sessionDecisionExpiry.TryGetValue(key, out var expiresAt) && expiresAt <= DateTime.UtcNow)
+        {
+            _sessionDecisions.TryRemove(key, out _);
+            _sessionDecisionExpiry.TryRemove(key, out _);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Синхронизирует белый/чёрный списки, разрешённые порты и флаг PID=0 с хранилищем.
+    /// Вызывается только при изменении ревизии конфига (дешёвый <see cref="JsonDataStore.GetSettings"/>),
+    /// поэтому правки, сделанные через вкладку Firewall, сразу видны детектору.
+    /// </summary>
+    private void RefreshSettingsCache()
+    {
+        if (_store == null)
+            return;
+
+        var revision = _store.Revision;
+        if (revision == _settingsRevision)
+            return;
+
+        lock (_settingsLock)
+        {
+            if (revision == _settingsRevision)
+                return;
+
+            try
+            {
+                var settings = _store.GetSettings();
+                _silentPid0 = settings.FirewallSilentPid0;
+
+                // Чёрный список имеет абсолютный приоритет над белым.
+                var black = new HashSet<string>(
+                    settings.FirewallBlacklistedApps.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()),
+                    StringComparer.OrdinalIgnoreCase);
+                var white = new HashSet<string>(
+                    settings.FirewallWhitelistedApps.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()),
+                    StringComparer.OrdinalIgnoreCase);
+                white.ExceptWith(black);
+
+                _blacklistedApps.Clear();
+                foreach (var a in black) _blacklistedApps.TryAdd(a, 0);
+                _whitelistedApps.Clear();
+                foreach (var a in white) _whitelistedApps.TryAdd(a, 0);
+
+                _allowedPorts.Clear();
+                foreach (var p in settings.FirewallAllowedPorts)
+                {
+                    if (p > 0) _allowedPorts.TryAdd(p, 0);
+                }
+
+                _settingsRevision = revision;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "NetworkAlerts: не удалось обновить кэш настроек из хранилища");
+            }
+        }
+    }
+
     /// <summary>Проверяет, является ли процесс доверенным системным (алерты не создаются никогда).</summary>
     public static bool IsTrustedProcess(string? processName, string? processPath)
     {
@@ -602,8 +930,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>
-    /// Строит кеш путей программ с правилами Firewall (в нижнем регистре) с TTL 60 секунд.
-    /// Обеспечивает 0% загрузку CPU в фоновом режиме.
+    /// Строит кеш нормализованных полных путей программ, у которых есть разрешающее
+    /// ИСХОДЯЩЕЕ правило Firewall (TTL 60 секунд). Обеспечивает 0% загрузку CPU в фоне.
     /// </summary>
     private HashSet<string>? BuildFirewallRulePathSet()
     {
@@ -616,8 +944,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
         try
         {
-            // Высокоскоростное точечное чтение путей без COM-reflection на 12 неиспользуемых свойств
-            var set = _firewall.GetApplicationRulePaths();
+            // Читаем только разрешающие исходящие правила: входящие/блокирующие не подавляют алерт.
+            var set = _firewall.GetOutboundAllowApplicationRulePaths();
             _cachedRulePaths = set;
             _cachedRulePathsTime = now;
             return set;
@@ -630,7 +958,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>
-    /// O(1)-проверка наличия правила Firewall по пред построенному кешу путей.
+    /// O(1)-проверка наличия разрешающего исходящего правила Firewall по пред построенному кешу.
+    /// Сопоставление выполняется ТОЛЬКО по полному нормализованному пути.
     /// </summary>
     private bool HasExistingFirewallRuleCached(string? processPath, string? processName, HashSet<string>? rulePaths)
     {
@@ -643,30 +972,26 @@ public sealed class NetworkConnectionAlertService : IDisposable
         if (rulePaths is null)
             return HasExistingFirewallRule(processPath, processName);
 
-        if (string.IsNullOrWhiteSpace(processPath) && string.IsNullOrWhiteSpace(processName))
-            return false;
+        // Матчинг по имени файла/имени процесса сознательно убран: правило другого файла
+        // с тем же именем (например browser.exe из другого каталога) или только входящее
+        // правило не должны подавлять алерт об исходящем соединении.
+        var normalizedPath = NormalizeProcessPath(processPath);
+        return normalizedPath != null && rulePaths.Contains(normalizedPath);
+    }
 
-        if (!string.IsNullOrWhiteSpace(processPath) &&
-            rulePaths.Contains(processPath.Trim().ToLowerInvariant()))
-            return true;
+    /// <summary>
+    /// Нормализует путь процесса к виду, в котором хранятся пути правил Firewall:
+    /// снимает кавычки, приводит слэши к '\' и регистр к нижнему.
+    /// </summary>
+    private static string? NormalizeProcessPath(string? processPath)
+    {
+        if (string.IsNullOrWhiteSpace(processPath))
+            return null;
 
-        string? wantedFile = null;
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(processPath))
-                wantedFile = Path.GetFileName(processPath.Trim());
-        }
-        catch { }
-
-        if (!string.IsNullOrWhiteSpace(wantedFile) &&
-            rulePaths.Contains(wantedFile.ToLowerInvariant()))
-            return true;
-
-        if (!string.IsNullOrWhiteSpace(processName) &&
-            rulePaths.Contains(processName.Trim().ToLowerInvariant()))
-            return true;
-
-        return false;
+        var path = processPath.Trim().Trim('"');
+        try { path = Environment.ExpandEnvironmentVariables(path); } catch { }
+        path = path.Replace('/', '\\').TrimEnd('\\');
+        return path.Length == 0 ? null : path.ToLowerInvariant();
     }
 
     private bool HasExistingFirewallRule(string? processPath, string? processName)

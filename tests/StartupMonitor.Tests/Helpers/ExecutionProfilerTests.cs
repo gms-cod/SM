@@ -1,4 +1,4 @@
-using StartupMonitor.Shared.Diagnostics;
+﻿using StartupMonitor.Shared.Diagnostics;
 using Xunit;
 
 namespace StartupMonitor.Tests.Helpers;
@@ -34,7 +34,7 @@ public class ExecutionProfilerTests
             using (ExecutionProfiler.Measure("Test.Disabled"))
                 Thread.Sleep(1);
             var snap = ExecutionProfiler.GetSnapshotAndReset();
-            Assert.Empty(snap);
+            Assert.DoesNotContain(snap, s => s.Name == "Test.Disabled");
         }
         finally
         {

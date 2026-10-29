@@ -10,6 +10,9 @@ namespace StartupMonitor.Service.Services.Runtime;
 /// </summary>
 public static class SleepAwareLoop
 {
+    /// <summary>Логгер для фиксации сбоев итерации (тихие падения запрещены).</summary>
+    private static readonly Serilog.ILogger Log = Serilog.Log.ForContext(typeof(SleepAwareLoop));
+
     /// <summary>
     /// Запускает адаптивный цикл. Тело <paramref name="body"/> вызывается только когда
     /// <paramref name="hasWork"/> возвращает <c>true</c>; иначе цикл спит
@@ -36,6 +39,7 @@ public static class SleepAwareLoop
         while (!ct.IsCancellationRequested)
         {
             var worked = false;
+            var iterationFailed = false;
             try
             {
                 worked = hasWork();
@@ -46,10 +50,31 @@ public static class SleepAwareLoop
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Тело обязано логировать само; здесь не роняем цикл.
-                worked = false;
+                // КРИТИЧНО: при сбое нельзя уходить в idle-сон (он может быть Infinite),
+                // иначе подсистема навсегда перестанет просыпаться и перестанет выполнять работу.
+                Log.Warning(ex, "SleepAwareLoop: сбой итерации, повтор через активный интервал");
+                iterationFailed = true;
+            }
+
+            if (iterationFailed)
+            {
+                // Гарантированный повтор через активный интервал (а не бесконечный сон).
+                var retryInterval = activeInterval;
+                if (retryInterval <= TimeSpan.Zero || retryInterval == Timeout.InfiniteTimeSpan)
+                    retryInterval = TimeSpan.FromSeconds(5);
+
+                try
+                {
+                    await gate.WaitAsync(retryInterval, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                continue;
             }
 
             var timeout = worked ? activeInterval : idleInterval;

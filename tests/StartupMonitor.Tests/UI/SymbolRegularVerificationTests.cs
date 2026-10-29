@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using Xunit;
@@ -22,7 +22,7 @@ public class SymbolRegularVerificationTests
         var uiDir = Path.Combine(dir.FullName, "src", "StartupMonitor.UI");
         Assert.True(Directory.Exists(uiDir), $"UI directory not found: {uiDir}");
 
-        var regex = new Regex(@"Symbol=""([A-Za-z0-9]+)""");
+        var regex = new Regex(@"(?:Symbol=""([A-Za-z0-9]+)""|\{ui:SymbolIcon\s+([A-Za-z0-9]+)\})");
         var xamlFiles = Directory.GetFiles(uiDir, "*.xaml", SearchOption.AllDirectories);
 
         var failures = new List<string>();
@@ -33,7 +33,7 @@ public class SymbolRegularVerificationTests
             var matches = regex.Matches(text);
             foreach (Match m in matches)
             {
-                var symName = m.Groups[1].Value;
+                var symName = !string.IsNullOrEmpty(m.Groups[1].Value) ? m.Groups[1].Value : m.Groups[2].Value;
                 if (!Enum.TryParse(typeof(Wpf.Ui.Controls.SymbolRegular), symName, out _))
                 {
                     failures.Add($"{Path.GetFileName(file)}: '{symName}' is not a valid SymbolRegular");
@@ -86,4 +86,3 @@ public class SymbolRegularVerificationTests
         Assert.True(failures.Count == 0, $"Invalid alignments found:\n{string.Join("\n", failures)}");
     }
 }
-

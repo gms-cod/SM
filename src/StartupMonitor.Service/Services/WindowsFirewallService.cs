@@ -572,6 +572,102 @@ public sealed class WindowsFirewallService
     }
 
     /// <summary>
+    /// Возвращает нормализованные полные пути приложений, для которых уже существует
+    /// РАЗРЕШАЮЩЕЕ ИСХОДЯЩЕЕ правило Windows Firewall.
+    /// </summary>
+    /// <remarks>
+    /// Используется детектором сетевых алертов, чтобы не показывать уведомление о новом
+    /// исходящем соединении для программы, которой пользователь уже разрешил исходящий трафик.
+    /// В отличие от <see cref="GetApplicationRulePaths"/> в набор попадают СТРОГО:
+    /// <list type="bullet">
+    /// <item>правила направления Outbound (<c>Direction = 2</c>) — входящие правила (например mDNS-In) не считаются;</item>
+    /// <item>правила действия Allow (<c>Action = 1</c>) — блокирующие правила не подавляют алерт;</item>
+    /// <item>только полные пути (без имён файлов и имён без расширения), нормализованные к нижнему регистру.</item>
+    /// </list>
+    /// Это устраняет ложные срабатывания фильтра «у программы уже есть правило».
+    /// </remarks>
+    public HashSet<string> GetOutboundAllowApplicationRulePaths()
+    {
+        lock (_sync)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            object? policyObj = null;
+            object? rulesObj = null;
+            System.Collections.IEnumerator? enumerator = null;
+            try
+            {
+                dynamic policy = CreatePolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+
+                enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
+                int count = 0;
+                while (true)
+                {
+                    bool moved;
+                    try { moved = enumerator.MoveNext(); }
+                    catch { break; }
+                    if (!moved) break;
+
+                    dynamic r = enumerator.Current;
+                    try
+                    {
+                        // Отбираем только включённые исходящие разрешающие правила.
+                        int dir = SafeGetInt(r, "Direction", DirIn);
+                        int action = SafeGetInt(r, "Action", ActionBlock);
+                        if (dir != DirOut || action != ActionAllow)
+                            continue;
+                        if (!SafeGetBool(r, "Enabled", true))
+                            continue;
+
+                        var normalized = NormalizeRuleAppPath(SafeGet(r, "ApplicationName"));
+                        if (normalized != null)
+                            set.Add(normalized);
+                    }
+                    catch { }
+                    finally
+                    {
+                        Release(r);
+                    }
+
+                    count++;
+                    if (count % 100 == 0)
+                        Thread.Yield();
+                }
+            }
+            catch (Exception ex) when (IsFirewallDown(ex))
+            {
+                Log.Warning(ex, "Firewall недоступен при чтении разрешающих исходящих правил");
+            }
+            finally
+            {
+                Release(enumerator);
+                Release(rulesObj);
+                Release(policyObj);
+            }
+
+            return set;
+        }
+    }
+
+    /// <summary>
+    /// Нормализует ApplicationName правила Firewall к каноническому виду:
+    /// раскрывает переменные окружения, убирает кавычки, приводит слэши к '\' и регистр к нижнему.
+    /// </summary>
+    /// <param name="app">Сырое значение ApplicationName из COM-объекта правила.</param>
+    /// <returns>Нормализованный полный путь либо <c>null</c> для пустого значения.</returns>
+    private static string? NormalizeRuleAppPath(string? app)
+    {
+        if (string.IsNullOrWhiteSpace(app))
+            return null;
+
+        var path = app.Trim().Trim('"');
+        try { path = Environment.ExpandEnvironmentVariables(path); } catch { }
+        path = path.Replace('/', '\\').TrimEnd('\\');
+        return path.Length == 0 ? null : path.ToLowerInvariant();
+    }
+
+    /// <summary>
     /// Создаёт или обновляет произвольное правило <c>HNetCfg.FWRule</c>.
     /// При <c>Direction.Both</c> создаются/обновляются два правила In+Out.
     /// </summary>

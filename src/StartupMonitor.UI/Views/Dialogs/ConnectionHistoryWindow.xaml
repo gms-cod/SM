@@ -1,0 +1,184 @@
+<ui:FluentWindow
+    x:Class="StartupMonitor.UI.Views.Dialogs.ConnectionHistoryWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="История сетевых подключений"
+    WindowStartupLocation="CenterScreen"
+    Background="{ui:ThemeResource ApplicationBackgroundBrush}"
+    ExtendsContentIntoTitleBar="True"
+    Width="1100" Height="720" MinWidth="850" MinHeight="500">
+
+    <Grid Margin="14,0,14,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Верхний TitleBar Fluent -->
+        <ui:TitleBar Grid.Row="0" Title="Журнал и история сетевых подключений" ShowMinimize="True" ShowMaximize="True" ShowClose="True" />
+
+        <!-- Панель фильтров и управления поиском -->
+        <ui:Card Grid.Row="1" Margin="0,0,0,10" Padding="12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Строка 1: Поиск и фильтры -->
+                <ui:TextBox x:Name="TxtSearch" Grid.Row="0" Grid.Column="0"
+                            PlaceholderText="Поиск по имени процесса, PID, IP-адресу или порту..."
+                            TextChanged="OnFilterChanged" Margin="0,0,10,8" />
+
+                <!-- Фильтр по вердикту -->
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,8">
+                    <TextBlock Text="Вердикт:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                    <ComboBox x:Name="CmbVerdict" Width="150" SelectionChanged="OnFilterChanged">
+                        <ComboBoxItem Content="Все вердикты" IsSelected="True" />
+                        <ComboBoxItem Content="Ожидает алерта" />
+                        <ComboBoxItem Content="Разрешено" />
+                        <ComboBoxItem Content="Заблокировано" />
+                        <ComboBoxItem Content="Белый список" />
+                        <ComboBoxItem Content="Чёрный список" />
+                        <ComboBoxItem Content="Создано правило" />
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Фильтр по периоду времени -->
+                <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,8">
+                    <TextBlock Text="Период:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                    <ComboBox x:Name="CmbPeriod" Width="140" SelectionChanged="OnFilterChanged">
+                        <ComboBoxItem Content="Все время" IsSelected="True" />
+                        <ComboBoxItem Content="Последний час" />
+                        <ComboBoxItem Content="Сегодня" />
+                        <ComboBoxItem Content="Последние 24 ч" />
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Фильтр по протоколу -->
+                <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,8">
+                    <TextBlock Text="Протокол:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                    <ComboBox x:Name="CmbProtocol" Width="90" SelectionChanged="OnFilterChanged">
+                        <ComboBoxItem Content="Все" IsSelected="True" />
+                        <ComboBoxItem Content="TCP" />
+                        <ComboBoxItem Content="UDP" />
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Кнопки Обновить и Очистить -->
+                <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,8">
+                    <ui:Button x:Name="BtnRefresh" Content="Обновить" Icon="{ui:SymbolIcon ArrowClockwise24}" Appearance="Secondary"
+                               Click="OnRefreshClick" Margin="0,0,6,0" />
+                    <ui:Button x:Name="BtnClear" Content="Очистить" Icon="{ui:SymbolIcon Delete24}" Appearance="Secondary"
+                               Click="OnClearClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" />
+                </StackPanel>
+
+                <!-- Строка 2: Счётчик записей и подсказка -->
+                <TextBlock x:Name="TxtSummary" Grid.Row="1" Grid.ColumnSpan="5"
+                           Text="Загрузка истории сетевых подключений..." FontSize="11"
+                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+            </Grid>
+        </ui:Card>
+
+        <!-- Таблица записей истории сетевых подключений -->
+        <Border Grid.Row="2" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+            <DataGrid x:Name="GridHistory" AutoGenerateColumns="False" IsReadOnly="True"
+                      SelectionMode="Single" HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal" RowHeight="32"
+                      Background="Transparent" BorderThickness="0"
+                      SelectionChanged="OnSelectionChanged"
+                      MouseDoubleClick="OnItemDoubleClick">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Создать правило: Разрешить исходящие" Click="OnCreateAllowRuleClick" />
+                        <MenuItem Header="Создать правило: Заблокировать исходящие" Click="OnCreateBlockRuleClick" />
+                        <Separator />
+                        <MenuItem Header="Добавить программу в белый список" Click="OnAddToWhitelistClick" />
+                        <MenuItem Header="Добавить программу в чёрный список" Click="OnAddToBlacklistClick" />
+                        <Separator />
+                        <MenuItem Header="Открыть расположение файла" Click="OnOpenLocationClick" />
+                        <MenuItem Header="Копировать удалённый IP-адрес" Click="OnCopyIpClick" />
+                        <MenuItem Header="Копировать полный путь к файлу" Click="OnCopyPathClick" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+
+                <DataGrid.Columns>
+                    <!-- Время -->
+                    <DataGridTextColumn Header="Время" Binding="{Binding LocalTimestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="145" />
+
+                    <!-- Процесс -->
+                    <DataGridTextColumn Header="Процесс" Binding="{Binding ProcessName}" Width="150" />
+
+                    <!-- PID -->
+                    <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="65" />
+
+                    <!-- Протокол -->
+                    <DataGridTextColumn Header="Протокол" Binding="{Binding Protocol}" Width="75" />
+
+                    <!-- Удалённый узел -->
+                    <DataGridTemplateColumn Header="Удалённый адрес / Порт" Width="200">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding CountryFlag}" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding RemoteAddress}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding RemotePort, StringFormat=':{0}'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Страна GeoIP -->
+                    <DataGridTextColumn Header="Страна" Binding="{Binding CountryName}" Width="110" />
+
+                    <!-- Вердикт -->
+                    <DataGridTemplateColumn Header="Вердикт" Width="140">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Verdict}" FontSize="11" FontWeight="SemiBold" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Пояснение -->
+                    <DataGridTextColumn Header="Пояснение / Детали" Binding="{Binding Details}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- Нижняя командная панель действий для выбранной записи -->
+        <Border Grid.Row="3" Margin="0,10,0,0" Padding="8,6"
+                Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button x:Name="BtnAllowRule" Content="Разрешить в брандмауэре" Icon="{ui:SymbolIcon ShieldCheckmark24}"
+                           Appearance="Secondary" Click="OnCreateAllowRuleClick" Margin="0,0,8,0" IsEnabled="False" />
+                <ui:Button x:Name="BtnBlockRule" Content="Заблокировать в брандмауэре" Icon="{ui:SymbolIcon ShieldDismiss24}"
+                           Appearance="Secondary" Click="OnCreateBlockRuleClick" Margin="0,0,8,0" IsEnabled="False" />
+                <ui:Button x:Name="BtnWhitelist" Content="В белый список" Icon="{ui:SymbolIcon CheckmarkCircle24}"
+                           Appearance="Secondary" Click="OnAddToWhitelistClick" Margin="0,0,8,0" IsEnabled="False" />
+                <ui:Button x:Name="BtnBlacklist" Content="В чёрный список" Icon="{ui:SymbolIcon DismissCircle24}"
+                           Appearance="Secondary" Click="OnAddToBlacklistClick" Margin="0,0,8,0" IsEnabled="False" />
+                <ui:Button x:Name="BtnOpenFile" Content="Папка файла" Icon="{ui:SymbolIcon FolderOpen24}"
+                           Appearance="Secondary" Click="OnOpenLocationClick" Margin="0,0,8,0" IsEnabled="False" />
+                <ui:Button x:Name="BtnCopyIp" Content="Копировать IP" Icon="{ui:SymbolIcon Copy24}"
+                           Appearance="Secondary" Click="OnCopyIpClick" Margin="0,0,8,0" IsEnabled="False" />
+                <ui:Button Content="Закрыть" Appearance="Primary" Click="OnCloseClick" HorizontalAlignment="Right" Margin="12,0,0,0" />
+            </WrapPanel>
+        </Border>
+    </Grid>
+</ui:FluentWindow>
+

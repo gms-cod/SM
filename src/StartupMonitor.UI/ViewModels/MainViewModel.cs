@@ -33,8 +33,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Глобальный таймер опроса сетевых алертов брандмауэра (работает автономно).</summary>
     private System.Threading.Timer? _networkAlertPollerTimer;
 
-    /// <summary>Флаг активности отображаемого окна сетевого алерта (предотвращает повторные окна).</summary>
-    private bool _isAlertWindowOpen;
+    /// <summary>Флаг активности отображаемого окна сетевого алерта (предотвращает повторные окна). 1 = открыто.</summary>
+    private int _isAlertWindowOpen;
 
     /// <summary>Флаг защиты от повторного входа в поллер сетевых алертов.</summary>
     private int _isPollingNetworkAlerts;
@@ -477,12 +477,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
             try { _themePollTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(2)); } catch { }
     }
 
-    /// <summary>Приостанавливает всю фоновую активность UI при сворачивании в трей.</summary>
-    public void SuspendBackgroundActivity() => SuspendCpuTimer();
-
-    /// <summary>Возобновляет фоновую активность UI при разворачивании окна из трея.</summary>
-    public void ResumeBackgroundActivity() => ResumeCpuTimer();
-
     /// <summary>Приостановлен ли CPU-таймер (окно скрыто в трей).</summary>
     public bool IsCpuTimerSuspended => _cpuTimerSuspended;
 
@@ -514,6 +508,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // служба перестаёт собирать снапшоты и рассылать метрики (0% CPU).
         _taskManagerWasActive = TaskManager.IsActive;
         _ = TaskManager.DeactivateAsync();
+
+        // ВАЖНО: _networkAlertPollerTimer НЕ останавливается здесь.
+        // Сетевые алерты должны приходить даже когда UI свёрнут в трей — это функция безопасности.
+        // Таймер привязан к состоянию Pipe-соединения (OnPipeClientConnected / OnPipeClientDisconnected),
+        // а не к видимости окна. Проверка _allBackgroundSuspended внутри PollNetworkAlertsAsync тоже убрана.
     }
 
     /// <summary>
@@ -536,6 +535,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Watch логов: только если страница «Логи» была активна
         if (_logWatchTimer != null)
             try { _logWatchTimer.Change(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3)); } catch { }
+
+        // Сетевые алерты: возобновляем поллер (пересоздаём, если был остановлен)
+        try
+        {
+            if (_networkAlertPollerTimer != null)
+                _networkAlertPollerTimer.Change(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+            else
+                StartNetworkAlertPoller();
+        }
+        catch { }
 
         _cpuTimerSuspended = false;
         try { _cpuUsageTimer?.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)); } catch { }
@@ -2801,6 +2810,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return updated;
     }
 
+    /// <summary>Устанавливает ручной рейтинг для записи (от 1 до 5 звёзд) или сбрасывает к автоматической AI-оценке.</summary>
+    public async Task<StartupEntry?> SetUserRatingAsync(string entryId, int stars, bool resetToAi = false)
+    {
+        var updated = await _pipeClient.SetUserRatingAsync(entryId, stars, resetToAi);
+        if (updated != null)
+        {
+            var existing = Entries.FirstOrDefault(e => e.Id == entryId);
+            if (existing != null)
+            {
+                existing.IsUserRating = updated.IsUserRating;
+                existing.AiRating = updated.AiRating;
+                existing.AiCategory = updated.AiCategory;
+                existing.AiRisk = updated.AiRisk;
+                existing.AiRecommendation = updated.AiRecommendation;
+            }
+        }
+        return updated;
+    }
+
+    /// <summary>Запрашивает полный журнал истории сетевых подключений у службы.</summary>
+    public async Task<List<NetworkConnectionHistoryItem>> GetConnectionHistoryAsync(CancellationToken ct = default)
+        => await _pipeClient.GetConnectionHistoryAsync(ct);
+
+    /// <summary>Очищает журнал истории сетевых подключений у службы.</summary>
+    public async Task<bool> ClearConnectionHistoryAsync(CancellationToken ct = default)
+        => await _pipeClient.ClearConnectionHistoryAsync(ct);
+
     // ───────── Живое обновление логов ─────────
 
     /// <summary>Таймер автообновления логов (срабатывает каждые 3 с).</summary>
@@ -3024,11 +3060,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Запускает глобальный опрос сетевых алертов брандмауэра (каждые 2 секунды).</summary>
+    /// <summary>Запускает глобальный опрос сетевых алертов брандмауэра (каждые 2 секунды).
+    /// Работает независимо от видимости главного окна и флага <see cref="_allBackgroundSuspended"/>,
+    /// потому что алерты брандмауэра — функция безопасности, которая обязана работать
+    /// даже когда UI свёрнут в трей. <see cref="SuspendAllBackgroundActivity"/> явно не
+    /// останавливает этот таймер, поэтому здесь нет проверки на приостановку.
+    /// </summary>
     public void StartNetworkAlertPoller()
     {
         _networkAlertPollerTimer?.Dispose();
-        _networkAlertPollerTimer = new Timer(async _ => await PollNetworkAlertsAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        _networkAlertPollerTimer = new Timer(_ => _ = SafePollNetworkAlertsAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+    }
+
+    private async Task SafePollNetworkAlertsAsync()
+    {
+        try
+        {
+            await PollNetworkAlertsAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"MainViewModel.SafePollNetworkAlerts: {ex.Message}");
+        }
     }
 
     /// <summary>Останавливает глобальный опрос сетевых алертов брандмауэра.</summary>
@@ -3036,6 +3089,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         _networkAlertPollerTimer?.Dispose();
         _networkAlertPollerTimer = null;
+        Interlocked.Exchange(ref _isPollingNetworkAlerts, 0);
+        Interlocked.Exchange(ref _isAlertWindowOpen, 0);
     }
 
     /// <summary>
@@ -3047,9 +3102,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (Interlocked.CompareExchange(ref _isPollingNetworkAlerts, 1, 0) != 0)
             return;
 
+        var windowOpened = false;
         try
         {
-            if (!IsConnected || _isAlertWindowOpen)
+            if (!IsConnected)
+                return;
+            if (Interlocked.CompareExchange(ref _isAlertWindowOpen, 0, 0) == 1)
                 return;
 
             List<NetworkConnectionAlertDto>? alerts = null;
@@ -3062,23 +3120,41 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            if (alerts == null || alerts.Count == 0 || _isAlertWindowOpen)
+            if (alerts == null || alerts.Count == 0)
                 return;
+            if (Interlocked.CompareExchange(ref _isAlertWindowOpen, 0, 0) == 1)
+                return;
+
+            if (Interlocked.CompareExchange(ref _isAlertWindowOpen, 1, 0) != 0)
+                return;
+            windowOpened = true;
 
             var alert = alerts[0];
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                if (_isAlertWindowOpen || alert == null)
-                    return;
-
-                _isAlertWindowOpen = true;
-                var window = new NetworkConnectionAlertWindow(alert, _pipeClient, countdownSeconds: 30);
-                window.Closed += (_, _) => { _isAlertWindowOpen = false; };
-                window.Show();
+                try
+                {
+                    var window = new NetworkConnectionAlertWindow(alert, _pipeClient, countdownSeconds: 30);
+                    window.Closed += (_, _) => Interlocked.Exchange(ref _isAlertWindowOpen, 0);
+                    // Owner устанавливаем только если главное окно видимо и не свёрнуто — иначе тост
+                    // может оказаться «заперт» за скрытым окном при работе из трея.
+                    var owner = System.Windows.Application.Current.MainWindow;
+                    if (owner != null && owner.IsVisible && owner.WindowState != System.Windows.WindowState.Minimized)
+                        window.Owner = owner;
+                    window.Show();
+                }
+                catch (Exception ex)
+                {
+                    Interlocked.Exchange(ref _isAlertWindowOpen, 0);
+                    windowOpened = false;
+                    App.Log($"MainViewModel.PollNetworkAlerts.Show: {ex.Message}");
+                }
             });
         }
         catch (Exception ex)
         {
+            if (windowOpened)
+                Interlocked.Exchange(ref _isAlertWindowOpen, 0);
             App.Log($"MainViewModel.PollNetworkAlerts: {ex.Message}");
         }
         finally

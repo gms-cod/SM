@@ -107,6 +107,13 @@ public partial class MainWindow
             _lastNonMinimizedState = WindowState.Normal;
         }
 
+        // При запуске с --minimized окно стартует свёрнутым, но Show() уже вызван в App.OnStartup,
+        // поэтому Loaded сработает, StartupSequence инициализирует Pipe и опрос алертов.
+        if (App.IsMinimized)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
         Loaded += async (_, _) =>
         {
             _hasShown = true;
@@ -137,10 +144,8 @@ public partial class MainWindow
                 else if (savedTab == 9) _ = LoadSnapshotsAsync();
             }
 
-            if (App.IsMinimized)
-            {
-                Hide();
-            }
+            // При --minimized окно уже свёрнуто через WindowState в конструкторе.
+            // Hide() здесь не нужен: Loaded должен дойти до конца, чтобы StartupSequence и опрос алертов инициализировались.
         };
         Closing += (_, e) =>
         {

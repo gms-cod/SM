@@ -678,6 +678,36 @@ public class PipeClient : IDisposable
         return null;
     }
 
+    /// <summary>Устанавливает ручной рейтинг для записи (от 1 до 5 звёзд) или сбрасывает к автоматической AI-оценке.</summary>
+    public async Task<StartupEntry?> SetUserRatingAsync(string entryId, int stars, bool resetToAi = false)
+    {
+        var request = new SetUserRatingRequest
+        {
+            EntryId = entryId,
+            Stars = stars,
+            ResetToAi = resetToAi
+        };
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetUserRating,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        });
+
+        if (response?.Payload != null)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        return null;
+    }
+
     /// <summary>Восстанавливает удалённую запись в системе.</summary>
     public async Task<bool> RestoreEntryAsync(string removedId)
     {
@@ -1563,6 +1593,51 @@ public class PipeClient : IDisposable
         catch
         {
             return new List<NetworkConnectionAlertDto>();
+        }
+    }
+
+    /// <summary>Запрашивает полный журнал истории сетевых подключений у службы.</summary>
+    public async Task<List<NetworkConnectionHistoryItem>> GetConnectionHistoryAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetConnectionHistory
+            }, ct);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Payload))
+                return new List<NetworkConnectionHistoryItem>();
+
+            if (response.Type == PipeMessageTypes.GetConnectionHistoryResponse)
+            {
+                return JsonSerializer.Deserialize<List<NetworkConnectionHistoryItem>>(response.Payload, JsonOptions)
+                    ?? new List<NetworkConnectionHistoryItem>();
+            }
+
+            return new List<NetworkConnectionHistoryItem>();
+        }
+        catch
+        {
+            return new List<NetworkConnectionHistoryItem>();
+        }
+    }
+
+    /// <summary>Запрашивает очистку журнала истории сетевых подключений у службы.</summary>
+    public async Task<bool> ClearConnectionHistoryAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ClearConnectionHistory
+            }, ct);
+
+            return response != null && response.Type == PipeMessageTypes.ClearConnectionHistoryResponse;
+        }
+        catch
+        {
+            return false;
         }
     }
 
