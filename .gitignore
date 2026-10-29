@@ -50,3 +50,5 @@ www/downloads/*.sha256
 tools/*.exe
 tools/*.apk
 tools/apk_build_env/
+.gradle/
+tools/**/.gradle/
