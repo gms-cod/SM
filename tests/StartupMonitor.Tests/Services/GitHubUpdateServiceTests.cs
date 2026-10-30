@@ -257,7 +257,7 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
-    public void IsUpdateCandidate_WhenVersionIsSame_AndRemoteInstallerIsNewer_ReturnsTrueAndSetsFlag()
+    public void IsUpdateCandidate_WhenVersionIsSame_ReturnsFalseEvenIfRemoteInstallerDateIsNewer()
     {
         var remoteVer = new Version(1, 4, 0);
         var localVer = new Version(1, 4, 0);
@@ -267,8 +267,8 @@ public class GitHubUpdateServiceTests
         var candidate = GitHubUpdateService.IsUpdateCandidate(
             remoteVer, localVer, remoteInstallerDate, localBuildDate, out var isNewerByDate);
 
-        Assert.True(candidate);
-        Assert.True(isNewerByDate);
+        Assert.False(candidate);
+        Assert.False(isNewerByDate);
     }
 
     [Fact]

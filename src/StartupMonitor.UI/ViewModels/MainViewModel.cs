@@ -1283,21 +1283,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Локальная переоценка доступности обновления для UI-клиента.
-    /// Возвращает true, если служба сообщила обновление для себя/клиента
-    /// ЛИБО если версия UI-клиента старее удалённой (защита от рассинхрона версий службы и UI).
+    /// Защищает от ложных срабатываний при одинаковых версиях программы или при рассинхроне версий UI и службы.
+    /// Обновление считается доступным только в том случае, если удалённая версия строго выше версии UI (SemVer: remote &gt; local).
     /// </summary>
+    /// <param name="info">Информация об обновлении, полученная от службы.</param>
+    /// <returns>True, если на GitHub обнаружена строго более свежая версия для UI-клиента; иначе false.</returns>
     private static bool IsUpdateEffectivelyAvailable(UpdateInfo? info)
     {
         if (info == null) return false;
-        if (info.IsUpdateAvailable || info.IsUpdateAvailableForClient) return true;
+
         var uiVer = typeof(MainViewModel).Assembly.GetName().Version;
         Version? remoteVer = null;
-        if (info.Version != null)
+        if (!string.IsNullOrWhiteSpace(info.Version))
         {
             try { remoteVer = ParseRemoteSemVer(CleanRemoteVersionTag(info.Version)); } catch { }
         }
-        bool uiIsStale = uiVer != null && remoteVer != null && remoteVer > new Version(uiVer.Major, uiVer.Minor, Math.Max(0, uiVer.Build));
-        return uiIsStale;
+
+        // Если обе версии успешно получены, производим строгое семантическое сравнение
+        if (uiVer != null && remoteVer != null)
+        {
+            var normalizedUiVer = new Version(uiVer.Major, uiVer.Minor, Math.Max(0, uiVer.Build));
+            return remoteVer > normalizedUiVer;
+        }
+
+        // Резервный путь: опираемся на флаг службы только при отсутствии ложного срабатывания по дате
+        return (info.IsUpdateAvailable || info.IsUpdateAvailableForClient) && !info.IsNewerByDate;
     }
 
     /// <summary>Очищает тег версии (убирает префикс 'v' и суффиксы типа '-beta'). Локальная копия логики службы.</summary>
@@ -1723,16 +1733,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
                 if (p.Action == "update_available")
                 {
-                    NotificationRequested?.Invoke(
-                        LocalizationService.Instance.UpdateDialogTitle,
-                        p.Name ?? "Доступна новая версия Startup Monitor",
-                        string.Empty);
-
                     _ = System.Windows.Application.Current?.Dispatcher?.InvokeAsync(async () =>
                     {
                         var res = await _pipeClient.CheckForUpdatesAsync();
                         if (res?.UpdateInfo != null && IsUpdateEffectivelyAvailable(res.UpdateInfo))
                         {
+                            // Проверяем, не была ли версия пропущена пользователем
+                            if (!string.IsNullOrEmpty(SkippedUpdateVersion) &&
+                                string.Equals(SkippedUpdateVersion.TrimStart('v', 'V'), res.UpdateInfo.Version?.TrimStart('v', 'V'), StringComparison.OrdinalIgnoreCase))
+                            {
+                                return;
+                            }
+
+                            NotificationRequested?.Invoke(
+                                LocalizationService.Instance.UpdateDialogTitle,
+                                p.Name ?? "Доступна новая версия Startup Monitor",
+                                string.Empty);
+
                             ShowUpdateAvailableDialog(res.UpdateInfo);
                         }
                     });

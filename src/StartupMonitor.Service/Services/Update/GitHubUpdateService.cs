@@ -629,11 +629,17 @@ public sealed class GitHubUpdateService : IDisposable
         => CompareVersions(remote, current) > 0;
 
     /// <summary>
-    /// Определяет, является ли удалённый релиз кандидатом на обновление по версии и времени создания инсталлятора.
-    /// Если удалённая версия строго выше локальной — обновление доступно.
-    /// Если версии совпадают, проверяется дата создания/обновления инсталлятора: если инсталлятор новее
-    /// локальной сборки более чем на 2 минуты — обновление также считается доступным (перевыпущенный билд).
+    /// Определяет, является ли удалённый релиз кандидатом на обновление по версии.
+    /// Обновление считается доступным строго в том случае, если удалённая версия строго выше локальной (SemVer: remote &gt; local).
+    /// При совпадении версий (cmp == 0) или если локальная версия новее (cmp &lt; 0), обновление категорически не предлагается
+    /// во избежание ложных циклов повторного обновления.
     /// </summary>
+    /// <param name="remoteVersion">Версия удалённого релиза с GitHub.</param>
+    /// <param name="localVersion">Локальная версия сервиса или UI-клиента.</param>
+    /// <param name="remoteInstallerDateUtc">Дата публикации инсталлятора на GitHub (сохраняется для телеметрии).</param>
+    /// <param name="localBuildDateUtc">Локальная дата сборки/установки бинарника (сохраняется для телеметрии).</param>
+    /// <param name="isNewerByDate">Флаг обновления по дате (при строгом следовании SemVer всегда false).</param>
+    /// <returns>True, если удалённая версия строго выше локальной; иначе false.</returns>
     public static bool IsUpdateCandidate(
         Version remoteVersion,
         Version localVersion,
@@ -643,26 +649,7 @@ public sealed class GitHubUpdateService : IDisposable
     {
         isNewerByDate = false;
         var cmp = CompareVersions(remoteVersion, localVersion);
-        if (cmp > 0)
-        {
-            return true;
-        }
-
-        if (cmp == 0)
-        {
-            // Проверка по времени создания/обновления инсталлятора
-            if (remoteInstallerDateUtc.HasValue && localBuildDateUtc.HasValue && localBuildDateUtc.Value > DateTime.MinValue)
-            {
-                // Запас в 2 минуты для сглаживания погрешностей времени сборки и выгрузки в GitHub Releases
-                if (remoteInstallerDateUtc.Value > localBuildDateUtc.Value.AddMinutes(2))
-                {
-                    isNewerByDate = true;
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return cmp > 0;
     }
 
     /// <summary>

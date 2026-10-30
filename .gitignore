@@ -11,8 +11,6 @@
 [Oo]bj/
 [Oo]ut/
 SMon2/
-installers/*.exe
-installers/*.sha256
 
 # Test results
 TestResults/
@@ -44,9 +42,8 @@ delete/
 # Website compiled binaries
 www/downloads/*.exe
 www/downloads/*.zip
-
-installers/*.zip
 www/downloads/*.sha256
+
 tools/*.exe
 tools/*.apk
 tools/apk_build_env/
