@@ -65,6 +65,7 @@ public partial class NetworkConnectionAlertWindow : Window
 
         UpdateCountdownText();
         _countdownTimer.Start();
+        _ = LoadAiVerdictAsync();
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
@@ -263,6 +264,91 @@ public partial class NetworkConnectionAlertWindow : Window
             BtnBlockAlways.IsEnabled = enabled;
             BtnAllowPort.IsEnabled = enabled;
             BtnClose.IsEnabled = enabled;
+        }
+        catch { }
+    }
+
+    /// <summary>Асинхронно загружает или отображает вердикт ИИ о назначении и рисках блокировки процесса.</summary>
+    private async Task LoadAiVerdictAsync()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_alert.AiPurpose))
+            {
+                DisplayAiVerdict(_alert.AiPurpose, _alert.AiBlockingRisk, _alert.AiRecommendation, _alert.AiRecommendedAction);
+                return;
+            }
+
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(25));
+            var result = await _pipeClient.EvaluateNetworkAlertAsync(
+                _alert.AlertId,
+                _alert.ProcessName,
+                _alert.ProcessPath,
+                _alert.RemoteAddress,
+                _alert.RemotePort,
+                cts.Token).ConfigureAwait(true);
+
+            if (result != null && !string.IsNullOrWhiteSpace(result.Purpose))
+            {
+                _alert.AiPurpose = result.Purpose;
+                _alert.AiBlockingRisk = result.BlockingRisk;
+                _alert.AiRecommendation = result.Recommendation;
+                _alert.AiRecommendedAction = result.RecommendedAction;
+
+                DisplayAiVerdict(result.Purpose, result.BlockingRisk, result.Recommendation, result.RecommendedAction);
+            }
+            else
+            {
+                DisplayAiFallback();
+            }
+        }
+        catch
+        {
+            DisplayAiFallback();
+        }
+    }
+
+    private void DisplayAiVerdict(string? purpose, string? risk, string? rec, string? action)
+    {
+        try
+        {
+            AiLoadingPanel.Visibility = Visibility.Collapsed;
+            AiContentPanel.Visibility = Visibility.Visible;
+
+            TxtAiPurpose.Text = !string.IsNullOrWhiteSpace(purpose) ? purpose : "Назначение не определено.";
+            TxtAiBlockingRisk.Text = !string.IsNullOrWhiteSpace(risk) ? risk : "Особых рисков для критических служб не выявлено.";
+            TxtAiRecommendation.Text = !string.IsNullOrWhiteSpace(rec) ? rec : "Решение на усмотрение пользователя.";
+
+            if (!string.IsNullOrWhiteSpace(action))
+            {
+                var actionText = action switch
+                {
+                    "AllowAlways" => "Рекомендация: Разрешить всегда",
+                    "AllowSession" => "Рекомендация: Разрешить на сессию",
+                    "BlockAlways" => "Рекомендация: Заблокировать всегда",
+                    "BlockSession" => "Рекомендация: Заблокировать на сессию",
+                    _ => $"Рекомендация: {action}"
+                };
+                TxtAiRecommendedAction.Text = actionText;
+            }
+            else
+            {
+                TxtAiRecommendedAction.Text = string.Empty;
+            }
+        }
+        catch { }
+    }
+
+    private void DisplayAiFallback()
+    {
+        try
+        {
+            AiLoadingPanel.Visibility = Visibility.Collapsed;
+            AiContentPanel.Visibility = Visibility.Visible;
+            TxtAiPurpose.Text = "Анализ нейросетью недоступен (проверьте настройки AI в параметрах).";
+            TxtAiBlockingRisk.Text = "Стандартное сетевое подключение приложения.";
+            TxtAiRecommendation.Text = "Применяйте стандартные правила брандмауэра.";
+            TxtAiRecommendedAction.Text = string.Empty;
         }
         catch { }
     }

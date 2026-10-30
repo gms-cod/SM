@@ -1,36 +1,48 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using StartupMonitor.Shared.Models.Firewall;
+using StartupMonitor.UI.Models;
 using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.UI.Views.Dialogs;
 
 /// <summary>
 /// Окно настройки службы защиты портов Port Defender.
+/// Предоставляет полноценное интерактивное управление списком отслеживаемых TCP-портов,
+/// порогами срабатывания, длительностью блокировок и белыми списками.
 /// </summary>
 public partial class PortDefenderConfigWindow
 {
     private readonly PipeClient _pipeClient;
     private readonly int? _initialPort;
+    private readonly ObservableCollection<PortDefenderPortItem> _portsCollection = new();
     private PortDefenderConfigDto? _config;
     private bool _isLoading;
 
-    /// <summary>PortDefenderConfigWindow: Выполняет операцию PortDefenderConfigWindow.</summary>
-    /// <param name="pipeClient">Входные данные: значение параметра pipeClient (PipeClient).</param>
-    /// <param name="initialPort">Входные данные: значение параметра initialPort (int?).</param>
+    /// <summary>
+    /// Инициализирует окно настройки службы защиты портов.
+    /// </summary>
+    /// <param name="pipeClient">Клиент именованного канала для связи с системной службой.</param>
+    /// <param name="initialPort">Опциональный целевой порт для предзаполнения в защищаемые.</param>
     public PortDefenderConfigWindow(PipeClient pipeClient, int? initialPort = null)
     {
         InitializeComponent();
-        _pipeClient = pipeClient;
+        _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
         _initialPort = initialPort;
+
+        GridProtectedPorts.ItemsSource = _portsCollection;
 
         Loaded += async (_, _) => await LoadConfigAsync();
     }
 
-    /// <summary>LoadConfigAsync: загружает текущую конфигурацию Port Defender из службы.</summary>
+    /// <summary>
+    /// Загружает текущую конфигурацию Port Defender из фоновой службы.
+    /// </summary>
     private async Task LoadConfigAsync()
     {
         if (_isLoading) return;
@@ -38,20 +50,25 @@ public partial class PortDefenderConfigWindow
 
         try
         {
-            TxtStatus.Text = "Загрузка конфигурации...";
+            TxtStatus.Text = "Загрузка конфигурации Port Defender...";
             _config = await _pipeClient.GetPortDefenderConfigAsync() ?? new PortDefenderConfigDto();
 
-            // Если окно открыто для конкретного порта — предзаполнить его в списке защищаемых.
-            if (_initialPort is >= 1 and <= 65535
-                && _config.ProtectedPorts.All(p => p != _initialPort.Value))
+            // Формируем уникальный отсортированный список портов
+            var ports = new HashSet<int>(_config.ProtectedPorts ?? new List<int>());
+
+            // Если окно открыто для конкретного порта — предзаполнить его в списке
+            if (_initialPort is >= 1 and <= 65535)
             {
-                TxtProtectedPorts.Text = string.Join(", ",
-                    _config.ProtectedPorts.Append(_initialPort.Value).Distinct().OrderBy(p => p));
+                ports.Add(_initialPort.Value);
             }
-            else
+
+            // Заполняем реактивную коллекцию элементов
+            _portsCollection.Clear();
+            foreach (var port in ports.OrderBy(p => p))
             {
-                TxtProtectedPorts.Text = string.Join(", ", _config.ProtectedPorts.Distinct().OrderBy(p => p));
+                _portsCollection.Add(new PortDefenderPortItem(port));
             }
+            UpdatePortsCountBadge();
 
             ChkEnabled.IsChecked = _config.Enabled;
             TxtMaxAttempts.Text = _config.MaxAttempts.ToString();
@@ -62,8 +79,8 @@ public partial class PortDefenderConfigWindow
             TxtWhitelist.Text = string.Join(", ", _config.WhitelistIps ?? new List<string>());
 
             TxtStatus.Text = _initialPort.HasValue
-                ? $"Порт {_initialPort.Value} предзаполнен в списке защищаемых."
-                : "Конфигурация загружена.";
+                ? $"Порт {_initialPort.Value} успешно добавлен в список для настройки."
+                : "Конфигурация успешно загружена.";
         }
         catch (Exception ex)
         {
@@ -76,22 +93,162 @@ public partial class PortDefenderConfigWindow
         }
     }
 
-    /// <summary>ParsePorts: разбирает список портов через запятую/пробел/точку с запятой.</summary>
-    /// <param name="text">Входные данные: значение параметра text (string).</param>
-    private static List<int> ParsePorts(string text)
+    /// <summary>
+    /// Обновляет бейдж количества портов в интерфейсе.
+    /// </summary>
+    private void UpdatePortsCountBadge()
     {
-        var result = new List<int>();
-        var parts = (text ?? string.Empty).Split(new[] { ',', ';', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (var part in parts)
+        TxtPortsCountBadge.Text = _portsCollection.Count switch
         {
-            if (int.TryParse(part.Trim(), out var port) && FirewallGuard.IsValidPort(port) && !result.Contains(port))
-                result.Add(port);
-        }
-        return result;
+            0 => "0 портов",
+            1 => "1 порт",
+            >= 2 and <= 4 => $"{_portsCollection.Count} порта",
+            _ => $"{_portsCollection.Count} портов"
+        };
     }
 
-    /// <summary>ParseWhitelist: разбирает белый список IP через запятую или перенос строки.</summary>
-    /// <param name="text">Входные данные: значение параметра text (string).</param>
+    /// <summary>
+    /// Обрабатывает нажатие кнопки добавления нового порта.
+    /// </summary>
+    private void OnAddPortClick(object sender, RoutedEventArgs e)
+    {
+        var existing = _portsCollection.Select(p => p.Port);
+        var dialog = new PortDefenderPortEditWindow(null, existing) { Owner = this };
+
+        if (dialog.ShowDialog() == true)
+        {
+            var newPort = dialog.ResultPort;
+            var newItem = new PortDefenderPortItem(newPort);
+
+            // Вставляем с сохранением сортировки по возрастанию номера порта
+            int index = 0;
+            while (index < _portsCollection.Count && _portsCollection[index].Port < newPort)
+            {
+                index++;
+            }
+            _portsCollection.Insert(index, newItem);
+            GridProtectedPorts.SelectedItem = newItem;
+            UpdatePortsCountBadge();
+            TxtStatus.Text = $"Порт #{newPort} ({newItem.ServiceName}) добавлен в список отслеживания.";
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает нажатие кнопки редактирования выбранного порта из панели действий.
+    /// </summary>
+    private void OnEditPortClick(object sender, RoutedEventArgs e)
+    {
+        if (GridProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            EditPortItem(selectedItem);
+        }
+        else
+        {
+            TxtStatus.Text = "Выберите порт в таблице для редактирования.";
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает клик по кнопке редактирования внутри строки DataGrid.
+    /// </summary>
+    private void OnRowEditPortClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PortDefenderPortItem item })
+        {
+            EditPortItem(item);
+        }
+    }
+
+    /// <summary>
+    /// Открывает диалог редактирования для конкретного элемента порта.
+    /// </summary>
+    private void EditPortItem(PortDefenderPortItem item)
+    {
+        var existing = _portsCollection.Select(p => p.Port);
+        var dialog = new PortDefenderPortEditWindow(item.Port, existing) { Owner = this };
+
+        if (dialog.ShowDialog() == true && dialog.ResultPort != item.Port)
+        {
+            int oldPort = item.Port;
+            item.UpdatePort(dialog.ResultPort);
+
+            // Пересортировываем коллекцию
+            var sorted = _portsCollection.OrderBy(p => p.Port).ToList();
+            _portsCollection.Clear();
+            foreach (var p in sorted)
+            {
+                _portsCollection.Add(p);
+            }
+            GridProtectedPorts.SelectedItem = item;
+            TxtStatus.Text = $"Порт #{oldPort} изменён на #{dialog.ResultPort} ({item.ServiceName}).";
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает нажатие кнопки удаления выбранного порта из панели действий.
+    /// </summary>
+    private void OnDeletePortClick(object sender, RoutedEventArgs e)
+    {
+        if (GridProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            DeletePortItem(selectedItem);
+        }
+        else
+        {
+            TxtStatus.Text = "Выберите порт в таблице для удаления.";
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает клик по кнопке удаления внутри строки DataGrid.
+    /// </summary>
+    private void OnRowDeletePortClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PortDefenderPortItem item })
+        {
+            DeletePortItem(item);
+        }
+    }
+
+    /// <summary>
+    /// Удаляет порт из коллекции с подтверждением и обновлением счетчика.
+    /// </summary>
+    private void DeletePortItem(PortDefenderPortItem item)
+    {
+        int portNumber = item.Port;
+        var serviceName = item.ServiceName;
+
+        _portsCollection.Remove(item);
+        UpdatePortsCountBadge();
+        TxtStatus.Text = $"Порт #{portNumber} ({serviceName}) удалён из списка отслеживаемых.";
+    }
+
+    /// <summary>
+    /// Двойной клик по строке таблицы открывает диалог редактирования.
+    /// </summary>
+    private void OnGridPortsMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (GridProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            EditPortItem(selectedItem);
+        }
+    }
+
+    /// <summary>
+    /// Обработка горячей клавиши Delete на строках таблицы.
+    /// </summary>
+    private void OnGridPortsKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && GridProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            DeletePortItem(selectedItem);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Разбирает список доверенных IP-адресов через запятую, пробел или новую строку.
+    /// </summary>
     private static List<string> ParseWhitelist(string text)
     {
         var result = new List<string>();
@@ -105,26 +262,31 @@ public partial class PortDefenderConfigWindow
         return result;
     }
 
-    /// <summary>ParsePositiveInt: разбирает положительное целое число с дефолтом.</summary>
-    /// <param name="text">Входные данные: значение параметра text (string).</param>
-    /// <param name="fallback">Входные данные: значение параметра fallback (int).</param>
+    /// <summary>
+    /// Разбирает целое число с безопасным значением по умолчанию.
+    /// </summary>
     private static int ParsePositiveInt(string text, int fallback) =>
         int.TryParse((text ?? string.Empty).Trim(), out var value) && value >= 0 ? value : fallback;
 
-    /// <summary>OnSaveClick: сохраняет конфигурацию через PipeClient.SetPortDefenderConfigAsync.</summary>
-    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
-    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
+    /// <summary>
+    /// Сохраняет обновленную конфигурацию Port Defender через именованный канал в системную службу.
+    /// </summary>
     private async void OnSaveClick(object sender, RoutedEventArgs e)
     {
         try
         {
-            TxtStatus.Text = "Сохранение...";
+            TxtStatus.Text = "Синхронизация конфигурации со службой...";
             var config = _config ?? new PortDefenderConfigDto();
 
             config.Enabled = ChkEnabled.IsChecked == true;
-            config.ProtectedPorts = ParsePorts(TxtProtectedPorts.Text);
+            config.ProtectedPorts = _portsCollection.Select(p => p.Port).Distinct().OrderBy(p => p).ToList();
+
+            // Если список пуст и был начальный порт — гарантируем его сохранение
             if (config.ProtectedPorts.Count == 0 && _initialPort is >= 1 and <= 65535)
+            {
                 config.ProtectedPorts.Add(_initialPort.Value);
+            }
+
             config.MaxAttempts = ParsePositiveInt(TxtMaxAttempts.Text, 10);
             if (config.MaxAttempts == 0) config.MaxAttempts = 10;
             config.WindowSeconds = ParsePositiveInt(TxtWindowSeconds.Text, 60);
@@ -137,7 +299,7 @@ public partial class PortDefenderConfigWindow
             var ok = await _pipeClient.SetPortDefenderConfigAsync(config);
             if (ok)
             {
-                TxtStatus.Text = "Конфигурация сохранена.";
+                TxtStatus.Text = "Конфигурация Port Defender успешно синхронизирована.";
                 DialogResult = true;
                 Close();
             }
@@ -148,13 +310,13 @@ public partial class PortDefenderConfigWindow
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Ошибка сохранения: {ex.Message}";
+            TxtStatus.Text = $"Ошибка сохранения конфигурации: {ex.Message}";
         }
     }
 
-    /// <summary>OnCancelClick: закрывает окно без сохранения.</summary>
-    /// <param name="sender">Входные данные: значение параметра sender (object).</param>
-    /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
+    /// <summary>
+    /// Закрывает окно без сохранения изменений.
+    /// </summary>
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
         DialogResult = false;

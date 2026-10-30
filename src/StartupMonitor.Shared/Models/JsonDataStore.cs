@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models.Snapshot;
@@ -79,12 +80,14 @@ public class JsonDataStore
         _options = new JsonSerializerOptions
         {
             WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNameCaseInsensitive = true
         };
         _historyOptions = new JsonSerializerOptions
         {
             WriteIndented = false,
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNameCaseInsensitive = true
         };
     }
 
@@ -159,7 +162,7 @@ public class JsonDataStore
         AppConfig? legacy = null;
         try
         {
-            legacy = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(_legacyPath), _options);
+            legacy = JsonSerializer.Deserialize<AppConfig>(ReadUtf8Text(_legacyPath), _options);
         }
         catch { }
         legacy ??= new AppConfig();
@@ -181,6 +184,27 @@ public class JsonDataStore
 
     // ───────────────────────────── Section IO ─────────────────────────────
 
+    /// <summary>
+    /// Читает текстовый файл в кодировке UTF-8, бесшовно поддерживая наличие или отсутствие BOM-маркера (P0-03).
+    /// </summary>
+    /// <param name="filePath">Путь к считываемому файлу.</param>
+    /// <returns>Строка содержимого файла без BOM.</returns>
+    private static string ReadUtf8Text(string filePath)
+    {
+        var bytes = File.ReadAllBytes(filePath);
+        if (bytes.Length == 0) return string.Empty;
+
+        var offset = 0;
+        // Проверяем 3-байтовый преамбулу UTF-8 BOM (0xEF, 0xBB, 0xBF)
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        {
+            offset = 3;
+        }
+
+        var text = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetString(bytes, offset, bytes.Length - offset);
+        return text.TrimStart('\uFEFF');
+    }
+
     /// <summary>Читает секцию с защитой от сбоев: при повреждении восстанавливает из .backup (P0-03).</summary>
     private T? ReadSection<T>(string path) where T : class
     {
@@ -191,7 +215,7 @@ public class JsonDataStore
             {
                 try
                 {
-                    var backupJson = File.ReadAllText(backup);
+                    var backupJson = ReadUtf8Text(backup);
                     var restored = JsonSerializer.Deserialize<T>(backupJson, _options);
                     if (restored != null)
                     {
@@ -207,7 +231,7 @@ public class JsonDataStore
 
         try
         {
-            var json = File.ReadAllText(path);
+            var json = ReadUtf8Text(path);
             _writtenHashes[path] = ContentHash(json);
             return JsonSerializer.Deserialize<T>(json, _options);
         }
@@ -218,7 +242,7 @@ public class JsonDataStore
             {
                 try
                 {
-                    var backupJson = File.ReadAllText(backup);
+                    var backupJson = ReadUtf8Text(backup);
                     var restored = JsonSerializer.Deserialize<T>(backupJson, _options);
                     if (restored != null)
                     {
@@ -240,7 +264,7 @@ public class JsonDataStore
         if (!File.Exists(HistoryPath)) return result;
         try
         {
-            var content = File.ReadAllText(HistoryPath);
+            var content = ReadUtf8Text(HistoryPath);
             if (string.IsNullOrWhiteSpace(content)) return result;
 
             using var reader = new StringReader(content);
@@ -319,7 +343,8 @@ public class JsonDataStore
 
         var tmp = path + ".tmp";
         using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
-        using (var writer = new StreamWriter(fs, System.Text.Encoding.UTF8))
+        // Гарантированная запись в чистом UTF-8 БЕЗ BOM (RFC 8259) для исключения битых символов
+        using (var writer = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
         {
             writer.Write(json);
             writer.Flush();

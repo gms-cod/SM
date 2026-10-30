@@ -217,6 +217,73 @@ public class AiRatingServiceTests : IDisposable
         Assert.Contains("STRICTLY IN ENGLISH", enPrompt);
     }
 
+    /// <summary>
+    /// Проверяет извлечение JSON из поля reasoning, если content пустой (для reasoning-моделей gpt-oss-120b, DeepSeek-R1).
+    /// </summary>
+    [Fact]
+    public void ParseResponse_WhenContentEmpty_ExtractsFromReasoning()
+    {
+        var rawJson = "{\"score\": 3, \"category\": \"utility\", \"risk\": \"Легитимный процесс мониторинга\", \"recommendation\": \"allow\"}";
+        var reasoningText = "Рассуждаю о безопасности... Вот итоговый вердикт:\n```json\n" + rawJson + "\n```";
+        
+        var responsePayload = new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        role = "assistant",
+                        content = "",
+                        reasoning = reasoningText
+                    }
+                }
+            }
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(responsePayload);
+        var rating = _service.ParseResponse(json, "TestEntry");
+
+        Assert.NotNull(rating);
+        Assert.Equal(3, rating.Score);
+        Assert.Equal("utility", rating.Category);
+        Assert.Equal("allow", rating.Recommendation);
+    }
+
+    /// <summary>
+    /// Проверяет извлечение JSON из поля thought, если content пустой.
+    /// </summary>
+    [Fact]
+    public void ParseResponse_WhenContentEmpty_ExtractsFromThought()
+    {
+        var rawJson = "{\"score\": 1, \"category\": \"system\", \"risk\": \"Системный файл Windows\", \"recommendation\": \"allow\"}";
+        var thoughtText = "Думаю над назначением программы... Результат: " + rawJson;
+        
+        var responsePayload = new
+        {
+            choices = new[]
+            {
+                new
+                {
+                    message = new
+                    {
+                        role = "assistant",
+                        content = (string?)null,
+                        thought = thoughtText
+                    }
+                }
+            }
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(responsePayload);
+        var rating = _service.ParseResponse(json, "SystemFile");
+
+        Assert.NotNull(rating);
+        Assert.Equal(1, rating.Score);
+        Assert.Equal("system", rating.Category);
+    }
+
     /// <summary>Удаляет временные файлы тестов.</summary>
     public void Dispose()
     {

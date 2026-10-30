@@ -80,6 +80,10 @@ public static class PipeMessageTypes
     public const string CleanStale = "CleanStale";
     /// <summary>Установка AI-конфига (ключ API, URL, модель).</summary>
     public const string SetAiConfig = "SetAiConfig";
+    /// <summary>Запрос конфигурации AI (ключ API, URL, модель) у службы.</summary>
+    public const string GetAiConfig = "GetAiConfig";
+    /// <summary>Ответ службы с конфигурацией AI.</summary>
+    public const string GetAiConfigResponse = "GetAiConfigResponse";
     /// <summary>Тестовый запрос к AI для проверки ключа и настроек.</summary>
     public const string TestAiConnection = "TestAiConnection";
     /// <summary>Ответ на тестовый запрос к AI.</summary>
@@ -258,6 +262,13 @@ public static class PipeMessageTypes
     public const string GetAlertsEnabled = "GetAlertsEnabled";
     /// <summary>Ответ службы с состоянием детектора новых сетевых подключений.</summary>
     public const string GetAlertsEnabledResponse = "GetAlertsEnabledResponse";
+
+    /// <summary>Запрос оценки сетевого процесса нейросетью.</summary>
+    public const string EvaluateNetworkAlert = "EvaluateNetworkAlert";
+    /// <summary>Ответ службы с оценкой сетевого процесса нейросетью.</summary>
+    public const string EvaluateNetworkAlertResponse = "EvaluateNetworkAlertResponse";
+    /// <summary>Установка настроек автономных решений ИИ для сетевых подключений.</summary>
+    public const string SetAiAutonomousDecisions = "SetAiAutonomousDecisions";
 
     /// <summary>Установка тихого режима для сокетов без определенного процесса (PID = 0).</summary>
     public const string SetFirewallSilentPid0 = "SetFirewallSilentPid0";
@@ -560,6 +571,30 @@ public record FirewallSilentPid0Payload(bool Silent);
 
 /// <summary>Полезная нагрузка ответа на решение по сетевому алерту.</summary>
 public record ResolveNetworkAlertResultPayload(bool Success, string Message);
+
+/// <summary>Запрос оценки сетевого подключения нейросетью.</summary>
+public record EvaluateNetworkAlertRequest(
+    [property: JsonPropertyName("alertId")] string AlertId,
+    [property: JsonPropertyName("processName")] string ProcessName,
+    [property: JsonPropertyName("processPath")] string ProcessPath,
+    [property: JsonPropertyName("remoteAddress")] string RemoteAddress,
+    [property: JsonPropertyName("remotePort")] int RemotePort
+);
+
+/// <summary>Ответ с вердиктом нейросети по сетевому подключению.</summary>
+public record EvaluateNetworkAlertResponsePayload(
+    [property: JsonPropertyName("alertId")] string AlertId,
+    [property: JsonPropertyName("purpose")] string Purpose,
+    [property: JsonPropertyName("blockingRisk")] string BlockingRisk,
+    [property: JsonPropertyName("recommendation")] string Recommendation,
+    [property: JsonPropertyName("recommendedAction")] string RecommendedAction
+);
+
+/// <summary>Полезная нагрузка настроек автономных решений ИИ.</summary>
+public record AiAutonomousDecisionsPayload(
+    [property: JsonPropertyName("enabled")] bool Enabled,
+    [property: JsonPropertyName("mode")] string Mode
+);
 
 /// <summary>Полезная нагрузка запроса импорта правил брандмауэра из бэкапа.</summary>
 public sealed class ImportFirewallRulesRequest

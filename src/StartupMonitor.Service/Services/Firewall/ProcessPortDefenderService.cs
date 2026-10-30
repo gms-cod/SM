@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -100,7 +100,8 @@ public sealed class ProcessPortDefenderService : IDisposable
         if (!_uiActive) return false;
         lock (_sync)
         {
-            return _config.IsGloballyEnabled && _config.Rules.Any(r => r.IsEnabled);
+            return _config.IsGloballyEnabled &&
+                   (_config.Rules.Any(r => r.IsEnabled) || (_config.ProtectedPorts != null && _config.ProtectedPorts.Count > 0));
         }
     }
 
@@ -198,11 +199,30 @@ public sealed class ProcessPortDefenderService : IDisposable
         if (config == null) return;
         lock (_sync)
         {
+            var oldPorts = new HashSet<int>(_config.ProtectedPorts ?? Enumerable.Empty<int>());
+            NormalizeAndSynchronizeRules(config);
+            var newPorts = new HashSet<int>(config.ProtectedPorts ?? Enumerable.Empty<int>());
+
+            // Очищаем ключи удаленных портов из дедупликатора
+            var removedPorts = oldPorts.Except(newPorts).ToHashSet();
+            if (removedPorts.Count > 0 && _previousConnectionKeys.Count > 0)
+            {
+                _previousConnectionKeys.RemoveWhere(k =>
+                {
+                    int arrowIdx = k.LastIndexOf("->", StringComparison.Ordinal);
+                    if (arrowIdx >= 0 && int.TryParse(k.Substring(arrowIdx + 2), out var p))
+                    {
+                        return removedPorts.Contains(p);
+                    }
+                    return false;
+                });
+            }
+
             _config = config;
             SaveConfigToFile();
         }
-        _logger.LogInformation("PortDefender: Конфигурация обновлена. Правил: {Count}, Активен: {Enabled}",
-            config.Rules?.Count ?? 0, config.IsGloballyEnabled);
+        _logger.LogInformation("PortDefender: Конфигурация обновлена. Портов: {PortCount}, Правил: {RuleCount}, Активен: {Enabled}",
+            config.ProtectedPorts?.Count ?? 0, config.Rules?.Count ?? 0, config.IsGloballyEnabled);
 
         // Смена правил → немедленный пересчёт режима сна (активный опрос либо 0% CPU Idle).
         _wake.Pulse();
@@ -306,11 +326,15 @@ public sealed class ProcessPortDefenderService : IDisposable
             cfg = _config;
         }
 
-        if (!cfg.IsGloballyEnabled || cfg.Rules.Count == 0)
+        if (!cfg.IsGloballyEnabled)
+            return;
+
+        var activeRules = GetEffectiveRules(cfg);
+        if (activeRules.Count == 0)
             return;
 
         // Индексируем активные правила по LocalPort
-        var rulesByPort = cfg.Rules
+        var rulesByPort = activeRules
             .Where(r => r.IsEnabled)
             .ToLookup(r => r.LocalPort);
 
@@ -665,6 +689,7 @@ public sealed class ProcessPortDefenderService : IDisposable
                 var loaded = JsonSerializer.Deserialize<PortDefenderConfigDto>(json, JsonOptions);
                 if (loaded != null)
                 {
+                    NormalizeAndSynchronizeRules(loaded);
                     _config = loaded;
                     return;
                 }
@@ -676,12 +701,115 @@ public sealed class ProcessPortDefenderService : IDisposable
         }
 
         // Значения по умолчанию
-        _config = new PortDefenderConfigDto
+        var def = new PortDefenderConfigDto
         {
             IsGloballyEnabled = true,
             DefaultBanDurationMinutes = 15,
+            ProtectedPorts = new List<int> { 3389 },
             Rules = []
         };
+        NormalizeAndSynchronizeRules(def);
+        _config = def;
+    }
+
+    /// <summary>
+    /// Нормализует список защищаемых портов и синхронизирует его со списком правил.
+    /// Гарантирует, что каждый защищаемый порт имеет активное правило мониторинга сокетов,
+    /// а удаленные порты исключаются из активного сканирования.
+    /// </summary>
+    private static void NormalizeAndSynchronizeRules(PortDefenderConfigDto config)
+    {
+        if (config == null) return;
+
+        config.ProtectedPorts ??= new List<int>();
+        config.Rules ??= new List<PortDefenderRuleConfig>();
+
+        // Очищаем и нормализуем защищаемые порты (только валидные 1..65535, без дубликатов)
+        var validProtectedPorts = config.ProtectedPorts
+            .Where(p => p is >= 1 and <= 65535)
+            .Distinct()
+            .OrderBy(p => p)
+            .ToList();
+
+        // Порты из явных правил
+        var rulePorts = config.Rules
+            .Where(r => r.LocalPort is >= 1 and <= 65535)
+            .Select(r => r.LocalPort)
+            .ToHashSet();
+
+        // Все порты из правил добавляем в ProtectedPorts
+        foreach (var rp in rulePorts)
+        {
+            if (!validProtectedPorts.Contains(rp))
+            {
+                validProtectedPorts.Add(rp);
+            }
+        }
+        validProtectedPorts.Sort();
+        config.ProtectedPorts = validProtectedPorts;
+
+        // Если для защищаемого порта нет правила — создаем дефолтное
+        var existingRulePorts = config.Rules
+            .Where(r => r.LocalPort is >= 1 and <= 65535)
+            .Select(r => r.LocalPort)
+            .ToHashSet();
+
+        foreach (var port in config.ProtectedPorts)
+        {
+            if (!existingRulePorts.Contains(port))
+            {
+                config.Rules.Add(new PortDefenderRuleConfig
+                {
+                    LocalPort = port,
+                    ProcessPath = null,
+                    IsEnabled = true,
+                    ThresholdCount = config.MaxAttempts > 0 ? config.MaxAttempts : 10,
+                    WindowUnit = config.WindowUnit,
+                    BanDurationMinutes = config.BanDurationMinutes > 0 ? config.BanDurationMinutes : 15,
+                    AutoEscalate = config.AutoEscalate,
+                    WhitelistIps = config.WhitelistIps != null ? new List<string>(config.WhitelistIps) : new()
+                });
+            }
+        }
+
+        // Удаляем общие правила портов (без привязки к конкретному processPath), которых больше нет в ProtectedPorts
+        var protectedSet = new HashSet<int>(config.ProtectedPorts);
+        config.Rules.RemoveAll(r => r.LocalPort > 0 && string.IsNullOrWhiteSpace(r.ProcessPath) && !protectedSet.Contains(r.LocalPort));
+    }
+
+    /// <summary>
+    /// Возвращает эффективный список активных правил с учётом индивидуальных правил и защищаемых портов.
+    /// </summary>
+    private static List<PortDefenderRuleConfig> GetEffectiveRules(PortDefenderConfigDto cfg)
+    {
+        var result = new List<PortDefenderRuleConfig>();
+        if (cfg.Rules != null)
+        {
+            result.AddRange(cfg.Rules.Where(r => r.IsEnabled));
+        }
+
+        if (cfg.ProtectedPorts != null && cfg.ProtectedPorts.Count > 0)
+        {
+            var coveredPorts = result.Select(r => r.LocalPort).ToHashSet();
+            foreach (var port in cfg.ProtectedPorts)
+            {
+                if (port is >= 1 and <= 65535 && !coveredPorts.Contains(port))
+                {
+                    result.Add(new PortDefenderRuleConfig
+                    {
+                        LocalPort = port,
+                        IsEnabled = true,
+                        ThresholdCount = cfg.MaxAttempts > 0 ? cfg.MaxAttempts : 10,
+                        WindowUnit = cfg.WindowUnit,
+                        BanDurationMinutes = cfg.BanDurationMinutes > 0 ? cfg.BanDurationMinutes : 15,
+                        AutoEscalate = cfg.AutoEscalate,
+                        WhitelistIps = cfg.WhitelistIps != null ? new List<string>(cfg.WhitelistIps) : new()
+                    });
+                }
+            }
+        }
+
+        return result;
     }
 
     private void SaveConfigToFile()

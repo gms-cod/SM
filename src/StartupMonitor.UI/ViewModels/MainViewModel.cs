@@ -720,6 +720,52 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _aiModel = "openai/gpt-oss-120b";
 
+    /// <summary>
+    /// Синхронизирует настройки AI: если в ui-settings.json ключ aiApiKey пуст или отсутствует,
+    /// запрашивает актуальный конфиг у системной службы через pipe, обновляет UI и запускает опрос рейтингов.
+    /// </summary>
+    private async Task SyncAiConfigAsync()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(AiApiKey))
+            {
+                var serviceAi = await _pipeClient.GetAiConfigAsync();
+                if (serviceAi != null && !string.IsNullOrWhiteSpace(serviceAi.ApiKey))
+                {
+                    AiApiKey = serviceAi.ApiKey;
+                    if (!string.IsNullOrWhiteSpace(serviceAi.ApiUrl))
+                        AiApiUrl = serviceAi.ApiUrl;
+                    if (!string.IsNullOrWhiteSpace(serviceAi.Model))
+                        AiModel = serviceAi.Model;
+
+                    SaveSetting("aiApiKey", AiApiKey);
+                    SaveSetting("aiApiUrl", AiApiUrl);
+                    SaveSetting("aiModel", AiModel);
+
+                    App.Log($"MainViewModel.SyncAiConfigAsync: AI-ключ успешно получен из службы ({AiApiKey.Length} симв.)");
+
+                    // Запускаем загрузку рейтингов, если они ещё не загружены
+                    if (AiEnabled && _allEntries.Count > 0)
+                    {
+                        _backgroundCts?.Cancel();
+                        _backgroundCts = new CancellationTokenSource();
+                        _ = LoadRatingsAsync(_allEntries, _backgroundCts.Token);
+                    }
+                }
+            }
+            else
+            {
+                // Если локальный ключ уже задан в UI, синхронизируем его со службой
+                await _pipeClient.SetAiConfigAsync(AiApiKey, AiApiUrl, AiModel);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"MainViewModel.SyncAiConfigAsync: ошибка синхронизации: {ex.Message}");
+        }
+    }
+
     partial void OnAiModelChanged(string value)
     {
         SaveSetting("aiModel", value);
@@ -733,6 +779,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Флаг успешности проверки AI (true = зеленый, false = красный).</summary>
     [ObservableProperty]
     private bool _aiTestSuccess;
+
+    /// <summary>Включены ли автономные решения ИИ для сетевых подключений.</summary>
+    [ObservableProperty]
+    private bool _aiAutonomousNetworkDecisionsEnabled;
+
+    partial void OnAiAutonomousNetworkDecisionsEnabledChanged(bool value)
+    {
+        SaveSetting("aiAutonomousNetworkDecisionsEnabled", value);
+        _ = _pipeClient.SetAiAutonomousDecisionsAsync(value, AiAutonomousDecisionMode);
+    }
+
+    /// <summary>Режим автономных решений ИИ по умолчанию ("AllowSession" или "BlockSession").</summary>
+    [ObservableProperty]
+    private string _aiAutonomousDecisionMode = "AllowSession";
+
+    partial void OnAiAutonomousDecisionModeChanged(string value)
+    {
+        SaveSetting("aiAutonomousDecisionMode", value);
+        _ = _pipeClient.SetAiAutonomousDecisionsAsync(AiAutonomousNetworkDecisionsEnabled, value);
+    }
+
+    /// <summary>Список доступных режимов автономных решений ИИ.</summary>
+    public List<AutonomousDecisionModeOption> AutonomousDecisionModeOptions { get; } =
+    [
+        new("AllowSession", "Временно разрешать соединение"),
+        new("BlockSession", "Временно блокировать соединение")
+    ];
 
     /// <summary>Выполняется ли тестирование подключения к AI.</summary>
     [ObservableProperty]
@@ -1438,6 +1511,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _aiApiKey = LoadSetting("aiApiKey", string.Empty);
         _aiApiUrl = LoadSetting("aiApiUrl", "https://api.groq.com/openai/v1/chat/completions");
         _aiModel = LoadSetting("aiModel", "openai/gpt-oss-120b");
+        _aiAutonomousNetworkDecisionsEnabled = LoadSetting("aiAutonomousNetworkDecisionsEnabled", false);
+        _aiAutonomousDecisionMode = LoadSetting("aiAutonomousDecisionMode", "AllowSession");
         _startWithWindows = LoadSetting("startWithWindows", true);
         _cpuThrottleEnabled = LoadSetting("cpuThrottleEnabled", false);
         _cpuThrottleThreshold = LoadSetting("cpuThrottleThreshold", 70);
@@ -1469,11 +1544,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ = _pipeClient.SetKillOnDisableAsync(_killOnDisable);
         _ = _pipeClient.SetStrictModeAsync(_strictMode);
         _ = _pipeClient.SetCpuThrottleAsync(_cpuThrottleEnabled, _cpuThrottleThreshold);
-        _ = _pipeClient.SetAiConfigAsync(_aiApiKey, _aiApiUrl, _aiModel);
+        if (!string.IsNullOrWhiteSpace(_aiApiKey))
+        {
+            _ = _pipeClient.SetAiConfigAsync(_aiApiKey, _aiApiUrl, _aiModel);
+        }
+        else
+        {
+            _ = SyncAiConfigAsync();
+        }
+        _ = _pipeClient.SetAiAutonomousDecisionsAsync(_aiAutonomousNetworkDecisionsEnabled, _aiAutonomousDecisionMode);
         _ = _pipeClient.SetKasperskyConfigAsync(_kasperskyEnabled, _kasperskyApiKey, _kasperskyApiUrl);
         _ = _pipeClient.SetUpdateSettingsAsync(new UpdateSettingsPayload(_autoCheckUpdates, _autoDownloadUpdates, _skippedUpdateVersion));
         SyncRemoteNotifications();
         SyncAutoGuardConfig();
+        _ = SyncAiConfigAsync();
 
         // Таймер периодического обновления текущей загрузки CPU (каждую 1 секунду).
         // П. 2.1: замеряем только UI-процесс + сервис по PID, без тяжёлого Process.GetProcesses().
@@ -3163,3 +3247,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 }
+
+/// <summary>Вариант режима автономных решений ИИ.</summary>
+public record AutonomousDecisionModeOption(string Code, string Display);

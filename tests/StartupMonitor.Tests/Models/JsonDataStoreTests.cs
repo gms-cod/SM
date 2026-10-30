@@ -332,6 +332,60 @@ public class JsonDataStoreTests : IDisposable
         Assert.Equal(2, migratedLines.Length);
     }
 
+    /// <summary>
+    /// Проверяет, что атомарная запись создаёт JSON строго в UTF-8 БЕЗ BOM (RFC 8259).
+    /// </summary>
+    [Fact]
+    public void WriteSectionAtomic_CreatesPureUtf8WithoutBom()
+    {
+        var entry = new StartupEntry { Name = "NoBomTest", FilePath = @"C:\nobom.exe" };
+        _store.AddEntry(entry);
+
+        var entriesPath = Path.Combine(_testDir, "startup-entries.json");
+        Assert.True(File.Exists(entriesPath));
+
+        var bytes = File.ReadAllBytes(entriesPath);
+        Assert.True(bytes.Length >= 3);
+        // Проверяем, что первых трёх байт UTF-8 BOM (0xEF, 0xBB, 0xBF) НЕТ
+        bool hasBom = bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+        Assert.False(hasBom, "Файл JSON содержит UTF-8 BOM, что противоречит стандарту RFC 8259!");
+        // Проверяем, что файл начинается с '[' (0x5B) или '{' (0x7B)
+        Assert.Equal((byte)'[', bytes[0]);
+    }
+
+    /// <summary>
+    /// Проверяет, что чтение секций бесшовно обрабатывает UTF-8 как с BOM-маркером, так и без него.
+    /// </summary>
+    [Fact]
+    public void ReadSection_SeamlesslyReadsUtf8WithAndWithoutBom()
+    {
+        var customDir = Path.Combine(Path.GetTempPath(), $"sm-bom-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(customDir);
+            var settingsPath = Path.Combine(customDir, "settings.json");
+
+            // Записываем файл С BOM-маркером вручную
+            var bomBytes = new byte[] { 0xEF, 0xBB, 0xBF };
+            var jsonBytes = System.Text.Encoding.UTF8.GetBytes("{\"language\": \"ru\", \"theme\": \"light\"}");
+            var combined = new byte[bomBytes.Length + jsonBytes.Length];
+            Buffer.BlockCopy(bomBytes, 0, combined, 0, bomBytes.Length);
+            Buffer.BlockCopy(jsonBytes, 0, combined, bomBytes.Length, jsonBytes.Length);
+            File.WriteAllBytes(settingsPath, combined);
+
+            var customStore = new JsonDataStore(Path.Combine(customDir, "startup-monitor.json"));
+            var loaded = customStore.Load();
+
+            Assert.NotNull(loaded);
+            Assert.Equal("ru", loaded.Language);
+            Assert.Equal("light", loaded.Theme);
+        }
+        finally
+        {
+            try { Directory.Delete(customDir, recursive: true); } catch { }
+        }
+    }
+
     /// <summary>Удаляет временную директорию тестов.</summary>
     public void Dispose()
     {

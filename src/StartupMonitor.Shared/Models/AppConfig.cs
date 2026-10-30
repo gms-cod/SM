@@ -202,6 +202,14 @@ public class AppSettings
     [JsonPropertyName("firewall_blacklisted_apps")]
     public List<string> FirewallBlacklistedApps { get; set; } = [];
 
+    /// <summary>Включены ли автономные решения ИИ для новых сетевых подключений.</summary>
+    [JsonPropertyName("ai_autonomous_network_decisions_enabled")]
+    public bool AiAutonomousNetworkDecisionsEnabled { get; set; }
+
+    /// <summary>Режим автономного решения ИИ по умолчанию ("AllowSession" или "BlockSession").</summary>
+    [JsonPropertyName("ai_autonomous_decision_mode")]
+    public string AiAutonomousDecisionMode { get; set; } = "AllowSession";
+
     /// <summary>Создает глубокую независимую копию настроек приложения.</summary>
     public AppSettings Clone()
     {

@@ -1847,24 +1847,150 @@
 
 
 
-                    <ui:Card Grid.Row="1" Padding="14">
-
-                        <StackPanel>
-
-                            <TextBlock Text="{Binding PortDefenderProtectedPortsLabel, Source={StaticResource Loc}}" FontSize="12" FontWeight="SemiBold"
-
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
-
-                            <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="14"
-
-                                       FontFamily="Consolas, Segoe UI"
-
-                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
-
-                                       TextWrapping="Wrap" />
-
-                        </StackPanel>
-
+                    <ui:Card Grid.Row="1" Grid.RowSpan="2" Padding="14">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Шапка списка портов и кнопки действий -->
+                            <Grid Grid.Row="0" Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="30" Height="30" CornerRadius="6" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="16" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="Защищаемые порты (Port Defender)" FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                    <Border CornerRadius="10" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtDefenderPortsCountBadge" Text="0 портов" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <ui:Button x:Name="BtnAddDefenderPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить порт" Click="OnAddDefenderPortClick" Margin="0,0,6,0" />
+                                    <ui:Button x:Name="BtnEditDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="Редактировать" Click="OnEditDefenderPortClick" Margin="0,0,6,0" />
+                                    <ui:Button x:Name="BtnDeleteDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="Удалить" Click="OnDeleteDefenderPortClick" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Интерактивная таблица портов -->
+                            <DataGrid Grid.Row="1"
+                                      x:Name="GridDefenderProtectedPorts"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserResizeRows="False"
+                                      HeadersVisibility="Column"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      MinHeight="180"
+                                      Background="Transparent"
+                                      BorderThickness="1"
+                                      BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                      MouseDoubleClick="OnGridDefenderPortsMouseDoubleClick"
+                                      PreviewKeyDown="OnGridDefenderPortsKeyDown">
+                                <DataGrid.Columns>
+                                    <!-- Номер порта -->
+                                    <DataGridTemplateColumn Header="Порт" Width="95">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="4" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
+                                                    <TextBlock Text="{Binding FormattedPort}" FontFamily="Consolas, Segoe UI" FontWeight="Bold" FontSize="12" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- Служба -->
+                                    <DataGridTemplateColumn Header="Служба" Width="110">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding ServiceName}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="4,0" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- Уровень риска -->
+                                    <DataGridTemplateColumn Header="Уровень риска" Width="120">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#00897B" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Критический">
+                                                                    <Setter Property="Background" Value="#D32F2F" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Высокий">
+                                                                    <Setter Property="Background" Value="#F57C00" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Средний">
+                                                                    <Setter Property="Background" Value="#FBC02D" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Инфо">
+                                                                    <Setter Property="Background" Value="#1976D2" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding RiskBadge}" FontSize="11" FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RiskBadge}" Value="Средний">
+                                                                        <Setter Property="Foreground" Value="#212121" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <!-- Описание защиты -->
+                                    <DataGridTextColumn Header="Описание защиты" Binding="{Binding Description}" Width="*" />
+
+                                    <!-- Действия в строке -->
+                                    <DataGridTemplateColumn Header="Действия" Width="85">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <ui:Button Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="Редактировать порт" Click="OnRowEditDefenderPortClick">
+                                                        <ui:SymbolIcon Symbol="Edit20" FontSize="14" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                    </ui:Button>
+                                                    <ui:Button Appearance="Transparent" Padding="4" ToolTip="Удалить порт" Click="OnRowDeleteDefenderPortClick">
+                                                        <ui:SymbolIcon Symbol="Delete20" FontSize="14" Foreground="#FF5252" />
+                                                    </ui:Button>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <!-- Нижняя панель подсказки и сводки -->
+                            <Grid Grid.Row="2" Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="💡 Изменения защищаемых портов применяются на лету без перезапуска службы." FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Активные порты: " FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+                                    <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="11" FontFamily="Consolas, Segoe UI" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
                     </ui:Card>
 
                 </Grid>

@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging.Abstractions;
+﻿using Microsoft.Extensions.Logging.Abstractions;
 using StartupMonitor.Service.Services;
 using StartupMonitor.Service.Services.Firewall;
 using StartupMonitor.Shared.Models;
@@ -230,6 +230,108 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
 
         Assert.True(ProcessPortDefenderService.IsIpWhitelisted("172.16.5.99", list));
         Assert.False(ProcessPortDefenderService.IsIpWhitelisted("172.16.6.99", list));
+    }
+
+    /// <summary>
+    /// Проверяет, что порты из ProtectedPorts без явного списка Rules успешно отслеживаются и блокируют атаки.
+    /// </summary>
+    [Fact]
+    public void ProcessSocketSnapshot_ProtectedPortsWithoutExplicitRule_TriggersBan()
+    {
+        _defender.SaveConfig(new PortDefenderConfigDto
+        {
+            IsGloballyEnabled = true,
+            ProtectedPorts = new List<int> { 8088 },
+            MaxAttempts = 3,
+            WindowSeconds = 60,
+            Rules = new List<PortDefenderRuleConfig>()
+        });
+
+        var attackingIp = "198.51.100.99";
+        var sockets = new List<TcpSocketInfo>
+        {
+            new() { LocalPort = 8088, RemoteAddress = attackingIp, RemotePort = 41001, State = "ESTABLISHED" },
+            new() { LocalPort = 8088, RemoteAddress = attackingIp, RemotePort = 41002, State = "ESTABLISHED" },
+            new() { LocalPort = 8088, RemoteAddress = attackingIp, RemotePort = 41003, State = "ESTABLISHED" }
+        };
+
+        _defender.ProcessSocketSnapshot(sockets);
+
+        var bans = _defender.GetActiveBans();
+        Assert.Contains(bans, b => b.Ip == attackingIp && b.TargetPort == 8088);
+    }
+
+    /// <summary>
+    /// Проверяет, что при удалении порта из ProtectedPorts он немедленно перестает отслеживаться.
+    /// </summary>
+    [Fact]
+    public void SaveConfig_PortRemovedFromProtectedPorts_ImmediatelyStopsMonitoring()
+    {
+        _defender.SaveConfig(new PortDefenderConfigDto
+        {
+            IsGloballyEnabled = true,
+            ProtectedPorts = new List<int> { 9099 },
+            MaxAttempts = 2,
+            WindowSeconds = 60
+        });
+
+        // Удаляем порт 9099 и оставляем только 3389
+        _defender.SaveConfig(new PortDefenderConfigDto
+        {
+            IsGloballyEnabled = true,
+            ProtectedPorts = new List<int> { 3389 },
+            MaxAttempts = 2,
+            WindowSeconds = 60
+        });
+
+        var attackingIp = "198.51.100.120";
+        var sockets = new List<TcpSocketInfo>
+        {
+            new() { LocalPort = 9099, RemoteAddress = attackingIp, RemotePort = 42001, State = "ESTABLISHED" },
+            new() { LocalPort = 9099, RemoteAddress = attackingIp, RemotePort = 42002, State = "ESTABLISHED" },
+            new() { LocalPort = 9099, RemoteAddress = attackingIp, RemotePort = 42003, State = "ESTABLISHED" }
+        };
+
+        _defender.ProcessSocketSnapshot(sockets);
+
+        var bans = _defender.GetActiveBans();
+        Assert.DoesNotContain(bans, b => b.Ip == attackingIp && b.TargetPort == 9099);
+    }
+
+    /// <summary>
+    /// Проверяет, что при изменении порта в ProtectedPorts новый порт немедленно защищается.
+    /// </summary>
+    [Fact]
+    public void SaveConfig_PortChangedInProtectedPorts_ImmediatelyProtectsNewPort()
+    {
+        _defender.SaveConfig(new PortDefenderConfigDto
+        {
+            IsGloballyEnabled = true,
+            ProtectedPorts = new List<int> { 7070 },
+            MaxAttempts = 2,
+            WindowSeconds = 60
+        });
+
+        // Заменяем 7070 на 7071
+        _defender.SaveConfig(new PortDefenderConfigDto
+        {
+            IsGloballyEnabled = true,
+            ProtectedPorts = new List<int> { 7071 },
+            MaxAttempts = 2,
+            WindowSeconds = 60
+        });
+
+        var attackingIp = "198.51.100.130";
+        var sockets = new List<TcpSocketInfo>
+        {
+            new() { LocalPort = 7071, RemoteAddress = attackingIp, RemotePort = 43001, State = "ESTABLISHED" },
+            new() { LocalPort = 7071, RemoteAddress = attackingIp, RemotePort = 43002, State = "ESTABLISHED" }
+        };
+
+        _defender.ProcessSocketSnapshot(sockets);
+
+        var bans = _defender.GetActiveBans();
+        Assert.Contains(bans, b => b.Ip == attackingIp && b.TargetPort == 7071);
     }
 
     public void Dispose()

@@ -38,11 +38,13 @@ public sealed class NetworkConnectionAlertServiceTests
         List<ProcessNetworkSocket>? sockets = null,
         Dictionary<int, string>? pathsByPid = null,
         Func<string, bool>? hasRule = null,
-        List<FirewallRuleDto>? appliedRules = null)
+        List<FirewallRuleDto>? appliedRules = null,
+        JsonDataStore? store = null)
     {
         var svc = new NetworkConnectionAlertService(
             new ProcessNetworkTracker(),
-            new WindowsFirewallService())
+            new WindowsFirewallService(),
+            store)
         {
             SocketsProvider = () => sockets ?? new List<ProcessNetworkSocket>(),
             ProcessPathResolver = pid =>
@@ -574,5 +576,202 @@ public sealed class NetworkConnectionAlertServiceTests
         var historyAfter = svc.GetConnectionHistory();
         var itemAfter = Assert.Single(historyAfter, h => h.Id == alert.AlertId);
         Assert.Equal(NetworkConnectionVerdict.RuleCreated, itemAfter.Verdict);
+    }
+
+    /// <summary>
+    /// Проверяет, что при включённых автономных решениях ИИ с режимом AllowSession
+    /// алерт НЕ добавляется в очередь всплывающего окна, а решение AllowSession
+    /// мгновенно фиксируется в сессии и журнале истории с метаданными ИИ.
+    /// </summary>
+    [Fact]
+    public async Task ScanNewConnections_AutonomousAllowSession_AppliesDecisionWithoutAlert()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new JsonDataStore(tmp);
+            var cfg = store.Load();
+            cfg.Settings.AiAutonomousNetworkDecisionsEnabled = true;
+            cfg.Settings.AiAutonomousDecisionMode = "AllowSession";
+            store.Save(cfg);
+
+            var svc = CreateService(
+                sockets: new List<ProcessNetworkSocket> { Sock(5555, "browser.exe", "93.184.216.34", 443) },
+                pathsByPid: Paths((5555, @"C:\Appsrowser.exe")),
+                store: store);
+
+            svc.AiEvaluatorOverride = (name, path, ip, port) => Task.FromResult<(string, string, string, string)?>((
+                "Веб-браузер для доступа в интернет",
+                "Риск блокировки сетевых сайтов и загрузок",
+                "Разрешить подключение на сеанс",
+                "AllowSession"));
+
+            var added = svc.ScanNewConnections();
+
+            // Всплывающий алерт НЕ должен создаваться
+            Assert.Equal(0, added);
+            Assert.Equal(0, svc.PendingCount);
+            Assert.Empty(svc.GetPendingAlerts());
+
+            // Ожидаем завершения асинхронной фиксации автономного решения
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (DateTime.UtcNow < deadline && svc.GetConnectionHistory().Count == 0)
+            {
+                await Task.Delay(20);
+            }
+
+            var history = svc.GetConnectionHistory();
+            Assert.NotEmpty(history);
+            var item = history[0];
+            Assert.Equal(NetworkConnectionVerdict.AllowSession, item.Verdict);
+            Assert.Contains("Веб-браузер", item.Details);
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, что при включённых автономных решениях ИИ с режимом BlockSession
+    /// применяется сессионная блокировка без всплывающих окон.
+    /// </summary>
+    [Fact]
+    public async Task ScanNewConnections_AutonomousBlockSession_AppliesDecisionWithoutAlert()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new JsonDataStore(tmp);
+            var cfg = store.Load();
+            cfg.Settings.AiAutonomousNetworkDecisionsEnabled = true;
+            cfg.Settings.AiAutonomousDecisionMode = "BlockSession";
+            store.Save(cfg);
+
+            var svc = CreateService(
+                sockets: new List<ProcessNetworkSocket> { Sock(6666, "miner.exe", "185.190.140.10", 3333) },
+                pathsByPid: Paths((6666, @"C:\Temp\miner.exe")),
+                store: store);
+
+            svc.AiEvaluatorOverride = (name, path, ip, port) => Task.FromResult<(string, string, string, string)?>((
+                "Подозрительный криптомайнер",
+                "Блокировка безопасна для операционной системы",
+                "Заблокировать сетевой трафик",
+                "BlockSession"));
+
+            var added = svc.ScanNewConnections();
+
+            Assert.Equal(0, added);
+            Assert.Equal(0, svc.PendingCount);
+
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (DateTime.UtcNow < deadline && svc.GetConnectionHistory().Count == 0)
+            {
+                await Task.Delay(20);
+            }
+
+            var history = svc.GetConnectionHistory();
+            Assert.NotEmpty(history);
+            Assert.Equal(NetworkConnectionVerdict.BlockSession, history[0].Verdict);
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, что при отключённых автономных решениях ИИ алерт создаётся штатно
+    /// и обогащается полями AI (AiPurpose, AiBlockingRisk, AiRecommendation).
+    /// </summary>
+    [Fact]
+    public async Task ScanNewConnections_StandardMode_EnrichesPendingAlertWithAi()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new JsonDataStore(tmp);
+            var cfg = store.Load();
+            cfg.Settings.AiAutonomousNetworkDecisionsEnabled = false;
+            store.Save(cfg);
+
+            var svc = CreateService(
+                sockets: new List<ProcessNetworkSocket> { Sock(7777, "telegram.exe", "149.154.167.50", 443) },
+                pathsByPid: Paths((7777, @"C:\Apps	elegram.exe")),
+                store: store);
+
+            svc.AiEvaluatorOverride = (name, path, ip, port) => Task.FromResult<(string, string, string, string)?>((
+                "Мессенджер Telegram",
+                "Нарушится доставка личных сообщений и звонков",
+                "Разрешить соединение",
+                "AllowSession"));
+
+            var added = svc.ScanNewConnections();
+
+            Assert.Equal(1, added);
+            Assert.Equal(1, svc.PendingCount);
+
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            var alerts = svc.GetPendingAlerts();
+            Assert.Single(alerts);
+
+            while (DateTime.UtcNow < deadline && string.IsNullOrEmpty(alerts[0].AiPurpose))
+            {
+                await Task.Delay(20);
+            }
+
+            Assert.Equal("Мессенджер Telegram", alerts[0].AiPurpose);
+            Assert.Equal("Нарушится доставка личных сообщений и звонков", alerts[0].AiBlockingRisk);
+            Assert.Equal("Разрешить соединение", alerts[0].AiRecommendation);
+            Assert.Equal("AllowSession", alerts[0].AiRecommendedAction);
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, что AiRatingService.EvaluateNetworkProcessAsync мгновенно
+    /// распознаёт компоненты StartupMonitor и системные доверенные службы Windows.
+    /// </summary>
+    [Fact]
+    public async Task AiRatingService_EvaluateNetworkProcessAsync_ReturnsImmediateTrustedVerdict()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new JsonDataStore(tmp);
+            var cache = new StartupMonitor.Service.Services.Ai.RatingsCache(store);
+            var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<StartupMonitor.Service.Services.Ai.AiRatingService>.Instance;
+
+            using var aiService = new StartupMonitor.Service.Services.Ai.AiRatingService(cache, logger, "test-api-key");
+
+            // Проверка для StartupMonitor
+            var smonVerdict = await aiService.EvaluateNetworkProcessAsync(
+                "StartupMonitor.Service.exe",
+                @"C:\Program Files\StartupMonitor\StartupMonitor.Service.exe",
+                "1.1.1.1",
+                443);
+
+            Assert.NotNull(smonVerdict);
+            Assert.Equal("AllowAlways", smonVerdict.Value.RecommendedAction);
+            Assert.Contains("Startup Monitor", smonVerdict.Value.Purpose);
+
+            // Проверка для доверенного процесса Windows
+            var sysVerdict = await aiService.EvaluateNetworkProcessAsync(
+                "svchost.exe",
+                @"C:\Windows\System32\svchost.exe",
+                "8.8.8.8",
+                53);
+
+            Assert.NotNull(sysVerdict);
+            Assert.Equal("AllowAlways", sysVerdict.Value.RecommendedAction);
+            Assert.Contains("Windows", sysVerdict.Value.Purpose);
+        }
+        finally
+        {
+            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+        }
     }
 }

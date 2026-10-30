@@ -447,6 +447,23 @@ public class PipeClient : IDisposable
     }
 
     /// <summary>Отправляет службе настройки для AI-рейтинга (ключ API, URL, модель).</summary>
+    /// <summary>Запрашивает актуальную конфигурацию AI у системной службы.</summary>
+    /// <returns>Полезная нагрузка с настройками AI (ключ, URL, модель) или null при ошибке.</returns>
+    public async Task<AiConfigPayload?> GetAiConfigAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAiConfig });
+        if (response?.Type == PipeMessageTypes.GetAiConfigResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<AiConfigPayload>(response.Payload, JsonOptions);
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>Устанавливает конфигурацию AI (ключ API, URL, модель).</summary>
     public async Task SetAiConfigAsync(string apiKey, string? apiUrl = null, string? model = null)
     {
         var payload = JsonSerializer.Serialize(new AiConfigPayload(apiKey, apiUrl, model), JsonOptions);
@@ -1639,6 +1656,46 @@ public class PipeClient : IDisposable
         {
             return false;
         }
+    }
+
+    /// <summary>Запрашивает оценку сетевого подключения нейросетью у службы.</summary>
+    public async Task<EvaluateNetworkAlertResponsePayload?> EvaluateNetworkAlertAsync(
+        string alertId, string processName, string processPath, string remoteAddress, int remotePort, CancellationToken ct = default)
+    {
+        try
+        {
+            var req = new EvaluateNetworkAlertRequest(alertId, processName, processPath, remoteAddress, remotePort);
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.EvaluateNetworkAlert,
+                Payload = JsonSerializer.Serialize(req, JsonOptions)
+            }, ct);
+
+            if (response != null && response.Type == PipeMessageTypes.EvaluateNetworkAlertResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<EvaluateNetworkAlertResponsePayload>(response.Payload, JsonOptions);
+            }
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Отправляет службе настройки автономных решений ИИ для сетевых подключений.</summary>
+    public async Task SetAiAutonomousDecisionsAsync(bool enabled, string mode, CancellationToken ct = default)
+    {
+        try
+        {
+            var payload = new AiAutonomousDecisionsPayload(enabled, mode);
+            await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetAiAutonomousDecisions,
+                Payload = JsonSerializer.Serialize(payload, JsonOptions)
+            }, ct);
+        }
+        catch { }
     }
 
     /// <summary>Включает/выключает детектор новых сетевых подключений на стороне службы.</summary>

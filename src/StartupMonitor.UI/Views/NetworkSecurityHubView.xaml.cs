@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Collections.ObjectModel;
+using System;
 
 using System.Collections.Generic;
 
@@ -77,6 +78,7 @@ public partial class NetworkSecurityHubView : UserControl
     private List<BanRow> _banRows = new();
 
     private PortDefenderConfigDto? _defenderConfig;
+    private readonly ObservableCollection<PortDefenderPortItem> _defenderPortsCollection = new();
 
     private FirewallFilteringMode _currentMode = FirewallFilteringMode.Normal;
 
@@ -607,6 +609,7 @@ public partial class NetworkSecurityHubView : UserControl
     {
 
         InitializeComponent();
+        GridDefenderProtectedPorts.ItemsSource = _defenderPortsCollection;
 
         _pipeClient = pipeClient ?? new PipeClient();
 
@@ -2460,31 +2463,227 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-    private async void OnRefreshDefenderClick(object sender, RoutedEventArgs e)
-
+        private async void OnRefreshDefenderClick(object sender, RoutedEventArgs e)
     {
-
         try
-
         {
-
             await LoadDefenderAsync();
-
             SetStatus("Сводка Port Defender обновлена.");
-
         }
-
         catch (Exception ex)
-
         {
-
             SetStatus($"Ошибка обновления Port Defender: {ex.Message}");
-
         }
-
     }
 
+    /// <summary>
+    /// Обрабатывает нажатие кнопки добавления защищаемого порта на вкладке Port Defender.
+    /// </summary>
+    private async void OnAddDefenderPortClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var owner = Window.GetWindow(this);
+            var existing = _defenderPortsCollection.Select(p => p.Port);
+            var dialog = new PortDefenderPortEditWindow(null, existing);
+            if (owner != null) dialog.Owner = owner;
 
+            if (dialog.ShowDialog() == true)
+            {
+                var newPort = dialog.ResultPort;
+                await AddOrUpdateDefenderPortAsync(newPort, null);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка добавления порта: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает нажатие кнопки редактирования выбранного порта из тулбара вкладки Port Defender.
+    /// </summary>
+    private async void OnEditDefenderPortClick(object sender, RoutedEventArgs e)
+    {
+        if (GridDefenderProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            await EditDefenderPortItemAsync(selectedItem);
+        }
+        else
+        {
+            SetStatus("Выберите порт в таблице для редактирования.");
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает нажатие кнопки редактирования в строке таблицы портов Port Defender.
+    /// </summary>
+    private async void OnRowEditDefenderPortClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PortDefenderPortItem item })
+        {
+            await EditDefenderPortItemAsync(item);
+        }
+    }
+
+    /// <summary>
+    /// Открывает диалог редактирования для выбранного защищаемого порта и сохраняет изменения.
+    /// </summary>
+    private async Task EditDefenderPortItemAsync(PortDefenderPortItem item)
+    {
+        try
+        {
+            var owner = Window.GetWindow(this);
+            var existing = _defenderPortsCollection.Select(p => p.Port);
+            var dialog = new PortDefenderPortEditWindow(item.Port, existing);
+            if (owner != null) dialog.Owner = owner;
+
+            if (dialog.ShowDialog() == true && dialog.ResultPort != item.Port)
+            {
+                await AddOrUpdateDefenderPortAsync(dialog.ResultPort, item.Port);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка редактирования порта: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает нажатие кнопки удаления выбранного порта из тулбара вкладки Port Defender.
+    /// </summary>
+    private async void OnDeleteDefenderPortClick(object sender, RoutedEventArgs e)
+    {
+        if (GridDefenderProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            await DeleteDefenderPortItemAsync(selectedItem);
+        }
+        else
+        {
+            SetStatus("Выберите порт в таблице для удаления.");
+        }
+    }
+
+    /// <summary>
+    /// Обрабатывает нажатие кнопки удаления в строке таблицы портов Port Defender.
+    /// </summary>
+    private async void OnRowDeleteDefenderPortClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PortDefenderPortItem item })
+        {
+            await DeleteDefenderPortItemAsync(item);
+        }
+    }
+
+    /// <summary>
+    /// Удаляет выбранный порт из конфигурации Port Defender и синхронизирует со службой.
+    /// </summary>
+    private async Task DeleteDefenderPortItemAsync(PortDefenderPortItem item)
+    {
+        try
+        {
+            var config = _defenderConfig ?? await _pipeClient.GetPortDefenderConfigAsync() ?? new PortDefenderConfigDto();
+            var portToRemove = item.Port;
+            var serviceName = item.ServiceName;
+
+            var updatedPorts = (config.ProtectedPorts ?? new List<int>())
+                .Where(p => p != portToRemove)
+                .Distinct()
+                .OrderBy(p => p)
+                .ToList();
+
+            config.ProtectedPorts = updatedPorts;
+
+            var ok = await _pipeClient.SetPortDefenderConfigAsync(config);
+            if (ok)
+            {
+                _defenderConfig = config;
+                _defenderPortsCollection.Remove(item);
+                UpdateDefenderPortsSummary();
+                SetStatus($"Порт #{portToRemove} ({serviceName}) удалён из мониторинга Port Defender.");
+            }
+            else
+            {
+                SetStatus($"Служба не подтвердила удаление порта #{portToRemove}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка при удалении порта: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Добавляет новый или обновляет существующий защищаемый порт с немедленной синхронизацией со службой.
+    /// </summary>
+    private async Task AddOrUpdateDefenderPortAsync(int newPort, int? oldPort)
+    {
+        var config = _defenderConfig ?? await _pipeClient.GetPortDefenderConfigAsync() ?? new PortDefenderConfigDto();
+        var ports = new HashSet<int>(config.ProtectedPorts ?? new List<int>());
+
+        if (oldPort.HasValue)
+        {
+            ports.Remove(oldPort.Value);
+        }
+        ports.Add(newPort);
+
+        config.ProtectedPorts = ports.OrderBy(p => p).ToList();
+
+        var ok = await _pipeClient.SetPortDefenderConfigAsync(config);
+        if (ok)
+        {
+            _defenderConfig = config;
+            await LoadDefenderAsync();
+            var msg = oldPort.HasValue
+                ? $"Порт #{oldPort.Value} успешно заменён на #{newPort} в Port Defender."
+                : $"Порт #{newPort} успешно добавлен в мониторинг Port Defender.";
+            SetStatus(msg);
+        }
+        else
+        {
+            SetStatus("Служба не подтвердила сохранение обновлённых портов.");
+        }
+    }
+
+    /// <summary>
+    /// Двойной клик по строке таблицы портов Port Defender открывает диалог редактирования.
+    /// </summary>
+    private async void OnGridDefenderPortsMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (GridDefenderProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            await EditDefenderPortItemAsync(selectedItem);
+        }
+    }
+
+    /// <summary>
+    /// Обработка нажатия клавиши Delete для удаления выбранного порта.
+    /// </summary>
+    private async void OnGridDefenderPortsKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && GridDefenderProtectedPorts.SelectedItem is PortDefenderPortItem selectedItem)
+        {
+            await DeleteDefenderPortItemAsync(selectedItem);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Обновляет текстовую сводку и счетчик портов Port Defender.
+    /// </summary>
+    private void UpdateDefenderPortsSummary()
+    {
+        TxtDefenderPortsCountBadge.Text = _defenderPortsCollection.Count switch
+        {
+            0 => "0 портов",
+            1 => "1 порт",
+            >= 2 and <= 4 => $"{_defenderPortsCollection.Count} порта",
+            _ => $"{_defenderPortsCollection.Count} портов"
+        };
+
+        var ports = _defenderPortsCollection.Select(p => p.Port).OrderBy(p => p).ToList();
+        TxtDefenderPorts.Text = ports.Count > 0 ? string.Join(", ", ports) : "Нет защищаемых портов";
+    }
 
     // ===== Баны =====
 

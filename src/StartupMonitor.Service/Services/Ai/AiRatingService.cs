@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -30,6 +30,8 @@ public class AiRatingService : IDisposable
         string? apiUrl = null, string? model = null)
     {
         _http = new HttpClient();
+        // Каноничный User-Agent для исключения блокировок Cloudflare/Groq WAF (403 Forbidden)
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd("StartupMonitor/2.0");
         _cache = cache;
         _logger = logger;
         _apiKey = apiKey;
@@ -134,7 +136,7 @@ public class AiRatingService : IDisposable
                 model = mdl,
                 messages = new[] { new { role = "user", content = "Respond with JSON: {\"status\": \"ok\"}" } },
                 temperature = 0.1,
-                max_tokens = 50
+                max_tokens = 400
             };
             var jsonBody = JsonSerializer.Serialize(body);
             using var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
@@ -712,27 +714,74 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
 {{""score"": <integer 1-10>, ""category"": ""<category in English>"", ""risk"": ""<comprehensive and clear human-readable explanation covering all 4 points: what this program is, what the arguments do, whether it is needed at boot, security verdict. 4-8 sentences in English>"", ""recommendation"": ""<actionable recommendation: Allow startup / Recommend disabling for faster boot / Block and remove, with a concise explanation in English>""}}";
     }
 
-    /// <summary>ParseResponse: Выполняет операцию ParseResponse.</summary>
-    /// <param name="json">Входные данные: значение параметра json (string).</param>
-    /// <param name="entryName">Входные данные: значение параметра entryName (string).</param>
-    /// <returns>Выходные данные: результирующее значение типа StartupRating?.</returns>
+    /// <summary>
+    /// Выполняет разбор JSON-ответа модели с поддержкой reasoning/thought блоков для рассуждающих моделей.
+    /// </summary>
+    /// <param name="json">Сырой JSON-ответ API.</param>
+    /// <param name="entryName">Имя анализируемой записи для журнала ошибок.</param>
+    /// <returns>Экземпляр StartupRating или null при ошибке разбора.</returns>
     internal StartupRating? ParseResponse(string json, string entryName)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
-            var text = doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString();
+            if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+                return null;
 
-            if (string.IsNullOrEmpty(text)) return null;
+            var choice = choices[0];
+            if (!choice.TryGetProperty("message", out var messageElem))
+                return null;
+
+            string? text = null;
+            if (messageElem.TryGetProperty("content", out var contentProp) && contentProp.ValueKind == JsonValueKind.String)
+            {
+                text = contentProp.GetString();
+            }
+
+            // Если основной content пустой, проверяем reasoning/thought поля (reasoning, reasoning_content, thought)
+            // Это критически важно для рассуждающих моделей (openai/gpt-oss-120b, deepseek-r1 и др.)
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                if (messageElem.TryGetProperty("reasoning", out var reasoningProp) && reasoningProp.ValueKind == JsonValueKind.String)
+                {
+                    text = reasoningProp.GetString();
+                }
+                else if (messageElem.TryGetProperty("reasoning_content", out var reasoningContentProp) && reasoningContentProp.ValueKind == JsonValueKind.String)
+                {
+                    text = reasoningContentProp.GetString();
+                }
+                else if (messageElem.TryGetProperty("thought", out var thoughtProp) && thoughtProp.ValueKind == JsonValueKind.String)
+                {
+                    text = thoughtProp.GetString();
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(text)) return null;
 
             var cleaned = text.Trim();
-            if (cleaned.StartsWith("```json")) cleaned = cleaned[7..];
-            if (cleaned.EndsWith("```")) cleaned = cleaned[..^3];
-            cleaned = cleaned.Trim();
+
+            // Если в ответе содержится markdown-блок ```json ... ```
+            var jsonBlockMatch = System.Text.RegularExpressions.Regex.Match(cleaned, @"```(?:json)?\s*(\{[\s\S]*?\})\s*```");
+            if (jsonBlockMatch.Success)
+            {
+                cleaned = jsonBlockMatch.Groups[1].Value.Trim();
+            }
+            else
+            {
+                // Если markdown-блока нет, но есть JSON-объект в тексте (например, внутри reasoning/thought)
+                var firstBrace = cleaned.IndexOf('{');
+                var lastBrace = cleaned.LastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace)
+                {
+                    cleaned = cleaned.Substring(firstBrace, lastBrace - firstBrace + 1).Trim();
+                }
+                else
+                {
+                    if (cleaned.StartsWith("```json")) cleaned = cleaned[7..];
+                    if (cleaned.EndsWith("```")) cleaned = cleaned[..^3];
+                    cleaned = cleaned.Trim();
+                }
+            }
 
             if (cleaned.StartsWith('<') && cleaned.Contains('>'))
             {
@@ -744,7 +793,8 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
 
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"(?<!\\)\\(?![""\\/bfnrt]|u[0-9a-fA-F]{4})", @"\\");
 
-            var rating = JsonSerializer.Deserialize<StartupRating>(cleaned);
+            var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var rating = JsonSerializer.Deserialize<StartupRating>(cleaned, jsonOptions);
             if (rating != null)
                 rating.Score = Math.Clamp(rating.Score, 1, 10);
             return rating;
@@ -757,7 +807,287 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         }
     }
 
-    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
-    /// <param name=")">Входные данные: значение параметра ) ().</param>
+    /// <summary>Кэш оценок сетевых процессов для исключения повторных запросов к API.</summary>
+    private readonly ConcurrentDictionary<string, (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)> _networkEvaluationsCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Выполняет анализ сетевого процесса с помощью LLM (Groq / OpenAI) для формирования контекстной справки и рекомендации.
+    /// </summary>
+    /// <param name="processName">Имя исполняемого файла (например, "chrome.exe").</param>
+    /// <param name="processPath">Полный путь к исполняемому файлу на диске.</param>
+    /// <param name="remoteAddress">Удалённый IP-адрес назначения.</param>
+    /// <param name="remotePort">Удалённый порт назначения.</param>
+    /// <returns>Кортеж с назначением, рисками, рекомендацией и действием или null при сбое.</returns>
+    public async Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?> EvaluateNetworkProcessAsync(
+        string processName, string? processPath, string remoteAddress, int remotePort)
+    {
+        using var _prof = ExecutionProfiler.Measure("Service.Ai.EvaluateNetworkProcess");
+
+        var pName = string.IsNullOrWhiteSpace(processName) ? "unknown.exe" : processName.Trim();
+        var pPath = string.IsNullOrWhiteSpace(processPath) ? string.Empty : processPath.Trim();
+        var remote = string.IsNullOrWhiteSpace(remoteAddress) ? "0.0.0.0" : remoteAddress.Trim();
+
+        // 1. Собственные компоненты StartupMonitor всегда считаются доверенными
+        if (pName.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase) ||
+            pPath.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase))
+        {
+            return (
+                "Официальный служебный компонент защитного комплекса Startup Monitor.",
+                "Блокировка нарушит мониторинг автозапуска, контроль портов и межсетевой экран.",
+                "Разрешить сетевое взаимодействие. Процесс полностью доверен.",
+                "AllowAlways"
+            );
+        }
+
+        // 2. Системные доверенные процессы Windows
+        if (StartupMonitor.Service.Services.Firewall.NetworkConnectionAlertService.IsTrustedProcess(pName, pPath))
+        {
+            return (
+                "Критически важный системный процесс операционной системы Windows.",
+                "Блокировка может нарушить сетевой стек, службы домена, работу DNS или обновление Windows.",
+                "Разрешить подключение, процесс является неотъемлемой частью операционной системы.",
+                "AllowAlways"
+            );
+        }
+
+        // 3. Проверка локального кэша
+        var cacheKey = $"{pPath.ToLowerInvariant()}|{pName.ToLowerInvariant()}|{remote}:{remotePort}";
+        if (_networkEvaluationsCache.TryGetValue(cacheKey, out var cachedVerdict))
+        {
+            return cachedVerdict;
+        }
+
+        // 4. Circuit Breaker и проверка наличия ключа
+        if (DateTime.UtcNow < _networkCooldownUntil)
+        {
+            _logger.LogWarning("AiRatingService: запрос для {Process} отклонён (Circuit Breaker активен до {Until} UTC)", pName, _networkCooldownUntil);
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(_apiKey) && !IsLocalUrl(_apiUrl))
+        {
+            _logger.LogDebug("AiRatingService: оценка сетевого процесса пропущена (не задан API-ключ)");
+            return null;
+        }
+
+        FileVersionInfo? fv = null;
+        try
+        {
+            if (!string.IsNullOrEmpty(pPath) && File.Exists(pPath))
+            {
+                fv = FileVersionInfo.GetVersionInfo(pPath);
+            }
+        }
+        catch { }
+
+        var company = !string.IsNullOrWhiteSpace(fv?.CompanyName) ? fv.CompanyName.Trim() : "Не указан";
+        var prodName = !string.IsNullOrWhiteSpace(fv?.ProductName) ? fv.ProductName.Trim() : pName;
+        var fileDesc = !string.IsNullOrWhiteSpace(fv?.FileDescription) ? fv.FileDescription.Trim() : "Не указано";
+        var fileVer = !string.IsNullOrWhiteSpace(fv?.FileVersion) ? fv.FileVersion.Trim() : "Не указана";
+
+        var prompt = BuildNetworkEvaluationPrompt(pName, pPath, prodName, fileDesc, company, fileVer, remote, remotePort);
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                var body = new
+                {
+                    model = _model,
+                    messages = new[] { new { role = "user", content = prompt } },
+                    temperature = 0.1,
+                    max_tokens = 1000,
+                    response_format = new { type = "json_object" }
+                };
+
+                var jsonBody = JsonSerializer.Serialize(body);
+                using var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
+                using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+
+                if (!string.IsNullOrWhiteSpace(_apiKey))
+                    request.Headers.Add("Authorization", $"Bearer {_apiKey.Trim()}");
+                else if (IsLocalUrl(_apiUrl))
+                    request.Headers.Add("Authorization", "Bearer ollama");
+
+                request.Content = content;
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+                var response = await _http.SendAsync(request, cts.Token);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    if (attempt < 3)
+                    {
+                        await Task.Delay(2000);
+                        continue;
+                    }
+                    return null;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning("AiRatingService: ошибка {Status} при оценке процесса {Name}: {Error}", response.StatusCode, pName, err);
+                    return null;
+                }
+
+                var respJson = await response.Content.ReadAsStringAsync();
+                var verdict = ParseNetworkEvaluationResponse(respJson, pName);
+                if (verdict != null)
+                {
+                    _networkEvaluationsCache[cacheKey] = verdict.Value;
+                    return verdict;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "AiRatingService: исключение при сетевой оценке процесса {Process} (попытка {Attempt})", pName, attempt);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Формирует промпт для оценки сетевой активности приложения экспертом ИИ.</summary>
+    private string BuildNetworkEvaluationPrompt(
+        string processName, string processPath, string productName, string fileDesc,
+        string company, string fileVersion, string remoteAddress, int remotePort)
+    {
+        return $@"Ты — ведущий эксперт по сетевой безопасности Windows и системному администрированию.
+Проанализируй сетевую активность процесса и дай оценку: каково назначение программы, чем грозит блокировка сетевого подключения и какова твоя рекомендация.
+
+Параметры процесса и подключения:
+- Имя процесса: {processName}
+- Путь к файлу: {processPath}
+- Название продукта: {productName}
+- Описание файла: {fileDesc}
+- Компания / Издатель: {company}
+- Версия файла: {fileVersion}
+- Удалённый адрес назначения: {remoteAddress}:{remotePort}
+- ОС: {WindowsVersion}
+
+Требования к ответу:
+1. Назначение программы (purpose): Что это за приложение, легитимно ли оно, для чего создано. 2-4 предложения на русском языке.
+2. Риски блокировки (blocking_risk): Чем грозит блокировка сетевого соединения пользователю. Разбери влияние на:
+   - системные компоненты Windows и службы;
+   - сетевую печать, локальные сетевые ресурсы и сетевые диски;
+   - доступ в интернет и внешние веб-сервисы;
+   - корректную работу приложения (сбои, потеря синхронизации, зависания). 2-4 предложения на русском языке.
+3. Рекомендация (recommendation): Чёткая рекомендация пользователю на русском языке, 1-3 предложения.
+4. Рекомендуемое действие (recommended_action): Строго одно из следующих значений:
+   - ""AllowSession"" (разрешить для текущей сессии)
+   - ""AllowAlways"" (разрешить навсегда / доверенное системное ПО)
+   - ""BlockSession"" (заблокировать на эту сессию)
+   - ""BlockAlways"" (заблокировать навсегда / опасное ПО)
+
+Ответь ИСКЛЮЧИТЕЛЬНО валидным JSON-объектом без лишних символов и без markdown-блоков:
+{{{{
+  ""purpose"": ""<описание назначения программы на русском языке, 2-4 предложения>"",
+  ""blocking_risk"": ""<подробное описание рисков блокировки для ОС, печати, сети и приложения на русском языке, 2-4 предложения>"",
+  ""recommendation"": ""<чёткая рекомендация пользователю на русском языке, 1-3 предложения>"",
+  ""recommended_action"": ""AllowSession|AllowAlways|BlockSession|BlockAlways""
+}}}}";
+    }
+
+    /// <summary>Парсит JSON-ответ нейросети по оценке сетевого процесса с поддержкой reasoning/thought.</summary>
+    private (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? ParseNetworkEvaluationResponse(string json, string processName)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
+                return null;
+
+            var choice = choices[0];
+            if (!choice.TryGetProperty("message", out var messageElem))
+                return null;
+
+            string? text = null;
+            if (messageElem.TryGetProperty("content", out var contentProp) && contentProp.ValueKind == JsonValueKind.String)
+                text = contentProp.GetString();
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                if (messageElem.TryGetProperty("reasoning", out var reasoningProp) && reasoningProp.ValueKind == JsonValueKind.String)
+                    text = reasoningProp.GetString();
+                else if (messageElem.TryGetProperty("reasoning_content", out var reasoningContentProp) && reasoningContentProp.ValueKind == JsonValueKind.String)
+                    text = reasoningContentProp.GetString();
+                else if (messageElem.TryGetProperty("thought", out var thoughtProp) && thoughtProp.ValueKind == JsonValueKind.String)
+                    text = thoughtProp.GetString();
+            }
+
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            var cleaned = text.Trim();
+            var jsonBlockMatch = System.Text.RegularExpressions.Regex.Match(cleaned, @"```(?:json)?\s*(\{[\s\S]*?\})\s*```");
+            if (jsonBlockMatch.Success)
+            {
+                cleaned = jsonBlockMatch.Groups[1].Value.Trim();
+            }
+            else
+            {
+                var firstBrace = cleaned.IndexOf('{');
+                var lastBrace = cleaned.LastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace)
+                    cleaned = cleaned.Substring(firstBrace, lastBrace - firstBrace + 1).Trim();
+            }
+
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"(?<!\\)\\(?![""\\/bfnrt]|u[0-9a-fA-F]{4})", @"\\");
+
+            using var innerDoc = JsonDocument.Parse(cleaned);
+            var root = innerDoc.RootElement;
+
+            string purpose = GetJsonStringProperty(root, "purpose", "Назначение не определено.");
+            string blockingRisk = GetJsonStringProperty(root, "blocking_risk", "blockingRisk", "Особых рисков для критических служб не выявлено.");
+            string recommendation = GetJsonStringProperty(root, "recommendation", "Применяйте стандартные правила брандмауэра.");
+            string rawAction = GetJsonStringProperty(root, "recommended_action", "recommendedAction", "AllowSession");
+
+            string action = rawAction.Trim() switch
+            {
+                var a when a.Equals("AllowAlways", StringComparison.OrdinalIgnoreCase) => "AllowAlways",
+                var a when a.Equals("AllowSession", StringComparison.OrdinalIgnoreCase) => "AllowSession",
+                var a when a.Equals("BlockAlways", StringComparison.OrdinalIgnoreCase) => "BlockAlways",
+                var a when a.Equals("BlockSession", StringComparison.OrdinalIgnoreCase) => "BlockSession",
+                var a when a.Contains("Block", StringComparison.OrdinalIgnoreCase) => "BlockSession",
+                _ => "AllowSession"
+            };
+
+            return (purpose, blockingRisk, recommendation, action);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("AiRatingService: не удалось распарсить JSON оценки сетевого процесса для {Name}: {Error}",
+                processName, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Вспомогательный метод извлечения строкового свойства из JsonElement с резервными ключами.</summary>
+    private static string GetJsonStringProperty(JsonElement element, string primaryKey, string defaultValue)
+    {
+        if (element.TryGetProperty(primaryKey, out var prop) && prop.ValueKind == JsonValueKind.String)
+        {
+            var val = prop.GetString();
+            if (!string.IsNullOrWhiteSpace(val)) return val.Trim();
+        }
+        return defaultValue;
+    }
+
+    /// <summary>Вспомогательный метод извлечения строкового свойства из JsonElement с альтернативным именем.</summary>
+    private static string GetJsonStringProperty(JsonElement element, string primaryKey, string secondaryKey, string defaultValue)
+    {
+        if (element.TryGetProperty(primaryKey, out var p1) && p1.ValueKind == JsonValueKind.String)
+        {
+            var val = p1.GetString();
+            if (!string.IsNullOrWhiteSpace(val)) return val.Trim();
+        }
+        if (element.TryGetProperty(secondaryKey, out var p2) && p2.ValueKind == JsonValueKind.String)
+        {
+            var val = p2.GetString();
+            if (!string.IsNullOrWhiteSpace(val)) return val.Trim();
+        }
+        return defaultValue;
+    }
+
     public void Dispose() => _http.Dispose();
 }

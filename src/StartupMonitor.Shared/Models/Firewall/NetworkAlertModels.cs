@@ -38,6 +38,22 @@ public class NetworkConnectionAlertDto
     /// <summary>Момент обнаружения (UTC).</summary>
     [JsonPropertyName("detectedAt")]
     public DateTime DetectedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Назначение программы по оценке нейросети.</summary>
+    [JsonPropertyName("aiPurpose")]
+    public string? AiPurpose { get; set; }
+
+    /// <summary>Оценка рисков блокировки процесса (для ОС, печати, сети, работы приложений) по мнению нейросети.</summary>
+    [JsonPropertyName("aiBlockingRisk")]
+    public string? AiBlockingRisk { get; set; }
+
+    /// <summary>Рекомендация нейросети пользователю.</summary>
+    [JsonPropertyName("aiRecommendation")]
+    public string? AiRecommendation { get; set; }
+
+    /// <summary>Рекомендуемое нейросетью действие ("AllowSession", "AllowAlways", "BlockSession", "BlockAlways").</summary>
+    [JsonPropertyName("aiRecommendedAction")]
+    public string? AiRecommendedAction { get; set; }
 }
 
 /// <summary>Решение пользователя по сетевому алерту с поддержкой ненавязчивых и постоянных политик.</summary>

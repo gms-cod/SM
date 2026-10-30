@@ -41,6 +41,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- Заголовок: иконка щита/сети, текст, кнопка закрытия -->
@@ -151,15 +152,75 @@
                 </Grid>
             </Border>
 
+            <!-- Карточка вердикта ИИ: назначение, риски блокировки, рекомендация -->
+            <Border x:Name="AiCardBorder" Grid.Row="3" Margin="0,0,0,10" Padding="12,10"
+                    CornerRadius="8"
+                    Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                    BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <Grid>
+                    <!-- Индикатор анализа программы нейросетью -->
+                    <StackPanel x:Name="AiLoadingPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4" Visibility="Visible">
+                        <ui:ProgressRing Width="18" Height="18" IsIndeterminate="True" Margin="0,0,10,0" />
+                        <TextBlock Text="Анализ программы нейросетью..."
+                                   FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Развёрнутый вердикт нейросети -->
+                    <StackPanel x:Name="AiContentPanel" Visibility="Collapsed">
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#0284C7" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                <TextBlock Text="⚡ Вердикт ИИ" FontSize="11" FontWeight="Bold" Foreground="White" />
+                            </Border>
+                            <TextBlock x:Name="TxtAiRecommendedAction" Grid.Column="1"
+                                       FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+
+                        <!-- Назначение программы -->
+                        <TextBlock Text="Назначение программы:" FontSize="11" FontWeight="Bold"
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,1" />
+                        <TextBlock x:Name="TxtAiPurpose"
+                                   FontSize="11" LineHeight="15"
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,6" />
+
+                        <!-- Риски блокировки -->
+                        <TextBlock Text="Риски блокировки (ОС / печать / сеть):" FontSize="11" FontWeight="Bold"
+                                   Foreground="#F59E0B" Margin="0,0,0,1" />
+                        <TextBlock x:Name="TxtAiBlockingRisk"
+                                   FontSize="11" LineHeight="15"
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,6" />
+
+                        <!-- Рекомендация ИИ -->
+                        <TextBlock Text="Рекомендация ИИ:" FontSize="11" FontWeight="Bold"
+                                   Foreground="#10B981" Margin="0,0,0,1" />
+                        <TextBlock x:Name="TxtAiRecommendation"
+                                   FontSize="11" LineHeight="15" FontWeight="SemiBold"
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <!-- Таймер обратного отсчета с индикацией паузы -->
-            <TextBlock x:Name="TxtCountdown" Grid.Row="3"
+            <TextBlock x:Name="TxtCountdown" Grid.Row="4"
                        Text="Автоматическое решение через 30 сек..."
                        FontSize="11"
                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                        Margin="0,0,0,6" />
 
             <!-- 5 эргономичных кнопок действий -->
-            <StackPanel Grid.Row="4" Margin="0,0,0,10">
+            <StackPanel Grid.Row="5" Margin="0,0,0,10">
                 <!-- 1. Белый список (Всегда разрешать) -->
                 <ui:Button x:Name="BtnWhitelist"
                            Appearance="Primary"
@@ -215,7 +276,7 @@
             </StackPanel>
 
             <!-- Тонкий ProgressBar обратного отсчета -->
-            <ProgressBar x:Name="CountdownBar" Grid.Row="5"
+            <ProgressBar x:Name="CountdownBar" Grid.Row="6"
                          Height="4" Minimum="0" Maximum="30" Value="30"
                          Background="Transparent"
                          Foreground="{ui:ThemeResource SystemAccentColorPrimaryBrush}"

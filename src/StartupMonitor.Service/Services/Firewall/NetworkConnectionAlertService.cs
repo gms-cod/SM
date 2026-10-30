@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using StartupMonitor.Service.Services.Ai;
 using StartupMonitor.Service.Services.Runtime;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
@@ -80,6 +81,13 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Переопределение применения правила Firewall (по умолчанию — CreateOrUpdateRule).</summary>
     public Action<FirewallRuleDto>? ApplyFirewallRuleOverride { get; set; }
 
+    /// <summary>Переопределение оценки сетевой активности нейросетью (тестовый шов).</summary>
+    public Func<string, string, string, int, Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?>>? AiEvaluatorOverride { get; set; }
+
+    private AiRatingService? _aiRating;
+    private volatile bool _aiAutonomousNetworkDecisionsEnabled;
+    private volatile string _aiAutonomousDecisionMode = "AllowSession";
+
     // ── Состояние ──
 
     /// <summary>Известные решения текущей сессии: ключ сессии → решение.</summary>
@@ -154,11 +162,13 @@ public sealed class NetworkConnectionAlertService : IDisposable
     public NetworkConnectionAlertService(
         ProcessNetworkTracker tracker,
         WindowsFirewallService firewall,
-        JsonDataStore? store = null)
+        JsonDataStore? store = null,
+        AiRatingService? aiRating = null)
     {
         _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
         _firewall = firewall ?? throw new ArgumentNullException(nameof(firewall));
         _store = store;
+        _aiRating = aiRating;
 
         if (_store != null)
         {
@@ -166,6 +176,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
             {
                 var cfg = _store.Load();
                 _silentPid0 = cfg.Settings.FirewallSilentPid0;
+                _aiAutonomousNetworkDecisionsEnabled = cfg.Settings.AiAutonomousNetworkDecisionsEnabled;
+                _aiAutonomousDecisionMode = string.IsNullOrWhiteSpace(cfg.Settings.AiAutonomousDecisionMode) ? "AllowSession" : cfg.Settings.AiAutonomousDecisionMode.Trim();
                 _settingsRevision = _store.Revision;
                 foreach (var app in cfg.Settings.FirewallWhitelistedApps)
                 {
@@ -192,6 +204,12 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 Log.Warning(ex, "NetworkAlerts: не удалось инициализировать списки из хранилища");
             }
         }
+    }
+
+    /// <summary>Устанавливает или актуализирует сервис оценки нейросетью.</summary>
+    public void SetAiRatingService(AiRatingService aiRating)
+    {
+        _aiRating = aiRating;
     }
 
     /// <summary>Запускает фоновый опрос новых подключений (вызывается из PipeServer).</summary>
@@ -424,6 +442,32 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 if (!_seenKeys.TryAdd(seenKey, DateTime.UtcNow))
                     continue;
 
+                // 4.5. Автономные решения нейросети: применяются без всплывающего окна
+                if (_aiAutonomousNetworkDecisionsEnabled)
+                {
+                    var initialResolution = string.Equals(_aiAutonomousDecisionMode, "BlockSession", StringComparison.OrdinalIgnoreCase)
+                        ? NetworkAlertResolution.BlockSession
+                        : NetworkAlertResolution.AllowSession;
+
+                    SetSessionDecision(sessionKey, initialResolution);
+                    if (!string.IsNullOrWhiteSpace(processName))
+                        SetSessionDecision(nameKey, initialResolution);
+
+                    _ = ExecuteAutonomousDecisionAsync(
+                        processName,
+                        processPath,
+                        remote,
+                        socket.RemotePort,
+                        socket.LocalAddress ?? string.Empty,
+                        socket.LocalPort,
+                        socket.Protocol ?? "TCP",
+                        socket.ProcessId,
+                        sessionKey,
+                        nameKey);
+
+                    continue;
+                }
+
                 var alert = new NetworkConnectionAlertDto
                 {
                     ProcessId = socket.ProcessId,
@@ -439,6 +483,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 {
                     _queue.Enqueue(alert);
                     added++;
+
+                    _ = EnrichAlertWithAiAsync(alert);
 
                     RecordHistory(new NetworkConnectionHistoryItem
                     {
@@ -557,7 +603,6 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 NetworkAlertResolution.AllowPort => NetworkConnectionVerdict.AllowSession,
                 _ => NetworkConnectionVerdict.PendingAlert
             };
-            hItem.Details = $"Решение пользователя: {request.Resolution}";
         }
 
         var path = !string.IsNullOrWhiteSpace(request.ProcessPath)
@@ -834,6 +879,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
             {
                 var settings = _store.GetSettings();
                 _silentPid0 = settings.FirewallSilentPid0;
+                _aiAutonomousNetworkDecisionsEnabled = settings.AiAutonomousNetworkDecisionsEnabled;
+                _aiAutonomousDecisionMode = string.IsNullOrWhiteSpace(settings.AiAutonomousDecisionMode) ? "AllowSession" : settings.AiAutonomousDecisionMode.Trim();
 
                 // Чёрный список имеет абсолютный приоритет над белым.
                 var black = new HashSet<string>(
@@ -1073,5 +1120,167 @@ public sealed class NetworkConnectionAlertService : IDisposable
             foreach (var alert in _pendingById.Values.OrderBy(a => a.DetectedAt))
                 _queue.Enqueue(alert);
         }
+    }
+
+    /// <summary>
+    /// Выполняет автономное решение ИИ в фоновом потоке, запрашивая вердикт у модели
+    /// и фиксируя результат в журнале истории и логе службы без всплывающего окна.
+    /// </summary>
+    private async Task ExecuteAutonomousDecisionAsync(
+        string processName,
+        string? processPath,
+        string remoteAddress,
+        int remotePort,
+        string localAddress,
+        int localPort,
+        string protocol,
+        int processId,
+        string sessionKey,
+        string nameKey)
+    {
+        try
+        {
+            (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
+
+            if (AiEvaluatorOverride != null)
+            {
+                try
+                {
+                    verdict = await AiEvaluatorOverride(processName, processPath ?? string.Empty, remoteAddress, remotePort).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "NetworkAlerts: сбой в AiEvaluatorOverride для {Process}", processName);
+                }
+            }
+            else if (_aiRating != null)
+            {
+                try
+                {
+                    verdict = await _aiRating.EvaluateNetworkProcessAsync(processName, processPath ?? string.Empty, remoteAddress, remotePort).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "NetworkAlerts: сбой EvaluateNetworkProcessAsync для {Process}", processName);
+                }
+            }
+
+            // Выбираем финальное решение с учётом настроенного режима и рекомендации ИИ
+            var resolution = string.Equals(_aiAutonomousDecisionMode, "BlockSession", StringComparison.OrdinalIgnoreCase)
+                ? NetworkAlertResolution.BlockSession
+                : NetworkAlertResolution.AllowSession;
+
+            if (verdict.HasValue && !string.IsNullOrWhiteSpace(verdict.Value.RecommendedAction))
+            {
+                if (string.Equals(verdict.Value.RecommendedAction, "BlockSession", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(verdict.Value.RecommendedAction, "BlockAlways", StringComparison.OrdinalIgnoreCase))
+                {
+                    resolution = NetworkAlertResolution.BlockSession;
+                }
+                else if (string.Equals(verdict.Value.RecommendedAction, "AllowSession", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(verdict.Value.RecommendedAction, "AllowAlways", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.Equals(_aiAutonomousDecisionMode, "BlockSession", StringComparison.OrdinalIgnoreCase))
+                    {
+                        resolution = NetworkAlertResolution.AllowSession;
+                    }
+                }
+            }
+
+            SetSessionDecision(sessionKey, resolution);
+            if (!string.IsNullOrWhiteSpace(processName))
+                SetSessionDecision(nameKey, resolution);
+
+            Log.Information(
+                "NetworkAlerts (Автономно ИИ): Процесс {Process} ({Path}) -> {Remote}:{Port}. Решение: {Resolution}. Назначение: {Purpose}. Риски: {Risk}. Рекомендация: {Rec}",
+                processName, processPath, remoteAddress, remotePort, resolution,
+                verdict?.Purpose ?? "Назначение не определено",
+                verdict?.BlockingRisk ?? "Риски не определены",
+                verdict?.Recommendation ?? "Автономное действие");
+
+            var purposeDesc = verdict?.Purpose ?? "Назначение не определено";
+            var recDesc = verdict?.Recommendation ?? "Решение применено автоматически";
+
+            RecordHistory(new NetworkConnectionHistoryItem
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
+                ProcessId = processId,
+                ProcessName = processName,
+                ProcessPath = processPath ?? string.Empty,
+                Protocol = protocol,
+                LocalAddress = localAddress,
+                LocalPort = localPort,
+                RemoteAddress = remoteAddress,
+                RemotePort = remotePort,
+                Verdict = resolution == NetworkAlertResolution.AllowSession ? NetworkConnectionVerdict.AllowSession : NetworkConnectionVerdict.BlockSession,
+                Direction = "Outbound",
+                Details = $"Автономное решение ИИ ({resolution}): {purposeDesc}. {recDesc}"
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "NetworkAlerts: сбой выполнения автономного решения для {Process}", processName);
+        }
+    }
+
+    /// <summary>
+    /// Фоновое обогащение ожидающего алерта оценкой нейросети.
+    /// </summary>
+    private async Task EnrichAlertWithAiAsync(NetworkConnectionAlertDto alert)
+    {
+        try
+        {
+            (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
+
+            if (AiEvaluatorOverride != null)
+            {
+                verdict = await AiEvaluatorOverride(alert.ProcessName, alert.ProcessPath, alert.RemoteAddress, alert.RemotePort).ConfigureAwait(false);
+            }
+            else if (_aiRating != null)
+            {
+                verdict = await _aiRating.EvaluateNetworkProcessAsync(alert.ProcessName, alert.ProcessPath, alert.RemoteAddress, alert.RemotePort).ConfigureAwait(false);
+            }
+
+            if (verdict != null)
+            {
+                alert.AiPurpose = verdict.Value.Purpose;
+                alert.AiBlockingRisk = verdict.Value.BlockingRisk;
+                alert.AiRecommendation = verdict.Value.Recommendation;
+                alert.AiRecommendedAction = verdict.Value.RecommendedAction;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "NetworkAlerts: сбой фонового обогащения алерта {AlertId}", alert.AlertId);
+        }
+    }
+
+    /// <summary>
+    /// Запрашивает оценку нейросети для сетевого алерта (вызывается через IPC PipeServer при открытии диалогового окна).
+    /// </summary>
+    public async Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?> EvaluateAlertAsync(
+        string alertId, string processName, string processPath, string remoteAddress, int remotePort)
+    {
+        (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
+
+        if (AiEvaluatorOverride != null)
+        {
+            verdict = await AiEvaluatorOverride(processName, processPath, remoteAddress, remotePort).ConfigureAwait(false);
+        }
+        else if (_aiRating != null)
+        {
+            verdict = await _aiRating.EvaluateNetworkProcessAsync(processName, processPath, remoteAddress, remotePort).ConfigureAwait(false);
+        }
+
+        if (verdict != null && !string.IsNullOrEmpty(alertId) && _pendingById.TryGetValue(alertId, out var alert))
+        {
+            alert.AiPurpose = verdict.Value.Purpose;
+            alert.AiBlockingRisk = verdict.Value.BlockingRisk;
+            alert.AiRecommendation = verdict.Value.Recommendation;
+            alert.AiRecommendedAction = verdict.Value.RecommendedAction;
+        }
+
+        return verdict;
     }
 }
