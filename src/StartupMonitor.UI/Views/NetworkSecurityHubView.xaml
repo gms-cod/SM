@@ -1,978 +1,2251 @@
-﻿<UserControl
-    x:Class="StartupMonitor.UI.Views.NetworkSecurityHubView"
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    Background="{ui:ThemeResource ApplicationBackgroundBrush}">
-
-    <UserControl.Resources>
-        <!-- Неоновые кибер-ресурсы и градиенты высокой контрастности -->
-        <SolidColorBrush x:Key="NeonCyanBrush" Color="#00D2D3" />
-        <SolidColorBrush x:Key="NeonEmeraldBrush" Color="#10B981" />
-        <SolidColorBrush x:Key="NeonCrimsonBrush" Color="#EF4444" />
-        <SolidColorBrush x:Key="NeonAmberBrush" Color="#F59E0B" />
-        <SolidColorBrush x:Key="DarkEmeraldBannerBg" Color="#122620" />
-        <SolidColorBrush x:Key="DarkEmeraldBannerBorder" Color="#10B981" />
-        <SolidColorBrush x:Key="DarkCrimsonBannerBg" Color="#2A1215" />
-        <SolidColorBrush x:Key="DarkCrimsonBannerBorder" Color="#EF4444" />
-
-        <Style x:Key="CyberActionMiniBtn" TargetType="Button">
-            <Setter Property="Background" Value="#18FFFFFF" />
-            <Setter Property="BorderBrush" Value="#30FFFFFF" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,3" />
-            <Setter Property="Margin" Value="2,0" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#3500D2D3" />
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#00D2D3" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
-
-    <Grid Margin="16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <!-- ===== Верхняя карточка: статус брандмауэра + профили + режим фильтрации ===== -->
-        <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- Иконка щита -->
-                <Border Grid.RowSpan="2" Grid.Column="0" Width="44" Height="44" CornerRadius="10"
-                        Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        Margin="0,0,14,0" VerticalAlignment="Center">
-                    <ui:SymbolIcon x:Name="FirewallShieldIcon" Symbol="Shield24" FontSize="22"
-                                   Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-
-                <!-- Статус + профили -->
-                <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border x:Name="FirewallStateBadge" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0"
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtFirewallState" Text="{Binding NetFwStateUnknown, Source={StaticResource Loc}}"
-                                       FontSize="13" FontWeight="SemiBold"
-                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-                        </Border>
-                        <TextBlock x:Name="TxtFirewallDetails" Text="{Binding NetStatusLoading, Source={StaticResource Loc}}"
-                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                    <!-- Индикаторы профилей -->
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <Border x:Name="ProfileDomainBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtProfileDomain" Text="{Binding NetProfileDomainDefault, Source={StaticResource Loc}}" FontSize="11"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                        </Border>
-                        <Border x:Name="ProfilePrivateBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtProfilePrivate" Text="{Binding NetProfilePrivateDefault, Source={StaticResource Loc}}" FontSize="11"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                        </Border>
-                        <Border x:Name="ProfilePublicBadge" CornerRadius="4" Padding="8,3"
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock x:Name="TxtProfilePublic" Text="{Binding NetProfilePublicDefault, Source={StaticResource Loc}}" FontSize="11"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                        </Border>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Кнопка обновления статуса -->
-                <ui:Button x:Name="BtnRefreshStatus" Grid.Row="0" Grid.Column="2" Appearance="Secondary"
-                           Content="{Binding NetBtnRefreshStatus, Source={StaticResource Loc}}" Click="OnRefreshStatusClick"
-                           VerticalAlignment="Center" Margin="12,0,0,0" />
-
-                <!-- Переключатели режима фильтрации -->
-                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
-                    <TextBlock Text="{Binding NetFilteringModeHeader, Source={StaticResource Loc}}" FontSize="11" FontWeight="SemiBold"
-                               Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode" Content="{Binding NetFilterModeNormal, Source={StaticResource Loc}}"
-                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
-                        <RadioButton x:Name="RbModeWhitelist" GroupName="FilteringMode"
-                                     Content="{Binding NetFilterModeWhitelist, Source={StaticResource Loc}}"
-                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
-                        <RadioButton x:Name="RbModeKillswitch" GroupName="FilteringMode"
-                                     Content="{Binding NetFilterModeKillswitch, Source={StaticResource Loc}}"
-                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center"
-                                     Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" FontWeight="SemiBold" />
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Тумблер интерактивных уведомлений о неизвестных программах -->
-                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
-                    <CheckBox x:Name="ChkInteractiveAlerts"
-                              Content="{Binding NetInteractiveAlertsCheck, Source={StaticResource Loc}}"
-                              Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged"
-                              VerticalAlignment="Center"
-                              ToolTip="{Binding NetInteractiveAlertsTip, Source={StaticResource Loc}}" />
-                    <CheckBox x:Name="ChkSilentPid0"
-                              Content="{Binding FirewallSilentPid0Label, Source={StaticResource Loc}}"
-                              Checked="OnSilentPid0Changed" Unchecked="OnSilentPid0Changed"
-                              VerticalAlignment="Center" Margin="0,6,0,0"
-                              ToolTip="{Binding FirewallSilentPid0Hint, Source={StaticResource Loc}}" />
-                </StackPanel>
-            </Grid>
-        </ui:Card>
-
-        <!-- ===== Навигационные вкладки брандмауэра в едином стиле страницы «Обзор» ===== -->
-        <Border Grid.Row="1" Margin="0,0,0,10" Padding="4"
-                Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                BorderThickness="1" CornerRadius="8">
-            <WrapPanel Orientation="Horizontal">
-                <ui:Button x:Name="TabBtnConnections" Content="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}"
-                           Icon="{ui:SymbolIcon Globe24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Primary"
-                           Click="OnTabNavClick" Tag="0" />
-
-                <ui:Button x:Name="TabBtnWhitelist" Content="Белый список"
-                           Icon="{ui:SymbolIcon ShieldCheckmark24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-                           Click="OnTabNavClick" Tag="1" />
-
-                <ui:Button x:Name="TabBtnBlacklist" Content="Чёрный список"
-                           Icon="{ui:SymbolIcon ShieldDismiss24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-                           Click="OnTabNavClick" Tag="2" />
-
-                <ui:Button x:Name="TabBtnRules" Content="{Binding NetRulesTabHeader, Source={StaticResource Loc}}"
-                           Icon="{ui:SymbolIcon DocumentBulletList24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-                           Click="OnTabNavClick" Tag="3" />
-
-                <ui:Button x:Name="TabBtnPortDefender" Content="Port Defender"
-                           Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-                           Click="OnTabNavClick" Tag="4" />
-
-                <ui:Button x:Name="TabBtnAttackLog" Content="{Binding NetAttackLogTabHeader, Source={StaticResource Loc}}"
-                           Icon="{ui:SymbolIcon Shield24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-                           Click="OnTabNavClick" Tag="5" ToolTip="Журнал обнаруженных атак и временных банов" />
-
-                <ui:Button x:Name="TabBtnHistory" Content="История подключений"
-                           Icon="{ui:SymbolIcon History24}" Margin="0,0,6,0"
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-                           Click="OnTabNavClick" Tag="6" ToolTip="История всех попыток сетевых подключений программ" />
-            </WrapPanel>
-        </Border>
-
-        <!-- ===== Вкладки (переключаются через навигационную панель) ===== -->
-        <TabControl Grid.Row="2" x:Name="MainTabs">
-            <TabControl.ItemContainerStyle>
-                <Style TargetType="TabItem">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                </Style>
-            </TabControl.ItemContainerStyle>
-
-            <!-- Вкладка 0: Активные соединения (Live) -->
-            <TabItem>
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="Globe24" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <TextBlock Text="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}" VerticalAlignment="Center" />
-                    </StackPanel>
-                </TabItem.Header>
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Верхняя панель управления -->
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="3*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <ui:TextBox x:Name="TxtSearchConnections" Grid.Row="0" Grid.Column="0"
-                                     PlaceholderText="{Binding NetSearchConnectionsHint, Source={StaticResource Loc}}"
-                                     TextChanged="OnConnectionsSearchChanged" Margin="0,0,12,6" />
-
-                        <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                            <RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="{Binding NetFilterAll, Source={StaticResource Loc}}"
-                                         IsChecked="True" Checked="OnConnectionsFilterChanged"
-                                         VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="{Binding NetFilterWan, Source={StaticResource Loc}}"
-                                         Checked="OnConnectionsFilterChanged"
-                                         VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="{Binding NetFilterLan, Source={StaticResource Loc}}"
-                                         Checked="OnConnectionsFilterChanged"
-                                         VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="{Binding NetFilterEstablished, Source={StaticResource Loc}}"
-                                         Checked="OnConnectionsFilterChanged"
-                                         VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="{Binding NetFilterListen, Source={StaticResource Loc}}"
-                                         Checked="OnConnectionsFilterChanged"
-                                         VerticalAlignment="Center" />
-                        </WrapPanel>
-
-                        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-                                    Orientation="Horizontal" VerticalAlignment="Center">
-                            <CheckBox x:Name="ChkAutoRefreshConn" Content="{Binding NetAutoRefresh2s, Source={StaticResource Loc}}"
-                                      IsChecked="True"
-                                      Checked="OnAutoRefreshConnChanged" Unchecked="OnAutoRefreshConnChanged"
-                                      VerticalAlignment="Center" Margin="0,0,12,0" />
-                            <ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="{Binding NetBtnRefreshNow, Source={StaticResource Loc}}"
-                                       Click="OnRefreshConnClick" Margin="0,0,12,0" />
-                            <TextBlock x:Name="TxtConnectionsSummary" Text="—"
-                                       FontSize="12"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Таблица живых соединений -->
-                    <Grid Grid.Row="2">
-                        <DataGrid x:Name="GridLiveConnections"
-                                  AutoGenerateColumns="False"
-                                  CanUserAddRows="False"
-                                  CanUserDeleteRows="False"
-                                  CanUserReorderColumns="False"
-                                  IsReadOnly="True"
-                                  SelectionMode="Single"
-                                  GridLinesVisibility="None"
-                                  HeadersVisibility="Column"
-                                  BorderThickness="1"
-                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                  RowHeight="34">
-                            <DataGrid.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem x:Name="CtxBlockRemoteIp" Header="{Binding NetCtxBlockRemoteIp, Source={StaticResource Loc}}" Click="OnCtxBlockRemoteIpClick" />
-                                    <MenuItem x:Name="CtxCreateRuleForProcess" Header="{Binding NetCtxCreateRuleForProcess, Source={StaticResource Loc}}" Click="OnCtxCreateRuleForProcessClick" />
-                                    <Separator />
-                                    <MenuItem x:Name="CtxCopyRemoteIp" Header="{Binding NetCtxCopyRemoteIp, Source={StaticResource Loc}}" Click="OnCtxCopyRemoteIpClick" />
-                                    <MenuItem x:Name="CtxCopyEndpoint" Header="{Binding NetCtxCopyEndpoint, Source={StaticResource Loc}}" Click="OnCtxCopyEndpointClick" />
-                                    <Separator />
-                                    <MenuItem x:Name="CtxWhois" Header="{Binding NetCtxWhois, Source={StaticResource Loc}}" Click="OnCtxWhoisClick" />
-                                    <MenuItem x:Name="CtxVirusTotal" Header="{Binding NetCtxVirusTotal, Source={StaticResource Loc}}" Click="OnCtxVirusTotalClick" />
-                                    <Separator />
-                                    <MenuItem x:Name="CtxKillProcess" Header="{Binding NetCtxKillProcess, Source={StaticResource Loc}}" Click="OnCtxKillProcessClick" />
-                                </ContextMenu>
-                            </DataGrid.ContextMenu>
-                            <DataGrid.Columns>
-                                <!-- Процесс -->
-                                <DataGridTemplateColumn Header="{Binding NetColProcess, Source={StaticResource Loc}}" Width="1.5*">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding ProcessName}" FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
-                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Pid, StringFormat=' ({0})'}" FontSize="11"
-                                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-
-                                <!-- Протокол -->
-                                <DataGridTextColumn Header="{Binding NetColProtocol, Source={StaticResource Loc}}" Binding="{Binding Protocol}" Width="60" />
-
-                                <!-- Локальный адрес -->
-                                <DataGridTextColumn Header="{Binding NetColLocalAddress, Source={StaticResource Loc}}" Binding="{Binding LocalEndPoint}" Width="150" />
-
-                                <!-- Удаленный адрес -->
-                                <DataGridTextColumn Header="{Binding NetColRemoteAddress, Source={StaticResource Loc}}" Binding="{Binding RemoteEndPoint}" Width="160" />
-
-                                <!-- Статус -->
-                                <DataGridTemplateColumn Header="{Binding NetColStatus, Source={StaticResource Loc}}" Width="120">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Border CornerRadius="4" Padding="6,2"
-                                                    Background="{Binding StateBadgeBrush}"
-                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding State}" FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="White" />
-                                            </Border>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-
-                                <!-- Сеть / Гео -->
-                                <DataGridTemplateColumn Header="{Binding NetColNetworkGeo, Source={StaticResource Loc}}" Width="130">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding CountryFlag}" FontSize="12"
-                                                           VerticalAlignment="Center" Margin="0,0,4,0" />
-                                                <TextBlock Text="{Binding CountryText}" FontSize="12"
-                                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-
-                                <!-- Брандмауэр -->
-                                <DataGridTextColumn Header="{Binding NetColFirewall, Source={StaticResource Loc}}" Binding="{Binding FirewallBadge}" Width="110" />
-                            
-                                <!-- Быстрые действия над активным сокетом -->
-                                <DataGridTemplateColumn Header="Действия" Width="140">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <Button Style="{StaticResource CyberActionMiniBtn}"
-                                                        ToolTip="Разрешить (в белый список)"
-                                                        Click="OnRowWhitelistClick">
-                                                    <TextBlock Text="🛡️" FontSize="11" />
-                                                </Button>
-                                                <Button Style="{StaticResource CyberActionMiniBtn}"
-                                                        ToolTip="Заблокировать (в чёрный список)"
-                                                        Click="OnRowBlacklistClick">
-                                                    <TextBlock Text="🚫" FontSize="11" />
-                                                </Button>
-                                                <Button Style="{StaticResource CyberActionMiniBtn}"
-                                                        ToolTip="Завершить процесс"
-                                                        Click="OnRowKillProcessClick">
-                                                    <TextBlock Text="❌" FontSize="11" Foreground="#EF4444" />
-                                                </Button>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <StackPanel x:Name="PanelConnEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
-                            <ui:SymbolIcon Symbol="Globe24" FontSize="32"
-                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="{Binding NetNoConnectionsTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                       HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding NetNoConnectionsSubtitle, Source={StaticResource Loc}}" FontSize="12"
-                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-            </TabItem>
-
-
-            <!-- Вкладка 1: Белый список приложений (Whitelist) -->
-            <TabItem>
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="14" Foreground="{StaticResource NeonEmeraldBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <TextBlock Text="Белый список" VerticalAlignment="Center" />
-                    </StackPanel>
-                </TabItem.Header>
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Информационный баннер высокой контрастности -->
-                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{StaticResource DarkEmeraldBannerBg}"
-                            BorderBrush="{StaticResource DarkEmeraldBannerBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="🛡️" FontSize="15" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="Доверенные приложения (Белый список)" FontSize="13.5" FontWeight="Bold"
-                                               Foreground="#FFFFFF" VerticalAlignment="Center" />
-                                    <Border Margin="10,0,0,0" Background="#10B981" CornerRadius="4" Padding="6,2">
-                                        <TextBlock Text="Разрешено всё • 0 алертов" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                    </Border>
-                                </StackPanel>
-                                <TextBlock Text="Приложениям из белого списка разрешен любой сетевой трафик без интерактивных запросов."
-                                           FontSize="11.5" Foreground="#CBD5E1" Margin="23,3,0,0" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ui:TextBox x:Name="TxtSearchWhitelist" Width="180" Margin="0,0,8,0"
-                                            PlaceholderText="Поиск в белом списке..." TextChanged="OnWhitelistSearchChanged" />
-                                <ui:Button Appearance="Primary" Content="➕ Добавить программу..."
-                                           Click="OnAddWhitelistAppClick" Margin="0,0,6,0" />
-                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" Click="OnRefreshWhitelistClick" ToolTip="Обновить белый список" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- Таблица белого списка -->
-                    <Grid Grid.Row="1">
-                        <DataGrid x:Name="GridWhitelist"
-                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                                  IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column"
-                                  BorderThickness="1" BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="36">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Программа" Binding="{Binding ProcessName}" FontWeight="SemiBold" Width="180" />
-                                <DataGridTextColumn Header="Статус" Binding="{Binding StatusBadge}" Width="130" />
-                                <DataGridTextColumn Header="Полный путь" Binding="{Binding FullPath}" Width="*" />
-                                <DataGridTextColumn Header="Размер" Binding="{Binding FileSizeDisplay}" Width="90" />
-                                <DataGridTextColumn Header="Изменен" Binding="{Binding DateAddedDisplay}" Width="130" />
-                                <DataGridTemplateColumn Header="Действие" Width="100">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <ui:Button Appearance="Danger" Padding="6,2" Content="Удалить"
-                                                       Click="OnRemoveWhitelistAppClick" HorizontalAlignment="Center" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <TextBlock x:Name="TxtWhitelistEmpty" Text="Белый список пуст. Нажмите «Добавить программу...»"
-                                   Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   FontSize="13" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                    </Grid>
-                </Grid>
-            </TabItem>
-
-            <!-- Вкладка 2: Чёрный список приложений (Blacklist) -->
-            <TabItem>
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="ShieldDismiss24" FontSize="14" Foreground="{StaticResource NeonCrimsonBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                        <TextBlock Text="Чёрный список" VerticalAlignment="Center" />
-                    </StackPanel>
-                </TabItem.Header>
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Информационный баннер высокой контрастности -->
-                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{StaticResource DarkCrimsonBannerBg}"
-                            BorderBrush="{StaticResource DarkCrimsonBannerBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="🚫" FontSize="15" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="Заблокированные приложения (Чёрный список)" FontSize="13.5" FontWeight="Bold"
-                                               Foreground="#FFFFFF" VerticalAlignment="Center" />
-                                    <Border Margin="10,0,0,0" Background="#EF4444" CornerRadius="4" Padding="6,2">
-                                        <TextBlock Text="Заблокировано всё • Брандмауэр Windows" FontSize="10.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                    </Border>
-                                </StackPanel>
-                                <TextBlock Text="Приложениям из чёрного списка полностью заблокирован сетевой доступ через правила Windows Firewall."
-                                           FontSize="11.5" Foreground="#CBD5E1" Margin="23,3,0,0" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ui:TextBox x:Name="TxtSearchBlacklist" Width="180" Margin="0,0,8,0"
-                                            PlaceholderText="Поиск в чёрном списке..." TextChanged="OnBlacklistSearchChanged" />
-                                <ui:Button Appearance="Danger" Content="➕ Добавить в чёрный список..."
-                                           Click="OnAddBlacklistAppClick" Margin="0,0,6,0" />
-                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Обновить" Click="OnRefreshBlacklistClick" ToolTip="Обновить чёрный список" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- Таблица чёрного списка -->
-                    <Grid Grid.Row="1">
-                        <DataGrid x:Name="GridBlacklist"
-                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-                                  IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column"
-                                  BorderThickness="1" BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="36">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Программа" Binding="{Binding ProcessName}" FontWeight="SemiBold" Width="180" />
-                                <DataGridTextColumn Header="Статус" Binding="{Binding StatusBadge}" Width="130" />
-                                <DataGridTextColumn Header="Полный путь" Binding="{Binding FullPath}" Width="*" />
-                                <DataGridTextColumn Header="Размер" Binding="{Binding FileSizeDisplay}" Width="90" />
-                                <DataGridTextColumn Header="Изменен" Binding="{Binding DateAddedDisplay}" Width="130" />
-                                <DataGridTemplateColumn Header="Действие" Width="120">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <ui:Button Appearance="Secondary" Padding="6,2" Content="Разблокировать"
-                                                       Click="OnRemoveBlacklistAppClick" HorizontalAlignment="Center" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <TextBlock x:Name="TxtBlacklistEmpty" Text="Чёрный список пуст."
-                                   Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   FontSize="13" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                    </Grid>
-                </Grid>
-            </TabItem>
-
-            <!-- Вкладка 1: Правила брандмауэра -->
-            <TabItem Header="{Binding NetTabFirewallRules, Source={StaticResource Loc}}">
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Поиск + фильтры -->
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="3*" />
-                        </Grid.ColumnDefinitions>
-                        <ui:TextBox x:Name="TxtRuleSearch" Grid.Column="0"
-                                     PlaceholderText="{Binding NetSearchRulesHint, Source={StaticResource Loc}}"
-                                     TextChanged="OnRuleSearchTextChanged" Margin="0,0,12,0" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding NetRulesFilterLabel, Source={StaticResource Loc}}" FontSize="12"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="{Binding NetRulesFilterAll, Source={StaticResource Loc}}" IsChecked="True"
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterInbound, Source={StaticResource Loc}}"
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterOutbound, Source={StaticResource Loc}}"
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="{Binding NetRulesFilterBlock, Source={StaticResource Loc}}"
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <RadioButton x:Name="FilterManaged" GroupName="RuleFilter" Content="StartupMonitor"
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Кнопки действий -->
-                    <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-                        <ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="{Binding NetBtnCreateRule, Source={StaticResource Loc}}"
-                                   Click="OnCreateRuleClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="{Binding NetBtnEditRule, Source={StaticResource Loc}}"
-                                   Click="OnEditRuleClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="{Binding NetBtnDeleteRule, Source={StaticResource Loc}}"
-                                   Click="OnDeleteRuleClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnExportRules" Appearance="Secondary"
-                                   Icon="{ui:SymbolIcon Save24}"
-                                   Content="{Binding NetBtnExport, Source={StaticResource Loc}}"
-                                   ToolTip="{Binding NetBtnExportTip, Source={StaticResource Loc}}"
-                                   Click="OnExportRulesClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnImportRules" Appearance="Secondary"
-                                   Icon="{ui:SymbolIcon FolderOpen24}"
-                                   Content="{Binding NetBtnImport, Source={StaticResource Loc}}"
-                                   ToolTip="{Binding NetBtnImportTip, Source={StaticResource Loc}}"
-                                   Click="OnImportRulesClick" Margin="0,0,8,4" />
-                        <ui:DropDownButton x:Name="BtnSecurityPresets" Appearance="Secondary"
-                                           Icon="{ui:SymbolIcon ShieldCheckmark24}"
-                                           Content="{Binding NetBtnSecurityPresets, Source={StaticResource Loc}}"
-                                           Margin="0,0,8,4">
-                            <ui:DropDownButton.Flyout>
-                                <ContextMenu>
-                                    <MenuItem Header="{Binding NetPresetMaxPrivacy, Source={StaticResource Loc}}" Click="OnApplyPresetMaxPrivacyClick" />
-                                    <MenuItem Header="{Binding NetPresetGaming, Source={StaticResource Loc}}" Click="OnApplyPresetGamingClick" />
-                                    <MenuItem Header="{Binding NetPresetPublicWifi, Source={StaticResource Loc}}" Click="OnApplyPresetPublicWifiClick" />
-                                    <Separator />
-                                    <MenuItem Header="{Binding NetPresetReset, Source={StaticResource Loc}}" Click="OnApplyPresetResetClick" />
-                                </ContextMenu>
-                            </ui:DropDownButton.Flyout>
-                        </ui:DropDownButton>
-                        <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
-                                   Click="OnRefreshRulesClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="{Binding NetBtnAntiTelemetry, Source={StaticResource Loc}}"
-                                   Click="OnAntiTelemetryClick" Margin="0,0,0,4"
-                                   ToolTip="{Binding NetBtnAntiTelemetryTip, Source={StaticResource Loc}}" />
-                    </WrapPanel>
-
-                    <!-- Таблица правил -->
-                    <Grid Grid.Row="2">
-                        <DataGrid x:Name="GridRules"
-                                  AutoGenerateColumns="False"
-                                  CanUserAddRows="False"
-                                  CanUserDeleteRows="False"
-                                  CanUserReorderColumns="False"
-                                  IsReadOnly="True"
-                                  SelectionMode="Single"
-                                  GridLinesVisibility="None"
-                                  HeadersVisibility="Column"
-                                  BorderThickness="1"
-                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                  RowHeight="34"
-                                  MouseDoubleClick="OnRuleGridDoubleClick">
-                            <DataGrid.Columns>
-                                <!-- Включение -->
-                                <DataGridTemplateColumn Header="{Binding NetColEnabled, Source={StaticResource Loc}}" Width="52">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}"
-                                                      Checked="OnRuleToggleChecked"
-                                                      Unchecked="OnRuleToggleChecked"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-
-                                <!-- Действие -->
-                                <DataGridTemplateColumn Header="{Binding NetColAction, Source={StaticResource Loc}}" Width="110">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#20107C41" />
-                                                        <Setter Property="BorderBrush" Value="#40107C41" />
-                                                        <Setter Property="BorderThickness" Value="1" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Action}" Value="Block">
-                                                                <Setter Property="Background" Value="#20D83B01" />
-                                                                <Setter Property="BorderBrush" Value="#40D83B01" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <TextBlock FontSize="11" FontWeight="SemiBold">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Text" Value="Allow" />
-                                                            <Setter Property="Foreground" Value="#107C41" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Action}" Value="Block">
-                                                                    <Setter Property="Text" Value="Block" />
-                                                                    <Setter Property="Foreground" Value="#D83B01" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-
-                                <!-- Направление -->
-                                <DataGridTemplateColumn Header="{Binding NetColDirection, Source={StaticResource Loc}}" Width="80">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                                    CornerRadius="4" Padding="6,2"
-                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
-                                                <TextBlock FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Text" Value="In" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Direction}" Value="Outbound">
-                                                                    <Setter Property="Text" Value="Out" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding Direction}" Value="Both">
-                                                                    <Setter Property="Text" Value="In+Out" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
-
-                                <DataGridTextColumn Header="{Binding NetColName, Source={StaticResource Loc}}" Binding="{Binding Name}" Width="2*" />
-                                <DataGridTextColumn Header="{Binding NetColProgram, Source={StaticResource Loc}}" Binding="{Binding ShortProgram}" Width="1.5*" />
-                                <DataGridTextColumn Header="{Binding NetColProtocol, Source={StaticResource Loc}}" Binding="{Binding ProtocolDisplay}" Width="80" />
-                                <DataGridTextColumn Header="{Binding NetColLocalPorts, Source={StaticResource Loc}}" Binding="{Binding LocalPorts}" Width="110" />
-                                <DataGridTextColumn Header="{Binding NetColRemoteAddresses, Source={StaticResource Loc}}" Binding="{Binding RemoteAddresses}" Width="1.5*" />
-                                <DataGridTextColumn Header="{Binding NetColProfiles, Source={StaticResource Loc}}" Binding="{Binding ProfilesDisplay}" Width="130" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <StackPanel x:Name="PanelRulesEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
-                            <ui:SymbolIcon Symbol="Shield24" FontSize="32"
-                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="{Binding NetNoRulesTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                       HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding NetNoRulesSubtitle, Source={StaticResource Loc}}" FontSize="12"
-                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-            </TabItem>
-
-            <!-- Вкладка 2: Port Defender -->
-            <TabItem Header="{Binding NetTabPortDefender, Source={StaticResource Loc}}">
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8"
-                                    Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    Margin="0,0,12,0" VerticalAlignment="Center">
-                                <ui:SymbolIcon Symbol="Shield24" FontSize="20"
-                                               Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtDefenderState" Text="{Binding NetDefenderStateLoading, Source={StaticResource Loc}}"
-                                           FontSize="13" FontWeight="SemiBold"
-                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
-                                <TextBlock x:Name="TxtDefenderDetails" Text="—" FontSize="12"
-                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="0,2,0,0" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ui:Button x:Name="BtnConfigureDefender" Appearance="Primary"
-                                           Content="{Binding PortDefenderTitle, Source={StaticResource Loc}}"
-                                           Click="OnConfigureDefenderClick" Margin="0,0,8,0" />
-                                <ui:Button x:Name="BtnRefreshDefender" Appearance="Secondary"
-                                           Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}" Click="OnRefreshDefenderClick" />
-                            </StackPanel>
-                        </Grid>
-                    </ui:Card>
-
-                    <ui:Card Grid.Row="1" Padding="14">
-                        <StackPanel>
-                            <TextBlock Text="{Binding PortDefenderProtectedPortsLabel, Source={StaticResource Loc}}" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
-                            <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="14"
-                                       FontFamily="Consolas, Segoe UI"
-                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </ui:Card>
-                </Grid>
-            </TabItem>
-
-            <!-- Вкладка 3: Журнал атак и банов -->
-            <TabItem Header="{Binding NetTabAttackBans, Source={StaticResource Loc}}">
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                        <ui:Button x:Name="BtnRefreshBans" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
-                                   Click="OnRefreshBansClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnUnblockIp" Appearance="Secondary" Content="{Binding NetBtnUnbanSelectedIp, Source={StaticResource Loc}}"
-                                   Click="OnUnblockIpClick" Margin="0,0,8,4" />
-                        <ui:Button x:Name="BtnClearBans" Appearance="Danger" Content="{Binding NetBtnResetAllBans, Source={StaticResource Loc}}"
-                                   Click="OnClearBansClick" Margin="0,0,0,4" />
-                        <TextBlock x:Name="TxtBansCount" Text="—" FontSize="12"
-                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                   VerticalAlignment="Center" Margin="12,0,0,4" />
-                    </WrapPanel>
-
-                    <Grid Grid.Row="1">
-                        <DataGrid x:Name="GridBans"
-                                  AutoGenerateColumns="False"
-                                  CanUserAddRows="False"
-                                  CanUserDeleteRows="False"
-                                  CanUserReorderColumns="False"
-                                  IsReadOnly="True"
-                                  SelectionMode="Single"
-                                  GridLinesVisibility="None"
-                                  HeadersVisibility="Column"
-                                  BorderThickness="1"
-                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                  RowHeight="34">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="{Binding NetColIp, Source={StaticResource Loc}}" Binding="{Binding Ip}" Width="130" />
-                                <DataGridTextColumn Header="{Binding NetColPort, Source={StaticResource Loc}}" Binding="{Binding TargetPort}" Width="70" />
-                                <DataGridTextColumn Header="{Binding NetColProcess, Source={StaticResource Loc}}" Binding="{Binding TargetProcess}" Width="1.5*" />
-                                <DataGridTextColumn Header="{Binding NetColAttempts, Source={StaticResource Loc}}" Binding="{Binding AttackRate}" Width="80" />
-                                <DataGridTextColumn Header="{Binding NetColReason, Source={StaticResource Loc}}" Binding="{Binding Reason}" Width="2*" />
-                                <DataGridTextColumn Header="{Binding NetColRemaining, Source={StaticResource Loc}}" Binding="{Binding RemainingText}" Width="110" />
-                                <DataGridTextColumn Header="{Binding NetColRepeats, Source={StaticResource Loc}}" Binding="{Binding RepeatCount}" Width="80" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <StackPanel x:Name="PanelBansEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
-                            <ui:SymbolIcon Symbol="Shield24" FontSize="32"
-                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
-                            <TextBlock Text="{Binding NetNoBansTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                       HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding NetNoBansSubtitle, Source={StaticResource Loc}}" FontSize="12"
-                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-            </TabItem>
-            <!-- Вкладка 6: История всех подключений -->
-            <TabItem Header="История подключений">
-                <Grid Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Фильтры истории -->
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <ui:TextBox x:Name="TxtHubHistSearch" Grid.Row="0" Grid.Column="0"
-                                    PlaceholderText="Поиск по имени процесса, PID, IP или порту..."
-                                    TextChanged="OnHubHistFilterChanged" Margin="0,0,10,6" />
-
-                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
-                            <TextBlock Text="Вердикт:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                            <ComboBox x:Name="CmbHubHistVerdict" Width="140" SelectionChanged="OnHubHistFilterChanged">
-                                <ComboBoxItem Content="Все вердикты" IsSelected="True" />
-                                <ComboBoxItem Content="Ожидает алерта" />
-                                <ComboBoxItem Content="Разрешено" />
-                                <ComboBoxItem Content="Заблокировано" />
-                                <ComboBoxItem Content="Белый список" />
-                                <ComboBoxItem Content="Чёрный список" />
-                                <ComboBoxItem Content="Создано правило" />
-                            </ComboBox>
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
-                            <TextBlock Text="Период:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                            <ComboBox x:Name="CmbHubHistPeriod" Width="120" SelectionChanged="OnHubHistFilterChanged">
-                                <ComboBoxItem Content="Все время" IsSelected="True" />
-                                <ComboBoxItem Content="Последний час" />
-                                <ComboBoxItem Content="Сегодня" />
-                                <ComboBoxItem Content="Последние 24 ч" />
-                            </ComboBox>
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
-                            <TextBlock Text="Протокол:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                            <ComboBox x:Name="CmbHubHistProtocol" Width="80" SelectionChanged="OnHubHistFilterChanged">
-                                <ComboBoxItem Content="Все" IsSelected="True" />
-                                <ComboBoxItem Content="TCP" />
-                                <ComboBoxItem Content="UDP" />
-                            </ComboBox>
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,6">
-                            <ui:Button x:Name="BtnRefreshHubHist" Content="Обновить" Icon="{ui:SymbolIcon ArrowClockwise24}"
-                                       Appearance="Secondary" Click="OnRefreshHubHistClick" Margin="0,0,6,0" ToolTip="Обновить список истории" />
-                            <ui:Button x:Name="BtnClearHubHist" Content="Очистить" Icon="{ui:SymbolIcon Delete24}"
-                                       Appearance="Secondary" Click="OnClearHubHistClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" ToolTip="Очистить весь журнал истории" />
-                        </StackPanel>
-
-                        <TextBlock x:Name="TxtHubHistSummary" Grid.Row="1" Grid.ColumnSpan="5" Text="—" FontSize="11"
-                                   Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <!-- Таблица истории -->
-                    <DataGrid x:Name="GridHubHistory" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
-                              SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                              RowHeight="32" Background="Transparent" BorderThickness="1"
-                              BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-                              SelectionChanged="OnHubHistSelectionChanged">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Время" Binding="{Binding LocalTimestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="140" />
-                            <DataGridTextColumn Header="Процесс" Binding="{Binding ProcessName}" Width="140" />
-                            <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="65" />
-                            <DataGridTextColumn Header="Протокол" Binding="{Binding Protocol}" Width="75" />
-                            <DataGridTemplateColumn Header="Удалённый адрес / Порт" Width="180">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding CountryFlag}" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding RemoteAddress}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding RemotePort, StringFormat=':{0}'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-                            <DataGridTextColumn Header="Страна" Binding="{Binding CountryName}" Width="100" />
-                            <DataGridTextColumn Header="Вердикт" Binding="{Binding Verdict}" Width="130" />
-                            <DataGridTextColumn Header="Детали" Binding="{Binding Details}" Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
-
-                    <!-- Нижняя панель действий -->
-                    <Border Grid.Row="2" Margin="0,8,0,0" Padding="8,6"
-                            Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
-                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:Button x:Name="BtnHubHistAllow" Content="Разрешить в брандмауэре" Icon="{ui:SymbolIcon ShieldCheckmark24}"
-                                       Appearance="Secondary" Click="OnHubHistAllowClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Создать разрешающее исходящее правило Windows Firewall" />
-                            <ui:Button x:Name="BtnHubHistBlock" Content="Заблокировать в брандмауэре" Icon="{ui:SymbolIcon ShieldDismiss24}"
-                                       Appearance="Secondary" Click="OnHubHistBlockClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Создать блокирующее исходящее правило Windows Firewall" />
-                            <ui:Button x:Name="BtnHubHistWhitelist" Content="В белый список" Icon="{ui:SymbolIcon CheckmarkCircle24}"
-                                       Appearance="Secondary" Click="OnHubHistWhitelistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Добавить программу в постоянный белый список" />
-                            <ui:Button x:Name="BtnHubHistBlacklist" Content="В чёрный список" Icon="{ui:SymbolIcon DismissCircle24}"
-                                       Appearance="Secondary" Click="OnHubHistBlacklistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Добавить программу в постоянный чёрный список" />
-                            <ui:Button x:Name="BtnHubHistOpenFile" Content="Папка файла" Icon="{ui:SymbolIcon FolderOpen24}"
-                                       Appearance="Secondary" Click="OnHubHistOpenFileClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Открыть папку с исполняемым файлом" />
-                            <ui:Button x:Name="BtnHubHistCopyIp" Content="Копировать IP" Icon="{ui:SymbolIcon Copy24}"
-                                       Appearance="Secondary" Click="OnHubHistCopyIpClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Скопировать удалённый IP-адрес в буфер обмена" />
-                        </WrapPanel>
-                    </Border>
-                </Grid>
-            </TabItem>
-        </TabControl>
-
-        <!-- ===== Статусная строка ===== -->
-        <Grid Grid.Row="3" Margin="0,8,0,0">
-            <TextBlock x:Name="TxtStatus" Text="{Binding NetStatusReady, Source={StaticResource Loc}}" FontSize="12"
-                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        </Grid>
-    </Grid>
-</UserControl>
+﻿<UserControl
+
+    x:Class="StartupMonitor.UI.Views.NetworkSecurityHubView"
+
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+
+    xmlns:controls="clr-namespace:StartupMonitor.UI.Controls"
+
+    Background="{ui:ThemeResource ApplicationBackgroundBrush}">
+
+
+
+    <UserControl.Resources>
+
+        <!-- Неоновые кибер-ресурсы и градиенты высокой контрастности -->
+
+        <SolidColorBrush x:Key="NeonCyanBrush" Color="#00D2D3" />
+
+        <SolidColorBrush x:Key="NeonEmeraldBrush" Color="#10B981" />
+
+        <SolidColorBrush x:Key="NeonCrimsonBrush" Color="#EF4444" />
+
+        <SolidColorBrush x:Key="NeonAmberBrush" Color="#F59E0B" />
+
+        <SolidColorBrush x:Key="DarkEmeraldBannerBg" Color="#122620" />
+
+        <SolidColorBrush x:Key="DarkEmeraldBannerBorder" Color="#10B981" />
+
+        <SolidColorBrush x:Key="DarkCrimsonBannerBg" Color="#2A1215" />
+
+        <SolidColorBrush x:Key="DarkCrimsonBannerBorder" Color="#EF4444" />
+
+        <BooleanToVisibilityConverter x:Key="BoolToVisConverter" />
+
+
+
+        <!-- Стиль сегментированного переключателя матрицы доступа -->
+
+        <Style x:Key="AccessSegmentRadioButton" TargetType="RadioButton">
+
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+
+            <Setter Property="Background" Value="Transparent" />
+
+            <Setter Property="BorderThickness" Value="0" />
+
+            <Setter Property="Cursor" Value="Hand" />
+
+            <Setter Property="Padding" Value="8,3" />
+
+            <Setter Property="FontSize" Value="11.5" />
+
+            <Setter Property="FontWeight" Value="SemiBold" />
+
+            <Setter Property="Template">
+
+                <Setter.Value>
+
+                    <ControlTemplate TargetType="RadioButton">
+
+                        <Border x:Name="SegBorder"
+
+                                Background="{TemplateBinding Background}"
+
+                                CornerRadius="5"
+
+                                Padding="{TemplateBinding Padding}"
+
+                                SnapsToDevicePixels="True">
+
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <Trigger Property="IsMouseOver" Value="True">
+
+                                <Setter TargetName="SegBorder" Property="Background" Value="#15FFFFFF" />
+
+                            </Trigger>
+
+                            <MultiTrigger>
+
+                                <MultiTrigger.Conditions>
+
+                                    <Condition Property="IsChecked" Value="True" />
+
+                                    <Condition Property="Tag" Value="Allow" />
+
+                                </MultiTrigger.Conditions>
+
+                                <Setter TargetName="SegBorder" Property="Background" Value="#2510B981" />
+
+                                <Setter Property="Foreground" Value="#10B981" />
+
+                            </MultiTrigger>
+
+                            <MultiTrigger>
+
+                                <MultiTrigger.Conditions>
+
+                                    <Condition Property="IsChecked" Value="True" />
+
+                                    <Condition Property="Tag" Value="Prompt" />
+
+                                </MultiTrigger.Conditions>
+
+                                <Setter TargetName="SegBorder" Property="Background" Value="#25F59E0B" />
+
+                                <Setter Property="Foreground" Value="#F59E0B" />
+
+                            </MultiTrigger>
+
+                            <MultiTrigger>
+
+                                <MultiTrigger.Conditions>
+
+                                    <Condition Property="IsChecked" Value="True" />
+
+                                    <Condition Property="Tag" Value="Block" />
+
+                                </MultiTrigger.Conditions>
+
+                                <Setter TargetName="SegBorder" Property="Background" Value="#30EF4444" />
+
+                                <Setter Property="Foreground" Value="#EF4444" />
+
+                            </MultiTrigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+
+                                <Setter Property="Opacity" Value="0.35" />
+
+                                <Setter Property="Cursor" Value="No" />
+
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+
+            </Setter>
+
+        </Style>
+
+
+
+        <Style x:Key="CyberActionMiniBtn" TargetType="Button">
+
+            <Setter Property="Background" Value="#18FFFFFF" />
+
+            <Setter Property="BorderBrush" Value="#30FFFFFF" />
+
+            <Setter Property="BorderThickness" Value="1" />
+
+            <Setter Property="Padding" Value="6,3" />
+
+            <Setter Property="Margin" Value="2,0" />
+
+            <Setter Property="Cursor" Value="Hand" />
+
+            <Setter Property="Template">
+
+                <Setter.Value>
+
+                    <ControlTemplate TargetType="Button">
+
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+
+                                BorderBrush="{TemplateBinding BorderBrush}"
+
+                                BorderThickness="{TemplateBinding BorderThickness}"
+
+                                CornerRadius="4">
+
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+
+                            <Trigger Property="IsMouseOver" Value="True">
+
+                                <Setter TargetName="bd" Property="Background" Value="#3500D2D3" />
+
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#00D2D3" />
+
+                            </Trigger>
+
+                        </ControlTemplate.Triggers>
+
+                    </ControlTemplate>
+
+                </Setter.Value>
+
+            </Setter>
+
+        </Style>
+
+        <!-- Стиль радиокнопок-чипов фильтрации и временных окон -->
+        <Style x:Key="FilterTabRadioButtonStyle" TargetType="RadioButton">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ui:ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="10,2" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#15FFFFFF" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#00D2D3" />
+                                <Setter Property="Foreground" Value="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#2500D2D3" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#00D2D3" />
+                                <Setter Property="Foreground" Value="#00D2D3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+
+
+
+
+    <Grid Margin="16">
+
+        <Grid.RowDefinitions>
+
+            <RowDefinition Height="Auto" />
+
+            <RowDefinition Height="Auto" />
+
+            <RowDefinition Height="*" />
+
+            <RowDefinition Height="Auto" />
+
+        </Grid.RowDefinitions>
+
+
+
+        <!-- ===== Верхняя карточка: статус брандмауэра + профили + режим фильтрации ===== -->
+
+        <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
+
+            <Grid>
+
+                <Grid.ColumnDefinitions>
+
+                    <ColumnDefinition Width="Auto" />
+
+                    <ColumnDefinition Width="*" />
+
+                    <ColumnDefinition Width="Auto" />
+
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+
+                    <RowDefinition Height="Auto" />
+
+                    <RowDefinition Height="Auto" />
+
+                    <RowDefinition Height="Auto" />
+
+                </Grid.RowDefinitions>
+
+
+
+                <!-- Иконка щита -->
+
+                <Border Grid.RowSpan="2" Grid.Column="0" Width="44" Height="44" CornerRadius="10"
+
+                        Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                        Margin="0,0,14,0" VerticalAlignment="Center">
+
+                    <ui:SymbolIcon x:Name="FirewallShieldIcon" Symbol="Shield24" FontSize="22"
+
+                                   Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                </Border>
+
+
+
+                <!-- Статус + профили -->
+
+                <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                        <Border x:Name="FirewallStateBadge" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0"
+
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+
+                            <TextBlock x:Name="TxtFirewallState" Text="{Binding NetFwStateUnknown, Source={StaticResource Loc}}"
+
+                                       FontSize="13" FontWeight="SemiBold"
+
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+
+                        </Border>
+
+                        <TextBlock x:Name="TxtFirewallDetails" Text="{Binding NetStatusLoading, Source={StaticResource Loc}}"
+
+                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                   VerticalAlignment="Center" />
+
+                    </StackPanel>
+
+                    <!-- Индикаторы профилей -->
+
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+
+                        <Border x:Name="ProfileDomainBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
+
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+
+                            <TextBlock x:Name="TxtProfileDomain" Text="{Binding NetProfileDomainDefault, Source={StaticResource Loc}}" FontSize="11"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                        </Border>
+
+                        <Border x:Name="ProfilePrivateBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
+
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+
+                            <TextBlock x:Name="TxtProfilePrivate" Text="{Binding NetProfilePrivateDefault, Source={StaticResource Loc}}" FontSize="11"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                        </Border>
+
+                        <Border x:Name="ProfilePublicBadge" CornerRadius="4" Padding="8,3"
+
+                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+
+                            <TextBlock x:Name="TxtProfilePublic" Text="{Binding NetProfilePublicDefault, Source={StaticResource Loc}}" FontSize="11"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                        </Border>
+
+                    </StackPanel>
+
+                </StackPanel>
+
+
+
+                <!-- Кнопка обновления статуса -->
+
+                <ui:Button x:Name="BtnRefreshStatus" Grid.Row="0" Grid.Column="2" Appearance="Secondary"
+
+                           Content="{Binding NetBtnRefreshStatus, Source={StaticResource Loc}}" Click="OnRefreshStatusClick"
+
+                           VerticalAlignment="Center" Margin="12,0,0,0" />
+
+
+
+                <!-- Переключатели режима фильтрации -->
+
+                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
+
+                    <TextBlock Text="{Binding NetFilteringModeHeader, Source={StaticResource Loc}}" FontSize="11" FontWeight="SemiBold"
+
+                               Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+
+                    <StackPanel Orientation="Horizontal">
+
+                        <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode" Content="{Binding NetFilterModeNormal, Source={StaticResource Loc}}"
+
+                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                        <RadioButton x:Name="RbModeWhitelist" GroupName="FilteringMode"
+
+                                     Content="{Binding NetFilterModeWhitelist, Source={StaticResource Loc}}"
+
+                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
+
+                        <RadioButton x:Name="RbModeKillswitch" GroupName="FilteringMode"
+
+                                     Content="{Binding NetFilterModeKillswitch, Source={StaticResource Loc}}"
+
+                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center"
+
+                                     Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" FontWeight="SemiBold" />
+
+                    </StackPanel>
+
+                </StackPanel>
+
+
+
+                <!-- Тумблер интерактивных уведомлений о неизвестных программах -->
+
+                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
+
+                    <CheckBox x:Name="ChkInteractiveAlerts"
+
+                              Content="{Binding NetInteractiveAlertsCheck, Source={StaticResource Loc}}"
+
+                              Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged"
+
+                              VerticalAlignment="Center"
+
+                              ToolTip="{Binding NetInteractiveAlertsTip, Source={StaticResource Loc}}" />
+
+                    <CheckBox x:Name="ChkSilentPid0"
+
+                              Content="{Binding FirewallSilentPid0Label, Source={StaticResource Loc}}"
+
+                              Checked="OnSilentPid0Changed" Unchecked="OnSilentPid0Changed"
+
+                              VerticalAlignment="Center" Margin="0,6,0,0"
+
+                              ToolTip="{Binding FirewallSilentPid0Hint, Source={StaticResource Loc}}" />
+
+                </StackPanel>
+
+            </Grid>
+
+        </ui:Card>
+
+
+
+        <!-- ===== Навигационные вкладки брандмауэра в едином стиле страницы «Обзор» ===== -->
+
+        <Border Grid.Row="1" Margin="0,0,0,10" Padding="4"
+
+                Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+
+                BorderThickness="1" CornerRadius="8">
+
+            <WrapPanel Orientation="Horizontal">
+
+                <ui:Button x:Name="TabBtnConnections" Content="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}"
+
+                           Icon="{ui:SymbolIcon Globe24}" Margin="0,0,6,0"
+
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Primary"
+
+                           Click="OnTabNavClick" Tag="0" />
+
+
+
+                <ui:Button x:Name="TabBtnAccessMatrix" Content="Контроль приложений (ACL)"
+
+                           Icon="{ui:SymbolIcon ShieldCheckmark24}" Margin="0,0,6,0"
+
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+
+                           Click="OnTabNavClick" Tag="1" ToolTip="Единая матрица контроля доступа к сети, белые и чёрные списки" />
+
+
+
+                <ui:Button x:Name="TabBtnRules" Content="{Binding NetRulesTabHeader, Source={StaticResource Loc}}"
+
+                           Icon="{ui:SymbolIcon DocumentBulletList24}" Margin="0,0,6,0"
+
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+
+                           Click="OnTabNavClick" Tag="2" />
+
+
+
+                <ui:Button x:Name="TabBtnPortDefender" Content="Port Defender"
+
+                           Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,6,0"
+
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+
+                           Click="OnTabNavClick" Tag="3" />
+
+
+
+                <ui:Button x:Name="TabBtnAttackLog" Content="{Binding NetAttackLogTabHeader, Source={StaticResource Loc}}"
+
+                           Icon="{ui:SymbolIcon Shield24}" Margin="0,0,6,0"
+
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+
+                           Click="OnTabNavClick" Tag="4" ToolTip="Журнал обнаруженных атак и временных банов" />
+
+
+
+                <ui:Button x:Name="TabBtnHistory" Content="История подключений"
+
+                           Icon="{ui:SymbolIcon History24}" Margin="0,0,6,0"
+
+                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
+
+                           Click="OnTabNavClick" Tag="5" ToolTip="История всех попыток сетевых подключений программ" />
+
+            </WrapPanel>
+
+        </Border>
+
+
+
+        <!-- ===== Вкладки (переключаются через навигационную панель) ===== -->
+
+        <TabControl Grid.Row="2" x:Name="MainTabs">
+
+            <TabControl.ItemContainerStyle>
+
+                <Style TargetType="TabItem">
+
+                    <Setter Property="Visibility" Value="Collapsed" />
+
+                </Style>
+
+            </TabControl.ItemContainerStyle>
+
+
+
+            <!-- Вкладка 0: Активные соединения (Live) и таймлайн-аналитика -->
+
+            <TabItem>
+
+                <TabItem.Header>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                        <ui:SymbolIcon Symbol="Globe24" FontSize="14" VerticalAlignment="Center" Margin="0,0,6,0" />
+
+                        <TextBlock Text="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}" VerticalAlignment="Center" />
+
+                    </StackPanel>
+
+                </TabItem.Header>
+
+                <Grid Margin="0,8,0,0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="*" />
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <!-- Верхняя зона: Аппаратно-ускоренный график сетевой активности (60 FPS) -->
+
+                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                            BorderBrush="#2500D2D3" BorderThickness="1" CornerRadius="8" Padding="12,10">
+
+                        <Grid>
+
+                            <Grid.RowDefinitions>
+
+                                <RowDefinition Height="Auto" />
+
+                                <RowDefinition Height="Auto" />
+
+                            </Grid.RowDefinitions>
+
+
+
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+
+                                <Grid.ColumnDefinitions>
+
+                                    <ColumnDefinition Width="*" />
+
+                                    <ColumnDefinition Width="Auto" />
+
+                                </Grid.ColumnDefinitions>
+
+
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                    <TextBlock Text="⚡" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
+
+                                    <TextBlock Text="Таймлайн сетевой активности (Live / 60 FPS)" FontSize="12.5" FontWeight="Bold"
+
+                                               Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+
+                                    <TextBlock x:Name="TxtTimelineActiveSlice" Text="" FontSize="11.5" Foreground="{StaticResource NeonCyanBrush}"
+
+                                               Margin="10,0,0,0" VerticalAlignment="Center" />
+
+                                </StackPanel>
+
+
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                    <RadioButton x:Name="RbTimeWindow1h" Content="1 час" IsChecked="True"
+
+                                                 Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,4,0"
+
+                                                 Click="OnTimeWindowClick" Tag="1" />
+
+                                    <RadioButton x:Name="RbTimeWindow24h" Content="24 часа"
+
+                                                 Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,4,0"
+
+                                                 Click="OnTimeWindowClick" Tag="24" />
+
+                                    <RadioButton x:Name="RbTimeWindow7d" Content="7 дней"
+
+                                                 Style="{StaticResource FilterTabRadioButtonStyle}"
+
+                                                 Click="OnTimeWindowClick" Tag="168" />
+
+                                    <ui:Button x:Name="BtnResetTimelineFilter" Appearance="Secondary" Content="↩ Сброс среза"
+
+                                               Margin="8,0,0,0" Padding="8,3" Visibility="Collapsed"
+
+                                               Click="OnResetTimelineFilterClick" ToolTip="Вернуться к полному Live-потоку сокетов" />
+
+                                </StackPanel>
+
+                            </Grid>
+
+
+
+                            <controls:NetworkTimelineChartControl x:Name="TimelineChart" Grid.Row="1" Height="80"
+
+                                                                  TimeSliceSelected="OnTimelineTimeSliceSelected" />
+
+                        </Grid>
+
+                    </Border>
+
+
+
+                    <!-- Панель управления и фильтрации соединений -->
+
+                    <Grid Grid.Row="1" Margin="0,0,0,8">
+
+                        <Grid.ColumnDefinitions>
+
+                            <ColumnDefinition Width="2*" />
+
+                            <ColumnDefinition Width="3*" />
+
+                        </Grid.ColumnDefinitions>
+
+                        <Grid.RowDefinitions>
+
+                            <RowDefinition Height="Auto" />
+
+                            <RowDefinition Height="Auto" />
+
+                        </Grid.RowDefinitions>
+
+
+
+                        <ui:TextBox x:Name="TxtSearchConnections" Grid.Row="0" Grid.Column="0"
+
+                                     PlaceholderText="{Binding NetSearchConnectionsHint, Source={StaticResource Loc}}"
+
+                                     TextChanged="OnConnectionsSearchChanged" Margin="0,0,12,6" />
+
+
+
+                        <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+
+                            <RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="{Binding NetFilterAll, Source={StaticResource Loc}}"
+
+                                         IsChecked="True" Checked="OnConnectionsFilterChanged"
+
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="{Binding NetFilterWan, Source={StaticResource Loc}}"
+
+                                         Checked="OnConnectionsFilterChanged"
+
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="{Binding NetFilterLan, Source={StaticResource Loc}}"
+
+                                         Checked="OnConnectionsFilterChanged"
+
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="{Binding NetFilterEstablished, Source={StaticResource Loc}}"
+
+                                         Checked="OnConnectionsFilterChanged"
+
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="{Binding NetFilterListen, Source={StaticResource Loc}}"
+
+                                         Checked="OnConnectionsFilterChanged"
+
+                                         VerticalAlignment="Center" />
+
+                        </WrapPanel>
+
+
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+
+                                    Orientation="Horizontal" VerticalAlignment="Center">
+
+                            <CheckBox x:Name="ChkAutoRefreshConn" Content="{Binding NetAutoRefresh2s, Source={StaticResource Loc}}"
+
+                                      IsChecked="True"
+
+                                      Checked="OnAutoRefreshConnChanged" Unchecked="OnAutoRefreshConnChanged"
+
+                                      VerticalAlignment="Center" Margin="0,0,12,0" />
+
+                            <ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="{Binding NetBtnRefreshNow, Source={StaticResource Loc}}"
+
+                                       Click="OnRefreshConnClick" Margin="0,0,12,0" />
+
+                            <TextBlock x:Name="TxtConnectionsSummary" Text="—"
+
+                                       FontSize="12"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                       VerticalAlignment="Center" />
+
+                        </StackPanel>
+
+                    </Grid>
+
+
+
+                    <!-- Таблица живых соединений -->
+
+                    <Grid Grid.Row="2">
+
+                        <DataGrid x:Name="GridLiveConnections"
+
+                                  AutoGenerateColumns="False"
+
+                                  CanUserAddRows="False"
+
+                                  CanUserDeleteRows="False"
+
+                                  CanUserReorderColumns="False"
+
+                                  IsReadOnly="True"
+
+                                  SelectionMode="Single"
+
+                                  GridLinesVisibility="None"
+
+                                  HeadersVisibility="Column"
+
+                                  BorderThickness="1"
+
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                                  RowHeight="34">
+
+                            <DataGrid.ContextMenu>
+
+                                <ContextMenu>
+
+                                    <MenuItem x:Name="CtxBlockRemoteIp" Header="{Binding NetCtxBlockRemoteIp, Source={StaticResource Loc}}" Click="OnCtxBlockRemoteIpClick" />
+
+                                    <MenuItem x:Name="CtxCreateRuleForProcess" Header="{Binding NetCtxCreateRuleForProcess, Source={StaticResource Loc}}" Click="OnCtxCreateRuleForProcessClick" />
+
+                                    <Separator />
+
+                                    <MenuItem x:Name="CtxCopyRemoteIp" Header="{Binding NetCtxCopyRemoteIp, Source={StaticResource Loc}}" Click="OnCtxCopyRemoteIpClick" />
+
+                                    <MenuItem x:Name="CtxCopyEndpoint" Header="{Binding NetCtxCopyEndpoint, Source={StaticResource Loc}}" Click="OnCtxCopyEndpointClick" />
+
+                                    <Separator />
+
+                                    <MenuItem x:Name="CtxWhois" Header="{Binding NetCtxWhois, Source={StaticResource Loc}}" Click="OnCtxWhoisClick" />
+
+                                    <MenuItem x:Name="CtxVirusTotal" Header="{Binding NetCtxVirusTotal, Source={StaticResource Loc}}" Click="OnCtxVirusTotalClick" />
+
+                                    <Separator />
+
+                                    <MenuItem x:Name="CtxKillProcess" Header="{Binding NetCtxKillProcess, Source={StaticResource Loc}}" Click="OnCtxKillProcessClick" />
+
+                                </ContextMenu>
+
+                            </DataGrid.ContextMenu>
+
+                            <DataGrid.Columns>
+
+                                <!-- Процесс -->
+
+                                <DataGridTemplateColumn Header="{Binding NetColProcess, Source={StaticResource Loc}}" Width="1.5*">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <TextBlock Text="{Binding ProcessName}" FontSize="12" FontWeight="SemiBold"
+
+                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+
+                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                                                <TextBlock Text="{Binding Pid, StringFormat=' ({0})'}" FontSize="11"
+
+                                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                                           VerticalAlignment="Center" />
+
+                                            </StackPanel>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Протокол -->
+
+                                <DataGridTextColumn Header="{Binding NetColProtocol, Source={StaticResource Loc}}" Binding="{Binding Protocol}" Width="60" />
+
+
+
+                                <!-- Локальный адрес -->
+
+                                <DataGridTextColumn Header="{Binding NetColLocalAddress, Source={StaticResource Loc}}" Binding="{Binding LocalEndPoint}" Width="150" />
+
+
+
+                                <!-- Удаленный адрес -->
+
+                                <DataGridTextColumn Header="{Binding NetColRemoteAddress, Source={StaticResource Loc}}" Binding="{Binding RemoteEndPoint}" Width="160" />
+
+
+
+                                <!-- Статус -->
+
+                                <DataGridTemplateColumn Header="{Binding NetColStatus, Source={StaticResource Loc}}" Width="120">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <Border CornerRadius="4" Padding="6,2"
+
+                                                    Background="{Binding StateBadgeBrush}"
+
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+
+                                                <TextBlock Text="{Binding State}" FontSize="11" FontWeight="SemiBold"
+
+                                                           Foreground="White" />
+
+                                            </Border>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Сеть / Гео -->
+
+                                <DataGridTemplateColumn Header="{Binding NetColNetworkGeo, Source={StaticResource Loc}}" Width="130">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <TextBlock Text="{Binding CountryFlag}" FontSize="12"
+
+                                                           VerticalAlignment="Center" Margin="0,0,4,0" />
+
+                                                <TextBlock Text="{Binding CountryText}" FontSize="12"
+
+                                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                                            </StackPanel>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Брандмауэр -->
+
+                                <DataGridTextColumn Header="{Binding NetColFirewall, Source={StaticResource Loc}}" Binding="{Binding FirewallBadge}" Width="110" />
+
+                            
+
+                                <!-- Быстрые действия над активным сокетом -->
+
+                                <DataGridTemplateColumn Header="Действия" Width="140">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                                                <Button Style="{StaticResource CyberActionMiniBtn}"
+
+                                                        ToolTip="Разрешить (в белый список)"
+
+                                                        Click="OnRowWhitelistClick">
+
+                                                    <TextBlock Text="🛡️" FontSize="11" />
+
+                                                </Button>
+
+                                                <Button Style="{StaticResource CyberActionMiniBtn}"
+
+                                                        ToolTip="Заблокировать (в чёрный список)"
+
+                                                        Click="OnRowBlacklistClick">
+
+                                                    <TextBlock Text="🚫" FontSize="11" />
+
+                                                </Button>
+
+                                                <Button Style="{StaticResource CyberActionMiniBtn}"
+
+                                                        ToolTip="Завершить процесс"
+
+                                                        Click="OnRowKillProcessClick">
+
+                                                    <TextBlock Text="❌" FontSize="11" Foreground="#EF4444" />
+
+                                                </Button>
+
+                                            </StackPanel>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+                            </DataGrid.Columns>
+
+                        </DataGrid>
+
+
+
+                        <StackPanel x:Name="PanelConnEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+
+                            <ui:SymbolIcon Symbol="Globe24" FontSize="32"
+
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+
+                            <TextBlock Text="{Binding NetNoConnectionsTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                       HorizontalAlignment="Center" />
+
+                            <TextBlock Text="{Binding NetNoConnectionsSubtitle, Source={StaticResource Loc}}" FontSize="12"
+
+                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+
+                        </StackPanel>
+
+                    </Grid>
+
+                </Grid>
+
+            </TabItem>
+
+
+
+
+
+            <!-- Вкладка 1: Единая матрица контроля доступа (Application Access Control Matrix) -->
+
+            <TabItem>
+
+                <TabItem.Header>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                        <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="14" Foreground="{StaticResource NeonCyanBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+
+                        <TextBlock Text="Контроль приложений (ACL)" VerticalAlignment="Center" FontWeight="SemiBold" />
+
+                    </StackPanel>
+
+                </TabItem.Header>
+
+
+
+                <Grid Margin="0,8,0,0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="*" />
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <!-- Верхний командный баннер с быстрыми чипами-фильтрами -->
+
+                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
+
+                        <Grid>
+
+                            <Grid.ColumnDefinitions>
+
+                                <ColumnDefinition Width="*" />
+
+                                <ColumnDefinition Width="Auto" />
+
+                            </Grid.ColumnDefinitions>
+
+
+
+                            <!-- Чипы быстрой фильтрации -->
+
+                            <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                <RadioButton x:Name="ChipFilterAll" Content="Все программы" IsChecked="True"
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="All" />
+
+                                <RadioButton x:Name="ChipFilterAllow" Content="🟢 Разрешено"
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Allow" />
+
+                                <RadioButton x:Name="ChipFilterPrompt" Content="🟡 По запросу"
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Prompt" />
+
+                                <RadioButton x:Name="ChipFilterBlock" Content="🔴 Заблокировано"
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Block" />
+
+                                <RadioButton x:Name="ChipFilterSystem" Content="🛡️ Системные Windows"
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="System" />
+
+                                <RadioButton x:Name="ChipFilterSession" Content="⏱️ Сессионные"
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,0,4" Click="OnAclFilterChipClick" Tag="Session" />
+
+                            </WrapPanel>
+
+
+
+                            <!-- Поиск и добавление программы -->
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                <ui:TextBox x:Name="TxtSearchMatrix" Width="200" Margin="0,0,8,0"
+
+                                            PlaceholderText="Поиск процесса или пути..." TextChanged="OnMatrixSearchChanged" />
+
+                                <ui:Button Appearance="Primary" Content="➕ Добавить EXE..." Click="OnAddMatrixAppClick" Margin="0,0,6,0" />
+
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="OnRefreshMatrixClick" ToolTip="Обновить матрицу доступа" />
+
+                            </StackPanel>
+
+                        </Grid>
+
+                    </Border>
+
+
+
+                    <!-- Таблица Матрицы контроля доступа -->
+
+                    <Grid Grid.Row="1">
+
+                        <DataGrid x:Name="GridAccessMatrix"
+
+                                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+
+                                  CanUserReorderColumns="False"
+
+                                  IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column"
+
+                                  GridLinesVisibility="None"
+
+                                  BorderThickness="1" BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="46">
+
+                            <DataGrid.Columns>
+
+
+
+                                <!-- Колонка 1: Приложение (Иконка, Имя, Защитный бейдж, Путь) -->
+
+                                <DataGridTemplateColumn Header="Приложение" Width="320">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <Grid Margin="6,2">
+
+                                                <Grid.ColumnDefinitions>
+
+                                                    <ColumnDefinition Width="Auto" />
+
+                                                    <ColumnDefinition Width="*" />
+
+                                                </Grid.ColumnDefinitions>
+
+                                                <ui:SymbolIcon Grid.Column="0" Symbol="AppGeneric24" FontSize="20"
+
+                                                               Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+
+                                                               VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+
+                                                    <StackPanel Orientation="Horizontal">
+
+                                                        <TextBlock Text="{Binding ProcessName}" FontWeight="Bold" FontSize="13"
+
+                                                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+
+
+
+                                                        <!-- Бейдж критического ядра (Уровень 3) -->
+
+                                                        <Border Visibility="{Binding IsCriticalSystem, Converter={StaticResource BoolToVisConverter}}"
+
+                                                                Background="#2500D2D3" BorderBrush="#00D2D3" BorderThickness="1" CornerRadius="4"
+
+                                                                Padding="5,1" Margin="6,0,0,0" ToolTip="Критический системный компонент ядра ОС. Блокировка запрещена.">
+
+                                                            <TextBlock Text="🔒 Ядро Windows" FontSize="10" FontWeight="Bold" Foreground="#00D2D3" />
+
+                                                        </Border>
+
+
+
+                                                        <!-- Бейдж защищенной подсистемы (Уровень 2) -->
+
+                                                        <Border Visibility="{Binding IsProtectedSubsystem, Converter={StaticResource BoolToVisConverter}}"
+
+                                                                Background="#25F59E0B" BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="4"
+
+                                                                Padding="5,1" Margin="6,0,0,0" ToolTip="Системный компонент Windows. Блокировка требует подтверждения.">
+
+                                                            <TextBlock Text="⚠️ Системный" FontSize="10" FontWeight="Bold" Foreground="#F59E0B" />
+
+                                                        </Border>
+
+                                                    </StackPanel>
+
+                                                    <TextBlock Text="{Binding FullPath}" FontSize="11"
+
+                                                               Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+
+                                                </StackPanel>
+
+                                            </Grid>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Колонка 2: Трехпозиционный переключатель состояния доступа -->
+
+                                <DataGridTemplateColumn Header="Политика доступа" Width="260">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <Border Background="#1E232A" BorderBrush="#323B46" BorderThickness="1" CornerRadius="8" Padding="3" HorizontalAlignment="Left">
+
+                                                <StackPanel Orientation="Horizontal">
+
+                                                    <!-- 🟢 Разрешено -->
+
+                                                    <RadioButton Content="🟢 Разрешено" Tag="Allow" GroupName="{Binding UniqueGroupKey}"
+
+                                                                 IsChecked="{Binding IsAllowedChecked, Mode=TwoWay}"
+
+                                                                 Click="OnMatrixStateRadioClick"
+
+                                                                 Style="{StaticResource AccessSegmentRadioButton}" />
+
+                                                    <!-- 🟡 По запросу -->
+
+                                                    <RadioButton Content="🟡 Спрашивать" Tag="Prompt" GroupName="{Binding UniqueGroupKey}"
+
+                                                                 IsChecked="{Binding IsPromptChecked, Mode=TwoWay}"
+
+                                                                 Click="OnMatrixStateRadioClick"
+
+                                                                 Style="{StaticResource AccessSegmentRadioButton}" />
+
+                                                    <!-- 🔴 Заблокировано -->
+
+                                                    <RadioButton Content="🔴 Блок" Tag="Block" GroupName="{Binding UniqueGroupKey}"
+
+                                                                 IsChecked="{Binding IsBlockedChecked, Mode=TwoWay}"
+
+                                                                 IsEnabled="{Binding CanBlock}"
+
+                                                                 Click="OnMatrixStateRadioClick"
+
+                                                                 Style="{StaticResource AccessSegmentRadioButton}" />
+
+                                                </StackPanel>
+
+                                            </Border>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Колонка 3: Область действия / Таймер сессии -->
+
+                                <DataGridTemplateColumn Header="Срок действия" Width="140">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <StackPanel VerticalAlignment="Center">
+
+                                                <Border Background="#15FFFFFF" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+
+                                                    <TextBlock Text="{Binding ScopeDisplay}" FontSize="11" FontWeight="SemiBold"
+
+                                                               Foreground="{Binding ScopeColorBrush}" />
+
+                                                </Border>
+
+                                            </StackPanel>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Колонка 4: Источник блокировки / правила -->
+
+                                <DataGridTemplateColumn Header="Источник правила" Width="170">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <Border Background="{Binding SourceBadgeBg}" BorderBrush="{Binding SourceBadgeBorder}"
+
+                                                    BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+
+                                                <TextBlock Text="{Binding SourceBadgeText}" FontSize="11" FontWeight="SemiBold"
+
+                                                           Foreground="{Binding SourceBadgeFg}" />
+
+                                            </Border>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Колонка 5: Сетевая активность сокетов -->
+
+                                <DataGridTextColumn Header="Сокеты" Binding="{Binding ActiveSocketsDisplay}" Width="80" />
+
+
+
+                                <!-- Колонка 6: Действия -->
+
+                                <DataGridTemplateColumn Header="Действия" Width="*">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                                <ui:Button Appearance="Secondary" Content="Правила..." Padding="6,2" Margin="0,0,4,0"
+
+                                                           Click="OnInspectAppRulesClick" ToolTip="Перейти к детальным правилам брандмауэра" />
+
+                                                <ui:Button Appearance="Danger" Content="Сброс" Padding="6,2"
+
+                                                           Click="OnResetAppPolicyClick" ToolTip="Сбросить политику к режиму «По запросу»" />
+
+                                            </StackPanel>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                            </DataGrid.Columns>
+
+                        </DataGrid>
+
+
+
+                        <TextBlock x:Name="TxtMatrixEmpty" Text="В матрице доступа нет приложений по выбранному фильтру."
+
+                                   Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+
+                                   FontSize="13" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                    </Grid>
+
+                </Grid>
+
+            </TabItem>
+
+
+
+            <!-- Вкладка 1: Правила брандмауэра -->
+
+            <TabItem Header="{Binding NetTabFirewallRules, Source={StaticResource Loc}}">
+
+                <Grid Margin="0,8,0,0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="*" />
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <!-- Поиск + фильтры -->
+
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+
+                        <Grid.ColumnDefinitions>
+
+                            <ColumnDefinition Width="2*" />
+
+                            <ColumnDefinition Width="3*" />
+
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TextBox x:Name="TxtRuleSearch" Grid.Column="0"
+
+                                     PlaceholderText="{Binding NetSearchRulesHint, Source={StaticResource Loc}}"
+
+                                     TextChanged="OnRuleSearchTextChanged" Margin="0,0,12,0" />
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+
+                            <TextBlock Text="{Binding NetRulesFilterLabel, Source={StaticResource Loc}}" FontSize="12"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                       VerticalAlignment="Center" Margin="0,0,8,0" />
+
+                            <RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="{Binding NetRulesFilterAll, Source={StaticResource Loc}}" IsChecked="True"
+
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterInbound, Source={StaticResource Loc}}"
+
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterOutbound, Source={StaticResource Loc}}"
+
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="{Binding NetRulesFilterBlock, Source={StaticResource Loc}}"
+
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <RadioButton x:Name="FilterManaged" GroupName="RuleFilter" Content="StartupMonitor"
+
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" />
+
+                        </StackPanel>
+
+                    </Grid>
+
+
+
+                    <!-- Кнопки действий -->
+
+                    <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+
+                        <ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="{Binding NetBtnCreateRule, Source={StaticResource Loc}}"
+
+                                   Click="OnCreateRuleClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="{Binding NetBtnEditRule, Source={StaticResource Loc}}"
+
+                                   Click="OnEditRuleClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="{Binding NetBtnDeleteRule, Source={StaticResource Loc}}"
+
+                                   Click="OnDeleteRuleClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnExportRules" Appearance="Secondary"
+
+                                   Icon="{ui:SymbolIcon Save24}"
+
+                                   Content="{Binding NetBtnExport, Source={StaticResource Loc}}"
+
+                                   ToolTip="{Binding NetBtnExportTip, Source={StaticResource Loc}}"
+
+                                   Click="OnExportRulesClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnImportRules" Appearance="Secondary"
+
+                                   Icon="{ui:SymbolIcon FolderOpen24}"
+
+                                   Content="{Binding NetBtnImport, Source={StaticResource Loc}}"
+
+                                   ToolTip="{Binding NetBtnImportTip, Source={StaticResource Loc}}"
+
+                                   Click="OnImportRulesClick" Margin="0,0,8,4" />
+
+                        <ui:DropDownButton x:Name="BtnSecurityPresets" Appearance="Secondary"
+
+                                           Icon="{ui:SymbolIcon ShieldCheckmark24}"
+
+                                           Content="{Binding NetBtnSecurityPresets, Source={StaticResource Loc}}"
+
+                                           Margin="0,0,8,4">
+
+                            <ui:DropDownButton.Flyout>
+
+                                <ContextMenu>
+
+                                    <MenuItem Header="{Binding NetPresetMaxPrivacy, Source={StaticResource Loc}}" Click="OnApplyPresetMaxPrivacyClick" />
+
+                                    <MenuItem Header="{Binding NetPresetGaming, Source={StaticResource Loc}}" Click="OnApplyPresetGamingClick" />
+
+                                    <MenuItem Header="{Binding NetPresetPublicWifi, Source={StaticResource Loc}}" Click="OnApplyPresetPublicWifiClick" />
+
+                                    <Separator />
+
+                                    <MenuItem Header="{Binding NetPresetReset, Source={StaticResource Loc}}" Click="OnApplyPresetResetClick" />
+
+                                </ContextMenu>
+
+                            </ui:DropDownButton.Flyout>
+
+                        </ui:DropDownButton>
+
+                        <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
+
+                                   Click="OnRefreshRulesClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="{Binding NetBtnAntiTelemetry, Source={StaticResource Loc}}"
+
+                                   Click="OnAntiTelemetryClick" Margin="0,0,0,4"
+
+                                   ToolTip="{Binding NetBtnAntiTelemetryTip, Source={StaticResource Loc}}" />
+
+                    </WrapPanel>
+
+
+
+                    <!-- Таблица правил -->
+
+                    <Grid Grid.Row="2">
+
+                        <DataGrid x:Name="GridRules"
+
+                                  AutoGenerateColumns="False"
+
+                                  CanUserAddRows="False"
+
+                                  CanUserDeleteRows="False"
+
+                                  CanUserReorderColumns="False"
+
+                                  IsReadOnly="True"
+
+                                  SelectionMode="Single"
+
+                                  GridLinesVisibility="None"
+
+                                  HeadersVisibility="Column"
+
+                                  BorderThickness="1"
+
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                                  RowHeight="34"
+
+                                  MouseDoubleClick="OnRuleGridDoubleClick">
+
+                            <DataGrid.Columns>
+
+                                <!-- Включение -->
+
+                                <DataGridTemplateColumn Header="{Binding NetColEnabled, Source={StaticResource Loc}}" Width="52">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}"
+
+                                                      Checked="OnRuleToggleChecked"
+
+                                                      Unchecked="OnRuleToggleChecked"
+
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Действие -->
+
+                                <DataGridTemplateColumn Header="{Binding NetColAction, Source={StaticResource Loc}}" Width="110">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+
+                                                <Border.Style>
+
+                                                    <Style TargetType="Border">
+
+                                                        <Setter Property="Background" Value="#20107C41" />
+
+                                                        <Setter Property="BorderBrush" Value="#40107C41" />
+
+                                                        <Setter Property="BorderThickness" Value="1" />
+
+                                                        <Style.Triggers>
+
+                                                            <DataTrigger Binding="{Binding Action}" Value="Block">
+
+                                                                <Setter Property="Background" Value="#20D83B01" />
+
+                                                                <Setter Property="BorderBrush" Value="#40D83B01" />
+
+                                                            </DataTrigger>
+
+                                                        </Style.Triggers>
+
+                                                    </Style>
+
+                                                </Border.Style>
+
+                                                <TextBlock FontSize="11" FontWeight="SemiBold">
+
+                                                    <TextBlock.Style>
+
+                                                        <Style TargetType="TextBlock">
+
+                                                            <Setter Property="Text" Value="Allow" />
+
+                                                            <Setter Property="Foreground" Value="#107C41" />
+
+                                                            <Style.Triggers>
+
+                                                                <DataTrigger Binding="{Binding Action}" Value="Block">
+
+                                                                    <Setter Property="Text" Value="Block" />
+
+                                                                    <Setter Property="Foreground" Value="#D83B01" />
+
+                                                                </DataTrigger>
+
+                                                            </Style.Triggers>
+
+                                                        </Style>
+
+                                                    </TextBlock.Style>
+
+                                                </TextBlock>
+
+                                            </Border>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <!-- Направление -->
+
+                                <DataGridTemplateColumn Header="{Binding NetColDirection, Source={StaticResource Loc}}" Width="80">
+
+                                    <DataGridTemplateColumn.CellTemplate>
+
+                                        <DataTemplate>
+
+                                            <Border Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
+
+                                                    CornerRadius="4" Padding="6,2"
+
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center">
+
+                                                <TextBlock FontSize="11" FontWeight="SemiBold"
+
+                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}">
+
+                                                    <TextBlock.Style>
+
+                                                        <Style TargetType="TextBlock">
+
+                                                            <Setter Property="Text" Value="In" />
+
+                                                            <Style.Triggers>
+
+                                                                <DataTrigger Binding="{Binding Direction}" Value="Outbound">
+
+                                                                    <Setter Property="Text" Value="Out" />
+
+                                                                </DataTrigger>
+
+                                                                <DataTrigger Binding="{Binding Direction}" Value="Both">
+
+                                                                    <Setter Property="Text" Value="In+Out" />
+
+                                                                </DataTrigger>
+
+                                                            </Style.Triggers>
+
+                                                        </Style>
+
+                                                    </TextBlock.Style>
+
+                                                </TextBlock>
+
+                                            </Border>
+
+                                        </DataTemplate>
+
+                                    </DataGridTemplateColumn.CellTemplate>
+
+                                </DataGridTemplateColumn>
+
+
+
+                                <DataGridTextColumn Header="{Binding NetColName, Source={StaticResource Loc}}" Binding="{Binding Name}" Width="2*" />
+
+                                <DataGridTextColumn Header="{Binding NetColProgram, Source={StaticResource Loc}}" Binding="{Binding ShortProgram}" Width="1.5*" />
+
+                                <DataGridTextColumn Header="{Binding NetColProtocol, Source={StaticResource Loc}}" Binding="{Binding ProtocolDisplay}" Width="80" />
+
+                                <DataGridTextColumn Header="{Binding NetColLocalPorts, Source={StaticResource Loc}}" Binding="{Binding LocalPorts}" Width="110" />
+
+                                <DataGridTextColumn Header="{Binding NetColRemoteAddresses, Source={StaticResource Loc}}" Binding="{Binding RemoteAddresses}" Width="1.5*" />
+
+                                <DataGridTextColumn Header="{Binding NetColProfiles, Source={StaticResource Loc}}" Binding="{Binding ProfilesDisplay}" Width="130" />
+
+                            </DataGrid.Columns>
+
+                        </DataGrid>
+
+
+
+                        <StackPanel x:Name="PanelRulesEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+
+                            <ui:SymbolIcon Symbol="Shield24" FontSize="32"
+
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+
+                            <TextBlock Text="{Binding NetNoRulesTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                       HorizontalAlignment="Center" />
+
+                            <TextBlock Text="{Binding NetNoRulesSubtitle, Source={StaticResource Loc}}" FontSize="12"
+
+                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+
+                        </StackPanel>
+
+                    </Grid>
+
+                </Grid>
+
+            </TabItem>
+
+
+
+            <!-- Вкладка 2: Port Defender -->
+
+            <TabItem Header="{Binding NetTabPortDefender, Source={StaticResource Loc}}">
+
+                <Grid Margin="0,8,0,0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="*" />
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
+
+                        <Grid>
+
+                            <Grid.ColumnDefinitions>
+
+                                <ColumnDefinition Width="Auto" />
+
+                                <ColumnDefinition Width="*" />
+
+                                <ColumnDefinition Width="Auto" />
+
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8"
+
+                                    Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                                    Margin="0,0,12,0" VerticalAlignment="Center">
+
+                                <ui:SymbolIcon Symbol="Shield24" FontSize="20"
+
+                                               Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                            </Border>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+
+                                <TextBlock x:Name="TxtDefenderState" Text="{Binding NetDefenderStateLoading, Source={StaticResource Loc}}"
+
+                                           FontSize="13" FontWeight="SemiBold"
+
+                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+
+                                <TextBlock x:Name="TxtDefenderDetails" Text="—" FontSize="12"
+
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="0,2,0,0" />
+
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                <ui:Button x:Name="BtnConfigureDefender" Appearance="Primary"
+
+                                           Content="{Binding PortDefenderTitle, Source={StaticResource Loc}}"
+
+                                           Click="OnConfigureDefenderClick" Margin="0,0,8,0" />
+
+                                <ui:Button x:Name="BtnRefreshDefender" Appearance="Secondary"
+
+                                           Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}" Click="OnRefreshDefenderClick" />
+
+                            </StackPanel>
+
+                        </Grid>
+
+                    </ui:Card>
+
+
+
+                    <ui:Card Grid.Row="1" Padding="14">
+
+                        <StackPanel>
+
+                            <TextBlock Text="{Binding PortDefenderProtectedPortsLabel, Source={StaticResource Loc}}" FontSize="12" FontWeight="SemiBold"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+
+                            <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="14"
+
+                                       FontFamily="Consolas, Segoe UI"
+
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+
+                                       TextWrapping="Wrap" />
+
+                        </StackPanel>
+
+                    </ui:Card>
+
+                </Grid>
+
+            </TabItem>
+
+
+
+            <!-- Вкладка 3: Журнал атак и банов -->
+
+            <TabItem Header="{Binding NetTabAttackBans, Source={StaticResource Loc}}">
+
+                <Grid Margin="0,8,0,0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="*" />
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+
+                        <ui:Button x:Name="BtnRefreshBans" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
+
+                                   Click="OnRefreshBansClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnUnblockIp" Appearance="Secondary" Content="{Binding NetBtnUnbanSelectedIp, Source={StaticResource Loc}}"
+
+                                   Click="OnUnblockIpClick" Margin="0,0,8,4" />
+
+                        <ui:Button x:Name="BtnClearBans" Appearance="Danger" Content="{Binding NetBtnResetAllBans, Source={StaticResource Loc}}"
+
+                                   Click="OnClearBansClick" Margin="0,0,0,4" />
+
+                        <TextBlock x:Name="TxtBansCount" Text="—" FontSize="12"
+
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                   VerticalAlignment="Center" Margin="12,0,0,4" />
+
+                    </WrapPanel>
+
+
+
+                    <Grid Grid.Row="1">
+
+                        <DataGrid x:Name="GridBans"
+
+                                  AutoGenerateColumns="False"
+
+                                  CanUserAddRows="False"
+
+                                  CanUserDeleteRows="False"
+
+                                  CanUserReorderColumns="False"
+
+                                  IsReadOnly="True"
+
+                                  SelectionMode="Single"
+
+                                  GridLinesVisibility="None"
+
+                                  HeadersVisibility="Column"
+
+                                  BorderThickness="1"
+
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                                  RowHeight="34">
+
+                            <DataGrid.Columns>
+
+                                <DataGridTextColumn Header="{Binding NetColIp, Source={StaticResource Loc}}" Binding="{Binding Ip}" Width="130" />
+
+                                <DataGridTextColumn Header="{Binding NetColPort, Source={StaticResource Loc}}" Binding="{Binding TargetPort}" Width="70" />
+
+                                <DataGridTextColumn Header="{Binding NetColProcess, Source={StaticResource Loc}}" Binding="{Binding TargetProcess}" Width="1.5*" />
+
+                                <DataGridTextColumn Header="{Binding NetColAttempts, Source={StaticResource Loc}}" Binding="{Binding AttackRate}" Width="80" />
+
+                                <DataGridTextColumn Header="{Binding NetColReason, Source={StaticResource Loc}}" Binding="{Binding Reason}" Width="2*" />
+
+                                <DataGridTextColumn Header="{Binding NetColRemaining, Source={StaticResource Loc}}" Binding="{Binding RemainingText}" Width="110" />
+
+                                <DataGridTextColumn Header="{Binding NetColRepeats, Source={StaticResource Loc}}" Binding="{Binding RepeatCount}" Width="80" />
+
+                            </DataGrid.Columns>
+
+                        </DataGrid>
+
+
+
+                        <StackPanel x:Name="PanelBansEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+
+                            <ui:SymbolIcon Symbol="Shield24" FontSize="32"
+
+                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                           HorizontalAlignment="Center" Margin="0,0,0,8" />
+
+                            <TextBlock Text="{Binding NetNoBansTitle, Source={StaticResource Loc}}" FontSize="14" FontWeight="SemiBold"
+
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+
+                                       HorizontalAlignment="Center" />
+
+                            <TextBlock Text="{Binding NetNoBansSubtitle, Source={StaticResource Loc}}" FontSize="12"
+
+                                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+
+                        </StackPanel>
+
+                    </Grid>
+
+                </Grid>
+
+            </TabItem>
+
+            <!-- Вкладка 6: История всех подключений -->
+
+            <TabItem Header="История подключений">
+
+                <Grid Margin="0,8,0,0">
+
+                    <Grid.RowDefinitions>
+
+                        <RowDefinition Height="Auto" />
+
+                        <RowDefinition Height="*" />
+
+                        <RowDefinition Height="Auto" />
+
+                    </Grid.RowDefinitions>
+
+
+
+                    <!-- Фильтры истории -->
+
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+
+                        <Grid.RowDefinitions>
+
+                            <RowDefinition Height="Auto" />
+
+                            <RowDefinition Height="Auto" />
+
+                        </Grid.RowDefinitions>
+
+                        <Grid.ColumnDefinitions>
+
+                            <ColumnDefinition Width="2*" />
+
+                            <ColumnDefinition Width="Auto" />
+
+                            <ColumnDefinition Width="Auto" />
+
+                            <ColumnDefinition Width="Auto" />
+
+                            <ColumnDefinition Width="*" />
+
+                        </Grid.ColumnDefinitions>
+
+
+
+                        <ui:TextBox x:Name="TxtHubHistSearch" Grid.Row="0" Grid.Column="0"
+
+                                    PlaceholderText="Поиск по имени процесса, PID, IP или порту..."
+
+                                    TextChanged="OnHubHistFilterChanged" Margin="0,0,10,6" />
+
+
+
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
+
+                            <TextBlock Text="Вердикт:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                            <ComboBox x:Name="CmbHubHistVerdict" Width="140" SelectionChanged="OnHubHistFilterChanged">
+
+                                <ComboBoxItem Content="Все вердикты" IsSelected="True" />
+
+                                <ComboBoxItem Content="Ожидает алерта" />
+
+                                <ComboBoxItem Content="Разрешено" />
+
+                                <ComboBoxItem Content="Заблокировано" />
+
+                                <ComboBoxItem Content="Белый список" />
+
+                                <ComboBoxItem Content="Чёрный список" />
+
+                                <ComboBoxItem Content="Создано правило" />
+
+                            </ComboBox>
+
+                        </StackPanel>
+
+
+
+                        <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
+
+                            <TextBlock Text="Период:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                            <ComboBox x:Name="CmbHubHistPeriod" Width="120" SelectionChanged="OnHubHistFilterChanged">
+
+                                <ComboBoxItem Content="Все время" IsSelected="True" />
+
+                                <ComboBoxItem Content="Последний час" />
+
+                                <ComboBoxItem Content="Сегодня" />
+
+                                <ComboBoxItem Content="Последние 24 ч" />
+
+                            </ComboBox>
+
+                        </StackPanel>
+
+
+
+                        <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
+
+                            <TextBlock Text="Протокол:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+
+                            <ComboBox x:Name="CmbHubHistProtocol" Width="80" SelectionChanged="OnHubHistFilterChanged">
+
+                                <ComboBoxItem Content="Все" IsSelected="True" />
+
+                                <ComboBoxItem Content="TCP" />
+
+                                <ComboBoxItem Content="UDP" />
+
+                            </ComboBox>
+
+                        </StackPanel>
+
+
+
+                        <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,6">
+
+                            <ui:Button x:Name="BtnRefreshHubHist" Content="Обновить" Icon="{ui:SymbolIcon ArrowClockwise24}"
+
+                                       Appearance="Secondary" Click="OnRefreshHubHistClick" Margin="0,0,6,0" ToolTip="Обновить список истории" />
+
+                            <ui:Button x:Name="BtnClearHubHist" Content="Очистить" Icon="{ui:SymbolIcon Delete24}"
+
+                                       Appearance="Secondary" Click="OnClearHubHistClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" ToolTip="Очистить весь журнал истории" />
+
+                        </StackPanel>
+
+
+
+                        <TextBlock x:Name="TxtHubHistSummary" Grid.Row="1" Grid.ColumnSpan="5" Text="—" FontSize="11"
+
+                                   Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+
+                    </Grid>
+
+
+
+                    <!-- Таблица истории -->
+
+                    <DataGrid x:Name="GridHubHistory" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+
+                              SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+
+                              RowHeight="32" Background="Transparent" BorderThickness="1"
+
+                              BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+
+                              SelectionChanged="OnHubHistSelectionChanged">
+
+                        <DataGrid.Columns>
+
+                            <DataGridTextColumn Header="Время" Binding="{Binding LocalTimestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="140" />
+
+                            <DataGridTextColumn Header="Процесс" Binding="{Binding ProcessName}" Width="140" />
+
+                            <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="65" />
+
+                            <DataGridTextColumn Header="Протокол" Binding="{Binding Protocol}" Width="75" />
+
+                            <DataGridTemplateColumn Header="Удалённый адрес / Порт" Width="180">
+
+                                <DataGridTemplateColumn.CellTemplate>
+
+                                    <DataTemplate>
+
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                                            <TextBlock Text="{Binding CountryFlag}" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+
+                                            <TextBlock Text="{Binding RemoteAddress}" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                                            <TextBlock Text="{Binding RemotePort, StringFormat=':{0}'}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+
+                                        </StackPanel>
+
+                                    </DataTemplate>
+
+                                </DataGridTemplateColumn.CellTemplate>
+
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="Страна" Binding="{Binding CountryName}" Width="100" />
+
+                            <DataGridTextColumn Header="Вердикт" Binding="{Binding Verdict}" Width="130" />
+
+                            <DataGridTextColumn Header="Детали" Binding="{Binding Details}" Width="*" />
+
+                        </DataGrid.Columns>
+
+                    </DataGrid>
+
+
+
+                    <!-- Нижняя панель действий -->
+
+                    <Border Grid.Row="2" Margin="0,8,0,0" Padding="8,6"
+
+                            Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+
+                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+
+                        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                            <ui:Button x:Name="BtnHubHistAllow" Content="Разрешить в брандмауэре" Icon="{ui:SymbolIcon ShieldCheckmark24}"
+
+                                       Appearance="Secondary" Click="OnHubHistAllowClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Создать разрешающее исходящее правило Windows Firewall" />
+
+                            <ui:Button x:Name="BtnHubHistBlock" Content="Заблокировать в брандмауэре" Icon="{ui:SymbolIcon ShieldDismiss24}"
+
+                                       Appearance="Secondary" Click="OnHubHistBlockClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Создать блокирующее исходящее правило Windows Firewall" />
+
+                            <ui:Button x:Name="BtnHubHistWhitelist" Content="В белый список" Icon="{ui:SymbolIcon CheckmarkCircle24}"
+
+                                       Appearance="Secondary" Click="OnHubHistWhitelistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Добавить программу в постоянный белый список" />
+
+                            <ui:Button x:Name="BtnHubHistBlacklist" Content="В чёрный список" Icon="{ui:SymbolIcon DismissCircle24}"
+
+                                       Appearance="Secondary" Click="OnHubHistBlacklistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Добавить программу в постоянный чёрный список" />
+
+                            <ui:Button x:Name="BtnHubHistOpenFile" Content="Папка файла" Icon="{ui:SymbolIcon FolderOpen24}"
+
+                                       Appearance="Secondary" Click="OnHubHistOpenFileClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Открыть папку с исполняемым файлом" />
+
+                            <ui:Button x:Name="BtnHubHistCopyIp" Content="Копировать IP" Icon="{ui:SymbolIcon Copy24}"
+
+                                       Appearance="Secondary" Click="OnHubHistCopyIpClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Скопировать удалённый IP-адрес в буфер обмена" />
+
+                        </WrapPanel>
+
+                    </Border>
+
+                </Grid>
+
+            </TabItem>
+
+        </TabControl>
+
+
+
+        <!-- ===== Статусная строка ===== -->
+
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+
+            <TextBlock x:Name="TxtStatus" Text="{Binding NetStatusReady, Source={StaticResource Loc}}" FontSize="12"
+
+                       Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
+
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+        </Grid>
+
+    </Grid>
+
+</UserControl>
+

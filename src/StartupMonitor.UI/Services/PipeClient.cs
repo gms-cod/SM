@@ -1962,4 +1962,43 @@ public class PipeClient : IDisposable
         }
         catch { return false; }
     }
+
+    /// <summary>Запрашивает консолидированный снимок Единой матрицы контроля доступа сетевых приложений.</summary>
+    public async Task<List<AppAccessMatrixItemDto>> GetAppAccessMatrixAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAppAccessMatrix }, ct);
+            if (response?.Type == PipeMessageTypes.GetAppAccessMatrixResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<List<AppAccessMatrixItemDto>>(response.Payload, JsonOptions) ?? new List<AppAccessMatrixItemDto>();
+            }
+        }
+        catch { }
+        return new List<AppAccessMatrixItemDto>();
+    }
+
+    /// <summary>Устанавливает состояние доступа программы в Матрице контроля доступа (Allowed / Prompt / Blocked).</summary>
+    public async Task<FirewallOperationResult> SetAppAccessControlStateAsync(SetAppAccessStateRequest request, CancellationToken ct = default)
+    {
+        if (request == null) return FirewallOperationResult.Fail("Запрос пуст.");
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetAppAccessControlState,
+                Payload = JsonSerializer.Serialize(request, JsonOptions)
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.SetAppAccessControlStateResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions) ?? FirewallOperationResult.Fail("Пустой ответ службы.");
+            }
+        }
+        catch (Exception ex)
+        {
+            return FirewallOperationResult.Fail(ex.Message);
+        }
+        return FirewallOperationResult.Fail("Нет связи со службой контроля доступа.");
+    }
 }

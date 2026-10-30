@@ -295,6 +295,15 @@ public static class PipeMessageTypes
     /// <summary>Удалить приложение из чёрного списка брандмауэра.</summary>
     public const string RemoveFromFirewallBlacklist = "RemoveFromFirewallBlacklist";
 
+    /// <summary>Запрос единой матрицы контроля доступа сетевых приложений.</summary>
+    public const string GetAppAccessMatrix = "GetAppAccessMatrix";
+    /// <summary>Ответ службы со снимком матрицы контроля доступа сетевых приложений.</summary>
+    public const string GetAppAccessMatrixResponse = "GetAppAccessMatrixResponse";
+    /// <summary>Установить состояние доступа приложения в матрице контроля доступа.</summary>
+    public const string SetAppAccessControlState = "SetAppAccessControlState";
+    /// <summary>Ответ на установку состояния доступа в матрице контроля доступа.</summary>
+    public const string SetAppAccessControlStateResponse = "SetAppAccessControlStateResponse";
+
 }
 
 /// <summary>Полезная нагрузка для добавления/удаления приложения в списки брандмауэра.</summary>
