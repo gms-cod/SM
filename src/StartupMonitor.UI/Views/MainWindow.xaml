@@ -1175,17 +1175,17 @@
                                            Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Автономные решения ИИ:" VerticalAlignment="Center" Margin="0 12 0 0" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{Binding AiAutonomousDecisionsLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 12 0 0" />
                             <StackPanel Grid.Row="4" Grid.Column="1" Margin="0 12 0 0">
                                 <ui:ToggleSwitch IsChecked="{Binding AiAutonomousNetworkDecisionsEnabled, Mode=TwoWay}"
-                                                 Content="Автономные решения ИИ для сетевых подключений"
+                                                 Content="{Binding AiAutonomousDecisionsToggle, Source={StaticResource Loc}}"
                                                  IsEnabled="{Binding AiEnabled}" />
-                                <TextBlock Text="Автоматически анализировать новые исходящие подключения нейросетью и применять решение без показа всплывающего окна"
+                                <TextBlock Text="{Binding AiAutonomousDecisionsHint, Source={StaticResource Loc}}"
                                            FontSize="12"
                                            Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Действие ИИ по умолчанию:" VerticalAlignment="Center" Margin="0 12 0 0" />
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="{Binding AiAutonomousDefaultActionLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 12 0 0" />
                             <StackPanel Grid.Row="5" Grid.Column="1" Margin="0 12 0 0">
                                 <ComboBox ItemsSource="{Binding AutonomousDecisionModeOptions}"
                                           SelectedValuePath="Code"
@@ -1193,7 +1193,7 @@
                                           SelectedValue="{Binding AiAutonomousDecisionMode, Mode=TwoWay}"
                                           Width="280" HorizontalAlignment="Left"
                                           IsEnabled="{Binding AiAutonomousNetworkDecisionsEnabled}" />
-                                <TextBlock Text="Действие, автоматически применяемое для соединений при автономном режиме работы ИИ"
+                                <TextBlock Text="{Binding AiAutonomousDefaultActionHint, Source={StaticResource Loc}}"
                                            FontSize="12"
                                            Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>

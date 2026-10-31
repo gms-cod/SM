@@ -1658,28 +1658,82 @@ public class PipeClient : IDisposable
         }
     }
 
-    /// <summary>Запрашивает оценку сетевого подключения нейросетью у службы.</summary>
+    /// <summary>
+    /// Запрашивает оценку сетевого подключения нейросетью у службы.
+    /// Оценка выполняется по отдельному именованному каналу, чтобы длительный AI-запрос
+    /// не удерживал <c>_sendLock</c> основного соединения и не блокировал действия пользователя
+    /// (например, кнопки «Разрешить»/«Заблокировать» в окне алерта).
+    /// </summary>
+    /// <param name="alertId">Идентификатор алерта.</param>
+    /// <param name="processName">Имя процесса.</param>
+    /// <param name="processPath">Полный путь к исполняемому файлу.</param>
+    /// <param name="remoteAddress">Удалённый IP-адрес.</param>
+    /// <param name="remotePort">Удалённый порт.</param>
+    /// <param name="ct">Токен отмены: при отмене отдельное соединение немедленно закрывается,
+    /// поэтому «хвостовой» ответ службы не может десинхронизировать основной канал.</param>
+    /// <returns>Результат оценки либо null при отмене, таймауте или недоступности службы.</returns>
     public async Task<EvaluateNetworkAlertResponsePayload?> EvaluateNetworkAlertAsync(
         string alertId, string processName, string processPath, string remoteAddress, int remotePort, CancellationToken ct = default)
     {
+        NamedPipeClientStream? pipe = null;
         try
         {
+            // Отдельный экземпляр канала: служба поддерживает до 10 одновременных клиентов,
+            // а основной канал остаётся свободным для срочных команд (ResolveNetworkAlert).
+            pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await pipe.ConnectAsync(3000, ct).ConfigureAwait(false);
+
+            using var reader = new StreamReader(pipe);
+            using var writer = new StreamWriter(pipe) { AutoFlush = true };
+
             var req = new EvaluateNetworkAlertRequest(alertId, processName, processPath, remoteAddress, remotePort);
-            var response = await SendAsync(new PipeMessage
+            var requestJson = JsonSerializer.Serialize(new PipeMessage
             {
                 Type = PipeMessageTypes.EvaluateNetworkAlert,
                 Payload = JsonSerializer.Serialize(req, JsonOptions)
-            }, ct);
+            }, JsonOptions);
 
-            if (response != null && response.Type == PipeMessageTypes.EvaluateNetworkAlertResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            await writer.WriteLineAsync(requestJson.AsMemory(), ct).ConfigureAwait(false);
+            await writer.FlushAsync(ct).ConfigureAwait(false);
+
+            // Ограничиваем ожидание ответа, не смешивая таймаут с пользовательской отменой:
+            // отмена ct должна закрыть канал, а не оставить недочитанный ответ в буфере.
+            using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            responseCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+            var line = await reader.ReadLineAsync(responseCts.Token).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(line))
+                return null;
+
+            var response = JsonSerializer.Deserialize<PipeMessage>(line, JsonOptions);
+            if (response != null
+                && response.Type == PipeMessageTypes.EvaluateNetworkAlertResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
             {
                 return JsonSerializer.Deserialize<EvaluateNetworkAlertResponsePayload>(response.Payload, JsonOptions);
             }
+
             return null;
         }
-        catch
+        catch (OperationCanceledException)
+        {
+            // Ожидаемая отмена: пользователь принял решение или окно закрыто.
+            return null;
+        }
+        catch (TimeoutException)
+        {
+            // Служба не успела открыть отдельный канал за 3 секунды.
+            return null;
+        }
+        catch (Exception)
         {
             return null;
+        }
+        finally
+        {
+            // Закрытие отдельного канала гарантирует, что поздний ответ службы
+            // уйдёт в уже закрытый pipe и не будет прочитан следующим запросом.
+            try { pipe?.Dispose(); } catch (ObjectDisposedException) { }
         }
     }
 

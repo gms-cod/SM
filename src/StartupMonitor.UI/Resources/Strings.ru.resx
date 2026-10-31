@@ -2110,4 +2110,37 @@
   <data name="ToolboxTabSecurity" xml:space="preserve">
     <value>Хеши и пароли</value>
   </data>
-<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Разрешить этот порт</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Разрешить сетевые подключения по данному порту и больше не показывать по нему уведомления</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Тихий режим для системных сокетов (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Подавлять всплывающие уведомления о сетевой активности сокетов ядра и завершающихся соединений</value></data></root>
+<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Разрешить этот порт</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Разрешить сетевые подключения по данному порту и больше не показывать по нему уведомления</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Тихий режим для системных сокетов (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Подавлять всплывающие уведомления о сетевой активности сокетов ядра и завершающихся соединений</value></data><data name="NetAlertAiAnalyzing" xml:space="preserve"><value>Анализ программы нейросетью...</value></data><data name="NetAlertAiVerdictBadge" xml:space="preserve"><value>⚡ Вердикт ИИ</value></data><data name="NetAlertAiPurposeLabel" xml:space="preserve"><value>Назначение программы:</value></data><data name="NetAlertAiBlockingRiskLabel" xml:space="preserve"><value>Риски блокировки (ОС / печать / сеть):</value></data><data name="NetAlertAiRecommendationLabel" xml:space="preserve"><value>Рекомендация ИИ:</value></data><data name="NetAlertCountdownPaused" xml:space="preserve"><value>Обратный отсчёт приостановлен (курсор мыши)</value></data><data name="NetAlertProcessUnknown" xml:space="preserve"><value>Неизвестный процесс</value></data><data name="NetAlertPathUnknown" xml:space="preserve"><value>Путь неизвестен</value></data><data name="NetAlertInternet" xml:space="preserve"><value>Интернет</value></data><data name="NetAlertProtocolDefault" xml:space="preserve"><value>TCP</value></data><data name="NetAlertCountdownFormat" xml:space="preserve"><value>Автоматическое решение через {0} сек...</value></data><data name="NetAlertAiPurposeFallback" xml:space="preserve"><value>Назначение не определено.</value></data><data name="NetAlertAiRiskFallback" xml:space="preserve"><value>Особых рисков для критических служб не выявлено.</value></data><data name="NetAlertAiRecommendationFallback" xml:space="preserve"><value>Решение на усмотрение пользователя.</value></data>
+  <data name="NetAlertAiActionAllowAlways" xml:space="preserve"><value>Всегда разрешать</value></data>
+  <data name="NetAlertAiActionAllowSession" xml:space="preserve"><value>Разрешить на сессию</value></data>
+  <data name="NetAlertAiActionBlockAlways" xml:space="preserve"><value>Всегда блокировать</value></data>
+  <data name="NetAlertAiActionBlockSession" xml:space="preserve"><value>Заблокировать на сессию</value></data>
+  <data name="NetAlertAiRecommendedActionFormat" xml:space="preserve"><value>Рекомендация: {0}</value></data>
+  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>Анализ нейросетью недоступен (проверьте настройки AI в параметрах).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Стандартное сетевое подключение приложения.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Применяйте стандартные правила брандмауэра.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Блок на сеанс</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Временно блокировать исходящие запросы процесса до перезапуска</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Рекомендация: Разрешить всегда</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Рекомендация: Разрешить на сеанс</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Рекомендация: Заблокировать всегда</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Рекомендация: Заблокировать на сеанс</value></data>  <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
+  <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Автономные решения ИИ:</value></data>
+  <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Автономные решения ИИ для сетевых подключений</value></data>
+  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>Автоматически анализировать новые исходящие подключения нейросетью и применять решение без показа всплывающего окна</value></data>
+  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>Действие ИИ по умолчанию:</value></data>
+  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>Действие, автоматически применяемое для соединений при автономном режиме работы ИИ</value></data>
+  <data name="NetTabAclMatrix" xml:space="preserve"><value>Контроль приложений (ACL)</value></data>
+  <data name="NetTabAclMatrixTip" xml:space="preserve"><value>Единая матрица контроля доступа к сети, белые и чёрные списки</value></data>
+  <data name="NetAclFilterAll" xml:space="preserve"><value>Все программы</value></data>
+  <data name="NetAclFilterAllow" xml:space="preserve"><value>🟢 Разрешено</value></data>
+  <data name="NetAclFilterPrompt" xml:space="preserve"><value>🟡 По запросу</value></data>
+  <data name="NetAclFilterBlock" xml:space="preserve"><value>🔴 Заблокировано</value></data>
+  <data name="NetAclFilterSystem" xml:space="preserve"><value>🛡️ Системные Windows</value></data>
+  <data name="NetAclFilterSession" xml:space="preserve"><value>⏱️ Сессионные</value></data>
+  <data name="NetAclSearchPlaceholder" xml:space="preserve"><value>Поиск процесса или пути...</value></data>
+  <data name="NetAclBtnAddExe" xml:space="preserve"><value>➕ Добавить EXE...</value></data>
+  <data name="NetAclRefreshTip" xml:space="preserve"><value>Обновить матрицу доступа</value></data>
+  <data name="NetAclColApp" xml:space="preserve"><value>Приложение</value></data>
+  <data name="NetAclColPolicy" xml:space="preserve"><value>Политика доступа</value></data>
+  <data name="NetAclColDuration" xml:space="preserve"><value>Срок действия</value></data>
+  <data name="NetAclColSource" xml:space="preserve"><value>Источник правила</value></data>
+  <data name="NetAclColSockets" xml:space="preserve"><value>Сокеты</value></data>
+  <data name="NetAclColActions" xml:space="preserve"><value>Действия</value></data>
+  <data name="NetAclRowWhitelistTip" xml:space="preserve"><value>Разрешить (в белый список)</value></data>
+  <data name="NetAclRowBlacklistTip" xml:space="preserve"><value>Заблокировать (в чёрный список)</value></data>
+  <data name="NetAclRowKillProcessTip" xml:space="preserve"><value>Завершить процесс</value></data>
+  <data name="NetAclEmptyText" xml:space="preserve"><value>В матрице доступа нет приложений по выбранному фильтру.</value></data>
+</root>

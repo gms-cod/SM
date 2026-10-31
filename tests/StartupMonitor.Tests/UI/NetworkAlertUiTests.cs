@@ -264,42 +264,61 @@ public sealed class NetworkAlertUiTests
         Assert.All(jsons, j => Assert.Contains("\"alertId\"", j));
     }
 
-    // ─── 5. Математика позиционирования «Bottom-Anchored» и защита границ экрана ───
+    // ─── 5. Математика позиционирования «Bottom-Anchored», адаптивной ширины и MaxHeight ───
 
     [Theory]
     [InlineData(1920, 1040, 490, 500, 1420, 530)]
-    [InlineData(1366, 728, 490, 460, 866, 258)]
+    [InlineData(1366, 728, 560, 460, 796, 258)]
+    [InlineData(1920, 688, 560, 520, 1350, 158)] // 1080p при 150% DPI
     public void CalculateBottomAnchoredPosition_StandardScreens_PositionsCorrectly(
         double workAreaWidth, double workAreaHeight, double winWidth, double winHeight, double expectedLeft, double expectedTop)
     {
         const double margin = 10.0;
         var targetLeft = Math.Max(0 + margin, workAreaWidth - winWidth - margin);
-        var targetTop = Math.Max(0 + margin, workAreaHeight - winHeight - margin);
+        var targetTop = workAreaHeight - winHeight - margin;
 
         Assert.Equal(expectedLeft, targetLeft);
         Assert.Equal(expectedTop, targetTop);
+
+        // Инвариант нижней привязки: нижняя кромка окна строго на (workArea.Bottom - margin)
+        var windowBottom = targetTop + winHeight;
+        Assert.Equal(workAreaHeight - margin, windowBottom);
+    }
+
+    [Theory]
+    [InlineData(728.0, 560.0)] // 1366x768 @ 100% -> 560 DIP
+    [InlineData(688.0, 560.0)] // 1080p @ 150% -> 560 DIP
+    [InlineData(825.0, 520.0)] // 1080p @ 125% -> 520 DIP
+    [InlineData(1040.0, 490.0)] // 1080p @ 100% -> 490 DIP
+    [InlineData(1400.0, 490.0)] // 1440p @ 100% -> 490 DIP
+    public void CalculateAdaptiveWidth_BasedOnScreenHeight_SelectsOptimalWidth(double workAreaHeight, double expectedWidth)
+    {
+        double width;
+        if (workAreaHeight <= 750.0) width = 560.0;
+        else if (workAreaHeight <= 850.0) width = 520.0;
+        else width = 490.0;
+
+        Assert.Equal(expectedWidth, width);
     }
 
     [Fact]
-    public void CalculateBottomAnchoredPosition_WindowTallerThanScreen_ClampsToTopMargin()
+    public void CalculateAiScrollViewerMaxHeight_ConstrainedScreen_PreventsWindowOverflow()
     {
         const double margin = 10.0;
-        const double workAreaHeight = 600.0;
-        const double windowHeight = 750.0;
+        const double workAreaHeight = 582.0; // 1366x768 @ 125% DPI
+        const double nonAiHeight = 398.0;
 
-        var targetTop = Math.Max(0 + margin, workAreaHeight - windowHeight - margin);
+        var maxAllowedWindowHeight = workAreaHeight - (margin * 2); // 562.0 DIP
+        var availableAiHeight = maxAllowedWindowHeight - nonAiHeight; // 164.0 DIP
+        var aiMaxHeight = Math.Max(80.0, availableAiHeight);
 
-        // Гарантирует, что окно не уходит за верхний край экрана (Top >= margin)
-        Assert.Equal(10.0, targetTop);
-    }
+        // Максимальная высота окна при максимальном заполнении ИИ
+        var totalWindowHeight = nonAiHeight + aiMaxHeight;
 
-    [Fact]
-    public void CalculateAdaptiveWidth_SmallDisplay_ScalesWithinBounds()
-    {
-        const double smallScreenWidth = 1366.0;
-        var adaptiveWidth = Math.Clamp(smallScreenWidth * 0.42, 440, 520);
+        Assert.Equal(164.0, aiMaxHeight);
+        Assert.True(totalWindowHeight <= maxAllowedWindowHeight, "Окно не должно превышать доступную высоту рабочей области");
 
-        Assert.InRange(adaptiveWidth, 440, 520);
-        Assert.Equal(520, adaptiveWidth); // 1366 * 0.42 = 573.72 -> clamped to 520
+        var targetTop = workAreaHeight - totalWindowHeight - margin;
+        Assert.True(targetTop >= margin, "Top окна не должен уходить за верхний край экрана");
     }
 }

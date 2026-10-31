@@ -47,6 +47,15 @@ if (Test-Path $pfDir) {
     Copy-Item (Join-Path $root "assets\icon.svg") "$pfDir\" -Force
     Copy-Item (Join-Path $root "assets\app.ico") "$pfDir\" -Force
     Get-ChildItem $pfDir -File | Unblock-File -ErrorAction SilentlyContinue
+
+    Write-Host "5.1. Запуск обновлённой службы StartupMonitor в $pfDir..." -ForegroundColor Cyan
+    Start-Service -Name 'StartupMonitor' -ErrorAction SilentlyContinue
+    $svc = Get-Service -Name 'StartupMonitor' -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -eq 'Running') {
+        Write-Host "Служба StartupMonitor успешно запущена (версия обновлена)!" -ForegroundColor Green
+    } else {
+        Write-Host "Внимание: служба StartupMonitor не запущена, проверьте журнал логов." -ForegroundColor Yellow
+    }
 }
 
 Write-Host "6. Снятие блокировок безопасности с SMon2..." -ForegroundColor Cyan

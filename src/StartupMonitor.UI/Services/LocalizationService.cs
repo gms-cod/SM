@@ -1187,7 +1187,6 @@ public class LocalizationService : INotifyPropertyChanged
     public string NetAlertBtnAllowSession => this["NetAlertBtnAllowSession"];
     /// <summary>Локализованная строка «NetAlertBtnBlock».</summary>
     public string NetAlertBtnBlock => this["NetAlertBtnBlock"];
-
     /// <summary>Локализованная строка «NetColProcess».</summary>
     public string NetColProcess => this["NetColProcess"];
     /// <summary>Локализованная строка «NetColProtocol».</summary>
@@ -1375,4 +1374,109 @@ public class LocalizationService : INotifyPropertyChanged
     public string FirewallSilentPid0Label => this["FirewallSilentPid0Label"];
     /// <summary>Подсказка тихого режима для PID 0.</summary>
     public string FirewallSilentPid0Hint => this["FirewallSilentPid0Hint"];
+
+    // ──── Окно сетевого алерта: служебные и AI-строки ────
+
+    /// <summary>Формат идентификатора процесса: «PID: {0}».</summary>
+    public string NetAlertPidFormat => this["NetAlertPidFormat"];
+    /// <summary>Подпись для неизвестного имени процесса.</summary>
+    public string NetAlertUnknownProcess => this["NetAlertProcessUnknown"];
+    /// <summary>Подпись для неизвестного пути процесса.</summary>
+    public string NetAlertUnknownPath => this["NetAlertPathUnknown"];
+    /// <summary>Подпись «Интернет» для GeoIP-фолбэка.</summary>
+    public string NetAlertCountryInternet => this["NetAlertInternet"];
+    /// <summary>Протокол по умолчанию, если служба его не передала.</summary>
+    public string NetAlertProtocolDefault => this["NetAlertProtocolDefault"];
+    /// <summary>Формат обратного отсчёта: «Автоматическое решение через {0} сек...».</summary>
+    public string NetAlertCountdownFormat => this["NetAlertCountdownFormat"];
+    /// <summary>Текст паузы обратного отсчёта при наведении курсора.</summary>
+    public string NetAlertCountdownPaused => this["NetAlertCountdownPaused"];
+    /// <summary>Текст индикатора анализа программы нейросетью.</summary>
+    public string NetAlertAiAnalyzing => this["NetAlertAiAnalyzing"];
+    /// <summary>Бейдж «Вердикт ИИ».</summary>
+    public string NetAlertAiVerdictBadge => this["NetAlertAiVerdictBadge"];
+    /// <summary>Метка «Назначение программы».</summary>
+    public string NetAlertAiPurposeLabel => this["NetAlertAiPurposeLabel"];
+    /// <summary>Метка «Риски блокировки».</summary>
+    public string NetAlertAiRiskLabel => this["NetAlertAiBlockingRiskLabel"];
+    /// <summary>Метка «Рекомендация ИИ».</summary>
+    public string NetAlertAiRecommendationLabel => this["NetAlertAiRecommendationLabel"];
+    /// <summary>Готовая рекомендация «Разрешить всегда».</summary>
+    public string NetAlertRecAllowAlways => this["NetAlertRecAllowAlways"];
+    /// <summary>Готовая рекомендация «Разрешить на сессию».</summary>
+    public string NetAlertRecAllowSession => this["NetAlertRecAllowSession"];
+    /// <summary>Готовая рекомендация «Заблокировать всегда».</summary>
+    public string NetAlertRecBlockAlways => this["NetAlertRecBlockAlways"];
+    /// <summary>Готовая рекомендация «Заблокировать на сессию».</summary>
+    public string NetAlertRecBlockSession => this["NetAlertRecBlockSession"];
+    /// <summary>Резервный текст назначения, если ИИ не вернул данные.</summary>
+    public string NetAlertAiPurposeFallback => this["NetAlertAiPurposeFallback"];
+    /// <summary>Резервный текст рисков, если ИИ не вернул данные.</summary>
+    public string NetAlertAiRiskFallback => this["NetAlertAiRiskFallback"];
+    /// <summary>Резервный текст рекомендации, если ИИ не вернул данные.</summary>
+    public string NetAlertAiRecommendationFallback => this["NetAlertAiRecommendationFallback"];
+    /// <summary>Сообщение о недоступности AI-анализа.</summary>
+    public string NetAlertAiUnavailable => this["NetAlertAiUnavailable"];
+    /// <summary>Стандартное описание сетевого подключения (AI-фолбэк).</summary>
+    public string NetAlertAiStandardRisk => this["NetAlertAiStandardRisk"];
+    /// <summary>Стандартная рекомендация брандмауэра (AI-фолбэк).</summary>
+    public string NetAlertAiStandardRecommendation => this["NetAlertAiStandardRecommendation"];
+    /// <summary>Подсказка кнопки блокировки на текущую сессию.</summary>
+    public string NetAlertBlockSessionTip => this["NetAlertBlockSessionTip"];
+    /// <summary>Текст кнопки блокировки на текущую сессию.</summary>
+    public string NetAlertBtnBlockSession => this["NetAlertBtnBlockSession"];
+
+    // ──── Локализация автономных решений ИИ и матрицы ACL ────
+    /// <summary>Локализованная строка «Автономные решения ИИ:».</summary>
+    public string AiAutonomousDecisionsLabel => this["AiAutonomousDecisionsLabel"];
+    /// <summary>Локализованная строка «Автономные решения ИИ для сетевых подключений».</summary>
+    public string AiAutonomousDecisionsToggle => this["AiAutonomousDecisionsToggle"];
+    /// <summary>Локализованная строка «Автоматически анализировать новые исходящие подключения нейросетью и применять решение без показа всплывающего окна».</summary>
+    public string AiAutonomousDecisionsHint => this["AiAutonomousDecisionsHint"];
+    /// <summary>Локализованная строка «Действие ИИ по умолчанию:».</summary>
+    public string AiAutonomousDefaultActionLabel => this["AiAutonomousDefaultActionLabel"];
+    /// <summary>Локализованная строка «Действие, автоматически применяемое для соединений при автономном режиме работы ИИ».</summary>
+    public string AiAutonomousDefaultActionHint => this["AiAutonomousDefaultActionHint"];
+    /// <summary>Локализованная строка «Контроль приложений (ACL)».</summary>
+    public string NetTabAclMatrix => this["NetTabAclMatrix"];
+    /// <summary>Локализованная строка «Единая матрица контроля доступа к сети, белые и чёрные списки».</summary>
+    public string NetTabAclMatrixTip => this["NetTabAclMatrixTip"];
+    /// <summary>Локализованная строка «Все программы».</summary>
+    public string NetAclFilterAll => this["NetAclFilterAll"];
+    /// <summary>Локализованная строка «🟢 Разрешено».</summary>
+    public string NetAclFilterAllow => this["NetAclFilterAllow"];
+    /// <summary>Локализованная строка «🟡 По запросу».</summary>
+    public string NetAclFilterPrompt => this["NetAclFilterPrompt"];
+    /// <summary>Локализованная строка «🔴 Заблокировано».</summary>
+    public string NetAclFilterBlock => this["NetAclFilterBlock"];
+    /// <summary>Локализованная строка «🛡️ Системные Windows».</summary>
+    public string NetAclFilterSystem => this["NetAclFilterSystem"];
+    /// <summary>Локализованная строка «⏱️ Сессионные».</summary>
+    public string NetAclFilterSession => this["NetAclFilterSession"];
+    /// <summary>Локализованная строка «Поиск процесса или пути...».</summary>
+    public string NetAclSearchPlaceholder => this["NetAclSearchPlaceholder"];
+    /// <summary>Локализованная строка «➕ Добавить EXE...».</summary>
+    public string NetAclBtnAddExe => this["NetAclBtnAddExe"];
+    /// <summary>Локализованная строка «Обновить матрицу доступа».</summary>
+    public string NetAclRefreshTip => this["NetAclRefreshTip"];
+    /// <summary>Локализованная строка «Приложение».</summary>
+    public string NetAclColApp => this["NetAclColApp"];
+    /// <summary>Локализованная строка «Политика доступа».</summary>
+    public string NetAclColPolicy => this["NetAclColPolicy"];
+    /// <summary>Локализованная строка «Срок действия».</summary>
+    public string NetAclColDuration => this["NetAclColDuration"];
+    /// <summary>Локализованная строка «Источник правила».</summary>
+    public string NetAclColSource => this["NetAclColSource"];
+    /// <summary>Локализованная строка «Сокеты».</summary>
+    public string NetAclColSockets => this["NetAclColSockets"];
+    /// <summary>Локализованная строка «Действия».</summary>
+    public string NetAclColActions => this["NetAclColActions"];
+    /// <summary>Локализованная строка «Разрешить (в белый список)».</summary>
+    public string NetAclRowWhitelistTip => this["NetAclRowWhitelistTip"];
+    /// <summary>Локализованная строка «Заблокировать (в чёрный список)».</summary>
+    public string NetAclRowBlacklistTip => this["NetAclRowBlacklistTip"];
+    /// <summary>Локализованная строка «Завершить процесс».</summary>
+    public string NetAclRowKillProcessTip => this["NetAclRowKillProcessTip"];
+    /// <summary>Локализованная строка «В матрице доступа нет приложений по выбранному фильтру.».</summary>
+    public string NetAclEmptyText => this["NetAclEmptyText"];
 }

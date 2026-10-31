@@ -32,6 +32,12 @@ public class ProcessMetricsTracker : IDisposable
     private readonly Timer _pollTimer;
     private readonly int _processorCount = Math.Max(1, Environment.ProcessorCount);
 
+    // Единая блокировка для сериализации CollectSnapshotCore (таймер + IPC CaptureSnapshot)
+    private readonly object _collectLock = new();
+    // Блокировка счётчика подписчиков
+    private readonly object _subscriberLock = new();
+    private readonly Microsoft.Extensions.Logging.ILogger<ProcessMetricsTracker>? _logger;
+
     // Количество активных подписчиков (UI на вкладке Диспетчера задач)
     private int _subscribersCount = 0;
     private int _isCollecting = 0;
@@ -73,10 +79,11 @@ public class ProcessMetricsTracker : IDisposable
     /// <summary>Инициализирует трекер с переиспользуемым нативным буфером.</summary>
     /// <param name="enricher">Обогатитель метаданных процессов.</param>
     /// <param name="linker">Связыватель процессов с автозапуском.</param>
-    public ProcessMetricsTracker(ProcessMetadataEnricher enricher, ProcessStartupLinker linker)
+    public ProcessMetricsTracker(ProcessMetadataEnricher enricher, ProcessStartupLinker linker, Microsoft.Extensions.Logging.ILogger<ProcessMetricsTracker>? logger = null)
     {
         _enricher = enricher;
         _linker = linker;
+        _logger = logger;
 
         // Выделяем переиспользуемый нативный буфер в неуправляемой памяти
         _nativeBuffer = Marshal.AllocHGlobal(_nativeBufferSize);
@@ -88,21 +95,32 @@ public class ProcessMetricsTracker : IDisposable
     /// <summary>Подписка UI на поток срезов метрик (активирует периодический опрос раз в 2000 мс).</summary>
     public void Subscribe()
     {
-        if (Interlocked.Increment(ref _subscribersCount) == 1)
+        lock (_subscriberLock)
         {
-            // Первый подписчик — включаем сбор каждые 2000 мс (сглаженный интервал без всплесков)
-            _pollTimer.Change(0, 2000);
+            if (_subscribersCount == 0)
+            {
+                // Первый подписчик — включаем сбор каждые 2000 мс (сглаженный интервал без всплесков)
+                _pollTimer.Change(0, 2000);
+            }
+            _subscribersCount++;
         }
     }
 
     /// <summary>Отписка UI (при уходе с вкладки или сворачивании в трей).</summary>
     public void Unsubscribe()
     {
-        if (Interlocked.Decrement(ref _subscribersCount) <= 0)
+        lock (_subscriberLock)
         {
-            _subscribersCount = 0;
-            // Все подписчики ушли — полностью выключаем таймер (0% CPU Idle)
-            _pollTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            if (_subscribersCount > 0)
+            {
+                _subscribersCount--;
+            }
+            if (_subscribersCount <= 0)
+            {
+                _subscribersCount = 0;
+                // Все подписчики ушли — полностью выключаем таймер (0% CPU Idle)
+                _pollTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            }
         }
     }
 
@@ -131,7 +149,10 @@ public class ProcessMetricsTracker : IDisposable
             var snapshot = CollectSnapshotCore();
             SnapshotReady?.Invoke(this, snapshot);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Ошибка сбора снимка метрик процессов");
+        }
         finally
         {
             Interlocked.Exchange(ref _isCollecting, 0);
@@ -145,8 +166,10 @@ public class ProcessMetricsTracker : IDisposable
     /// </summary>
     private SystemPerformanceSnapshot CollectSnapshotCore()
     {
-        using var _profSnapshot = ExecutionProfiler.Profile("Service.ProcessMetricsSnapshot");
-        using var _prof = ExecutionProfiler.Measure("Service.ProcessMetrics.Collect");
+        lock (_collectLock)
+        {
+            using var _profSnapshot = ExecutionProfiler.Profile("Service.ProcessMetricsSnapshot");
+            using var _prof = ExecutionProfiler.Measure("Service.ProcessMetrics.Collect");
         var now = DateTime.UtcNow;
         var snapshot = new SystemPerformanceSnapshot();
 
@@ -403,6 +426,7 @@ public class ProcessMetricsTracker : IDisposable
 
         _enricher.PruneDeadProcesses(activePids);
         return snapshot;
+        }
     }
 
     /// <summary>Рассчитывает процент загрузки системного процессора через GetSystemTimes.</summary>
@@ -481,7 +505,8 @@ public class ProcessMetricsTracker : IDisposable
     {
         _pollTimer.Dispose();
         _networkTracker.Dispose();
-        lock (_nativeBufferLock)
+        _enricher.Dispose();
+        lock (_collectLock)
         {
             if (_nativeBuffer != IntPtr.Zero)
             {

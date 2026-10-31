@@ -1975,7 +1975,7 @@ Do you really want to proceed?</value>
     <value>🔴 Block</value>
   </data>
   <data name="NetAlertBtnWhitelist" xml:space="preserve">
-    <value>🛡️ Добавить программу в белый список</value>
+    <value>🛡️ Add program to whitelist</value>
   </data>
   <data name="NetAlertWhitelistTip" xml:space="preserve">
     <value>Allow all network activity for this program and add to whitelist</value>
@@ -2110,4 +2110,38 @@ Import with overwrite of existing rules?</value>
   <data name="ToolboxTabSecurity" xml:space="preserve">
     <value>Hash &amp; Passwords</value>
   </data>
-<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Allow this port</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Allow connections on this port and suppress future alerts for it</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Silent mode for system sockets (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Suppress pop-up alerts for kernel sockets and terminating connections</value></data></root>
+<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Allow this port</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Allow connections on this port and suppress future alerts for it</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Silent mode for system sockets (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Suppress pop-up alerts for kernel sockets and terminating connections</value></data><data name="NetAlertAiAnalyzing" xml:space="preserve"><value>Analyzing program with neural network...</value></data><data name="NetAlertAiVerdictBadge" xml:space="preserve"><value>⚡ AI Verdict</value></data><data name="NetAlertAiPurposeLabel" xml:space="preserve"><value>Program purpose:</value></data><data name="NetAlertAiBlockingRiskLabel" xml:space="preserve"><value>Blocking risks (OS / printing / network):</value></data><data name="NetAlertAiRecommendationLabel" xml:space="preserve"><value>AI recommendation:</value></data><data name="NetAlertCountdownPaused" xml:space="preserve"><value>Countdown paused (mouse cursor)</value></data><data name="NetAlertProcessUnknown" xml:space="preserve"><value>Unknown process</value></data><data name="NetAlertPathUnknown" xml:space="preserve"><value>Path unknown</value></data><data name="NetAlertInternet" xml:space="preserve"><value>Internet</value></data><data name="NetAlertProtocolDefault" xml:space="preserve"><value>TCP</value></data><data name="NetAlertCountdownFormat" xml:space="preserve"><value>Auto-resolve in {0} sec...</value></data><data name="NetAlertAiPurposeFallback" xml:space="preserve"><value>Purpose not determined.</value></data><data name="NetAlertAiRiskFallback" xml:space="preserve"><value>No significant risks to critical services detected.</value></data><data name="NetAlertAiRecommendationFallback" xml:space="preserve"><value>Decision at user's discretion.</value></data>
+  <data name="NetAlertAiActionAllowAlways" xml:space="preserve"><value>Allow always</value></data>
+  <data name="NetAlertAiActionAllowSession" xml:space="preserve"><value>Allow session</value></data>
+  <data name="NetAlertAiActionBlockAlways" xml:space="preserve"><value>Block always</value></data>
+  <data name="NetAlertAiActionBlockSession" xml:space="preserve"><value>Block session</value></data>
+  <data name="NetAlertAiRecommendedActionFormat" xml:space="preserve"><value>Recommendation: {0}</value></data>
+  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>AI analysis unavailable (check AI settings in parameters).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Standard application network connection.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Apply standard firewall rules.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Block for session</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Temporarily block outgoing requests of the process until restart</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Recommendation: Allow always</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Recommendation: Allow for session</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Recommendation: Block always</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Recommendation: Block for session</value></data>
+  <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
+  <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Autonomous AI Decisions:</value></data>
+  <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Autonomous AI decisions for network connections</value></data>
+  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>Automatically analyze new outgoing connections with neural network and apply decisions without showing popup alerts</value></data>
+  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>Default AI Action:</value></data>
+  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>Action automatically applied to connections when autonomous AI mode is enabled</value></data>
+  <data name="NetTabAclMatrix" xml:space="preserve"><value>App Control (ACL)</value></data>
+  <data name="NetTabAclMatrixTip" xml:space="preserve"><value>Unified network access control matrix, whitelists and blacklists</value></data>
+  <data name="NetAclFilterAll" xml:space="preserve"><value>All Applications</value></data>
+  <data name="NetAclFilterAllow" xml:space="preserve"><value>🟢 Allowed</value></data>
+  <data name="NetAclFilterPrompt" xml:space="preserve"><value>🟡 Prompt</value></data>
+  <data name="NetAclFilterBlock" xml:space="preserve"><value>🔴 Blocked</value></data>
+  <data name="NetAclFilterSystem" xml:space="preserve"><value>🛡️ Windows System</value></data>
+  <data name="NetAclFilterSession" xml:space="preserve"><value>⏱️ Session</value></data>
+  <data name="NetAclSearchPlaceholder" xml:space="preserve"><value>Search process or path...</value></data>
+  <data name="NetAclBtnAddExe" xml:space="preserve"><value>➕ Add EXE...</value></data>
+  <data name="NetAclRefreshTip" xml:space="preserve"><value>Refresh access matrix</value></data>
+  <data name="NetAclColApp" xml:space="preserve"><value>Application</value></data>
+  <data name="NetAclColPolicy" xml:space="preserve"><value>Access Policy</value></data>
+  <data name="NetAclColDuration" xml:space="preserve"><value>Duration</value></data>
+  <data name="NetAclColSource" xml:space="preserve"><value>Rule Source</value></data>
+  <data name="NetAclColSockets" xml:space="preserve"><value>Sockets</value></data>
+  <data name="NetAclColActions" xml:space="preserve"><value>Actions</value></data>
+  <data name="NetAclRowWhitelistTip" xml:space="preserve"><value>Allow (add to whitelist)</value></data>
+  <data name="NetAclRowBlacklistTip" xml:space="preserve"><value>Block (add to blacklist)</value></data>
+  <data name="NetAclRowKillProcessTip" xml:space="preserve"><value>Terminate process</value></data>
+  <data name="NetAclEmptyText" xml:space="preserve"><value>No applications match the selected filter in the access matrix.</value></data>
+</root>

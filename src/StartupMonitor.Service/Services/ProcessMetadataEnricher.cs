@@ -357,6 +357,7 @@ public class ProcessMetadataEnricher : IDisposable
     public void Dispose()
     {
         _cts.Cancel();
+        try { _workerTask.Wait(TimeSpan.FromMilliseconds(500)); } catch { }
         _cts.Dispose();
     }
 }
