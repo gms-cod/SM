@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="{Binding NetAlertTitle, Source={StaticResource Loc}}"
-    Width="420"
+    Width="490"
+    MaxWidth="540"
     SizeToContent="Height"
     MinHeight="220"
     WindowStyle="None"
@@ -168,47 +169,53 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- Развёрнутый вердикт нейросети -->
-                    <StackPanel x:Name="AiContentPanel" Visibility="Collapsed">
-                        <Grid Margin="0,0,0,6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="#0284C7" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
-                                <TextBlock Text="⚡ Вердикт ИИ" FontSize="11" FontWeight="Bold" Foreground="White" />
-                            </Border>
-                            <TextBlock x:Name="TxtAiRecommendedAction" Grid.Column="1"
-                                       FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                       VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis" />
-                        </Grid>
+                    <!-- Развёрнутый вердикт нейросети внутри ScrollViewer с защитой от переполнения экрана -->
+                    <ScrollViewer x:Name="AiScrollViewer"
+                                  MaxHeight="220"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                        <StackPanel x:Name="AiContentPanel" Visibility="Collapsed">
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Background="#0284C7" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                    <TextBlock Text="⚡ Вердикт ИИ" FontSize="11" FontWeight="Bold" Foreground="White" />
+                                </Border>
+                                <TextBlock x:Name="TxtAiRecommendedAction" Grid.Column="1"
+                                           FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
 
-                        <!-- Назначение программы -->
-                        <TextBlock Text="Назначение программы:" FontSize="11" FontWeight="Bold"
-                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,1" />
-                        <TextBlock x:Name="TxtAiPurpose"
-                                   FontSize="11" LineHeight="15"
-                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
-                                   TextWrapping="Wrap" Margin="0,0,0,6" />
+                            <!-- Назначение программы -->
+                            <TextBlock Text="Назначение программы:" FontSize="11" FontWeight="Bold"
+                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,2,0,1" />
+                            <TextBlock x:Name="TxtAiPurpose"
+                                       FontSize="11" LineHeight="15"
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" Margin="0,0,0,6" />
 
-                        <!-- Риски блокировки -->
-                        <TextBlock Text="Риски блокировки (ОС / печать / сеть):" FontSize="11" FontWeight="Bold"
-                                   Foreground="#F59E0B" Margin="0,0,0,1" />
-                        <TextBlock x:Name="TxtAiBlockingRisk"
-                                   FontSize="11" LineHeight="15"
-                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
-                                   TextWrapping="Wrap" Margin="0,0,0,6" />
+                            <!-- Риски блокировки -->
+                            <TextBlock Text="Риски блокировки (ОС / печать / сеть):" FontSize="11" FontWeight="Bold"
+                                       Foreground="#F59E0B" Margin="0,0,0,1" />
+                            <TextBlock x:Name="TxtAiBlockingRisk"
+                                       FontSize="11" LineHeight="15"
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" Margin="0,0,0,6" />
 
-                        <!-- Рекомендация ИИ -->
-                        <TextBlock Text="Рекомендация ИИ:" FontSize="11" FontWeight="Bold"
-                                   Foreground="#10B981" Margin="0,0,0,1" />
-                        <TextBlock x:Name="TxtAiRecommendation"
-                                   FontSize="11" LineHeight="15" FontWeight="SemiBold"
-                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
+                            <!-- Рекомендация ИИ -->
+                            <TextBlock Text="Рекомендация ИИ:" FontSize="11" FontWeight="Bold"
+                                       Foreground="#10B981" Margin="0,0,0,1" />
+                            <TextBlock x:Name="TxtAiRecommendation"
+                                       FontSize="11" LineHeight="15" FontWeight="SemiBold"
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </Border>
 
@@ -219,61 +226,76 @@
                        Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
                        Margin="0,0,0,6" />
 
-            <!-- 5 эргономичных кнопок действий -->
-            <StackPanel Grid.Row="5" Margin="0,0,0,10">
+            <!-- 5 эргономичных кнопок действий в компактной сетке 2x2 + 1 -->
+            <Grid Grid.Row="5" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
                 <!-- 1. Белый список (Всегда разрешать) -->
                 <ui:Button x:Name="BtnWhitelist"
+                           Grid.Row="0" Grid.Column="0"
                            Appearance="Primary"
                            Background="#0284C7" BorderBrush="#0369A1" Foreground="White"
                            Content="{Binding NetAlertBtnWhitelist, Source={StaticResource Loc}}"
                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                           Padding="10,7" Margin="0,0,0,6"
+                           Padding="8,7" Margin="0,0,4,6"
                            Focusable="False"
                            Click="OnWhitelistClick"
                            ToolTip="{Binding NetAlertWhitelistTip, Source={StaticResource Loc}}" />
 
-                <!-- 2. Разрешить на текущую сессию -->
-                <ui:Button x:Name="BtnAllowSession"
-                           Appearance="Secondary"
-                           Content="{Binding NetAlertBtnAllowSession, Source={StaticResource Loc}}"
-                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                           Padding="10,7" Margin="0,0,0,6"
-                           Focusable="False"
-                           Click="OnAllowSessionClick"
-                           ToolTip="{Binding NetAlertAllowSessionTip, Source={StaticResource Loc}}" />
-
-                <!-- 3. Запретить на текущую сессию -->
-                <ui:Button x:Name="BtnBlockSession"
-                           Appearance="Secondary"
-                           Background="#D97706" BorderBrush="#B45309" Foreground="White"
-                           Content="⛔ Запретить на текущий сеанс"
-                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                           Padding="10,7" Margin="0,0,0,6"
-                           Focusable="False"
-                           Click="OnBlockSessionClick"
-                           ToolTip="Временно блокировать исходящие запросы процесса до перезапуска" />
-
-                <!-- 4. Чёрный список (Всегда блокировать) -->
+                <!-- 2. Чёрный список (Всегда блокировать) -->
                 <ui:Button x:Name="BtnBlockAlways"
+                           Grid.Row="0" Grid.Column="1"
                            Appearance="Danger"
                            Background="#DC2626" BorderBrush="#B91C1C" Foreground="White"
                            Content="{Binding NetAlertBtnBlock, Source={StaticResource Loc}}"
                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                           Padding="10,7" Margin="0,0,0,6"
+                           Padding="8,7" Margin="4,0,0,6"
                            Focusable="False"
                            Click="OnBlockAlwaysClick"
                            ToolTip="{Binding NetAlertBlockTip, Source={StaticResource Loc}}" />
 
-                <!-- 5. Разрешить удаленный порт -->
+                <!-- 3. Разрешить на текущую сессию -->
+                <ui:Button x:Name="BtnAllowSession"
+                           Grid.Row="1" Grid.Column="0"
+                           Appearance="Secondary"
+                           Content="{Binding NetAlertBtnAllowSession, Source={StaticResource Loc}}"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                           Padding="8,7" Margin="0,0,4,6"
+                           Focusable="False"
+                           Click="OnAllowSessionClick"
+                           ToolTip="{Binding NetAlertAllowSessionTip, Source={StaticResource Loc}}" />
+
+                <!-- 4. Запретить на текущую сессию -->
+                <ui:Button x:Name="BtnBlockSession"
+                           Grid.Row="1" Grid.Column="1"
+                           Appearance="Secondary"
+                           Background="#D97706" BorderBrush="#B45309" Foreground="White"
+                           Content="⛔ Блок на сеанс"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                           Padding="8,7" Margin="4,0,0,6"
+                           Focusable="False"
+                           Click="OnBlockSessionClick"
+                           ToolTip="Временно блокировать исходящие запросы процесса до перезапуска" />
+
+                <!-- 5. Разрешить удаленный порт (на всю ширину) -->
                 <ui:Button x:Name="BtnAllowPort"
+                           Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                            Appearance="Secondary"
                            Content="{Binding NetAlertBtnAllowPort, Source={StaticResource Loc}}"
                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                           Padding="10,6"
+                           Padding="8,6"
                            Focusable="False"
                            Click="OnAllowPortClick"
                            ToolTip="{Binding NetAlertAllowPortTip, Source={StaticResource Loc}}" />
-            </StackPanel>
+            </Grid>
 
             <!-- Тонкий ProgressBar обратного отсчета -->
             <ProgressBar x:Name="CountdownBar" Grid.Row="6"

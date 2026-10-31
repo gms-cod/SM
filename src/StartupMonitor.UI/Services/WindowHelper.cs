@@ -1,3 +1,6 @@
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -148,6 +151,115 @@ public static class WindowHelper
                 Interlocked.Exchange(ref _refreshInFlight, 0);
             }
         });
+    }
+
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private class MONITORINFO
+    {
+        public int cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+        public RECT rcMonitor = new();
+        public RECT rcWork = new();
+        public int dwFlags = 0;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, [In, Out] MONITORINFO lpmi);
+
+    /// <summary>
+    /// Возвращает рабочую область монитора (в аппаратно-независимых единицах WPF DIP с учётом Per-Monitor DPI),
+    /// на котором находится окно, либо на котором находится курсор мыши / окно-владелец.
+    /// Гарантирует корректное определение экранных границ в многомониторных конфигурациях.
+    /// </summary>
+    /// <param name="window">Экземпляр окна WPF.</param>
+    /// <returns>Прямоугольник рабочей области в координатах DIP рабочего стола.</returns>
+    public static Rect GetCurrentMonitorWorkArea(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        try
+        {
+            var helper = new WindowInteropHelper(window);
+            var hWnd = helper.Handle;
+            var hMonitor = IntPtr.Zero;
+
+            if (hWnd != IntPtr.Zero)
+            {
+                hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+            }
+
+            if (hMonitor == IntPtr.Zero && window.Owner != null)
+            {
+                var ownerHwnd = new WindowInteropHelper(window.Owner).Handle;
+                if (ownerHwnd != IntPtr.Zero)
+                {
+                    hMonitor = MonitorFromWindow(ownerHwnd, MONITOR_DEFAULTTONEAREST);
+                }
+            }
+
+            if (hMonitor == IntPtr.Zero && GetCursorPos(out POINT pt))
+            {
+                hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+            }
+
+            if (hMonitor == IntPtr.Zero)
+            {
+                return SystemParameters.WorkArea;
+            }
+
+            var mi = new MONITORINFO();
+            if (!GetMonitorInfo(hMonitor, mi))
+            {
+                return SystemParameters.WorkArea;
+            }
+
+            var dpi = VisualTreeHelper.GetDpi(window);
+            var dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+            var dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+            var left = mi.rcWork.Left / dpiX;
+            var top = mi.rcWork.Top / dpiY;
+            var width = (mi.rcWork.Right - mi.rcWork.Left) / dpiX;
+            var height = (mi.rcWork.Bottom - mi.rcWork.Top) / dpiY;
+
+            if (width <= 0 || height <= 0)
+            {
+                return SystemParameters.WorkArea;
+            }
+
+            return new Rect(left, top, width, height);
+        }
+        catch
+        {
+            return SystemParameters.WorkArea;
+        }
     }
 }
 

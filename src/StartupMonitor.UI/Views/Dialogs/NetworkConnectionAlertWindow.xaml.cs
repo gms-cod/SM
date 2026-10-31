@@ -23,6 +23,7 @@ public partial class NetworkConnectionAlertWindow : Window
     private int _remainingSeconds;
     private bool _isResolved;
     private bool _isPausedByHover;
+    private bool _isManuallyMoved;
 
     /// <summary>Решение, выбранное пользователем (или применённое по таймауту).</summary>
     public NetworkAlertResolution? Resolution { get; private set; }
@@ -51,6 +52,7 @@ public partial class NetworkConnectionAlertWindow : Window
         Loaded += OnWindowLoaded;
         Closed += OnWindowClosed;
         MouseLeftButtonDown += OnDragMove;
+        SizeChanged += OnWindowSizeChanged;
 
         // Интеллектуальная пауза при наведении курсора мыши
         MouseEnter += OnWindowMouseEnter;
@@ -60,16 +62,19 @@ public partial class NetworkConnectionAlertWindow : Window
     private void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
         FillAlertFields();
-        PositionBottomRight();
+        RepositionWindow(animate: false);
         FadeIn();
 
         UpdateCountdownText();
         _countdownTimer.Start();
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         _ = LoadAiVerdictAsync();
     }
 
     private void OnWindowClosed(object? sender, EventArgs e)
     {
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        SizeChanged -= OnWindowSizeChanged;
         try { _countdownTimer.Stop(); } catch { }
         _countdownTimer.Tick -= OnCountdownTick;
     }
@@ -98,7 +103,13 @@ public partial class NetworkConnectionAlertWindow : Window
     {
         if (e.ButtonState == MouseButtonState.Pressed)
         {
-            try { DragMove(); } catch { }
+            try
+            {
+                _isManuallyMoved = true;
+                DragMove();
+                ClampInsideCurrentMonitor();
+            }
+            catch { }
         }
     }
 
@@ -137,26 +148,111 @@ public partial class NetworkConnectionAlertWindow : Window
         }
     }
 
-    /// <summary>Позиционирует окно в правом нижнем углу рабочей области (над панелью задач).</summary>
-    private void PositionBottomRight()
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
         try
         {
-            UpdateLayout();
-            var workArea = SystemParameters.WorkArea;
+            Dispatcher.InvokeAsync(() => RepositionWindow(animate: false));
+        }
+        catch { }
+    }
+
+    private void OnWindowSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.HeightChanged || e.WidthChanged)
+        {
+            RepositionWindow(animate: IsLoaded && Opacity > 0);
+        }
+    }
+
+    /// <summary>
+    /// Выполняет динамическое позиционирование окна в правом нижнем углу рабочей области текущего монитора.
+    /// Реализует привязку к нижнему краю экрана («Bottom-Anchored»): при росте высоты окна
+    /// (например, при подгрузке вердикта ИИ) окно динамически и плавно поднимается вверх,
+    /// гарантируя, что все кнопки действий всегда остаются полностью видимыми над панелью задач.
+    /// </summary>
+    /// <param name="animate">Флаг плавного анимирования координаты Top.</param>
+    private void RepositionWindow(bool animate = false)
+    {
+        try
+        {
+            var workArea = WindowHelper.GetCurrentMonitorWorkArea(this);
             const double margin = 10.0;
 
-            var width = double.IsNaN(Width) || Width <= 0 ? ActualWidth : Width;
-            if (width <= 0) width = 420;
-            var height = ActualHeight > 0 ? ActualHeight : 460;
+            // Динамически масштабируем ширину для компактных экранов
+            if (workArea.Width > 0 && workArea.Width < 1400)
+            {
+                var adaptiveWidth = Math.Clamp(workArea.Width * 0.42, 440, 520);
+                if (Math.Abs(Width - adaptiveWidth) > 5)
+                {
+                    Width = adaptiveWidth;
+                }
+            }
 
-            Left = Math.Max(workArea.Left, workArea.Right - width - margin);
-            Top = Math.Max(workArea.Top, workArea.Bottom - height - margin);
+            // Динамически ограничиваем максимальную высоту окна, оставляя гарантированный отступ
+            MaxHeight = Math.Max(260, workArea.Height - (margin * 2));
+            MaxWidth = Math.Max(320, workArea.Width - (margin * 2));
+
+            var width = ActualWidth > 0 ? ActualWidth : (double.IsNaN(Width) || Width <= 0 ? 490 : Width);
+            var height = ActualHeight > 0 ? ActualHeight : (double.IsNaN(Height) || Height <= 0 ? 460 : Height);
+
+            var targetLeft = Math.Max(workArea.Left + margin, workArea.Right - width - margin);
+            var targetTop = Math.Max(workArea.Top + margin, workArea.Bottom - height - margin);
+
+            if (_isManuallyMoved)
+            {
+                ClampInsideCurrentMonitor();
+                return;
+            }
+
+            Left = targetLeft;
+
+            if (animate && Math.Abs(Top - targetTop) > 1.0)
+            {
+                BeginAnimation(TopProperty, null);
+                var anim = new DoubleAnimation
+                {
+                    From = Top,
+                    To = targetTop,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+                    FillBehavior = FillBehavior.Stop
+                };
+                anim.Completed += (_, _) =>
+                {
+                    Top = targetTop;
+                };
+                BeginAnimation(TopProperty, anim);
+            }
+            else
+            {
+                BeginAnimation(TopProperty, null);
+                Top = targetTop;
+            }
         }
         catch
         {
-            // Игнорируем ошибки позиционирования
+            // Zero-Crash: защита от непредвиденных исключений layout
         }
+    }
+
+    /// <summary>
+    /// Удерживает окно строго в пределах видимой рабочей области монитора при ручном перемещении.
+    /// </summary>
+    private void ClampInsideCurrentMonitor()
+    {
+        try
+        {
+            var workArea = WindowHelper.GetCurrentMonitorWorkArea(this);
+            const double margin = 10.0;
+
+            var width = ActualWidth > 0 ? ActualWidth : 490;
+            var height = ActualHeight > 0 ? ActualHeight : 460;
+
+            Left = Math.Clamp(Left, workArea.Left + margin, Math.Max(workArea.Left + margin, workArea.Right - width - margin));
+            Top = Math.Clamp(Top, workArea.Top + margin, Math.Max(workArea.Top + margin, workArea.Bottom - height - margin));
+        }
+        catch { }
     }
 
     private void FadeIn()
@@ -335,6 +431,9 @@ public partial class NetworkConnectionAlertWindow : Window
             {
                 TxtAiRecommendedAction.Text = string.Empty;
             }
+
+            UpdateLayout();
+            RepositionWindow(animate: true);
         }
         catch { }
     }
@@ -349,6 +448,8 @@ public partial class NetworkConnectionAlertWindow : Window
             TxtAiBlockingRisk.Text = "Стандартное сетевое подключение приложения.";
             TxtAiRecommendation.Text = "Применяйте стандартные правила брандмауэра.";
             TxtAiRecommendedAction.Text = string.Empty;
+            UpdateLayout();
+            RepositionWindow(animate: true);
         }
         catch { }
     }

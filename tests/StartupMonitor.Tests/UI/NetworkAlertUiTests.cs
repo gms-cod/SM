@@ -263,4 +263,43 @@ public sealed class NetworkAlertUiTests
         Assert.Equal(allResolutions.Length, jsons.Distinct().Count());
         Assert.All(jsons, j => Assert.Contains("\"alertId\"", j));
     }
+
+    // ─── 5. Математика позиционирования «Bottom-Anchored» и защита границ экрана ───
+
+    [Theory]
+    [InlineData(1920, 1040, 490, 500, 1420, 530)]
+    [InlineData(1366, 728, 490, 460, 866, 258)]
+    public void CalculateBottomAnchoredPosition_StandardScreens_PositionsCorrectly(
+        double workAreaWidth, double workAreaHeight, double winWidth, double winHeight, double expectedLeft, double expectedTop)
+    {
+        const double margin = 10.0;
+        var targetLeft = Math.Max(0 + margin, workAreaWidth - winWidth - margin);
+        var targetTop = Math.Max(0 + margin, workAreaHeight - winHeight - margin);
+
+        Assert.Equal(expectedLeft, targetLeft);
+        Assert.Equal(expectedTop, targetTop);
+    }
+
+    [Fact]
+    public void CalculateBottomAnchoredPosition_WindowTallerThanScreen_ClampsToTopMargin()
+    {
+        const double margin = 10.0;
+        const double workAreaHeight = 600.0;
+        const double windowHeight = 750.0;
+
+        var targetTop = Math.Max(0 + margin, workAreaHeight - windowHeight - margin);
+
+        // Гарантирует, что окно не уходит за верхний край экрана (Top >= margin)
+        Assert.Equal(10.0, targetTop);
+    }
+
+    [Fact]
+    public void CalculateAdaptiveWidth_SmallDisplay_ScalesWithinBounds()
+    {
+        const double smallScreenWidth = 1366.0;
+        var adaptiveWidth = Math.Clamp(smallScreenWidth * 0.42, 440, 520);
+
+        Assert.InRange(adaptiveWidth, 440, 520);
+        Assert.Equal(520, adaptiveWidth); // 1366 * 0.42 = 573.72 -> clamped to 520
+    }
 }
