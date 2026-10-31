@@ -155,71 +155,132 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
         if (_points.Count < 2)
             return;
 
-        // 2. Расчет масштабирования по максимальным пикам
-        double maxTraffic = 1024.0; // Базовый минимум: 1 КБ/с
+        // 2. Расчет адаптивного динамического диапазона (Auto-Gain Control / AGC)
+        const double topPadding = 12.0;
+        const double bottomPadding = 10.0;
+        double usableHeight = Math.Max(10.0, height - topPadding - bottomPadding);
+
+        double minTraffic = double.MaxValue;
+        double maxTraffic = 0.0;
         int maxBlocked = 1;
 
         for (int i = 0; i < _points.Count; i++)
         {
             var p = _points[i];
-            if (p.InboundBps > maxTraffic) maxTraffic = p.InboundBps;
-            if (p.OutboundBps > maxTraffic) maxTraffic = p.OutboundBps;
+            double traffic = Math.Max(p.InboundBps, p.OutboundBps);
+            if (traffic < minTraffic) minTraffic = traffic;
+            if (traffic > maxTraffic) maxTraffic = traffic;
             if (p.BlockedCount > maxBlocked) maxBlocked = p.BlockedCount;
         }
 
-        // Запас 15% сверху для эстетичного отображения пиков без прилипания к границе
-        maxTraffic *= 1.15;
+        if (minTraffic > maxTraffic)
+        {
+            minTraffic = 0.0;
+            maxTraffic = 1024.0;
+        }
 
-        // 3. Построение геометрии трафика (StreamGeometry)
+        double range = maxTraffic - minTraffic;
+        double effectiveMin;
+        double effectiveMax;
+
+        if (maxTraffic < 10.0)
+        {
+            // Практически нулевой трафик — привязка к baseline с окном 1 КБ/с
+            effectiveMin = 0.0;
+            effectiveMax = 1024.0;
+        }
+        else if (range < maxTraffic * 0.40)
+        {
+            // Малая амплитуда (высокое постоянное смещение / DC offset):
+            // AGC центрирует вариацию на ~55% полезной высоты холста для четкой видимости динамики
+            double mid = (maxTraffic + minTraffic) * 0.5;
+            double desiredSpan = Math.Max(range * 2.0, maxTraffic * 0.35);
+            effectiveMin = Math.Max(0.0, mid - desiredSpan * 0.5);
+            effectiveMax = effectiveMin + desiredSpan;
+        }
+        else
+        {
+            // Выраженный динамический диапазон: масштабирование от 0 с запасом 15% сверху
+            effectiveMin = 0.0;
+            effectiveMax = maxTraffic * 1.15;
+        }
+
+        double trafficSpan = Math.Max(1.0, effectiveMax - effectiveMin);
+
+        // Функция проекции величины трафика в экранную координату Y
+        double ValueToY(double val)
+        {
+            double norm = (val - effectiveMin) / trafficSpan;
+            if (norm < 0.0) norm = 0.0;
+            if (norm > 1.0) norm = 1.0;
+            return (height - bottomPadding) - (norm * usableHeight);
+        }
+
+        int n = _points.Count;
+        double stepX = width / (n - 1);
+        Point[] pts = new Point[n];
+
+        for (int i = 0; i < n; i++)
+        {
+            pts[i] = new Point(i * stepX, ValueToY(_points[i].InboundBps));
+        }
+
+        // 3. Построение сглаженной кубической геометрии Безье (Smooth Cubic Bezier Spline)
         var trafficGeometry = new StreamGeometry();
         var trafficFillGeometry = new StreamGeometry();
         var blockedGeometry = new StreamGeometry();
 
-        double stepX = width / (_points.Count - 1);
+        const double tension = 0.40; // Оптимальный коэффициент натяжения для предотвращения перерегулирования
 
         using (var ctxLine = trafficGeometry.Open())
         using (var ctxFill = trafficFillGeometry.Open())
         {
-            Point startPt = new Point(0, height - (_points[0].InboundBps / maxTraffic * height));
-            ctxLine.BeginFigure(startPt, false, false);
+            ctxLine.BeginFigure(pts[0], false, false);
 
-            ctxFill.BeginFigure(new Point(0, height), true, true);
-            ctxFill.LineTo(startPt, true, false);
+            ctxFill.BeginFigure(new Point(pts[0].X, height), true, true);
+            ctxFill.LineTo(pts[0], true, false);
 
-            for (int i = 1; i < _points.Count; i++)
+            for (int i = 0; i < n - 1; i++)
             {
-                double x = i * stepX;
-                double y = height - (_points[i].InboundBps / maxTraffic * height);
-                Point pt = new Point(x, y);
+                Point pPrev = (i > 0) ? pts[i - 1] : new Point(2 * pts[0].X - pts[1].X, 2 * pts[0].Y - pts[1].Y);
+                Point p0 = pts[i];
+                Point p1 = pts[i + 1];
+                Point pNext = (i < n - 2) ? pts[i + 2] : new Point(2 * pts[n - 1].X - pts[n - 2].X, 2 * pts[n - 1].Y - pts[n - 2].Y);
 
-                ctxLine.LineTo(pt, true, false);
-                ctxFill.LineTo(pt, true, false);
+                // Расчет контрольных точек Безье из сплайна Кэтмулла-Рома
+                double cp1X = p0.X + (p1.X - pPrev.X) * (tension / 3.0);
+                double cp1Y = p0.Y + (p1.Y - pPrev.Y) * (tension / 3.0);
+
+                double cp2X = p1.X - (pNext.X - p0.X) * (tension / 3.0);
+                double cp2Y = p1.Y - (pNext.Y - p0.Y) * (tension / 3.0);
+
+                // Ограничение контрольных точек по вертикали (Overshoot Clamping)
+                cp1Y = Math.Clamp(cp1Y, topPadding, height - bottomPadding);
+                cp2Y = Math.Clamp(cp2Y, topPadding, height - bottomPadding);
+
+                Point cp1 = new Point(cp1X, cp1Y);
+                Point cp2 = new Point(cp2X, cp2Y);
+
+                ctxLine.BezierTo(cp1, cp2, p1, true, true);
+                ctxFill.BezierTo(cp1, cp2, p1, true, true);
             }
 
-            ctxFill.LineTo(new Point(width, height), true, false);
+            ctxFill.LineTo(new Point(pts[n - 1].X, height), true, false);
         }
 
-        // Построение геометрии блокировок (Crimson)
+        // Построение геометрии блокировок (Crimson Spikes)
         using (var ctxBlocked = blockedGeometry.Open())
         {
-            bool hasStarted = false;
-            for (int i = 0; i < _points.Count; i++)
+            for (int i = 0; i < n; i++)
             {
                 if (_points[i].BlockedCount > 0)
                 {
                     double x = i * stepX;
-                    double barH = Math.Min(height, (_points[i].BlockedCount / (double)maxBlocked) * (height * 0.75));
-                    double y = height - barH;
+                    double barH = Math.Min(height * 0.75, (_points[i].BlockedCount / (double)maxBlocked) * (usableHeight * 0.85) + 6.0);
+                    double y = (height - bottomPadding) - barH;
 
-                    if (!hasStarted)
-                    {
-                        ctxBlocked.BeginFigure(new Point(x, y), false, false);
-                        hasStarted = true;
-                    }
-                    else
-                    {
-                        ctxBlocked.LineTo(new Point(x, y), true, false);
-                    }
+                    ctxBlocked.BeginFigure(new Point(x, height - bottomPadding), false, false);
+                    ctxBlocked.LineTo(new Point(x, y), true, false);
                 }
             }
         }
@@ -230,18 +291,18 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
 
         // 4. Отрисовка заливки с неоновым градиентом
         var fillBrush = new LinearGradientBrush(
-            Color.FromArgb(50, 0x00, 0xD2, 0xD3),
+            Color.FromArgb(55, 0x00, 0xD2, 0xD3),
             Color.FromArgb(2, 0x00, 0xD2, 0xD3),
             90.0);
         fillBrush.Freeze();
 
         dc.DrawGeometry(fillBrush, null, trafficFillGeometry);
 
-        // 5. Отрисовка линий со свечением (Neon Glow)
+        // 5. Отрисовка сглаженной линии со свечением (Neon Glow)
         dc.DrawGeometry(null, CyanGlowPen, trafficGeometry);
         dc.DrawGeometry(null, CyanLinePen, trafficGeometry);
 
-        // 6. Отрисовка кривой блокировок (если присутствуют заблокированные события)
+        // 6. Отрисовка спайков блокировок
         if (maxBlocked > 0)
         {
             dc.DrawGeometry(null, CrimsonGlowPen, blockedGeometry);
@@ -251,7 +312,8 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
         // 7. Интерактивный курсор и карточка тултипа при наведении мыши
         if (_cursorPosition.HasValue && _hoveredPoint.HasValue)
         {
-            DrawInteractiveHairline(dc, _cursorPosition.Value.X, height, _hoveredPoint.Value);
+            double markerY = ValueToY(_hoveredPoint.Value.InboundBps);
+            DrawInteractiveHairline(dc, _cursorPosition.Value.X, height, _hoveredPoint.Value, markerY);
         }
     }
 
@@ -280,15 +342,16 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
     /// <summary>
     /// Отрисовывает вертикальную линию сканирования и парящий кибер-тултип со срезом метрик.
     /// </summary>
-    private void DrawInteractiveHairline(DrawingContext dc, double x, double height, ChartDataPoint pt)
+    private void DrawInteractiveHairline(DrawingContext dc, double x, double height, ChartDataPoint pt, double markerY)
     {
-        // Вертикальная линия прилипания
+        // Вертикальная линия визира
         dc.DrawLine(HairlinePen, new Point(x, 0), new Point(x, height));
 
-        // Маркер на оси X
-        dc.DrawEllipse(new SolidColorBrush(CyanColor), null, new Point(x, height - 3), 3.5, 3.5);
+        // Подсвечиваемый маркер прямо на кривой Безье с неоновым ореолом
+        dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(80, 0x00, 0xD2, 0xD3)), null, new Point(x, markerY), 7.0, 7.0);
+        dc.DrawEllipse(new SolidColorBrush(CyanColor), null, new Point(x, markerY), 3.5, 3.5);
 
-        // Формирование плавающего тултипа
+        // Формирование текста тултипа
         string timeStr = pt.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
         string trafficStr = FormatBytesPerSec(pt.InboundBps);
         string blockedStr = pt.BlockedCount > 0 ? $" | 🚫 Блоков: {pt.BlockedCount}" : string.Empty;
@@ -307,14 +370,13 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
         double boxWidth = formattedText.Width + 18;
         double boxHeight = formattedText.Height + 10;
 
-        // Позиционирование всплывающего окна (предотвращение выхода за границы контрола)
         double boxX = x + 10;
         if (boxX + boxWidth > ActualWidth)
         {
             boxX = x - boxWidth - 10;
         }
 
-        double boxY = 10;
+        double boxY = Math.Clamp(markerY - boxHeight - 8, 8.0, height - boxHeight - 8.0);
 
         var tooltipRect = new Rect(boxX, boxY, boxWidth, boxHeight);
         dc.DrawRoundedRectangle(TooltipBackgroundBrush, TooltipBorderPen, tooltipRect, 6.0, 6.0);

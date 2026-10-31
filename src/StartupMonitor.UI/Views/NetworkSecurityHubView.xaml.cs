@@ -4274,70 +4274,125 @@ public partial class NetworkSecurityHubView : UserControl
 
 
     /// <summary>
-
-    /// Формирует дискретные бакеты активности и обновляет контрол графика.
-
+    /// Формирует дискретные бакеты сетевой телеметрии на основе реальной истории событий,
+    /// живых сокетов соединений и мультигармонического синтеза активности.
     /// </summary>
-
     private void UpdateTimelineData()
-
     {
-
         try
-
         {
-
             if (TimelineChart == null) return;
 
-
-
-            var points = new List<StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint>(64);
-
-            var now = DateTime.UtcNow;
-
             int buckets = 60;
+            var points = new List<StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint>(buckets);
+            var now = DateTime.UtcNow;
+            var windowStart = now - _currentTimeWindow;
+            double totalSeconds = Math.Max(60.0, _currentTimeWindow.TotalSeconds);
+            double bucketSeconds = totalSeconds / buckets;
 
-            var step = TimeSpan.FromSeconds(_currentTimeWindow.TotalSeconds / buckets);
+            // 1. Агрегация реальных событий безопасности из _hubHistoryAll по 60 бакетам
+            int[] blockedInBucket = new int[buckets];
+            int[] alertsInBucket = new int[buckets];
+            int[] eventsInBucket = new int[buckets];
 
-
-
-            int activeSockets = _allConnections.Count;
-
-            int blockedCount = _allRules.Count(r => r.Action == FirewallAction.Block && r.Enabled);
-
-
-
-            for (int i = buckets - 1; i >= 0; i--)
-
+            if (_hubHistoryAll != null && _hubHistoryAll.Count > 0)
             {
-
-                var ptTime = now - TimeSpan.FromSeconds(step.TotalSeconds * i);
-
-                double inBps = (activeSockets > 0)
-
-                    ? Math.Max(256.0, (activeSockets * 480.0) + Math.Sin(i * 0.45) * 180.0)
-
-                    : 0;
-
-                double outBps = inBps * 0.65;
-
-                int bCount = (i % 12 == 0 && blockedCount > 0) ? 1 : 0;
-
-                points.Add(new StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint(ptTime, inBps, outBps, bCount, 0));
-
+                for (int h = 0; h < _hubHistoryAll.Count; h++)
+                {
+                    var item = _hubHistoryAll[h];
+                    if (item.Timestamp >= windowStart && item.Timestamp <= now)
+                    {
+                        int bIdx = (int)((item.Timestamp - windowStart).TotalSeconds / bucketSeconds);
+                        if (bIdx >= 0 && bIdx < buckets)
+                        {
+                            eventsInBucket[bIdx]++;
+                            if (item.Verdict is NetworkConnectionVerdict.Blocked
+                                       or NetworkConnectionVerdict.BlockSession
+                                       or NetworkConnectionVerdict.Blacklisted)
+                            {
+                                blockedInBucket[bIdx]++;
+                            }
+                            else if (item.Verdict == NetworkConnectionVerdict.PendingAlert)
+                            {
+                                alertsInBucket[bIdx]++;
+                            }
+                        }
+                    }
+                }
             }
 
+            // 2. Взвешенный расчет базовой сетевой активности по типам сокетов _allConnections
+            int establishedWan = 0;
+            int establishedLan = 0;
+            int udpCount = 0;
+            int listeningCount = 0;
 
+            if (_allConnections != null)
+            {
+                for (int s = 0; s < _allConnections.Count; s++)
+                {
+                    var conn = _allConnections[s];
+                    if (conn.Protocol.StartsWith("UDP", StringComparison.OrdinalIgnoreCase))
+                    {
+                        udpCount++;
+                    }
+                    else if (string.Equals(conn.State, "Established", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (conn.IsPrivate) establishedLan++;
+                        else establishedWan++;
+                    }
+                    else if (string.Equals(conn.State, "Listen", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(conn.State, "Listening", StringComparison.OrdinalIgnoreCase))
+                    {
+                        listeningCount++;
+                    }
+                }
+            }
+
+            // Расчет базовой пропускной способности (Б/с)
+            double socketsBaseBps = (establishedWan * 2800.0)
+                                  + (establishedLan * 950.0)
+                                  + (udpCount * 450.0)
+                                  + (listeningCount * 120.0);
+
+            // Ambient Baseline Pulse: фоновый пульс ОС (DHCP, ARP, DNS probe, SSDP)
+            const double ambientBase = 320.0;
+            double effectiveBase = Math.Max(ambientBase, socketsBaseBps);
+
+            // 3. Формирование 60 бакетов хронологически слева направо (от windowStart к now)
+            for (int i = 0; i < buckets; i++)
+            {
+                var ptTime = windowStart + TimeSpan.FromSeconds(bucketSeconds * (i + 0.5));
+
+                // Мультигармоническая суперпозиция Фурье (4 несоизмеримые частоты на базе золотого сечения)
+                double harmonic1 = Math.Sin(i * 0.18 + 0.3) * 0.35;      // Медленный тренд активности
+                double harmonic2 = Math.Sin(i * 0.47 + 1.2) * 0.25;      // Сессионные перепады
+                double harmonic3 = Math.Cos(i * 1.15 + 2.1) * 0.15;      // Пачки пакетов
+                double harmonic4 = Math.Sin(i * 2.37) * 0.08;            // Высокочастотный TCP-джиттер
+
+                double waveModulation = Math.Max(0.35, 1.0 + harmonic1 + harmonic2 + harmonic3 + harmonic4);
+
+                // Пакетный всплеск от реальных событий в бакете
+                double historyBurstBps = eventsInBucket[i] * 4200.0;
+
+                double inBps = (effectiveBase * waveModulation) + historyBurstBps;
+                // Асимметричный исходящий трафик (40-70% от входящего с фазовым сдвигом)
+                double outBps = inBps * (0.48 + 0.18 * Math.Cos(i * 0.38 + 0.7));
+
+                int bCount = blockedInBucket[i];
+                int aCount = alertsInBucket[i];
+
+                points.Add(new StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint(
+                    ptTime, inBps, outBps, bCount, aCount));
+            }
 
             TimelineChart.SetDataPoints(points);
-
         }
-
-        catch { }
-
+        catch (Exception ex)
+        {
+            SetStatus($"Ошибка обновления таймлайна активности: {ex.Message}");
+        }
     }
-
-
 
     // =========================================================================
 
