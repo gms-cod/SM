@@ -19,6 +19,7 @@
 
 
     xmlns:controls="clr-namespace:StartupMonitor.UI.Controls"
+    xmlns:firewall="clr-namespace:StartupMonitor.Shared.Models.Firewall;assembly=StartupMonitor.Shared"
 
 
 
@@ -536,371 +537,85 @@
 
 
 
-        <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
-
-
-
+        <Border Grid.Row="0" Margin="0,0,0,14" Padding="18,14"
+                Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12">
+            <!-- Компактная сводка всегда видима; редкие глобальные параметры раскрываются отдельно. -->
             <Grid>
-
-
-
-                <Grid.ColumnDefinitions>
-
-
-
-                    <ColumnDefinition Width="Auto" />
-
-
-
-                    <ColumnDefinition Width="*" />
-
-
-
-                    <ColumnDefinition Width="Auto" />
-
-
-
-                </Grid.ColumnDefinitions>
-
-
-
-                <Grid.RowDefinitions>
-
-
-
-                    <RowDefinition Height="Auto" />
-
-
-
-                    <RowDefinition Height="Auto" />
-
-
-
-                    <RowDefinition Height="Auto" />
-
-
-
-                </Grid.RowDefinitions>
-
-
-
-
-
-
-
-                <!-- Иконка щита -->
-
-
-
-                <Border Grid.RowSpan="2" Grid.Column="0" Width="44" Height="44" CornerRadius="10"
-
-
-
-                        Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-
-
-
-                        Margin="0,0,14,0" VerticalAlignment="Center">
-
-
-
-                    <ui:SymbolIcon x:Name="FirewallShieldIcon" Symbol="Shield24" FontSize="22"
-
-
-
-                                   Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
-
-
-
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-
-
-
-                </Border>
-
-
-
-
-
-
-
-                <!-- Статус + профили -->
-
-
-
-                <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
-
-
-
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                        <Border x:Name="FirewallStateBadge" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0"
-
-
-
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-
-
-
-                            <TextBlock x:Name="TxtFirewallState" Text="{Binding NetFwStateUnknown, Source={StaticResource Loc}}"
-
-
-
-                                       FontSize="13" FontWeight="SemiBold"
-
-
-
-                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-
-
-
-                        </Border>
-
-
-
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Grid Grid.Row="0" Grid.Column="0" Margin="0,0,12,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Border Width="44" Height="44" CornerRadius="12" Margin="0,0,14,0" VerticalAlignment="Top"
+                            Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                        <ui:SymbolIcon x:Name="FirewallShieldIcon" Symbol="Shield24" FontSize="24"
+                                       Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding [NetUxTitle], Source={StaticResource Loc}}" FontSize="23" FontWeight="SemiBold"
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <WrapPanel Margin="0,6,0,0">
+                            <Border x:Name="FirewallStateBadge" CornerRadius="5" Padding="8,3" Margin="0,0,8,4"
+                                    Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <TextBlock x:Name="TxtFirewallState" Text="{Binding NetFwStateUnknown, Source={StaticResource Loc}}"
+                                           FontSize="12" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </Border>
+                            <Border x:Name="ProfileDomainBadge" CornerRadius="5" Padding="8,3" Margin="0,0,6,4"
+                                    Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <TextBlock x:Name="TxtProfileDomain" Text="{Binding NetProfileDomainDefault, Source={StaticResource Loc}}" FontSize="11"
+                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                            <Border x:Name="ProfilePrivateBadge" CornerRadius="5" Padding="8,3" Margin="0,0,6,4"
+                                    Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <TextBlock x:Name="TxtProfilePrivate" Text="{Binding NetProfilePrivateDefault, Source={StaticResource Loc}}" FontSize="11"
+                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                            <Border x:Name="ProfilePublicBadge" CornerRadius="5" Padding="8,3" Margin="0,0,0,4"
+                                    Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <TextBlock x:Name="TxtProfilePublic" Text="{Binding NetProfilePublicDefault, Source={StaticResource Loc}}" FontSize="11"
+                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                        </WrapPanel>
                         <TextBlock x:Name="TxtFirewallDetails" Text="{Binding NetStatusLoading, Source={StaticResource Loc}}"
-
-
-
-                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
-
-
-
-                                   VerticalAlignment="Center" />
-
-
-
+                                   TextWrapping="Wrap" FontSize="11.5" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
                     </StackPanel>
-
-
-
-                    <!-- Индикаторы профилей -->
-
-
-
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-
-
-
-                        <Border x:Name="ProfileDomainBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
-
-
-
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-
-
-
-                            <TextBlock x:Name="TxtProfileDomain" Text="{Binding NetProfileDomainDefault, Source={StaticResource Loc}}" FontSize="11"
-
-
-
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-
-
-
-                        </Border>
-
-
-
-                        <Border x:Name="ProfilePrivateBadge" CornerRadius="4" Padding="8,3" Margin="0,0,6,0"
-
-
-
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-
-
-
-                            <TextBlock x:Name="TxtProfilePrivate" Text="{Binding NetProfilePrivateDefault, Source={StaticResource Loc}}" FontSize="11"
-
-
-
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-
-
-
-                        </Border>
-
-
-
-                        <Border x:Name="ProfilePublicBadge" CornerRadius="4" Padding="8,3"
-
-
-
-                                Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}">
-
-
-
-                            <TextBlock x:Name="TxtProfilePublic" Text="{Binding NetProfilePublicDefault, Source={StaticResource Loc}}" FontSize="11"
-
-
-
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-
-
-
-                        </Border>
-
-
-
+                </Grid>
+                <ui:Button x:Name="BtnRefreshStatus" Grid.Column="1" Appearance="Secondary"
+                           Icon="{ui:SymbolIcon ArrowClockwise24}" Click="OnRefreshStatusClick"
+                           ToolTip="{Binding NetBtnRefreshStatus, Source={StaticResource Loc}}"
+                           AutomationProperties.Name="{Binding NetBtnRefreshStatus, Source={StaticResource Loc}}"
+                           VerticalAlignment="Top" Padding="10" />
+                <Expander Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" IsExpanded="False"
+                          Header="{Binding [NetUxSettings], Source={StaticResource Loc}}">
+                    <StackPanel Margin="0,10,0,2">
+                        <TextBlock Text="{Binding [NetUxModeHint], Source={StaticResource Loc}}" TextWrapping="Wrap"
+                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,10" />
+                        <WrapPanel>
+                            <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode"
+                                         Content="{Binding NetFilterModeNormal, Source={StaticResource Loc}}"
+                                         Style="{StaticResource FilterTabRadioButtonStyle}" Checked="OnFilteringModeChecked"
+                                         ToolTip="{Binding [NetUxNormalTip], Source={StaticResource Loc}}" Margin="0,0,8,6" />
+                            <RadioButton x:Name="RbModeWhitelist" GroupName="FilteringMode"
+                                         Content="{Binding NetFilterModeWhitelist, Source={StaticResource Loc}}"
+                                         Style="{StaticResource FilterTabRadioButtonStyle}" Checked="OnFilteringModeChecked"
+                                         ToolTip="{Binding [NetUxWhitelistTip], Source={StaticResource Loc}}" Margin="0,0,8,6" />
+                            <RadioButton x:Name="RbModeKillswitch" GroupName="FilteringMode"
+                                         Content="{Binding NetFilterModeKillswitch, Source={StaticResource Loc}}"
+                                         Style="{StaticResource FilterTabRadioButtonStyle}" Checked="OnFilteringModeChecked"
+                                         ToolTip="{Binding [NetUxKillswitchTip], Source={StaticResource Loc}}"
+                                         Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" Margin="0,0,0,6" />
+                        </WrapPanel>
+                        <CheckBox x:Name="ChkInteractiveAlerts" Content="{Binding NetInteractiveAlertsCheck, Source={StaticResource Loc}}"
+                                  Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged" Margin="0,8,0,0"
+                                  ToolTip="{Binding NetInteractiveAlertsTip, Source={StaticResource Loc}}" />
+                        <CheckBox x:Name="ChkSilentPid0" Content="{Binding FirewallSilentPid0Label, Source={StaticResource Loc}}"
+                                  Checked="OnSilentPid0Changed" Unchecked="OnSilentPid0Changed" Margin="0,8,0,0"
+                                  ToolTip="{Binding FirewallSilentPid0Hint, Source={StaticResource Loc}}" />
                     </StackPanel>
-
-
-
-                </StackPanel>
-
-
-
-
-
-
-
-                <!-- Кнопка обновления статуса -->
-
-
-
-                <ui:Button x:Name="BtnRefreshStatus" Grid.Row="0" Grid.Column="2" Appearance="Secondary"
-
-
-
-                           Content="{Binding NetBtnRefreshStatus, Source={StaticResource Loc}}" Click="OnRefreshStatusClick"
-
-
-
-                           VerticalAlignment="Center" Margin="12,0,0,0" />
-
-
-
-
-
-
-
-                <!-- Переключатели режима фильтрации -->
-
-
-
-                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,12,0,0">
-
-
-
-                    <TextBlock Text="{Binding NetFilteringModeHeader, Source={StaticResource Loc}}" FontSize="11" FontWeight="SemiBold"
-
-
-
-                               Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
-
-
-
-                    <StackPanel Orientation="Horizontal">
-
-
-
-                        <RadioButton x:Name="RbModeNormal" GroupName="FilteringMode" Content="{Binding NetFilterModeNormal, Source={StaticResource Loc}}"
-
-
-
-                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
-
-
-
-                        <RadioButton x:Name="RbModeWhitelist" GroupName="FilteringMode"
-
-
-
-                                     Content="{Binding NetFilterModeWhitelist, Source={StaticResource Loc}}"
-
-
-
-                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center" Margin="0,0,16,0" />
-
-
-
-                        <RadioButton x:Name="RbModeKillswitch" GroupName="FilteringMode"
-
-
-
-                                     Content="{Binding NetFilterModeKillswitch, Source={StaticResource Loc}}"
-
-
-
-                                     Checked="OnFilteringModeChecked" VerticalAlignment="Center"
-
-
-
-                                     Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" FontWeight="SemiBold" />
-
-
-
-                    </StackPanel>
-
-
-
-                </StackPanel>
-
-
-
-
-
-
-
-                <!-- Тумблер интерактивных уведомлений о неизвестных программах -->
-
-
-
-                <StackPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
-
-
-
-                    <CheckBox x:Name="ChkInteractiveAlerts"
-
-
-
-                              Content="{Binding NetInteractiveAlertsCheck, Source={StaticResource Loc}}"
-
-
-
-                              Checked="OnInteractiveAlertsChanged" Unchecked="OnInteractiveAlertsChanged"
-
-
-
-                              VerticalAlignment="Center"
-
-
-
-                              ToolTip="{Binding NetInteractiveAlertsTip, Source={StaticResource Loc}}" />
-
-
-
-                    <CheckBox x:Name="ChkSilentPid0"
-
-
-
-                              Content="{Binding FirewallSilentPid0Label, Source={StaticResource Loc}}"
-
-
-
-                              Checked="OnSilentPid0Changed" Unchecked="OnSilentPid0Changed"
-
-
-
-                              VerticalAlignment="Center" Margin="0,6,0,0"
-
-
-
-                              ToolTip="{Binding FirewallSilentPid0Hint, Source={StaticResource Loc}}" />
-
-
-
-                </StackPanel>
-
-
-
+                </Expander>
             </Grid>
-
-
-
-        </ui:Card>
+        </Border>
 
 
 
@@ -912,146 +627,28 @@
 
 
 
-        <Border Grid.Row="1" Margin="0,0,0,10" Padding="4"
-
-
-
-                Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-
-
-
-                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
-
-
-
-                BorderThickness="1" CornerRadius="8">
-
-
-
-            <WrapPanel Orientation="Horizontal">
-
-
-
-                <ui:Button x:Name="TabBtnConnections" Content="{Binding NetLiveConnectionsHeader, Source={StaticResource Loc}}"
-
-
-
-                           Icon="{ui:SymbolIcon Globe24}" Margin="0,0,6,0"
-
-
-
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Primary"
-
-
-
-                           Click="OnTabNavClick" Tag="0" />
-
-
-
-
-
-
-
-                <ui:Button x:Name="TabBtnAccessMatrix" Content="{Binding NetTabAclMatrix, Source={StaticResource Loc}}"
-
-
-
-                           Icon="{ui:SymbolIcon ShieldCheckmark24}" Margin="0,0,6,0"
-
-
-
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-
-
-
-                           Click="OnTabNavClick" Tag="1" ToolTip="{Binding NetTabAclMatrixTip, Source={StaticResource Loc}}" />
-
-
-
-
-
-
-
-                <ui:Button x:Name="TabBtnRules" Content="{Binding NetRulesTabHeader, Source={StaticResource Loc}}"
-
-
-
-                           Icon="{ui:SymbolIcon DocumentBulletList24}" Margin="0,0,6,0"
-
-
-
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-
-
-
-                           Click="OnTabNavClick" Tag="2" />
-
-
-
-
-
-
-
-                <ui:Button x:Name="TabBtnPortDefender" Content="Port Defender"
-
-
-
-                           Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,6,0"
-
-
-
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-
-
-
-                           Click="OnTabNavClick" Tag="3" />
-
-
-
-
-
-
-
-                <ui:Button x:Name="TabBtnAttackLog" Content="{Binding NetAttackLogTabHeader, Source={StaticResource Loc}}"
-
-
-
-                           Icon="{ui:SymbolIcon Shield24}" Margin="0,0,6,0"
-
-
-
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-
-
-
-                           Click="OnTabNavClick" Tag="4" ToolTip="Журнал обнаруженных атак и временных банов" />
-
-
-
-
-
-
-
-                <ui:Button x:Name="TabBtnHistory" Content="{Binding [NetConnectionHistoryTitle], Source={StaticResource Loc}}"
-
-
-
-                           Icon="{ui:SymbolIcon History24}" Margin="0,0,6,0"
-
-
-
-                           Style="{DynamicResource FilterTabButtonStyle}" Appearance="Secondary"
-
-
-
-                           Click="OnTabNavClick" Tag="5" ToolTip="История всех попыток сетевых подключений программ" />
-
-
-
+        <Border Grid.Row="1" Margin="0,0,0,10" Padding="0" Background="Transparent">
+            <!-- Порядок кнопок отражает повседневные задачи; индексы существующих вкладок сохранены. -->
+            <WrapPanel x:Name="HubNavigation" Orientation="Horizontal">
+                <ui:Button x:Name="TabBtnAccessMatrix" Content="{Binding [NetUxNavApps], Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon ShieldCheckmark24}" Margin="0,0,6,6" Padding="12,8" FontSize="12"
+                           Appearance="Primary" Click="OnTabNavClick" Tag="1" />
+                <ui:Button x:Name="TabBtnConnections" Content="{Binding [NetUxNavConnections], Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon Globe24}" Margin="0,0,6,6" Padding="12,8" FontSize="12"
+                           Appearance="Secondary" Click="OnTabNavClick" Tag="0" />
+                <ui:Button x:Name="TabBtnPortDefender" Content="{Binding [NetUxNavPorts], Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,6,6" Padding="12,8" FontSize="12"
+                           Appearance="Secondary" Click="OnTabNavClick" Tag="3" />
+                <ui:Button x:Name="TabBtnAttackLog" Content="{Binding [NetUxNavBans], Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon Shield24}" Margin="0,0,6,6" Padding="12,8" FontSize="12"
+                           Appearance="Secondary" Click="OnTabNavClick" Tag="4" />
+                <ui:Button x:Name="TabBtnHistory" Content="{Binding [NetUxNavHistory], Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon History24}" Margin="0,0,6,6" Padding="12,8" FontSize="12"
+                           Appearance="Secondary" Click="OnTabNavClick" Tag="5" />
+                <ui:Button x:Name="TabBtnRules" Content="{Binding [NetUxNavRules], Source={StaticResource Loc}}"
+                           Icon="{ui:SymbolIcon DocumentBulletList24}" Margin="0,0,6,6" Padding="12,8" FontSize="12"
+                           Appearance="Secondary" Click="OnTabNavClick" Tag="2" />
             </WrapPanel>
-
-
-
         </Border>
 
 
@@ -1064,7 +661,35 @@
 
 
 
-        <TabControl Grid.Row="2" x:Name="MainTabs">
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" Margin="2,2,0,10">
+                <TextBlock FontSize="17" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}">
+                    <TextBlock.Style><Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="{Binding [NetUxConnectionsTitle], Source={StaticResource Loc}}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="1"><Setter Property="Text" Value="{Binding [NetUxAppsTitle], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="2"><Setter Property="Text" Value="{Binding [NetUxRulesTitle], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="3"><Setter Property="Text" Value="{Binding [NetUxPortsTitle], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="4"><Setter Property="Text" Value="{Binding [NetUxBansTitle], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="5"><Setter Property="Text" Value="{Binding [NetUxHistoryTitle], Source={StaticResource Loc}}" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style></TextBlock.Style>
+                </TextBlock>
+                <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}">
+                    <TextBlock.Style><Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="{Binding [NetUxConnectionsHelp], Source={StaticResource Loc}}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="1"><Setter Property="Text" Value="{Binding [NetUxAppsHelp], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="2"><Setter Property="Text" Value="{Binding [NetUxRulesHelp], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="3"><Setter Property="Text" Value="{Binding [NetUxPortsHelp], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="4"><Setter Property="Text" Value="{Binding [NetUxBansHelp], Source={StaticResource Loc}}" /></DataTrigger>
+                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=MainTabs}" Value="5"><Setter Property="Text" Value="{Binding [NetUxHistoryHelp], Source={StaticResource Loc}}" /></DataTrigger>
+                        </Style.Triggers>
+                    </Style></TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+            <TabControl Grid.Row="1" x:Name="MainTabs" SelectedIndex="1" Background="Transparent" BorderThickness="0">
 
 
 
@@ -1156,99 +781,21 @@
 
 
 
-                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-
-
-
-                            BorderBrush="#2500D2D3" BorderThickness="1" CornerRadius="8" Padding="12,10">
-
-
-
+                    <Border Grid.Row="0" Margin="0,0,0,12" Padding="12" CornerRadius="10"
+                            Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                         <Grid>
-
-
-
-                            <Grid.RowDefinitions>
-
-
-
-                                <RowDefinition Height="Auto" />
-
-
-
-                                <RowDefinition Height="Auto" />
-
-
-
-                            </Grid.RowDefinitions>
-
-
-
-
-
-
-
-                            <Grid Grid.Row="0" Margin="0,0,0,8">
-
-
-
-                                <Grid.ColumnDefinitions>
-
-
-
-                                    <ColumnDefinition Width="*" />
-
-
-
-                                    <ColumnDefinition Width="Auto" />
-
-
-
-                                </Grid.ColumnDefinitions>
-
-
-
-
-
-
-
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                                    <TextBlock Text="⚡" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
-
-
-
-                                    <TextBlock Text="{Binding [TimelineTitle], Source={StaticResource Loc}}" FontSize="12.5" FontWeight="Bold"
-
-
-
-                                               Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-
-
-
-                                    <TextBlock x:Name="TxtTimelineActiveSlice" Text="" FontSize="11.5" Foreground="{StaticResource NeonCyanBrush}"
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <WrapPanel Grid.Row="0" Margin="0,0,0,8">
+                                <TextBlock Text="{Binding [TimelineTitle], Source={StaticResource Loc}}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock x:Name="TxtTimelineActiveSlice" Text="" FontSize="11.5" Foreground="{StaticResource NeonCyanBrush}"
 
 
 
                                                Margin="10,0,0,0" VerticalAlignment="Center" />
-
-
-
-                                </StackPanel>
-
-
-
-
-
-
-
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                                    <RadioButton x:Name="RbTimeWindow1h" Content="{Binding [TimelineHour], Source={StaticResource Loc}}" IsChecked="True"
+                            </WrapPanel>
+                            <WrapPanel Grid.Row="1" Margin="0,0,0,8"><RadioButton x:Name="RbTimeWindow1h" Content="{Binding [TimelineHour], Source={StaticResource Loc}}" IsChecked="True"
 
 
 
@@ -1257,10 +804,7 @@
 
 
                                                  Click="OnTimeWindowClick" Tag="1" />
-
-
-
-                                    <RadioButton x:Name="RbTimeWindow24h" Content="{Binding [TimelineDay], Source={StaticResource Loc}}"
+<RadioButton x:Name="RbTimeWindow24h" Content="{Binding [TimelineDay], Source={StaticResource Loc}}"
 
 
 
@@ -1269,10 +813,7 @@
 
 
                                                  Click="OnTimeWindowClick" Tag="24" />
-
-
-
-                                    <RadioButton x:Name="RbTimeWindow7d" Content="{Binding [TimelineWeek], Source={StaticResource Loc}}"
+<RadioButton x:Name="RbTimeWindow7d" Content="{Binding [TimelineWeek], Source={StaticResource Loc}}"
 
 
 
@@ -1281,10 +822,7 @@
 
 
                                                  Click="OnTimeWindowClick" Tag="168" />
-
-
-
-                                    <ui:Button x:Name="BtnResetTimelineFilter" Appearance="Secondary" Content="{Binding [TimelineReset], Source={StaticResource Loc}}"
+<ui:Button x:Name="BtnResetTimelineFilter" Appearance="Secondary" Content="{Binding [TimelineReset], Source={StaticResource Loc}}"
 
 
 
@@ -1292,34 +830,13 @@
 
 
 
-                                               Click="OnResetTimelineFilterClick" ToolTip="{Binding [TimelineResetTip], Source={StaticResource Loc}}" />
-
-
-
-                                </StackPanel>
-
-
-
-                            </Grid>
-
-
-
-
-
-
-
-                            <controls:NetworkTimelineChartControl x:Name="TimelineChart" Grid.Row="1" Height="80"
+                                               Click="OnResetTimelineFilterClick" ToolTip="{Binding [TimelineResetTip], Source={StaticResource Loc}}" /></WrapPanel>
+                            <controls:NetworkTimelineChartControl x:Name="TimelineChart" Grid.Row="2" Height="80"
 
 
 
                                                                   TimeSliceSelected="OnTimelineTimeSliceSelected" />
-
-
-
                         </Grid>
-
-
-
                     </Border>
 
 
@@ -1332,47 +849,8 @@
 
 
 
-                    <Grid Grid.Row="1" Margin="0,0,0,8">
-
-
-
-                        <Grid.ColumnDefinitions>
-
-
-
-                            <ColumnDefinition Width="2*" />
-
-
-
-                            <ColumnDefinition Width="3*" />
-
-
-
-                        </Grid.ColumnDefinitions>
-
-
-
-                        <Grid.RowDefinitions>
-
-
-
-                            <RowDefinition Height="Auto" />
-
-
-
-                            <RowDefinition Height="Auto" />
-
-
-
-                        </Grid.RowDefinitions>
-
-
-
-
-
-
-
-                        <ui:TextBox x:Name="TxtSearchConnections" Grid.Row="0" Grid.Column="0"
+                    <StackPanel Grid.Row="1" Margin="0,0,0,10">
+                        <ui:TextBox x:Name="TxtSearchConnections"
 
 
 
@@ -1380,19 +858,8 @@
 
 
 
-                                     TextChanged="OnConnectionsSearchChanged" Margin="0,0,12,6" />
-
-
-
-
-
-
-
-                        <WrapPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-
-
-
-                            <RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="{Binding NetFilterAll, Source={StaticResource Loc}}"
+                                     TextChanged="OnConnectionsSearchChanged" Margin="0,0,0,8" />
+                        <WrapPanel Margin="0,0,0,10"><RadioButton x:Name="RbConnAll" GroupName="ConnFilter" Content="{Binding NetFilterAll, Source={StaticResource Loc}}"
 
 
 
@@ -1401,22 +868,7 @@
 
 
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="{Binding NetFilterWan, Source={StaticResource Loc}}"
-
-
-
-                                         Checked="OnConnectionsFilterChanged"
-
-
-
-                                         VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="{Binding NetFilterLan, Source={StaticResource Loc}}"
+<RadioButton x:Name="RbConnWan" GroupName="ConnFilter" Content="{Binding NetFilterWan, Source={StaticResource Loc}}"
 
 
 
@@ -1425,10 +877,7 @@
 
 
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="{Binding NetFilterEstablished, Source={StaticResource Loc}}"
+<RadioButton x:Name="RbConnLan" GroupName="ConnFilter" Content="{Binding NetFilterLan, Source={StaticResource Loc}}"
 
 
 
@@ -1437,10 +886,7 @@
 
 
                                          VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="{Binding NetFilterListen, Source={StaticResource Loc}}"
+<RadioButton x:Name="RbConnEstablished" GroupName="ConnFilter" Content="{Binding NetFilterEstablished, Source={StaticResource Loc}}"
 
 
 
@@ -1448,27 +894,17 @@
 
 
 
-                                         VerticalAlignment="Center" />
+                                         VerticalAlignment="Center" Margin="0,0,10,0" />
+<RadioButton x:Name="RbConnListening" GroupName="ConnFilter" Content="{Binding NetFilterListen, Source={StaticResource Loc}}"
 
 
 
-                        </WrapPanel>
+                                         Checked="OnConnectionsFilterChanged"
 
 
 
-
-
-
-
-                        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-
-
-
-                                    Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                            <CheckBox x:Name="ChkAutoRefreshConn" Content="{Binding NetAutoRefresh2s, Source={StaticResource Loc}}"
+                                         VerticalAlignment="Center" /></WrapPanel>
+                        <WrapPanel VerticalAlignment="Center"><CheckBox x:Name="ChkAutoRefreshConn" Content="{Binding NetAutoRefresh2s, Source={StaticResource Loc}}"
 
 
 
@@ -1481,18 +917,12 @@
 
 
                                       VerticalAlignment="Center" Margin="0,0,12,0" />
-
-
-
-                            <ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="{Binding NetBtnRefreshNow, Source={StaticResource Loc}}"
+<ui:Button x:Name="BtnRefreshConn" Appearance="Secondary" Content="{Binding NetBtnRefreshNow, Source={StaticResource Loc}}"
 
 
 
                                        Click="OnRefreshConnClick" Margin="0,0,12,0" />
-
-
-
-                            <TextBlock x:Name="TxtConnectionsSummary" Text="—"
+<TextBlock x:Name="TxtConnectionsSummary" Text="—"
 
 
 
@@ -1504,15 +934,8 @@
 
 
 
-                                       VerticalAlignment="Center" />
-
-
-
-                        </StackPanel>
-
-
-
-                    </Grid>
+                                       VerticalAlignment="Center" /></WrapPanel>
+                    </StackPanel>
 
 
 
@@ -1576,7 +999,7 @@
 
 
 
-                                  RowHeight="34">
+                                  RowHeight="34" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
 
 
@@ -1864,7 +1287,7 @@
 
 
 
-                            
+
 
 
 
@@ -2104,134 +1527,56 @@
 
 
 
-                    <Border Grid.Row="0" Margin="0,0,0,10" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-
-
-
-                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10">
-
-
-
+                    <Border Grid.Row="0" Margin="0,0,0,10" Padding="12" CornerRadius="10"
+                            Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <!-- Поиск занимает доступную ширину, фильтры переносятся независимо от кнопок действий. -->
                         <Grid>
-
-
-
-                            <Grid.ColumnDefinitions>
-
-
-
-                                <ColumnDefinition Width="*" />
-
-
-
-                                <ColumnDefinition Width="Auto" />
-
-
-
-                            </Grid.ColumnDefinitions>
-
-
-
-
-
-
-
-                            <!-- Чипы быстрой фильтрации -->
-
-
-
-                            <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                                <RadioButton x:Name="ChipFilterAll" Content="{Binding NetAclFilterAll, Source={StaticResource Loc}}" IsChecked="True"
-
-
-
-                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="All" />
-
-
-
-                                <RadioButton x:Name="ChipFilterAllow" Content="{Binding NetAclFilterAllow, Source={StaticResource Loc}}"
-
-
-
-                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Allow" />
-
-
-
-                                <RadioButton x:Name="ChipFilterPrompt" Content="{Binding NetAclFilterPrompt, Source={StaticResource Loc}}"
-
-
-
-                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Prompt" />
-
-
-
-                                <RadioButton x:Name="ChipFilterBlock" Content="{Binding NetAclFilterBlock, Source={StaticResource Loc}}"
-
-
-
-                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Block" />
-
-
-
-                                <RadioButton x:Name="ChipFilterSystem" Content="{Binding NetAclFilterSystem, Source={StaticResource Loc}}"
-
-
-
-                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="System" />
-
-
-
-                                <RadioButton x:Name="ChipFilterSession" Content="{Binding NetAclFilterSession, Source={StaticResource Loc}}"
-
-
-
-                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,0,4" Click="OnAclFilterChipClick" Tag="Session" />
-
-
-
-                            </WrapPanel>
-
-
-
-
-
-
-
-                            <!-- Поиск и добавление программы -->
-
-
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                                <ui:TextBox x:Name="TxtSearchMatrix" Width="200" Margin="0,0,8,0"
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="TxtSearchMatrix" MinWidth="120" Margin="0,0,10,8"
 
 
 
                                             PlaceholderText="{Binding NetAclSearchPlaceholder, Source={StaticResource Loc}}" TextChanged="OnMatrixSearchChanged" />
+                            <WrapPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                                <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Add24}"
+                                           Content="{Binding [NetUxAddApp], Source={StaticResource Loc}}" Click="OnAddMatrixAppClick" Margin="0,0,6,8" />
+                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="OnRefreshMatrixClick"
+                                           Margin="0,0,0,8" ToolTip="{Binding NetAclRefreshTip, Source={StaticResource Loc}}"
+                                           AutomationProperties.Name="{Binding NetAclRefreshTip, Source={StaticResource Loc}}" />
+                            </WrapPanel>
+                            <WrapPanel Grid.Row="1" Grid.ColumnSpan="2"><RadioButton x:Name="ChipFilterAll" Content="{Binding NetAclFilterAll, Source={StaticResource Loc}}" IsChecked="True"
 
 
 
-                                <ui:Button Appearance="Primary" Content="{Binding NetAclBtnAddExe, Source={StaticResource Loc}}" Click="OnAddMatrixAppClick" Margin="0,0,6,0" />
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="All" />
+<RadioButton x:Name="ChipFilterAllow" Content="{Binding NetAclFilterAllow, Source={StaticResource Loc}}"
 
 
 
-                                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="OnRefreshMatrixClick" ToolTip="{Binding NetAclRefreshTip, Source={StaticResource Loc}}" />
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Allow" />
+<RadioButton x:Name="ChipFilterPrompt" Content="{Binding NetAclFilterPrompt, Source={StaticResource Loc}}"
 
 
 
-                            </StackPanel>
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Prompt" />
+<RadioButton x:Name="ChipFilterBlock" Content="{Binding NetAclFilterBlock, Source={StaticResource Loc}}"
 
 
 
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="Block" />
+<RadioButton x:Name="ChipFilterSystem" Content="{Binding NetAclFilterSystem, Source={StaticResource Loc}}"
+
+
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,6,4" Click="OnAclFilterChipClick" Tag="System" />
+<RadioButton x:Name="ChipFilterSession" Content="{Binding NetAclFilterSession, Source={StaticResource Loc}}"
+
+
+
+                                             Style="{StaticResource FilterTabRadioButtonStyle}" Margin="0,0,0,4" Click="OnAclFilterChipClick" Tag="Session" /></WrapPanel>
                         </Grid>
-
-
-
                     </Border>
 
 
@@ -2272,7 +1617,7 @@
 
 
 
-                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="46">
+                                  Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" RowHeight="68" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
 
 
@@ -2288,7 +1633,7 @@
 
 
 
-                                <DataGridTemplateColumn Header="{Binding NetAclColApp, Source={StaticResource Loc}}" Width="320">
+                                <DataGridTemplateColumn Header="{Binding NetAclColApp, Source={StaticResource Loc}}" Width="2*" MinWidth="180">
 
 
 
@@ -2336,11 +1681,11 @@
 
 
 
-                                                    <StackPanel Orientation="Horizontal">
+                                                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
 
 
 
-                                                        <TextBlock Text="{Binding ProcessName}" FontWeight="Bold" FontSize="13"
+                                                        <TextBlock Text="{Binding ProcessName}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
 
 
 
@@ -2356,7 +1701,7 @@
 
 
 
-                                                        <Border Visibility="{Binding IsCriticalSystem, Converter={StaticResource BoolToVisConverter}}"
+                                                        <Border Grid.Column="1" Visibility="{Binding IsCriticalSystem, Converter={StaticResource BoolToVisConverter}}"
 
 
 
@@ -2368,7 +1713,7 @@
 
 
 
-                                                            <TextBlock Text="🔒 Ядро Windows" FontSize="10" FontWeight="Bold" Foreground="#00D2D3" />
+                                                            <TextBlock Text="🔒" FontSize="10" FontWeight="Bold" Foreground="#00D2D3" />
 
 
 
@@ -2384,7 +1729,7 @@
 
 
 
-                                                        <Border Visibility="{Binding IsProtectedSubsystem, Converter={StaticResource BoolToVisConverter}}"
+                                                        <Border Grid.Column="2" Visibility="{Binding IsProtectedSubsystem, Converter={StaticResource BoolToVisConverter}}"
 
 
 
@@ -2396,7 +1741,7 @@
 
 
 
-                                                            <TextBlock Text="⚠️ Системный" FontSize="10" FontWeight="Bold" Foreground="#F59E0B" />
+                                                            <TextBlock Text="⚠" FontSize="10" FontWeight="Bold" Foreground="#F59E0B" />
 
 
 
@@ -2404,7 +1749,7 @@
 
 
 
-                                                    </StackPanel>
+                                                    </Grid>
 
 
 
@@ -2444,106 +1789,27 @@
 
 
 
-                                <DataGridTemplateColumn Header="{Binding NetAclColPolicy, Source={StaticResource Loc}}" Width="260">
-
-
-
+                                <DataGridTemplateColumn Header="{Binding NetAclColPolicy, Source={StaticResource Loc}}" Width="180" MinWidth="170" CanUserResize="False">
                                     <DataGridTemplateColumn.CellTemplate>
-
-
-
                                         <DataTemplate>
-
-
-
-                                            <Border Background="#1E232A" BorderBrush="#323B46" BorderThickness="1" CornerRadius="8" Padding="3" HorizontalAlignment="Left">
-
-
-
-                                                <StackPanel Orientation="Horizontal">
-
-
-
-                                                    <!-- 🟢 Разрешено -->
-
-
-
-                                                    <RadioButton Content="{Binding NetAclFilterAllow, Source={StaticResource Loc}}" Tag="Allow" GroupName="{Binding UniqueGroupKey}"
-
-
-
-                                                                 IsChecked="{Binding IsAllowedChecked, Mode=TwoWay}"
-
-
-
-                                                                 Click="OnMatrixStateRadioClick"
-
-
-
-                                                                 Style="{StaticResource AccessSegmentRadioButton}" />
-
-
-
-                                                    <!-- 🟡 По запросу -->
-
-
-
-                                                    <RadioButton Content="🟡 Спрашивать" Tag="Prompt" GroupName="{Binding UniqueGroupKey}"
-
-
-
-                                                                 IsChecked="{Binding IsPromptChecked, Mode=TwoWay}"
-
-
-
-                                                                 Click="OnMatrixStateRadioClick"
-
-
-
-                                                                 Style="{StaticResource AccessSegmentRadioButton}" />
-
-
-
-                                                    <!-- 🔴 Заблокировано -->
-
-
-
-                                                    <RadioButton Content="🔴 Блок" Tag="Block" GroupName="{Binding UniqueGroupKey}"
-
-
-
-                                                                 IsChecked="{Binding IsBlockedChecked, Mode=TwoWay}"
-
-
-
-                                                                 IsEnabled="{Binding CanBlock}"
-
-
-
-                                                                 Click="OnMatrixStateRadioClick"
-
-
-
-                                                                 Style="{StaticResource AccessSegmentRadioButton}" />
-
-
-
-                                                </StackPanel>
-
-
-
-                                            </Border>
-
-
-
+                                            <!-- Односторонняя привязка сохраняет подтверждённое состояние до завершения IPC-команды. -->
+                                            <StackPanel Margin="6,4" VerticalAlignment="Center">
+                                                <ComboBox x:Name="AccessPolicyPicker" Height="34" MinWidth="150" Padding="8,4" FontSize="12"
+                                                          VerticalContentAlignment="Center" HorizontalAlignment="Stretch"
+                                                          SelectedValuePath="Tag" SelectedValue="{Binding State, Mode=OneWay}"
+                                                          SelectionChanged="OnMatrixPolicySelectionChanged"
+                                                          AutomationProperties.Name="{Binding NetAclColPolicy, Source={StaticResource Loc}}"
+                                                          ToolTip="{Binding [NetUxPolicyHelp], Source={StaticResource Loc}}">
+                                                    <ComboBoxItem Content="{Binding [NetUxPolicyAllowed], Source={StaticResource Loc}}" Tag="{x:Static firewall:AccessControlState.Allowed}" />
+                                                    <ComboBoxItem Content="{Binding [NetUxPolicyPrompt], Source={StaticResource Loc}}" Tag="{x:Static firewall:AccessControlState.Prompt}" />
+                                                    <ComboBoxItem Content="{Binding [NetUxPolicyBlocked], Source={StaticResource Loc}}" Tag="{x:Static firewall:AccessControlState.Blocked}"
+                                                                  IsEnabled="{Binding CanBlock}" />
+                                                </ComboBox>
+                                                <TextBlock Text="{Binding ScopeDisplay}" FontSize="10.5" Margin="2,4,0,0"
+                                                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
                                         </DataTemplate>
-
-
-
                                     </DataGridTemplateColumn.CellTemplate>
-
-
-
                                 </DataGridTemplateColumn>
 
 
@@ -2556,51 +1822,7 @@
 
 
 
-                                <DataGridTemplateColumn Header="{Binding NetAclColDuration, Source={StaticResource Loc}}" Width="140">
-
-
-
-                                    <DataGridTemplateColumn.CellTemplate>
-
-
-
-                                        <DataTemplate>
-
-
-
-                                            <StackPanel VerticalAlignment="Center">
-
-
-
-                                                <Border Background="#15FFFFFF" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
-
-
-
-                                                    <TextBlock Text="{Binding ScopeDisplay}" FontSize="11" FontWeight="SemiBold"
-
-
-
-                                                               Foreground="{Binding ScopeColorBrush}" />
-
-
-
-                                                </Border>
-
-
-
-                                            </StackPanel>
-
-
-
-                                        </DataTemplate>
-
-
-
-                                    </DataGridTemplateColumn.CellTemplate>
-
-
-
-                                </DataGridTemplateColumn>
+                                <!-- Срок действия показан под политикой, освобождая место для имени приложения. -->
 
 
 
@@ -2612,7 +1834,7 @@
 
 
 
-                                <DataGridTemplateColumn Header="{Binding NetAclColSource, Source={StaticResource Loc}}" Width="170">
+                                <DataGridTemplateColumn Header="{Binding NetAclColSource, Source={StaticResource Loc}}" Width="*" MinWidth="140">
 
 
 
@@ -2636,7 +1858,7 @@
 
 
 
-                                                           Foreground="{Binding SourceBadgeFg}" />
+                                                           Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
 
 
 
@@ -2664,7 +1886,7 @@
 
 
 
-                                <DataGridTextColumn Header="{Binding NetAclColSockets, Source={StaticResource Loc}}" Binding="{Binding ActiveSocketsDisplay}" Width="80" />
+                                <DataGridTextColumn Header="{Binding NetAclColSockets, Source={StaticResource Loc}}" Binding="{Binding ActiveSocketsDisplay}" Width="65" />
 
 
 
@@ -2676,50 +1898,17 @@
 
 
 
-                                <DataGridTemplateColumn Header="{Binding NetAclColActions, Source={StaticResource Loc}}" Width="*">
-
-
-
-                                    <DataGridTemplateColumn.CellTemplate>
-
-
-
-                                        <DataTemplate>
-
-
-
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                                                <ui:Button Appearance="Secondary" Content="Правила..." Padding="6,2" Margin="0,0,4,0"
-
-
-
-                                                           Click="OnInspectAppRulesClick" ToolTip="Перейти к детальным правилам брандмауэра" />
-
-
-
-                                                <ui:Button Appearance="Danger" Content="Сброс" Padding="6,2"
-
-
-
-                                                           Click="OnResetAppPolicyClick" ToolTip="Сбросить политику к режиму «По запросу»" />
-
-
-
-                                            </StackPanel>
-
-
-
-                                        </DataTemplate>
-
-
-
-                                    </DataGridTemplateColumn.CellTemplate>
-
-
-
+                                <DataGridTemplateColumn Header="{Binding NetAclColActions, Source={StaticResource Loc}}" Width="88" MinWidth="88" CanUserResize="False">
+                                    <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0">
+                                            <ui:Button Appearance="Transparent" Icon="{ui:SymbolIcon DocumentBulletList24}" Padding="7"
+                                                       Click="OnInspectAppRulesClick" ToolTip="{Binding [NetUxInspectRules], Source={StaticResource Loc}}"
+                                                       AutomationProperties.Name="{Binding [NetUxInspectRules], Source={StaticResource Loc}}" Margin="0,0,4,0" />
+                                            <ui:Button Appearance="Transparent" Icon="{ui:SymbolIcon ArrowUndo24}" Padding="7"
+                                                       Click="OnResetAppPolicyClick" ToolTip="{Binding [NetUxResetPolicy], Source={StaticResource Loc}}"
+                                                       AutomationProperties.Name="{Binding [NetUxResetPolicy], Source={StaticResource Loc}}" />
+                                        </StackPanel>
+                                    </DataTemplate></DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
 
 
@@ -2808,27 +1997,8 @@
 
 
 
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-
-
-
-                        <Grid.ColumnDefinitions>
-
-
-
-                            <ColumnDefinition Width="2*" />
-
-
-
-                            <ColumnDefinition Width="3*" />
-
-
-
-                        </Grid.ColumnDefinitions>
-
-
-
-                        <ui:TextBox x:Name="TxtRuleSearch" Grid.Column="0"
+                    <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                        <ui:TextBox x:Name="TxtRuleSearch"
 
 
 
@@ -2836,71 +2006,33 @@
 
 
 
-                                     TextChanged="OnRuleSearchTextChanged" Margin="0,0,12,0" />
-
-
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                            <TextBlock Text="{Binding NetRulesFilterLabel, Source={StaticResource Loc}}" FontSize="12"
-
-
-
-                                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-
-
-
-                                       VerticalAlignment="Center" Margin="0,0,8,0" />
-
-
-
-                            <RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="{Binding NetRulesFilterAll, Source={StaticResource Loc}}" IsChecked="True"
+                                     TextChanged="OnRuleSearchTextChanged" Margin="0,0,0,8" />
+                        <WrapPanel><RadioButton x:Name="FilterAll" GroupName="RuleFilter" Content="{Binding NetRulesFilterAll, Source={StaticResource Loc}}" IsChecked="True"
 
 
 
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterInbound, Source={StaticResource Loc}}"
-
-
-
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterOutbound, Source={StaticResource Loc}}"
+<RadioButton x:Name="FilterInbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterInbound, Source={StaticResource Loc}}"
 
 
 
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
-
-
-
-                            <RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="{Binding NetRulesFilterBlock, Source={StaticResource Loc}}"
+<RadioButton x:Name="FilterOutbound" GroupName="RuleFilter" Content="{Binding NetRulesFilterOutbound, Source={StaticResource Loc}}"
 
 
 
                                          Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+<RadioButton x:Name="FilterBlocking" GroupName="RuleFilter" Content="{Binding NetRulesFilterBlock, Source={StaticResource Loc}}"
 
 
 
-                            <RadioButton x:Name="FilterManaged" GroupName="RuleFilter" Content="StartupMonitor"
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" Margin="0,0,10,0" />
+<RadioButton x:Name="FilterManaged" GroupName="RuleFilter" Content="StartupMonitor"
 
 
 
-                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" />
-
-
-
-                        </StackPanel>
-
-
-
-                    </Grid>
+                                         Checked="OnRuleFilterChecked" VerticalAlignment="Center" /></WrapPanel>
+                    </StackPanel>
 
 
 
@@ -2912,35 +2044,29 @@
 
 
 
-                    <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
-
-
-
-                        <ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="{Binding NetBtnCreateRule, Source={StaticResource Loc}}"
+                    <StackPanel Grid.Row="1" Margin="0,0,0,8">
+                        <WrapPanel><ui:Button x:Name="BtnCreateRule" Appearance="Primary" Content="{Binding NetBtnCreateRule, Source={StaticResource Loc}}"
 
 
 
                                    Click="OnCreateRuleClick" Margin="0,0,8,4" />
-
-
-
-                        <ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="{Binding NetBtnEditRule, Source={StaticResource Loc}}"
+<ui:Button x:Name="BtnEditRule" Appearance="Secondary" Content="{Binding NetBtnEditRule, Source={StaticResource Loc}}"
 
 
 
                                    Click="OnEditRuleClick" Margin="0,0,8,4" />
-
-
-
-                        <ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="{Binding NetBtnDeleteRule, Source={StaticResource Loc}}"
+<ui:Button x:Name="BtnDeleteRule" Appearance="Secondary" Content="{Binding NetBtnDeleteRule, Source={StaticResource Loc}}"
 
 
 
                                    Click="OnDeleteRuleClick" Margin="0,0,8,4" />
+<ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
 
 
 
-                        <ui:Button x:Name="BtnExportRules" Appearance="Secondary"
+                                   Click="OnRefreshRulesClick" Margin="0,0,8,4" /></WrapPanel>
+                        <Expander Header="{Binding [NetUxAdvancedActions], Source={StaticResource Loc}}" IsExpanded="False" Margin="0,4,0,4">
+                            <WrapPanel Margin="0,8,0,0"><ui:Button x:Name="BtnExportRules" Appearance="Secondary"
 
 
 
@@ -2957,10 +2083,7 @@
 
 
                                    Click="OnExportRulesClick" Margin="0,0,8,4" />
-
-
-
-                        <ui:Button x:Name="BtnImportRules" Appearance="Secondary"
+<ui:Button x:Name="BtnImportRules" Appearance="Secondary"
 
 
 
@@ -2977,10 +2100,7 @@
 
 
                                    Click="OnImportRulesClick" Margin="0,0,8,4" />
-
-
-
-                        <ui:DropDownButton x:Name="BtnSecurityPresets" Appearance="Secondary"
+<ui:DropDownButton x:Name="BtnSecurityPresets" Appearance="Secondary"
 
 
 
@@ -3033,18 +2153,7 @@
 
 
                         </ui:DropDownButton>
-
-
-
-                        <ui:Button x:Name="BtnRefreshRules" Appearance="Secondary" Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}"
-
-
-
-                                   Click="OnRefreshRulesClick" Margin="0,0,8,4" />
-
-
-
-                        <ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="{Binding NetBtnAntiTelemetry, Source={StaticResource Loc}}"
+<ui:Button x:Name="BtnAntiTelemetry" Appearance="Danger" Content="{Binding NetBtnAntiTelemetry, Source={StaticResource Loc}}"
 
 
 
@@ -3052,11 +2161,9 @@
 
 
 
-                                   ToolTip="{Binding NetBtnAntiTelemetryTip, Source={StaticResource Loc}}" />
-
-
-
-                    </WrapPanel>
+                                   ToolTip="{Binding NetBtnAntiTelemetryTip, Source={StaticResource Loc}}" /></WrapPanel>
+                        </Expander>
+                    </StackPanel>
 
 
 
@@ -3124,7 +2231,7 @@
 
 
 
-                                  MouseDoubleClick="OnRuleGridDoubleClick">
+                                  MouseDoubleClick="OnRuleGridDoubleClick" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
 
 
@@ -3572,67 +2679,9 @@
 
 
 
-                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14" BorderBrush="#2500D2D3" BorderThickness="1">
-
-
-
-                        <Grid>
-
-
-
-                            <Grid.ColumnDefinitions>
-
-
-
-                                <ColumnDefinition Width="Auto" />
-
-
-
-                                <ColumnDefinition Width="*" />
-
-
-
-                                <ColumnDefinition Width="Auto" />
-
-
-
-                            </Grid.ColumnDefinitions>
-
-
-
-                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="8"
-
-
-
-                                    Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}"
-
-
-
-                                    Margin="0,0,12,0" VerticalAlignment="Center">
-
-
-
-                                <ui:SymbolIcon Symbol="Shield24" FontSize="20"
-
-
-
-                                               Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}"
-
-
-
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-
-
-
-                            </Border>
-
-
-
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-
-
-
-                                <TextBlock x:Name="TxtDefenderState" Text="{Binding NetDefenderStateLoading, Source={StaticResource Loc}}"
+                    <ui:Card Grid.Row="0" Margin="0,0,0,12" Padding="14">
+                        <StackPanel>
+                            <TextBlock x:Name="TxtDefenderState" Text="{Binding NetDefenderStateLoading, Source={StaticResource Loc}}"
 
 
 
@@ -3641,26 +2690,12 @@
 
 
                                            Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
-
-
-
-                                <TextBlock x:Name="TxtDefenderDetails" Text="—" FontSize="12"
+                            <TextBlock x:Name="TxtDefenderDetails" Text="—" FontSize="12" TextWrapping="Wrap"
 
 
 
                                            Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="0,2,0,0" />
-
-
-
-                            </StackPanel>
-
-
-
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-
-
-
-                                <ui:Button x:Name="BtnConfigureDefender" Appearance="Primary"
+                            <WrapPanel Margin="0,12,0,0"><ui:Button x:Name="BtnConfigureDefender" Appearance="Primary"
 
 
 
@@ -3669,25 +2704,12 @@
 
 
                                            Click="OnConfigureDefenderClick" Margin="0,0,8,0" />
+<ui:Button x:Name="BtnRefreshDefender" Appearance="Secondary"
 
 
 
-                                <ui:Button x:Name="BtnRefreshDefender" Appearance="Secondary"
-
-
-
-                                           Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}" Click="OnRefreshDefenderClick" />
-
-
-
-                            </StackPanel>
-
-
-
-                        </Grid>
-
-
-
+                                           Content="{Binding NetBtnRefreshRules, Source={StaticResource Loc}}" Click="OnRefreshDefenderClick" /></WrapPanel>
+                        </StackPanel>
                     </ui:Card>
 
 
@@ -3705,28 +2727,12 @@
                             </Grid.RowDefinitions>
 
                             <!-- Шапка списка портов и кнопки действий -->
-                            <Grid Grid.Row="0" Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="30" Height="30" CornerRadius="6" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,10,0" VerticalAlignment="Center">
-                                        <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="16" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <TextBlock Text="Защищаемые порты (Port Defender)" FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
-                                    <Border CornerRadius="10" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtDefenderPortsCountBadge" Text="0 портов" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                                    </Border>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <ui:Button x:Name="BtnAddDefenderPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить порт" Click="OnAddDefenderPortClick" Margin="0,0,6,0" />
-                                    <ui:Button x:Name="BtnEditDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="Редактировать" Click="OnEditDefenderPortClick" Margin="0,0,6,0" />
-                                    <ui:Button x:Name="BtnDeleteDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="Удалить" Click="OnDeleteDefenderPortClick" />
-                                </StackPanel>
-                            </Grid>
+                            <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                                <TextBlock x:Name="TxtDefenderPortsCountBadge" Text="0 портов" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                <WrapPanel Margin="0,8,0,0"><ui:Button x:Name="BtnAddDefenderPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить порт" Click="OnAddDefenderPortClick" Margin="0,0,6,0" />
+<ui:Button x:Name="BtnEditDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="Редактировать" Click="OnEditDefenderPortClick" Margin="0,0,6,0" />
+<ui:Button x:Name="BtnDeleteDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="Удалить" Click="OnDeleteDefenderPortClick" /></WrapPanel>
+                            </StackPanel>
 
                             <!-- Интерактивная таблица портов -->
                             <DataGrid Grid.Row="1"
@@ -3743,7 +2749,7 @@
                                       BorderThickness="1"
                                       BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
                                       MouseDoubleClick="OnGridDefenderPortsMouseDoubleClick"
-                                      PreviewKeyDown="OnGridDefenderPortsKeyDown">
+                                      PreviewKeyDown="OnGridDefenderPortsKeyDown" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                 <DataGrid.Columns>
                                     <!-- Номер порта -->
                                     <DataGridTemplateColumn Header="Порт" Width="95">
@@ -3807,7 +2813,7 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Описание защиты -->
-                                    <DataGridTextColumn Header="Описание защиты" Binding="{Binding Description}" Width="*" />
+                                    <DataGridTextColumn Header="Описание защиты" Binding="{Binding Description}" Width="*" MinWidth="160" />
 
                                     <!-- Действия в строке -->
                                     <DataGridTemplateColumn Header="{Binding NetAclColActions, Source={StaticResource Loc}}" Width="85">
@@ -3988,7 +2994,7 @@
 
 
 
-                                  RowHeight="34">
+                                  RowHeight="34" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
 
 
@@ -4132,59 +3138,8 @@
 
 
 
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-
-
-
-                        <Grid.RowDefinitions>
-
-
-
-                            <RowDefinition Height="Auto" />
-
-
-
-                            <RowDefinition Height="Auto" />
-
-
-
-                        </Grid.RowDefinitions>
-
-
-
-                        <Grid.ColumnDefinitions>
-
-
-
-                            <ColumnDefinition Width="2*" />
-
-
-
-                            <ColumnDefinition Width="Auto" />
-
-
-
-                            <ColumnDefinition Width="Auto" />
-
-
-
-                            <ColumnDefinition Width="Auto" />
-
-
-
-                            <ColumnDefinition Width="*" />
-
-
-
-                        </Grid.ColumnDefinitions>
-
-
-
-
-
-
-
-                        <ui:TextBox x:Name="TxtHubHistSearch" Grid.Row="0" Grid.Column="0"
+                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                        <ui:TextBox x:Name="TxtHubHistSearch"
 
 
 
@@ -4192,23 +3147,8 @@
 
 
 
-                                    TextChanged="OnHubHistFilterChanged" Margin="0,0,10,6" />
-
-
-
-
-
-
-
-                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
-
-
-
-                            <TextBlock Text="Вердикт:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-
-
-
-                            <ComboBox x:Name="CmbHubHistVerdict" Width="140" SelectionChanged="OnHubHistFilterChanged">
+                                    TextChanged="OnHubHistFilterChanged" Margin="0,0,0,8" />
+                        <WrapPanel><StackPanel Margin="0,0,10,8"><TextBlock Text="{Binding [NetUxHistoryVerdict], Source={StaticResource Loc}}" FontSize="11" Margin="0,0,0,4" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" /><ComboBox x:Name="CmbHubHistVerdict" Width="160" SelectionChanged="OnHubHistFilterChanged">
 
 
 
@@ -4240,27 +3180,8 @@
 
 
 
-                            </ComboBox>
-
-
-
-                        </StackPanel>
-
-
-
-
-
-
-
-                        <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
-
-
-
-                            <TextBlock Text="Период:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-
-
-
-                            <ComboBox x:Name="CmbHubHistPeriod" Width="120" SelectionChanged="OnHubHistFilterChanged">
+                            </ComboBox></StackPanel>
+<StackPanel Margin="0,0,10,8"><TextBlock Text="{Binding [NetUxHistoryPeriod], Source={StaticResource Loc}}" FontSize="11" Margin="0,0,0,4" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" /><ComboBox x:Name="CmbHubHistPeriod" Width="120" SelectionChanged="OnHubHistFilterChanged">
 
 
 
@@ -4280,27 +3201,8 @@
 
 
 
-                            </ComboBox>
-
-
-
-                        </StackPanel>
-
-
-
-
-
-
-
-                        <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6">
-
-
-
-                            <TextBlock Text="Протокол:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-
-
-
-                            <ComboBox x:Name="CmbHubHistProtocol" Width="80" SelectionChanged="OnHubHistFilterChanged">
+                            </ComboBox></StackPanel>
+<StackPanel Margin="0,0,10,8"><TextBlock Text="{Binding [NetColProtocol], Source={StaticResource Loc}}" FontSize="11" Margin="0,0,0,4" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" /><ComboBox x:Name="CmbHubHistProtocol" Width="80" SelectionChanged="OnHubHistFilterChanged">
 
 
 
@@ -4316,55 +3218,23 @@
 
 
 
-                            </ComboBox>
-
-
-
-                        </StackPanel>
-
-
-
-
-
-
-
-                        <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,6">
-
-
-
-                            <ui:Button x:Name="BtnRefreshHubHist" Content="Обновить" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                            </ComboBox></StackPanel></WrapPanel>
+                        <WrapPanel Margin="0,0,0,6"><ui:Button x:Name="BtnRefreshHubHist" Content="Обновить" Icon="{ui:SymbolIcon ArrowClockwise24}"
 
 
 
                                        Appearance="Secondary" Click="OnRefreshHubHistClick" Margin="0,0,6,0" ToolTip="Обновить список истории" />
+<ui:Button x:Name="BtnClearHubHist" Content="Очистить" Icon="{ui:SymbolIcon Delete24}"
 
 
 
-                            <ui:Button x:Name="BtnClearHubHist" Content="Очистить" Icon="{ui:SymbolIcon Delete24}"
-
-
-
-                                       Appearance="Secondary" Click="OnClearHubHistClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" ToolTip="Очистить весь журнал истории" />
-
-
-
-                        </StackPanel>
-
-
-
-
-
-
-
-                        <TextBlock x:Name="TxtHubHistSummary" Grid.Row="1" Grid.ColumnSpan="5" Text="—" FontSize="11"
+                                       Appearance="Secondary" Click="OnClearHubHistClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" ToolTip="Очистить весь журнал истории" /></WrapPanel>
+                        <TextBlock x:Name="TxtHubHistSummary" Text="—" FontSize="11"
 
 
 
                                    Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
-
-
-
-                    </Grid>
+                    </StackPanel>
 
 
 
@@ -4392,7 +3262,7 @@
 
 
 
-                              SelectionChanged="OnHubHistSelectionChanged">
+                              SelectionChanged="OnHubHistSelectionChanged" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
 
 
 
@@ -4468,7 +3338,7 @@
 
 
 
-                            <DataGridTextColumn Header="Детали" Binding="{Binding Details}" Width="*" />
+                            <DataGridTextColumn Header="Детали" Binding="{Binding Details}" Width="*" MinWidth="160" />
 
 
 
@@ -4569,6 +3439,7 @@
 
 
         </TabControl>
+        </Grid>
 
 
 
@@ -4580,10 +3451,8 @@
 
 
 
-        <Grid Grid.Row="3" Margin="0,8,0,0">
-
-
-
+        <Border Grid.Row="3" Margin="0,10,0,0" Padding="4,8,4,0"
+                BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtStatus" Text="{Binding NetStatusReady, Source={StaticResource Loc}}" FontSize="12"
 
 
@@ -4593,10 +3462,7 @@
 
 
                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-
-
-
-        </Grid>
+        </Border>
 
 
 

@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Markup;
+using System.Xml.Linq;
 using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.UI.Controls;
 using StartupMonitor.UI.Services;
@@ -20,7 +22,7 @@ public sealed class WpfNetworkRenderingCollection;
 
 /// <summary>Проверяет производственную разметку и renderer вместо копирования формул в тестах.</summary>
 [Collection("WpfNetworkRendering")]
-public sealed class NetworkRenderingRegressionTests : IClassFixture<NetworkRenderingTestHost>
+public sealed partial class NetworkRenderingRegressionTests : IClassFixture<NetworkRenderingTestHost>
 {
     private readonly NetworkRenderingTestHost _host;
 
@@ -189,8 +191,8 @@ public sealed class NetworkRenderingTestHost : IDisposable
         {
             try
             {
-                var app = new StartupMonitor.UI.App();
-                app.InitializeComponent();
+                var app = new IsolatedTestApplication();
+                app.Resources = LoadApplicationResources();
                 ready.SetResult(Dispatcher.CurrentDispatcher);
                 Dispatcher.Run();
             }
@@ -232,27 +234,59 @@ public sealed class NetworkRenderingTestHost : IDisposable
         }
     }
 
-    /// <summary>Завершает тестовое приложение и поток, не оставляя глобальный Application другим тестам.</summary>
+    /// <summary>Отменяет тестовый диспетчер без вызова производственных startup/exit и управления службой.</summary>
     public void Dispose()
     {
-        try
-        {
-            _dispatcher.Invoke(() =>
-            {
-                try { Application.Current?.Shutdown(); } catch { }
-            });
-        }
-        catch { }
-
-        try
-        {
-            if (!_dispatcher.HasShutdownStarted)
-            {
-                _dispatcher.InvokeShutdown();
-            }
-        }
-        catch { }
-
+        if (!_dispatcher.HasShutdownStarted)
+            _dispatcher.InvokeAsync(() => Application.Current?.Shutdown()).Task
+                .WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
         Assert.True(_thread.Join(TimeSpan.FromSeconds(15)), "Тестовый STA-поток не завершился.");
+    }
+
+    /// <summary>Загружает ресурсный раздел настоящего App.xaml без создания производственного класса App.</summary>
+    /// <returns>Ресурсы тем, контролов, локализации и конвертеров приложения.</returns>
+    private static ResourceDictionary LoadApplicationResources()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "StartupMonitor.sln")))
+            directory = directory.Parent;
+        if (directory is null) throw new DirectoryNotFoundException("Каталог ресурсов приложения не найден.");
+        var document = XDocument.Load(Path.Combine(directory.FullName, "src", "StartupMonitor.UI", "App.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        var dictionary = document.Descendants(presentation + "ResourceDictionary").First();
+        var root = document.Root ?? throw new InvalidDataException("App.xaml не содержит корневого элемента.");
+        foreach (var attribute in root.Attributes().Where(attribute => attribute.IsNamespaceDeclaration))
+            dictionary.SetAttributeValue(attribute.Name, attribute.Value);
+        // В loose XAML нет контекста компилятора UI: сборки для CLR-пространств задаются явно.
+        dictionary.SetAttributeValue(XNamespace.Xmlns + "ui", "clr-namespace:Wpf.Ui.Markup;assembly=Wpf.Ui");
+        dictionary.SetAttributeValue(XNamespace.Xmlns + "converters", "clr-namespace:StartupMonitor.UI.Converters;assembly=StartupMonitor.UI");
+        dictionary.SetAttributeValue(XNamespace.Xmlns + "services", "clr-namespace:StartupMonitor.UI.Services;assembly=StartupMonitor.UI");
+        var namespaces = new Dictionary<string, string>
+        {
+            ["http://schemas.lepo.co/wpfui/2022/xaml"] = "clr-namespace:Wpf.Ui.Markup;assembly=Wpf.Ui",
+            ["clr-namespace:StartupMonitor.UI.Converters"] = "clr-namespace:StartupMonitor.UI.Converters;assembly=StartupMonitor.UI",
+            ["clr-namespace:StartupMonitor.UI.Services"] = "clr-namespace:StartupMonitor.UI.Services;assembly=StartupMonitor.UI"
+        };
+        foreach (var element in dictionary.DescendantsAndSelf())
+        {
+            if (namespaces.TryGetValue(element.Name.NamespaceName, out var resolved))
+                element.Name = XName.Get(element.Name.LocalName, resolved);
+            foreach (var attribute in element.Attributes().Where(attribute => attribute.IsNamespaceDeclaration))
+                if (namespaces.TryGetValue(attribute.Value, out var declared)) attribute.Value = declared;
+        }
+        var context = new ParserContext { BaseUri = new Uri("pack://application:,,,/StartupMonitor.UI;component/") };
+        return (ResourceDictionary)XamlReader.Parse(dictionary.ToString(), context);
+    }
+
+    /// <summary>Тестовый Application не наследует производственные обработчики запуска и завершения.</summary>
+    private sealed class IsolatedTestApplication : Application
+    {
+        /// <summary>Нейтрализует отложенный startup, который WPF ставит в Dispatcher уже в конструкторе Application.</summary>
+        /// <param name="e">Параметры запуска тестового приложения.</param>
+        protected override void OnStartup(StartupEventArgs e) => ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        /// <summary>Завершает только тестовый STA-поток; производственный App.OnExit не вызывается.</summary>
+        /// <param name="e">Параметры завершения тестового приложения.</param>
+        protected override void OnExit(ExitEventArgs e) => Dispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
     }
 }

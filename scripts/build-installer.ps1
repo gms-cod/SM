@@ -13,14 +13,31 @@ $propsFile = Join-Path $repoRoot "Directory.Build.props"
 [xml]$propsXml = Get-Content $propsFile
 $version = $propsXml.Project.PropertyGroup.Version
 if (-not $version) {
-    $version = "1.3.1"
+    throw "Версия не задана в Directory.Build.props."
 }
 Write-Host "Версия продукта: $version" -ForegroundColor Green
+
+# Установщик нельзя повторно собирать под уже использованной версией тега.
+$versionTags = & git -C $repoRoot tag --list 'v*'
+if ($LASTEXITCODE -ne 0) { throw "Не удалось проверить использованные версии Git." }
+foreach ($tag in $versionTags) {
+    if ($tag -match '^v(\d+\.\d+\.\d+)$' -and [version]$version -le [version]$Matches[1]) {
+        throw "Версия $version должна быть строго выше уже существующего тега $tag."
+    }
+}
 
 # 2. Публикация Release бинарников (если не пропущена)
 if (-not $SkipPublish) {
     Write-Host "`n--> Выполняется публикация проектов..." -ForegroundColor Yellow
-    & (Join-Path $PSScriptRoot "publish.ps1")
+    & (Join-Path $PSScriptRoot "publish.ps1") -SkipSign:$SkipSign
+}
+
+# Пропуск публикации допустим только для свежих бинарников той же версии.
+foreach ($name in @('StartupMonitor.Service.exe', 'StartupMonitor.UI.exe')) {
+    $payload = Get-Item -LiteralPath (Join-Path $repoRoot "SMon2\$name") -ErrorAction Stop
+    if ([version]$payload.VersionInfo.FileVersion -ne [version]"$version.0") {
+        throw "Бинарник $name имеет версию $($payload.VersionInfo.FileVersion), ожидалась $version.0."
+    }
 }
 
 # 3. Поиск компилятора Inno Setup
@@ -81,12 +98,13 @@ Write-Host "`nИнсталлятор успешно собран: $installerExe 
 # 5. Цифровая подпись инсталлятора
 if (-not $SkipSign) {
     Write-Host "`n--> Выполняется подпись инсталлятора..." -ForegroundColor Yellow
-    try {
-        & (Join-Path $PSScriptRoot "sign-binaries.ps1") -Files @($installerExe)
+    & (Join-Path $PSScriptRoot "sign-binaries.ps1") -Files @($installerExe)
+    if ((Get-AuthenticodeSignature -LiteralPath $installerExe).Status -ne 'Valid') {
+        throw "Запрошенная подпись инсталлятора не подтверждена. Для явной сборки без подписи укажите -SkipSign."
     }
-    catch {
-        Write-Warning "Подпись инсталлятора не удалась: $($_.Exception.Message)"
-    }
+}
+else {
+    Write-Warning "Инсталлятор собран без Authenticode-подписи; целостность подтверждается SHA-256."
 }
 
 # 6. Вычисление и сохранение SHA-256

@@ -132,7 +132,7 @@
     <value>Immediately removes any new autorun entry from the system, terminates its process, saves a backup and displays a notification.</value>
   </data>
   <data name="NavLogs" xml:space="preserve">
-    <value>Logs</value>
+    <value>Event log</value>
   </data>
   <data name="LogsTitle" xml:space="preserve">
     <value>Logs</value>
@@ -399,7 +399,7 @@
     <value>Task Scheduler</value>
   </data>
   <data name="NavOverview" xml:space="preserve">
-    <value>Overview</value>
+    <value>Startup</value>
   </data>
   <data name="StatusStarting" xml:space="preserve">
     <value>Starting...</value>
@@ -504,7 +504,7 @@
     <value>Startup Monitor</value>
   </data>
   <data name="NavHistory" xml:space="preserve">
-    <value>History</value>
+    <value>Changes</value>
   </data>
   <data name="HistoryTitle" xml:space="preserve">
     <value>Change history</value>
@@ -930,7 +930,7 @@
     <value>~ Modified</value>
   </data>
   <data name="NavBootTime" xml:space="preserve">
-    <value>Boot Time</value>
+    <value>Windows boot</value>
   </data>
   <data name="NavSnapshots" xml:space="preserve">
     <value>Snapshots</value>
@@ -2159,4 +2159,53 @@ Import with overwrite of existing rules?</value>
   <data name="UnitMegabytesPerSecond" xml:space="preserve"><value>MB/s</value></data>
   <data name="UnitGigabytes" xml:space="preserve"><value>GB</value></data>
   <data name="NetConnectionHistoryTitle" xml:space="preserve"><value>Connection history</value></data>
+  <data name="NetUxTitle" xml:space="preserve"><value>Network protection</value></data>
+  <data name="NetUxSettings" xml:space="preserve"><value>Protection settings</value></data>
+  <data name="NetUxModeHint" xml:space="preserve"><value>The filtering mode applies to the whole system. Use Apps to manage an individual program.</value></data>
+  <data name="NetUxNormalTip" xml:space="preserve"><value>Uses the existing Windows Firewall rules.</value></data>
+  <data name="NetUxWhitelistTip" xml:space="preserve"><value>Only programs with allow rules can connect. Other connections are blocked.</value></data>
+  <data name="NetUxKillswitchTip" xml:space="preserve"><value>Emergency network blocking. Confirmation is required.</value></data>
+  <data name="NetUxNavApps" xml:space="preserve"><value>Apps</value></data>
+  <data name="NetUxNavConnections" xml:space="preserve"><value>Connections</value></data>
+  <data name="NetUxNavPorts" xml:space="preserve"><value>Port protection</value></data>
+  <data name="NetUxNavBans" xml:space="preserve"><value>Blocked addresses</value></data>
+  <data name="NetUxNavHistory" xml:space="preserve"><value>History</value></data>
+  <data name="NetUxNavRules" xml:space="preserve"><value>Rules</value></data>
+  <data name="NetUxAppsTitle" xml:space="preserve"><value>App access</value></data>
+  <data name="NetUxAppsHelp" xml:space="preserve"><value>Choose which programs can access the network. A policy is saved after the service confirms it.</value></data>
+  <data name="NetUxConnectionsTitle" xml:space="preserve"><value>Live network activity</value></data>
+  <data name="NetUxConnectionsHelp" xml:space="preserve"><value>See active connections and measured traffic. Search by program or address, then narrow the results with filters.</value></data>
+  <data name="NetUxPortsTitle" xml:space="preserve"><value>Protect exposed ports</value></data>
+  <data name="NetUxPortsHelp" xml:space="preserve"><value>Choose ports and thresholds for detecting suspicious incoming connections.</value></data>
+  <data name="NetUxBansTitle" xml:space="preserve"><value>Blocked addresses</value></data>
+  <data name="NetUxBansHelp" xml:space="preserve"><value>Review why an address was blocked and for how long. Unblocking allows connections from that address again.</value></data>
+  <data name="NetUxHistoryTitle" xml:space="preserve"><value>Connection history</value></data>
+  <data name="NetUxHistoryHelp" xml:space="preserve"><value>Find a program, address and access decision. History filters do not change protection rules.</value></data>
+  <data name="NetUxRulesTitle" xml:space="preserve"><value>Firewall rules</value></data>
+  <data name="NetUxRulesHelp" xml:space="preserve"><value>Advanced Windows Firewall configuration. Backups and presets are available under More actions.</value></data>
+  <data name="NetUxPolicyAllowed" xml:space="preserve"><value>Allowed</value></data>
+  <data name="NetUxPolicyPrompt" xml:space="preserve"><value>Ask each time</value></data>
+  <data name="NetUxPolicyBlocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="NetUxPolicyHelp" xml:space="preserve"><value>Choose whether to allow, ask, or block. Critical Windows components cannot be blocked.</value></data>
+  <data name="NetUxAddApp" xml:space="preserve"><value>Add app</value></data>
+  <data name="NetUxInspectRules" xml:space="preserve"><value>Open app rules</value></data>
+  <data name="NetUxResetPolicy" xml:space="preserve"><value>Reset to Ask</value></data>
+  <data name="NetUxAdvancedActions" xml:space="preserve"><value>More actions</value></data>
+  <data name="NetUxPolicyApplying" xml:space="preserve"><value>Saving policy for {0}…</value></data>
+  <data name="NetUxPolicySaved" xml:space="preserve"><value>Policy saved for {0}.</value></data>
+  <data name="NetUxPolicyFailed" xml:space="preserve"><value>Could not save the policy. The previous setting was kept.</value></data>
+  <data name="NetUxPolicyError" xml:space="preserve"><value>Could not update policy: {0}</value></data>
+  <data name="NetUxHistoryVerdict" xml:space="preserve"><value>Decision</value></data>
+  <data name="NetUxHistoryPeriod" xml:space="preserve"><value>Time range</value></data>
+  <data name="NavGroupAnalysis" xml:space="preserve"><value>Analysis</value></data>
+  <data name="NavGroupMaintenance" xml:space="preserve"><value>Manage</value></data>
+  <data name="NavTip0" xml:space="preserve"><value>Programs that start with Windows.</value></data>
+  <data name="NavTip6" xml:space="preserve"><value>Running processes and resource usage.</value></data>
+  <data name="NavTip8" xml:space="preserve"><value>App network access and network protection rules.</value></data>
+  <data name="NavTip7" xml:space="preserve"><value>Windows boot time and causes of slow startup.</value></data>
+  <data name="NavTipSnapshots" xml:space="preserve"><value>Saved startup configurations and comparisons.</value></data>
+  <data name="NavTip4" xml:space="preserve"><value>History of changes to startup entries.</value></data>
+  <data name="NavTip1" xml:space="preserve"><value>Rules for blocking unwanted startup programs.</value></data>
+  <data name="NavTip3" xml:space="preserve"><value>Removed startup entries.</value></data>
+  <data name="NavTip5" xml:space="preserve"><value>Monitoring events and application diagnostics.</value></data>
 </root>

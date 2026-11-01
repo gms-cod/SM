@@ -3,7 +3,7 @@
 ; =====================================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.8"
+  #define MyAppVersion "2.0.10"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -17,6 +17,8 @@
 AppId={{5A8D3F91-7C42-4F1E-9C84-B168C8E192D4}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+; Числовая версия PE проверяется перед публикацией вместе с версией продукта.
+VersionInfoVersion={#MyAppVersion}.0
 AppVerName={#MyAppName} v{#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
@@ -33,8 +35,8 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64compatible
 PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=commandline
 ShowLanguageDialog=auto
 ; Закрытие запущенных процессов StartupMonitor перед установкой через Restart Manager
 CloseApplications=yes

@@ -16,6 +16,7 @@ using System.Reflection;
 using System.Text.Json;
 
 using System.Threading.Tasks;
+using System.Threading;
 
 using System.Windows;
 
@@ -135,6 +136,8 @@ public partial class NetworkSecurityHubView : UserControl
     private string _matrixFilterChip = "All";
 
     private bool _isLoadingMatrix;
+    /// <summary>Исключает повторную отправку политики и обновление строки до завершения текущей команды.</summary>
+    private bool _isApplyingMatrixPolicy;
 
 
 
@@ -4374,7 +4377,7 @@ public partial class NetworkSecurityHubView : UserControl
 
     {
 
-        if (_isLoadingMatrix) return;
+        if (_isLoadingMatrix || _isApplyingMatrixPolicy) return;
 
         _isLoadingMatrix = true;
 
@@ -4628,123 +4631,84 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-    private async void OnMatrixStateRadioClick(object sender, RoutedEventArgs e)
-
+    /// <summary>Отправляет выбранную политику, сохраняя подтверждённое состояние при отмене или ошибке.</summary>
+    /// <param name="sender">Компактный список политики в строке приложения.</param>
+    /// <param name="e">Изменение выбранного значения; исходная привязка не изменяет DTO.</param>
+    private async void OnMatrixPolicySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-
+        if (sender is not ComboBox picker || picker.DataContext is not AppAccessMatrixItemViewModel item ||
+            picker.SelectedValue is not AccessControlState targetState || targetState == item.State)
+            return;
+        if (_isLoadingMatrix || _isApplyingMatrixPolicy)
+        {
+            picker.SetCurrentValue(ComboBox.SelectedValueProperty, item.State);
+            return;
+        }
+        _isApplyingMatrixPolicy = true;
+        picker.IsEnabled = false;
+        var loc = LocalizationService.Instance;
+        var refreshAfterSuccess = false;
         try
-
         {
-
-            if (sender is not RadioButton rb || rb.DataContext is not AppAccessMatrixItemViewModel item)
-
-                return;
-
-
-
-            var tag = rb.Tag?.ToString();
-
-            var targetState = tag switch
-
+            SetStatus(string.Format(loc["NetUxPolicyApplying"], item.ProcessName));
+            var result = await ApplyMatrixPolicyAsync(item, targetState,
+                () => SystemProtectionDialogHelper.ConfirmBlocking(Window.GetWindow(this), item.ProcessName, item.ProtectionLevel),
+                (request, ct) => _pipeClient.SetAppAccessControlStateAsync(request, ct));
+            if (result is not null)
             {
-
-                "Allow" => AccessControlState.Allowed,
-
-                "Prompt" => AccessControlState.Prompt,
-
-                "Block" => AccessControlState.Blocked,
-
-                _ => AccessControlState.Prompt
-
-            };
-
-
-
-            // Защитный барьер: проверка блокировки системных процессов Windows
-
-            if (targetState == AccessControlState.Blocked)
-
-            {
-
-                var window = Window.GetWindow(this);
-
-                if (!SystemProtectionDialogHelper.ConfirmBlocking(window, item.ProcessName, item.ProtectionLevel))
-
-                {
-
-                    // Откат переключателя к предыдущему состоянию
-
-                    rb.IsChecked = false;
-
-                    if (item.State == AccessControlState.Allowed)
-
-                        item.IsAllowedChecked = true;
-
-                    else
-
-                        item.IsPromptChecked = true;
-
-                    return;
-
-                }
-
+                refreshAfterSuccess = result.Success;
+                SetStatus(result.Success ? string.Format(loc["NetUxPolicySaved"], item.ProcessName)
+                    : result.Message ?? loc["NetUxPolicyFailed"]);
             }
-
-
-
-            SetStatus($"Применение политики «{targetState}» для {item.ProcessName}...");
-
-
-
-            var req = new SetAppAccessStateRequest
-
-            {
-
-                ApplicationPath = item.FullPath,
-
-                ProcessName = item.ProcessName,
-
-                TargetState = targetState,
-
-                Scope = AccessRuleScope.Permanent
-
-            };
-
-
-
-            var result = await _pipeClient.SetAppAccessControlStateAsync(req);
-
-            if (result != null && result.Success)
-
-            {
-
-                item.SetState(targetState);
-
-                SetStatus($"Политика для {item.ProcessName} сохранена: {targetState}.");
-
-            }
-
-            else
-
-            {
-
-                SetStatus(result?.Message ?? "Не удалось применить изменение политики.");
-
-                await LoadAccessMatrixAsync();
-
-            }
-
+            else SetStatus(loc["NetStatusReady"]);
         }
-
         catch (Exception ex)
-
         {
-
-            SetStatus($"Ошибка изменения политики доступа: {ex.Message}");
-
+            App.Log($"NetworkSecurityHub: изменение политики {item.ProcessName} не выполнено: {ex}");
+            SetStatus(string.Format(loc["NetUxPolicyError"], ex.Message));
         }
-
+        finally
+        {
+            // SetCurrentValue сохраняет привязку: UI вновь показывает фактическую, а не запрошенную политику.
+            picker.SetCurrentValue(ComboBox.SelectedValueProperty, item.State);
+            picker.IsEnabled = true;
+            _isApplyingMatrixPolicy = false;
+        }
+        // После подтверждения перечитывается источник и срок политики, не только визуальное состояние списка.
+        if (refreshAfterSuccess && _isActive) await LoadAccessMatrixAsync();
     }
+
+    /// <summary>Меняет модель только после подтверждения защитного барьера и успешной команды службы.</summary>
+    /// <param name="item">Приложение с последним подтверждённым состоянием.</param>
+    /// <param name="targetState">Политика, выбранная пользователем.</param>
+    /// <param name="confirmBlocking">Проверка подтверждения блокировки защищённого приложения.</param>
+    /// <param name="apply">Асинхронная отправка команды; в тестах используется управляемая граница IPC.</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>Результат службы либо null, если изменение не запрашивалось или было отменено.</returns>
+    internal static async Task<FirewallOperationResult?> ApplyMatrixPolicyAsync(AppAccessMatrixItemViewModel item,
+        AccessControlState targetState, Func<bool> confirmBlocking,
+        Func<SetAppAccessStateRequest, CancellationToken, Task<FirewallOperationResult>> apply,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(confirmBlocking);
+        ArgumentNullException.ThrowIfNull(apply);
+        if (!Enum.IsDefined(targetState)) throw new ArgumentOutOfRangeException(nameof(targetState));
+        ct.ThrowIfCancellationRequested();
+        if (targetState == item.State) return null;
+        if (targetState == AccessControlState.Blocked && (!item.CanBlock || !confirmBlocking()))
+            return null;
+        var result = await apply(new SetAppAccessStateRequest
+        {
+            ApplicationPath = item.FullPath,
+            ProcessName = item.ProcessName,
+            TargetState = targetState,
+            Scope = AccessRuleScope.Permanent
+        }, ct);
+        if (result.Success) item.SetState(targetState);
+        return result;
+    }
+
 
 
 

@@ -150,7 +150,7 @@ Startup Monitor объединяет в едином интерфейсе Fluent
 ## 🚀 Установка и быстрый старт
 
 ### Способ 1: Готовый инсталлятор с цифровой подписью (Рекомендуется)
-1. Скачайте актуальный файл установщика **`StartupMonitorSetup-1.7.2.exe`** из раздела [**Releases на GitHub**](https://github.com/gms-cod/Startup-Monitor/releases/latest).
+1. Скачайте актуальный файл установщика **`StartupMonitorSetup-2.0.10.exe`** из раздела [**Releases на GitHub**](https://github.com/gms-cod/SM/releases/latest).
 2. Запустите установщик. Все исполняемые файлы и инсталлятор подписаны сертификатом разработчика **Authenticode (SHA256, RFC 3161)**.
    - **Контрольная сумма SHA-256**: `839fc6071c6f9432349a32e1dc685635869710a1d8de79553d115954f2d6b3ce`
 3. Мастер установки автоматически:

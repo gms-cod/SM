@@ -74,8 +74,10 @@
                 </StackPanel>
 
                 <!-- Навигация -->
-                <StackPanel Grid.Row="1" Margin="8 0">
-                      <Border x:Name="NavItem0" Tag="0" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <!-- Меняется только визуальный порядок: стабильные Tag сохраняют выбранную страницу пользователя. -->
+                    <StackPanel x:Name="SidebarNavigation" Margin="8,0">
+<Border x:Name="NavItem0" Tag="0" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip0], Source={StaticResource Loc}}">
                           <Grid>
                               <Rectangle x:Name="NavBar0" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
                                          Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
@@ -87,8 +89,46 @@
                               </StackPanel>
                           </Grid>
                       </Border>
-                      <!-- Пункт навигации: Снимки системы (контрольные снимки «Было — Стало») -->
-                      <Border x:Name="NavItemSnapshots" Tag="9" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+<Border x:Name="NavItem6" Tag="6" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip6], Source={StaticResource Loc}}">
+                         <Grid>
+                             <Rectangle x:Name="NavBar6" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                 <Viewbox Width="16" Height="16">
+                                     <Path Data="{StaticResource IconPulse}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                 </Viewbox>
+                                 <TextBlock Text="{Binding NavTaskManager, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                             </StackPanel>
+                         </Grid>
+                     </Border>
+<Border x:Name="NavItem8" Tag="8" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip8], Source={StaticResource Loc}}">
+                          <Grid>
+                              <Rectangle x:Name="NavBar8" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                  <Viewbox Width="16" Height="16">
+                                      <Path Data="{StaticResource IconShieldCheckmark}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                  </Viewbox>
+                                  <TextBlock Text="{Binding NavFirewall, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                              </StackPanel>
+                          </Grid>
+                      </Border>
+<Border Height="1" Margin="12,10,12,8" Background="{ui:ThemeResource CardStrokeColorDefaultBrush}" />
+                    <TextBlock Text="{Binding [NavGroupAnalysis], Source={StaticResource Loc}}" Margin="16,0,0,6" FontSize="10.5"
+                               Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+<Border x:Name="NavItem7" Tag="7" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip7], Source={StaticResource Loc}}">
+                         <Grid>
+                             <Rectangle x:Name="NavBar7" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                 <Viewbox Width="16" Height="16">
+                                     <Path Data="{StaticResource IconBootTime}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                 </Viewbox>
+                                 <TextBlock Text="{Binding NavBootTime, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                             </StackPanel>
+                         </Grid>
+                     </Border>
+<Border x:Name="NavItemSnapshots" Tag="9" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTipSnapshots], Source={StaticResource Loc}}">
                           <Grid>
                               <Rectangle x:Name="NavBarSnapshots" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
                                          Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
@@ -105,55 +145,7 @@
                               </StackPanel>
                           </Grid>
                       </Border>
-                     <Border x:Name="NavItem6" Tag="6" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                         <Grid>
-                             <Rectangle x:Name="NavBar6" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                 <Viewbox Width="16" Height="16">
-                                     <Path Data="{StaticResource IconPulse}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                 </Viewbox>
-                                 <TextBlock Text="{Binding NavTaskManager, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                             </StackPanel>
-                         </Grid>
-                     </Border>
-                     <Border x:Name="NavItem7" Tag="7" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                         <Grid>
-                             <Rectangle x:Name="NavBar7" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                 <Viewbox Width="16" Height="16">
-                                     <Path Data="{StaticResource IconBootTime}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                 </Viewbox>
-                                 <TextBlock Text="{Binding NavBootTime, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                             </StackPanel>
-                         </Grid>
-                     </Border>
-                     <Border x:Name="NavItem1" Tag="1" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                         <Grid>
-                             <Rectangle x:Name="NavBar1" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                 <Viewbox Width="16" Height="16">
-                                     <Path Data="{StaticResource IconShieldDismiss}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                 </Viewbox>
-                                 <TextBlock Text="{Binding NavBlacklist, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                             </StackPanel>
-                         </Grid>
-                     </Border>
-                     <Border x:Name="NavItem3" Tag="3" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                         <Grid>
-                             <Rectangle x:Name="NavBar3" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                 <Viewbox Width="16" Height="16">
-                                     <Path Data="{StaticResource IconDelete}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                 </Viewbox>
-                                 <TextBlock Text="{Binding NavRemoved, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                             </StackPanel>
-                         </Grid>
-                     </Border>
-                     <Border x:Name="NavItem4" Tag="4" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+<Border x:Name="NavItem4" Tag="4" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip4], Source={StaticResource Loc}}">
                          <Grid>
                              <Rectangle x:Name="NavBar4" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
@@ -165,7 +157,34 @@
                              </StackPanel>
                          </Grid>
                      </Border>
-                      <Border x:Name="NavItem5" Tag="5" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
+<Border Height="1" Margin="12,10,12,8" Background="{ui:ThemeResource CardStrokeColorDefaultBrush}" />
+                    <TextBlock Text="{Binding [NavGroupMaintenance], Source={StaticResource Loc}}" Margin="16,0,0,6" FontSize="10.5"
+                               Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+<Border x:Name="NavItem1" Tag="1" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip1], Source={StaticResource Loc}}">
+                         <Grid>
+                             <Rectangle x:Name="NavBar1" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                 <Viewbox Width="16" Height="16">
+                                     <Path Data="{StaticResource IconShieldDismiss}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                 </Viewbox>
+                                 <TextBlock Text="{Binding NavBlacklist, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                             </StackPanel>
+                         </Grid>
+                     </Border>
+<Border x:Name="NavItem3" Tag="3" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip3], Source={StaticResource Loc}}">
+                         <Grid>
+                             <Rectangle x:Name="NavBar3" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
+                                        Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
+                             <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
+                                 <Viewbox Width="16" Height="16">
+                                     <Path Data="{StaticResource IconDelete}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
+                                 </Viewbox>
+                                 <TextBlock Text="{Binding NavRemoved, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
+                             </StackPanel>
+                         </Grid>
+                     </Border>
+<Border x:Name="NavItem5" Tag="5" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}" ToolTip="{Binding [NavTip5], Source={StaticResource Loc}}">
                           <Grid>
                               <Rectangle x:Name="NavBar5" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
                                          Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
@@ -177,19 +196,8 @@
                               </StackPanel>
                           </Grid>
                       </Border>
-                      <Border x:Name="NavItem8" Tag="8" MouseLeftButtonDown="OnNavClick" Style="{StaticResource NavItemStyle}">
-                          <Grid>
-                              <Rectangle x:Name="NavBar8" Width="3.5" Height="22" HorizontalAlignment="Left" RadiusX="1.75" RadiusY="1.75"
-                                         Fill="{StaticResource NavActiveMarkerBrush}" Visibility="Collapsed" />
-                              <StackPanel Orientation="Horizontal" Margin="6 0 0 0">
-                                  <Viewbox Width="16" Height="16">
-                                      <Path Data="{StaticResource IconShieldCheckmark}" Fill="{ui:ThemeResource TextFillColorPrimaryBrush}" Stretch="Uniform" />
-                                  </Viewbox>
-                                  <TextBlock Text="{Binding NavFirewall, Source={StaticResource Loc}}" Style="{StaticResource NavTextStyle}" Margin="10 0 0 0" />
-                              </StackPanel>
-                          </Grid>
-                      </Border>
-                 </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
 
                 <!-- Настройки и выход -->
                 <StackPanel Grid.Row="2" Margin="8 0 8 12">

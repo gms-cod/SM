@@ -132,7 +132,7 @@
     <value>При обнаружении новой записи немедленно стирает её из системы, завершает процесс, сохраняет резервную копию и отображает уведомление.</value>
   </data>
   <data name="NavLogs" xml:space="preserve">
-    <value>Логи</value>
+    <value>Журнал</value>
   </data>
   <data name="LogsTitle" xml:space="preserve">
     <value>Логи</value>
@@ -399,7 +399,7 @@
     <value>Планировщик задач</value>
   </data>
   <data name="NavOverview" xml:space="preserve">
-    <value>Обзор</value>
+    <value>Автозапуск</value>
   </data>
   <data name="StatusStarting" xml:space="preserve">
     <value>Запуск...</value>
@@ -504,7 +504,7 @@
     <value>Startup Monitor</value>
   </data>
   <data name="NavHistory" xml:space="preserve">
-    <value>История</value>
+    <value>Изменения</value>
   </data>
   <data name="HistoryTitle" xml:space="preserve">
     <value>История изменений</value>
@@ -930,10 +930,10 @@
     <value>~ Изменена</value>
   </data>
   <data name="NavBootTime" xml:space="preserve">
-    <value>Загрузка</value>
+    <value>Загрузка Windows</value>
   </data>
   <data name="NavSnapshots" xml:space="preserve">
-    <value>Снимки системы</value>
+    <value>Снимки</value>
   </data>
   <data name="BootTimeTitle" xml:space="preserve">
     <value>Анализатор времени загрузки Windows</value>
@@ -2158,4 +2158,53 @@
   <data name="UnitMegabytesPerSecond" xml:space="preserve"><value>МБ/с</value></data>
   <data name="UnitGigabytes" xml:space="preserve"><value>ГБ</value></data>
   <data name="NetConnectionHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
+  <data name="NetUxTitle" xml:space="preserve"><value>Сетевой экран</value></data>
+  <data name="NetUxSettings" xml:space="preserve"><value>Параметры защиты</value></data>
+  <data name="NetUxModeHint" xml:space="preserve"><value>Режим применяется ко всей системе. Для отдельной программы используйте вкладку «Приложения».</value></data>
+  <data name="NetUxNormalTip" xml:space="preserve"><value>Работают обычные правила брандмауэра Windows.</value></data>
+  <data name="NetUxWhitelistTip" xml:space="preserve"><value>Разрешены только программы с разрешающими правилами. Остальные подключения блокируются.</value></data>
+  <data name="NetUxKillswitchTip" xml:space="preserve"><value>Экстренно блокирует сетевой доступ. Потребуется подтверждение.</value></data>
+  <data name="NetUxNavApps" xml:space="preserve"><value>Приложения</value></data>
+  <data name="NetUxNavConnections" xml:space="preserve"><value>Соединения</value></data>
+  <data name="NetUxNavPorts" xml:space="preserve"><value>Защита портов</value></data>
+  <data name="NetUxNavBans" xml:space="preserve"><value>Блокировки</value></data>
+  <data name="NetUxNavHistory" xml:space="preserve"><value>История</value></data>
+  <data name="NetUxNavRules" xml:space="preserve"><value>Правила</value></data>
+  <data name="NetUxAppsTitle" xml:space="preserve"><value>Контроль приложений</value></data>
+  <data name="NetUxAppsHelp" xml:space="preserve"><value>Управляйте доступом программ к сети. Выбор политики сохраняется после подтверждения службы.</value></data>
+  <data name="NetUxConnectionsTitle" xml:space="preserve"><value>Что происходит в сети</value></data>
+  <data name="NetUxConnectionsHelp" xml:space="preserve"><value>Активные подключения и измеренный трафик. Поиск и фильтры помогут найти нужный процесс или адрес.</value></data>
+  <data name="NetUxPortsTitle" xml:space="preserve"><value>Защита открытых портов</value></data>
+  <data name="NetUxPortsHelp" xml:space="preserve"><value>Выберите порты и условия обнаружения подозрительных входящих подключений.</value></data>
+  <data name="NetUxBansTitle" xml:space="preserve"><value>Заблокированные адреса</value></data>
+  <data name="NetUxBansHelp" xml:space="preserve"><value>Проверьте причину и срок блокировки. Снятие блокировки снова разрешит подключения с этого адреса.</value></data>
+  <data name="NetUxHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
+  <data name="NetUxHistoryHelp" xml:space="preserve"><value>Найдите приложение, адрес и принятое решение. Фильтры журнала не меняют правила защиты.</value></data>
+  <data name="NetUxRulesTitle" xml:space="preserve"><value>Правила брандмауэра</value></data>
+  <data name="NetUxRulesHelp" xml:space="preserve"><value>Подробные настройки Windows Firewall. Резервные копии и готовые наборы доступны в дополнительных действиях.</value></data>
+  <data name="NetUxPolicyAllowed" xml:space="preserve"><value>Разрешено</value></data>
+  <data name="NetUxPolicyPrompt" xml:space="preserve"><value>Спрашивать</value></data>
+  <data name="NetUxPolicyBlocked" xml:space="preserve"><value>Не разрешено</value></data>
+  <data name="NetUxPolicyHelp" xml:space="preserve"><value>Выберите полный вариант в списке: разрешать, спрашивать или блокировать. Критические компоненты Windows защищены от блокировки.</value></data>
+  <data name="NetUxAddApp" xml:space="preserve"><value>Добавить приложение</value></data>
+  <data name="NetUxInspectRules" xml:space="preserve"><value>Открыть правила приложения</value></data>
+  <data name="NetUxResetPolicy" xml:space="preserve"><value>Вернуть режим «Спрашивать»</value></data>
+  <data name="NetUxAdvancedActions" xml:space="preserve"><value>Дополнительные действия</value></data>
+  <data name="NetUxPolicyApplying" xml:space="preserve"><value>Сохранение политики для {0}…</value></data>
+  <data name="NetUxPolicySaved" xml:space="preserve"><value>Политика для {0} сохранена.</value></data>
+  <data name="NetUxPolicyFailed" xml:space="preserve"><value>Не удалось сохранить политику. Предыдущее значение сохранено.</value></data>
+  <data name="NetUxPolicyError" xml:space="preserve"><value>Ошибка изменения политики: {0}</value></data>
+  <data name="NetUxHistoryVerdict" xml:space="preserve"><value>Решение</value></data>
+  <data name="NetUxHistoryPeriod" xml:space="preserve"><value>Период</value></data>
+  <data name="NavGroupAnalysis" xml:space="preserve"><value>Анализ</value></data>
+  <data name="NavGroupMaintenance" xml:space="preserve"><value>Управление</value></data>
+  <data name="NavTip0" xml:space="preserve"><value>Программы, запускаемые вместе с Windows.</value></data>
+  <data name="NavTip6" xml:space="preserve"><value>Работающие процессы и их потребление ресурсов.</value></data>
+  <data name="NavTip8" xml:space="preserve"><value>Доступ приложений к сети и правила сетевой защиты.</value></data>
+  <data name="NavTip7" xml:space="preserve"><value>Время загрузки Windows и причины замедления.</value></data>
+  <data name="NavTipSnapshots" xml:space="preserve"><value>Сохранённые состояния автозапуска и сравнение изменений.</value></data>
+  <data name="NavTip4" xml:space="preserve"><value>История изменений записей автозапуска.</value></data>
+  <data name="NavTip1" xml:space="preserve"><value>Правила блокировки нежелательного автозапуска.</value></data>
+  <data name="NavTip3" xml:space="preserve"><value>Удалённые записи автозапуска.</value></data>
+  <data name="NavTip5" xml:space="preserve"><value>События мониторинга и диагностика приложения.</value></data>
 </root>
