@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Pipes;
+using System.Security.Principal;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models;
@@ -17,6 +18,12 @@ public class PipeClient : IDisposable
 
     /// <summary>Читатель основного канала.</summary>
     private StreamReader? _reader;
+
+    /// <summary>Ограниченный читатель ответов с сохранением границ кадров.</summary>
+    private BoundedLineReader? _responseFrames;
+
+    /// <summary>Признак завершения клиента.</summary>
+    private bool _disposed;
 
     /// <summary>Писатель основного канала.</summary>
     private StreamWriter? _writer;
@@ -74,24 +81,37 @@ public class PipeClient : IDisposable
     /// <summary>Подключается к службе по именованному каналу. В случае успеха запускает event-pipe.</summary>
     public async Task ConnectAsync()
     {
+        if (_disposed) return;
+        await _sendLock.WaitAsync();
+        var connected = false;
         try
         {
+            if (_disposed) return;
             _pipe?.Dispose();
-            _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut,
+                PipeOptions.Asynchronous, TokenImpersonationLevel.Impersonation);
             await _pipe.ConnectAsync(3000);
-
             _reader = new StreamReader(_pipe);
+            _responseFrames = new BoundedLineReader(_reader);
             _writer = new StreamWriter(_pipe) { AutoFlush = true };
-
+            connected = true;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or UnauthorizedAccessException or ObjectDisposedException)
+        {
+            App.Log($"PipeClient: подключение не установлено ({ex.GetType().Name}): {ex.Message}");
+            _pipe?.Dispose();
+            _pipe = null;
+            _reader = null;
+            _writer = null;
+            _responseFrames = null;
+        }
+        finally { _sendLock.Release(); }
+        if (connected)
+        {
             Connected?.Invoke(this, EventArgs.Empty);
             StartEventPipe();
         }
-        catch (Exception)
-        {
-            _pipe?.Dispose();
-            _pipe = null;
-            Disconnected?.Invoke(this, EventArgs.Empty);
-        }
+        else { Disconnected?.Invoke(this, EventArgs.Empty); }
     }
 
     /// <summary>Запускает фоновое чтение event-канала для получения асинхронных уведомлений от службы.</summary>
@@ -117,10 +137,11 @@ public class PipeClient : IDisposable
                 _eventPipe = new NamedPipeClientStream(".", "StartupMonitorEvents", PipeDirection.In, PipeOptions.Asynchronous);
                 await _eventPipe.ConnectAsync(3000, cts.Token);
                 _eventReader = new StreamReader(_eventPipe);
+                var eventFrames = new BoundedLineReader(_eventReader);
 
                 while (!cts.IsCancellationRequested && _eventPipe.IsConnected)
                 {
-                    var line = await _eventReader.ReadLineAsync(cts.Token);
+                    var line = await eventFrames.ReadLineAsync(cts.Token);
                     if (line == null) break;
 
                     List<PipeMessage>? batch = null;
@@ -163,7 +184,7 @@ public class PipeClient : IDisposable
                 }
             }
             catch (OperationCanceledException) { break; }
-            catch (Exception) { }
+            catch (Exception ex) { App.Log($"PipeClient: событийный канал прерван: {ex.Message}"); }
 
             try { await Task.Delay(2000, cts.Token); }
             catch (OperationCanceledException) { break; }
@@ -176,79 +197,86 @@ public class PipeClient : IDisposable
     /// <returns>Ответ службы или null при таймауте/разрыве.</returns>
     public async Task<PipeMessage?> SendAsync(PipeMessage request, CancellationToken ct = default)
     {
-        using var _prof = ExecutionProfiler.Measure("UI.Pipe.Send." + request.Type);
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Type);
+        if (_disposed) return null;
+        using var profile = ExecutionProfiler.Measure("UI.Pipe.Send." + request.Type);
+        using var queueCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        queueCts.CancelAfter(TimeSpan.FromSeconds(10));
+        try { await _sendLock.WaitAsync(queueCts.Token); }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException) { return null; }
+        NamedPipeClientStream? transport = null;
+        var exchangeStarted = false;
         try
         {
-            await _sendLock.WaitAsync(timeoutCts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-        try
-        {
-            if (_writer == null || _pipe?.IsConnected != true)
-                return null;
-
+            transport = _pipe;
+            var reader = _reader;
+            var writer = _writer;
+            if (_disposed || writer is null || reader is null || transport?.IsConnected != true) return null;
+            ct.ThrowIfCancellationRequested();
             var json = JsonSerializer.Serialize(request, JsonOptions);
-            await _writer.WriteLineAsync(json.AsMemory(), ct);
-            await _writer.FlushAsync(ct);
-
-            // Таймаут: если сервис завис, не ждём вечно — рвём соединение и переподключаемся
+            if (json.Length > BoundedLineReader.MaximumFrameCharacters)
+                throw new InvalidDataException("IPC: исходящий запрос превышает допустимый размер кадра.");
+            using var writeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            writeCts.CancelAfter(TimeSpan.FromSeconds(10));
+            // После начала записи отменённый обмен не переиспользуется: поздний ответ принадлежит старому каналу.
+            exchangeStarted = true;
+            await writer.WriteLineAsync(json.AsMemory(), writeCts.Token);
+            await writer.FlushAsync(writeCts.Token);
             using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             responseCts.CancelAfter(ResponseTimeout);
-            string? response;
-            try
-            {
-                response = await _reader!.ReadLineAsync(responseCts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                if (!ct.IsCancellationRequested)
-                {
-                    try { _pipe?.Dispose(); } catch { }
-                    Disconnected?.Invoke(this, EventArgs.Empty);
-                }
-                return null;
-            }
-            if (response == null)
-            {
-                // Поток разорван со стороны службы (EOF, служба закрыла соединение)
-                try { _pipe?.Dispose(); } catch { }
-                Disconnected?.Invoke(this, EventArgs.Empty);
-                return null;
-            }
-
-            return JsonSerializer.Deserialize<PipeMessage>(response, JsonOptions);
+            var frames = _responseFrames ??= new BoundedLineReader(reader);
+            var response = await frames.ReadLineAsync(responseCts.Token);
+            if (response is null) { DropConnection(transport); return null; }
+            var message = JsonSerializer.Deserialize<PipeMessage>(response, JsonOptions);
+            if (message is null || string.IsNullOrWhiteSpace(message.Type))
+                throw new JsonException("IPC: ответ не содержит обязательного типа сообщения.");
+            return message;
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or JsonException or OperationCanceledException)
         {
-            // Обрыв канала связи со службой (перезапуск службы или сбой IPC)
-            try { _pipe?.Dispose(); } catch { }
-            Disconnected?.Invoke(this, EventArgs.Empty);
-            return null;
-        }
-        catch (ObjectDisposedException)
-        {
-            // Попытка операции с уже закрытым каналом
-            try { _pipe?.Dispose(); } catch { }
-            Disconnected?.Invoke(this, EventArgs.Empty);
-            return null;
-        }
-        catch (OperationCanceledException)
-        {
+            if (ex is not OperationCanceledException)
+                App.Log($"PipeClient: обмен {request.Type} прерван ({ex.GetType().Name}): {ex.Message}");
+            if (exchangeStarted || ex is not OperationCanceledException) DropConnection(transport);
             return null;
         }
         finally
         {
-            try
-            {
-                _sendLock.Release();
-            }
-            catch (ObjectDisposedException) { }
+            try { _sendLock.Release(); }
+            catch (ObjectDisposedException ex) { App.Log($"PipeClient: завершение обмена после Dispose: {ex.Message}"); }
         }
+    }
+
+    /// <summary>Закрывает только транспорт сбойного обмена и сообщает о необходимости переподключения.</summary>
+    /// <param name="transport">Транспорт, захваченный до начала запроса.</param>
+    private void DropConnection(NamedPipeClientStream? transport)
+    {
+        if (transport is null || !ReferenceEquals(transport, _pipe)) return;
+        _pipe = null;
+        _reader = null;
+        _writer = null;
+        _responseFrames = null;
+        transport.Dispose();
+        if (!_disposed) Disconnected?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Получает реально измеренные интервалы сетевого трафика с явными пропусками измерений.</summary>
+    /// <param name="fromUtc">Начало интервала UTC.</param>
+    /// <param name="toUtc">Конец интервала UTC.</param>
+    /// <param name="bucketCount">Число временных интервалов.</param>
+    /// <param name="ct">Токен отмены запроса.</param>
+    /// <returns>Измеренные интервалы либо пустая коллекция при недоступной службе.</returns>
+    public async Task<List<NetworkTrafficHistoryPoint>> GetNetworkTrafficHistoryAsync(
+        DateTime fromUtc, DateTime toUtc, int bucketCount = 60, CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetNetworkTrafficHistory,
+            Payload = JsonSerializer.Serialize(new NetworkTrafficHistoryRequest(fromUtc, toUtc, bucketCount), JsonOptions)
+        }, ct);
+        if (response?.Type != PipeMessageTypes.GetNetworkTrafficHistoryResponse || string.IsNullOrWhiteSpace(response.Payload)) return [];
+        try { return await DeserializeInBackgroundAsync<List<NetworkTrafficHistoryPoint>>(response.Payload, JsonOptions) ?? []; }
+        catch (JsonException ex) { App.Log($"PipeClient: повреждена история сетевых измерений: {ex.Message}"); return []; }
     }
 
     /// <summary>Запрашивает у службы полный список записей автозапуска.</summary>
@@ -1929,6 +1957,8 @@ public class PipeClient : IDisposable
     /// <summary>Освобождает все ресурсы: каналы, читатели, писатели, токены отмены.</summary>
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         try { _eventCts?.Cancel(); } catch { }
         try { _eventReader?.Dispose(); } catch { }
         try { _eventPipe?.Dispose(); } catch { }

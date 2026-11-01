@@ -1,4 +1,6 @@
 using System.IO.Pipes;
+using System.Collections.Concurrent;
+using System.Security.Principal;
 
 using System.Text.Json;
 
@@ -169,6 +171,15 @@ public class PipeServer : BackgroundService
     // служба находится в режиме 0% CPU Idle (фоновые подсистемы заглушены).
 
     private int _activeUiClients;
+    /// <summary>Сериализует изменение числа клиентов вместе с переходами состояния мониторинга.</summary>
+    private readonly object _uiClientsSync = new();
+    /// <summary>Активные соединения и их задачи для детерминированного завершения службы.</summary>
+    private readonly ConcurrentDictionary<int, NamedPipeServerStream> _clientStreams = new();
+    private readonly ConcurrentDictionary<int, Task> _clientTasks = new();
+    private int _nextConnectionId;
+    /// <summary>Источник реально измеренной истории сетевых интерфейсов.</summary>
+    private readonly NetworkTrafficHistoryService? _networkTrafficHistory;
+
 
 
 
@@ -309,6 +320,7 @@ public class PipeServer : BackgroundService
         _alertService?.SetAiRatingService(_aiRating);
 
         _accessMatrixCoordinator = serviceProvider.GetService<AccessMatrixCoordinatorService>();
+        _networkTrafficHistory = serviceProvider.GetService<NetworkTrafficHistoryService>();
 
         try { _alertService?.StartBackgroundScan(); } catch { }
 
@@ -367,206 +379,130 @@ public class PipeServer : BackgroundService
     /// <param name="stoppingToken">Токен отмены остановки службы</param>
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-
     {
-
         _logger.LogInformation("PipeServer запущен");
-
-
-
-        // Запускаем фоновые циклы: очистка устаревших записей, проверка хешей и AI-оценка
-
-        _ = BackgroundCleanupLoop(stoppingToken);
-
-        _ = BackgroundHashScanLoop(stoppingToken);
-
-        _ = BackgroundRatingLoop(stoppingToken);
-
+        var backgroundTasks = new[] { BackgroundCleanupLoop(stoppingToken), BackgroundHashScanLoop(stoppingToken), BackgroundRatingLoop(stoppingToken) };
         _updateService.StartBackgroundCheck();
-
-
-
-        while (!stoppingToken.IsCancellationRequested)
-
-        {
-
-            try
-
-            {
-
-                // Создаём экземпляр pipe-сервера с ACL-безопасностью
-
-                var pipe = NamedPipeServerStreamAcl.Create(
-
-                    PipeName,
-
-                    PipeDirection.InOut,
-
-                    maxNumberOfServerInstances: 10,
-
-                    PipeTransmissionMode.Message,
-
-                    PipeOptions.Asynchronous,
-
-                    inBufferSize: 0,
-
-                    outBufferSize: 0,
-
-                    PipeSecurityFactory.CreateDefault());
-
-
-
-                // Блокируемся до подключения клиента
-
-                await pipe.WaitForConnectionAsync(stoppingToken);
-
-                _logger.LogInformation("UI-клиент подключился");
-
-
-
-                // Обработка клиента в фоновой задаче — освобождаем поток для новых подключений
-
-                _ = HandleClientAsync(pipe, stoppingToken);
-
-            }
-
-            catch (OperationCanceledException)
-
-            {
-
-                break;
-
-            }
-
-            catch (Exception ex)
-
-            {
-
-                _logger.LogError(ex, "Ошибка PipeServer при подключении клиента");
-
-                await Task.Delay(1000, stoppingToken);
-
-            }
-
-        }
-
-    }
-
-
-
-    /// <summary>
-
-    /// Обрабатывает одно подключение клиента: читает JSON-строки, десериализует,
-
-    /// выполняет команду через ProcessMessage, сериализует ответ и отправляет обратно.
-
-    /// </summary>
-
-    /// <param name="pipe">Экземпляр подключённого pipe</param>
-
-    /// <param name="ct">Токен отмены</param>
-
-    private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
-
-    {
-
-        // Учёт активного UI-клиента: пока счётчик > 0, фоновые подсистемы активны.
-
-        OnUiClientConnected();
-
         try
-
         {
-
-            var reader = new StreamReader(pipe);
-
-            var writer = new StreamWriter(pipe) { AutoFlush = true };
-
-
-
-            try
-
+            while (!stoppingToken.IsCancellationRequested)
             {
-
-                // Цикл чтения команд: пока клиент подключён и не запрошена отмена
-
-                while (!ct.IsCancellationRequested && pipe.IsConnected)
-
+                NamedPipeServerStream? pending = null;
+                try
                 {
-
-                    var line = await reader.ReadLineAsync(ct);
-
-                    if (line == null) break;
-
-
-
-                    var message = JsonSerializer.Deserialize<PipeMessage>(line, JsonOptions);
-
-                    if (message == null) continue;
-
-
-
-                    var response = await ProcessMessage(message, ct);
-
-                    var json = JsonSerializer.Serialize(response, JsonOptions);
-
-                    await writer.WriteLineAsync(json);
-
+                    pending = NamedPipeServerStreamAcl.Create(PipeName, PipeDirection.InOut, 10,
+                        PipeTransmissionMode.Message, PipeOptions.Asynchronous, 65536, 65536, PipeSecurityFactory.CreateDefault());
+                    await pending.WaitForConnectionAsync(stoppingToken);
+                    var pipe = pending;
+                    var id = Interlocked.Increment(ref _nextConnectionId);
+                    _clientStreams[id] = pipe;
+                    var task = HandleClientAsync(pipe, stoppingToken);
+                    _clientTasks[id] = task;
+                    _ = task.ContinueWith(completed =>
+                    {
+                        _clientTasks.TryRemove(id, out var removed);
+                        _clientStreams.TryRemove(id, out var stream);
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    pending = null;
                 }
-
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "PipeServer: не удалось принять клиента");
+                    try { await Task.Delay(1000, stoppingToken); }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                }
+                finally { pending?.Dispose(); }
             }
-
-            finally
-
-            {
-
-                // Гарантированное освобождение ресурсов при отключении клиента
-
-                try { writer.Dispose(); } catch { }
-
-                try { reader.Dispose(); } catch { }
-
-                try { pipe.Dispose(); } catch { }
-
-            }
-
         }
-
-        catch (IOException)
-
-        {
-
-            _logger.LogInformation("UI-клиент отключился");
-
-        }
-
-        catch (OperationCanceledException)
-
-        {
-
-            _logger.LogInformation("Сервер остановлен");
-
-        }
-
-        catch (Exception ex)
-
-        {
-
-            _logger.LogError(ex, "Ошибка обработки клиента PipeServer");
-
-        }
-
         finally
-
         {
-
-            OnUiClientDisconnected();
-
+            foreach (var pipe in _clientStreams.Values) pipe.Dispose();
+            await Task.WhenAll(_clientTasks.Values.Concat(backgroundTasks));
         }
-
     }
 
+    /// <summary>Обрабатывает ограниченные строковые кадры с авторизацией команд и отменяемой записью.</summary>
+    /// <param name="pipe">Подключённый канал, принадлежащий обработчику.</param>
+    /// <param name="ct">Токен завершения службы.</param>
+    private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
+    {
+        OnUiClientConnected();
+        try
+        {
+            using (pipe)
+            using (var reader = new StreamReader(pipe))
+            using (var writer = new StreamWriter(pipe) { AutoFlush = true })
+            {
+                var frames = new BoundedLineReader(reader);
+                bool? administrator = null;
+                while (!ct.IsCancellationRequested && pipe.IsConnected)
+                {
+                    using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    readCts.CancelAfter(TimeSpan.FromMinutes(3));
+                    var line = await frames.ReadLineAsync(readCts.Token);
+                    if (line is null) break;
+                    var message = JsonSerializer.Deserialize<PipeMessage>(line, JsonOptions);
+                    if (message is null || string.IsNullOrWhiteSpace(message.Type))
+                        throw new JsonException("IPC: запрос не содержит типа команды.");
+                    // Олицетворение выполняется после первого чтения: Windows получает токен именно отправившего данные клиента.
+                    administrator ??= IsAdministratorClient(pipe);
+                    var response = IsCommandAllowed(message.Type, administrator.Value)
+                        ? await ProcessMessage(message, ct)
+                        : new PipeMessage { Type = PipeMessageTypes.Error, Payload = "Для этой команды требуются права администратора." };
+                    var json = JsonSerializer.Serialize(response, JsonOptions);
+                    if (json.Length > BoundedLineReader.MaximumFrameCharacters)
+                        throw new InvalidDataException("IPC: ответ превышает допустимый размер кадра.");
+                    using var writeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    writeCts.CancelAfter(TimeSpan.FromSeconds(10));
+                    await writer.WriteLineAsync(json.AsMemory(), writeCts.Token);
+                }
+            }
+        }
+        catch (OperationCanceledException) { _logger.LogDebug("PipeServer: ожидание клиента завершено отменой или истечением lease"); }
+        catch (IOException ex) { _logger.LogDebug(ex, "PipeServer: клиент отключён или нарушил протокол"); }
+        catch (ObjectDisposedException ex) { _logger.LogDebug(ex, "PipeServer: транспорт завершён при остановке"); }
+        catch (Exception ex) { _logger.LogWarning(ex, "PipeServer: ошибка обработки клиента"); }
+        finally { OnUiClientDisconnected(); }
+    }
 
+    /// <summary>Проверяет административный токен клиента; ошибки олицетворения закрывают привилегированный доступ.</summary>
+    /// <param name="pipe">Канал после первого прочитанного кадра.</param>
+    /// <returns>Признак административного доступа.</returns>
+    private bool IsAdministratorClient(NamedPipeServerStream pipe)
+    {
+        var allowed = false;
+        try
+        {
+            pipe.RunAsClient(() =>
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                allowed = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator) || identity.IsSystem;
+            });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            _logger.LogWarning(ex, "PipeServer: личность клиента не подтверждена, доступ ограничен чтением");
+        }
+        return allowed;
+    }
+
+    /// <summary>Разрешает обычному пользователю только явно перечисленные запросы без секретов и системных изменений.</summary>
+    /// <param name="type">Тип команды протокола.</param>
+    /// <param name="administrator">Подтверждённые административные права.</param>
+    /// <returns>Признак разрешения команды.</returns>
+    internal static bool IsCommandAllowed(string type, bool administrator) => administrator || type is
+        PipeMessageTypes.GetAllEntries or PipeMessageTypes.GetEntriesDelta or PipeMessageTypes.GetBlacklist or
+        PipeMessageTypes.GetStatus or PipeMessageTypes.GetRemovedEntries or PipeMessageTypes.GetHistory or
+        PipeMessageTypes.GetRatings or PipeMessageTypes.GetProcesses or PipeMessageTypes.GetSnapshots or
+        PipeMessageTypes.GetBootTimeReport or PipeMessageTypes.GetMonitoringState or PipeMessageTypes.GetServiceInfo or
+        PipeMessageTypes.GetProcessNetworkConnections or PipeMessageTypes.GetProcessModules or
+        PipeMessageTypes.GetUpdateStatus or PipeMessageTypes.GetFirewallStatus or PipeMessageTypes.GetPortDefenderConfig or
+        PipeMessageTypes.GetActiveBans or PipeMessageTypes.GetAllFirewallRules or PipeMessageTypes.GetFirewallFilteringMode or
+        PipeMessageTypes.GetPendingNetworkAlerts or PipeMessageTypes.GetConnectionHistory or PipeMessageTypes.GetAlertsEnabled or
+        PipeMessageTypes.GetFirewallSilentPid0 or PipeMessageTypes.GetFirewallWhitelist or PipeMessageTypes.GetFirewallBlacklist or
+        PipeMessageTypes.GetAppAccessMatrix or PipeMessageTypes.GetNetworkTrafficHistory or
+        PipeMessageTypes.SubscribeProcessMetrics or PipeMessageTypes.UnsubscribeProcessMetrics;
 
     /// <summary>
 
@@ -577,24 +513,15 @@ public class PipeServer : BackgroundService
     /// </summary>
 
     private void OnUiClientConnected()
-
     {
-
-        var count = Interlocked.Increment(ref _activeUiClients);
-
-        if (count != 1) return;
-
-
-
-        _logger.LogInformation("Первый UI-клиент подключён: выход из режима Idle");
-
-        try { _alertService?.SetMonitorWindowActive(true); } catch { }
-
-        try { _portDefenderService?.SetUiActive(true); } catch { }
-
+        lock (_uiClientsSync)
+        {
+            _activeUiClients++;
+            if (_activeUiClients != 1) return;
+            _alertService?.SetMonitorWindowActive(true);
+            _portDefenderService?.SetUiActive(true);
+        }
     }
-
-
 
     /// <summary>
 
@@ -605,28 +532,16 @@ public class PipeServer : BackgroundService
     /// </summary>
 
     private void OnUiClientDisconnected()
-
     {
-
-        var count = Interlocked.Decrement(ref _activeUiClients);
-
-        if (count > 0) return;
-
-
-
-        // Защита от «ухода в минус» при двойном вызове.
-
-        Interlocked.Exchange(ref _activeUiClients, 0);
-
-        _logger.LogInformation("Все UI-клиенты отключены: переход в режим 0% CPU Idle");
-
-        try { _alertService?.SetMonitorWindowActive(false); } catch { }
-
-        try { _portDefenderService?.SetUiActive(false); } catch { }
-
+        lock (_uiClientsSync)
+        {
+            if (_activeUiClients == 0) return;
+            _activeUiClients--;
+            if (_activeUiClients != 0) return;
+            _alertService?.SetMonitorWindowActive(false);
+            _portDefenderService?.SetUiActive(false);
+        }
     }
-
-
 
     /// <summary>
 
@@ -661,6 +576,16 @@ public class PipeServer : BackgroundService
             switch (message.Type)
 
             {
+
+                case PipeMessageTypes.GetNetworkTrafficHistory:
+                    // История строится только из измерений источника, без синтетического заполнения пропусков.
+                    var trafficRequest = JsonSerializer.Deserialize<NetworkTrafficHistoryRequest>(message.Payload, JsonOptions)
+                        ?? throw new JsonException("Отсутствует запрос сетевой истории.");
+                    var trafficHistory = _networkTrafficHistory?.GetHistory(trafficRequest)
+                        ?? Array.Empty<NetworkTrafficHistoryPoint>();
+                    response.Type = PipeMessageTypes.GetNetworkTrafficHistoryResponse;
+                    response.Payload = JsonSerializer.Serialize(trafficHistory, JsonOptions);
+                    break;
 
                 case PipeMessageTypes.GetAllEntries:
 
@@ -3834,7 +3759,7 @@ public class PipeServer : BackgroundService
 
 
 
-                        _alertService.ScanNewConnections();
+                        // Чтение очереди не запускает повторный обход сети: снимками владеет фоновый цикл.
 
                         var alerts = _alertService.GetPendingAlerts();
 
@@ -5026,12 +4951,11 @@ public class PipeServer : BackgroundService
 
                     await _kaspersky.ScanAllAsync(cfg.Entries, ct);
 
-                    _store.Save(cfg);
-
                     _logger.LogInformation("KasperskyScan: фоновая проверка завершена");
 
                 }
 
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
                 catch (Exception ex)
 
                 {

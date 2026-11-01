@@ -51,7 +51,7 @@ public class LocationToIconStringConverter : IValueConverter
         };
     }
 
-    /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
+    /// <summary>Отклоняет обратное преобразование одностороннего отображения без изменения исходного свойства.</summary>
     /// <param name="value">Входные данные: значение параметра value (object).</param>
     /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
     /// <param name="parameter">Входные данные: значение параметра parameter (object).</param>
@@ -59,6 +59,6 @@ public class LocationToIconStringConverter : IValueConverter
     /// <returns>Выходные данные: результирующее значение типа object.</returns>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        throw new NotImplementedException();
+        return Binding.DoNothing;
     }
 }

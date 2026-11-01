@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
+using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models.Snapshot;
 
@@ -35,6 +37,14 @@ public class JsonDataStore
 
     /// <summary>Объект блокировки для потокобезопасного доступа.</summary>
     private readonly object _lock = new();
+    /// <summary>Исходные неизменяемые состояния снимков; слабые ключи не удерживают завершившихся читателей.</summary>
+    private readonly ConditionalWeakTable<AppConfig, AppConfig> _snapshotOrigins = new();
+    /// <summary>Исходные состояния отдельных записей для сохранения независимых параллельных полей.</summary>
+    private readonly ConditionalWeakTable<StartupEntry, StartupEntry> _entryOrigins = new();
+    /// <summary>Приёмник диагностических сообщений без зависимости Shared от конкретного логгера.</summary>
+    private readonly Action<string, Exception?> _logWarning;
+    /// <summary>Время последней физической компактации истории.</summary>
+    private DateTime _lastHistoryCompactionUtc = DateTime.MinValue;
     /// <summary>Хеши уже записанного содержимого — чтобы не писать неизменённые секции</summary>
     private readonly Dictionary<string, string> _writtenHashes = new();
 
@@ -64,8 +74,11 @@ public class JsonDataStore
 
     /// <summary>Инициализирует хранилище с путём к старому единому файлу конфигурации.</summary>
     /// <param name="filePath">Путь к legacy-файлу (startup-monitor.json).</param>
-    public JsonDataStore(string filePath)
+    /// <param name="logWarning">Приёмник сообщений восстановления; без него используется Trace.</param>
+    public JsonDataStore(string filePath, Action<string, Exception?>? logWarning = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        _logWarning = logWarning ?? ((message, exception) => System.Diagnostics.Trace.TraceWarning("{0}: {1}", message, exception));
         if (Directory.Exists(filePath) || string.IsNullOrEmpty(Path.GetExtension(filePath)))
         {
             _dir = filePath;
@@ -127,7 +140,12 @@ public class JsonDataStore
         lock (_lock)
         {
             EnsureLoadedLocked();
-            return CloneSnapshot(_cache!);
+            var source = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
+            var snapshot = CloneSnapshot(source);
+            _snapshotOrigins.Add(snapshot, source);
+            for (var i = 0; i < snapshot.Entries.Count; i++)
+                _entryOrigins.Add(snapshot.Entries[i], source.Entries[i]);
+            return snapshot;
         }
     }
 
@@ -148,6 +166,71 @@ public class JsonDataStore
         };
     }
 
+    /// <summary>Создаёт новую оболочку кэша; вызывающий метод копирует только изменяемую коллекцию.</summary>
+    private void ForkCache()
+    {
+        var source = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
+        _cache = new AppConfig
+        {
+            Language = source.Language, Theme = source.Theme, Settings = source.Settings,
+            Entries = source.Entries, Blacklist = source.Blacklist,
+            RemovedEntries = source.RemovedEntries, History = source.History
+        };
+    }
+
+    /// <summary>Проверяет обязательные объекты и диапазоны до публикации десериализованной секции.</summary>
+    /// <typeparam name="T">Тип секции.</typeparam>
+    /// <param name="value">Десериализованный объект.</param>
+    /// <returns>Проверенный объект.</returns>
+    private static T ValidateSection<T>(T? value) where T : class
+    {
+        if (value is null) throw new JsonException("Обязательная секция содержит null.");
+        switch (value)
+        {
+            case SettingsSection section:
+                ValidateSettings(section.Settings);
+                break;
+            case AppConfig config:
+                ValidateSettings(config.Settings);
+                ValidateSection(config.Entries);
+                ValidateSection(config.Blacklist);
+                ValidateSection(config.RemovedEntries);
+                ValidateSection(config.History);
+                break;
+            case IEnumerable<StartupEntry> entries:
+                foreach (var entry in entries)
+                    if (entry is null || entry.RawData is null || entry.ThreatInfo is { Indicators: null } ||
+                        !Enum.IsDefined(entry.Status) || !Enum.IsDefined(entry.Location))
+                        throw new JsonException("Запись автозапуска содержит недопустимый объект или enum.");
+                break;
+            case System.Collections.IEnumerable items when value is not string:
+                foreach (var item in items)
+                {
+                    if (item is null) throw new JsonException("Коллекция содержит обязательный элемент null.");
+                    if (item is BaselineSnapshot snapshot) ValidateSection(snapshot.Entries);
+                }
+                break;
+        }
+        return value;
+    }
+
+    /// <summary>Проверяет границы настроек, необходимые для безопасного клонирования и расчёта времени.</summary>
+    /// <param name="settings">Проверяемые настройки.</param>
+    private static void ValidateSettings(AppSettings? settings)
+    {
+        if (settings is null || settings.PortDefender is null || settings.ActiveBans is null ||
+            settings.FirewallAllowedPorts is null || settings.FirewallWhitelistedApps is null ||
+            settings.FirewallBlacklistedApps is null)
+            throw new JsonException("Настройки содержат обязательный объект null.");
+        if (settings.HistoryDays is < 1 or > 36500 || settings.CpuThrottleThreshold is < 0 or > 100)
+            throw new JsonException("Настройки содержат недопустимый срок истории или порог CPU.");
+        var defender = settings.PortDefender;
+        if (defender.Rules is null || defender.ProtectedPorts is null || defender.WhitelistIps is null ||
+            defender.Rules.Any(rule => rule is null || rule.WhitelistIps is null || !Enum.IsDefined(rule.WindowUnit)) ||
+            settings.ActiveBans.Any(ban => ban is null))
+            throw new JsonException("Настройки защиты портов содержат недопустимую коллекцию или enum.");
+    }
+
     /// <summary>Старый единый файл раскладывается по секционным и переименовывается в .migrated.</summary>
     private void MigrateLegacyIfNeeded()
     {
@@ -162,9 +245,9 @@ public class JsonDataStore
         AppConfig? legacy = null;
         try
         {
-            legacy = JsonSerializer.Deserialize<AppConfig>(ReadUtf8Text(_legacyPath), _options);
+            legacy = ValidateSection(JsonSerializer.Deserialize<AppConfig>(ReadUtf8Text(_legacyPath), _options));
         }
-        catch { }
+        catch (Exception ex) { _logWarning("Не удалось прочитать исходную конфигурацию для миграции.", ex); }
         legacy ??= new AppConfig();
 
         WriteSectionAtomic(EntriesPath, JsonSerializer.Serialize(legacy.Entries, _options));
@@ -216,7 +299,7 @@ public class JsonDataStore
                 try
                 {
                     var backupJson = ReadUtf8Text(backup);
-                    var restored = JsonSerializer.Deserialize<T>(backupJson, _options);
+                    var restored = ValidateSection(JsonSerializer.Deserialize<T>(backupJson, _options));
                     if (restored != null)
                     {
                         File.Copy(backup, path, overwrite: true);
@@ -224,7 +307,7 @@ public class JsonDataStore
                         return restored;
                     }
                 }
-                catch { }
+                catch (Exception ex) { _logWarning($"Не удалось восстановить секцию '{path}' из резервной копии.", ex); }
             }
             return null;
         }
@@ -232,18 +315,21 @@ public class JsonDataStore
         try
         {
             var json = ReadUtf8Text(path);
+            var section = ValidateSection(JsonSerializer.Deserialize<T>(json, _options));
             _writtenHashes[path] = ContentHash(json);
-            return JsonSerializer.Deserialize<T>(json, _options);
+            return section;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            try { File.Move(path, path + ".corrupt", overwrite: true); } catch { }
+            _logWarning($"Повреждена секция '{path}', выполняется восстановление.", ex);
+            try { File.Move(path, path + ".corrupt", overwrite: true); }
+            catch (Exception moveError) { _logWarning($"Не удалось сохранить повреждённую секцию '{path}'.", moveError); }
             if (File.Exists(backup))
             {
                 try
                 {
                     var backupJson = ReadUtf8Text(backup);
-                    var restored = JsonSerializer.Deserialize<T>(backupJson, _options);
+                    var restored = ValidateSection(JsonSerializer.Deserialize<T>(backupJson, _options));
                     if (restored != null)
                     {
                         File.Copy(backup, path, overwrite: true);
@@ -251,7 +337,7 @@ public class JsonDataStore
                         return restored;
                     }
                 }
-                catch { }
+                catch (Exception restoreError) { _logWarning($"Не удалось восстановить секцию '{path}' из резервной копии.", restoreError); }
             }
             return null;
         }
@@ -401,16 +487,25 @@ public class JsonDataStore
     /// <summary>Сохраняет весь конфиг — все секции целиком.</summary>
     public void Save(AppConfig config)
     {
+        ArgumentNullException.ThrowIfNull(config);
+        ValidateSection(config);
         using var _profSave = ExecutionProfiler.Profile("Service.JsonDataStoreSave");
         using var _prof = ExecutionProfiler.Measure("Shared.Store.Save");
         lock (_lock)
         {
-            // Сохраняем изолированный снимок для исключения внешних мутаций кэша
-            _cache = CloneSnapshot(config);
+            EnsureLoadedLocked();
+            // Базовые состояния неизменяемы: независимые изменения объединяются только при устаревшем снимке.
+            var current = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
+            _cache = _snapshotOrigins.TryGetValue(config, out var original) && !ReferenceEquals(original, current)
+                ? ConfigurationMerge.Merge(original, config, current, _options)
+                : CloneSnapshot(config);
             SaveEntries();
             SaveBlacklist();
             SaveRemoved();
             SaveSettings();
+            // Повторное сохранение того же снимка сравнивается с его первоначальной базой:
+            // отсутствующие в снимке конкурентные добавления не превращаются в запрос удаления.
+            _snapshotOrigins.GetValue(config, _ => _cache);
         }
     }
 
@@ -422,8 +517,9 @@ public class JsonDataStore
         lock (_lock)
         {
             EnsureLoadedLocked();
-            _cache!.Entries.Clear();
-            _cache.History.Clear();
+            ForkCache();
+            _cache!.Entries = [];
+            _cache.History = [];
             SaveEntries();
             WriteSectionAtomic(HistoryPath, "");
         }
@@ -435,13 +531,15 @@ public class JsonDataStore
     /// <returns>true, если запись добавлена; false, если дубликат найден.</returns>
     public bool AddEntry(StartupEntry entry, bool checkDuplicate = true)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         lock (_lock)
         {
             EnsureLoadedLocked();
             if (_cache == null) return false;
             if (checkDuplicate && _cache.Entries.Any(e => e.Id == entry.Id))
                 return false;
-            _cache.Entries.Add(entry.Clone());
+            ForkCache();
+            _cache!.Entries = [.. _cache.Entries, entry.Clone()];
             SaveEntries();
             return true;
         }
@@ -456,7 +554,10 @@ public class JsonDataStore
         {
             EnsureLoadedLocked();
             var entry = _cache?.Entries.FirstOrDefault(predicate);
-            return entry?.Clone(); // Клонируем исключительно найденную запись для изоляции
+            if (entry is null) return null;
+            var snapshot = entry.Clone();
+            _entryOrigins.Add(snapshot, entry);
+            return snapshot;
         }
     }
 
@@ -526,17 +627,20 @@ public class JsonDataStore
     /// <param name="clearFirst">Очистить существующие записи и историю перед добавлением.</param>
     public void AddEntryBatch(List<StartupEntry> entries, bool clearFirst = false)
     {
+        ArgumentNullException.ThrowIfNull(entries);
+        ValidateSection(entries);
         lock (_lock)
         {
             EnsureLoadedLocked();
             if (_cache == null) return;
+            ForkCache();
             if (clearFirst)
             {
-                _cache.Entries.Clear();
-                _cache.History.Clear();
+                _cache!.Entries = [];
+                _cache.History = [];
                 WriteSectionAtomic(HistoryPath, "");
             }
-            _cache.Entries.AddRange(entries.Select(e => e.Clone()));
+            _cache!.Entries = [.. _cache.Entries, .. entries.Select(e => e.Clone())];
             SaveEntries();
         }
     }
@@ -569,8 +673,10 @@ public class JsonDataStore
         using var _prof = ExecutionProfiler.Measure("Shared.Store.Deduplicate");
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
+            ForkCache();
+            _cache!.Entries = _cache.Entries.Select(entry => entry.Clone()).ToList();
             var map = new Dictionary<string, StartupEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in _cache.Entries)
             {
@@ -627,9 +733,12 @@ public class JsonDataStore
         {
             EnsureLoadedLocked();
             if (_cache == null) return;
-            var removed = _cache.Entries.RemoveAll(e => e.Id == entryId);
+            var retained = _cache.Entries.Where(e => e.Id != entryId).ToList();
+            var removed = _cache.Entries.Count - retained.Count;
             if (removed > 0)
             {
+                ForkCache();
+                _cache!.Entries = retained;
                 SaveEntries();
             }
         }
@@ -638,6 +747,7 @@ public class JsonDataStore
     /// <summary>Обновляет запись (заменяет по Id).</summary>
     public void UpdateEntry(StartupEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         lock (_lock)
         {
             EnsureLoadedLocked();
@@ -645,9 +755,41 @@ public class JsonDataStore
             var idx = _cache.Entries.FindIndex(e => e.Id == entry.Id);
             if (idx >= 0)
             {
-                _cache.Entries[idx] = entry.Clone();
+                var current = _cache.Entries[idx];
+                var replacement = _entryOrigins.TryGetValue(entry, out var original) && !ReferenceEquals(original, current)
+                    ? ConfigurationMerge.Merge(original, entry, current, _options)
+                    : entry.Clone();
+                ForkCache();
+                _cache!.Entries = [.. _cache.Entries];
+                _cache.Entries[idx] = replacement;
                 SaveEntries();
             }
+        }
+    }
+
+    /// <summary>Сохраняет репутационные поля пачки записей одной записью файла, не меняя их актуальные статусы.</summary>
+    /// <param name="entries">Завершённые результаты репутационного сканирования.</param>
+    public void UpdateEntryReputations(IEnumerable<StartupEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        var updates = entries.ToDictionary(entry => entry.Id, StringComparer.Ordinal);
+        if (updates.Count == 0) return;
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            ForkCache();
+            var current = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
+            current.Entries = current.Entries.Select(existing =>
+            {
+                if (!updates.TryGetValue(existing.Id, out var update)) return existing;
+                var result = existing.Clone();
+                result.KasperskyZone = update.KasperskyZone;
+                result.KasperskyFileStatus = update.KasperskyFileStatus;
+                result.KasperskyDetection = update.KasperskyDetection;
+                if (!string.IsNullOrEmpty(update.SHA256)) result.SHA256 = update.SHA256;
+                return result;
+            }).ToList();
+            SaveEntries();
         }
     }
 
@@ -656,16 +798,28 @@ public class JsonDataStore
     /// <summary>Добавляет запись в историю, обрезая элементы старше HistoryDays.</summary>
     public void AddHistory(HistoryEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         lock (_lock)
         {
             EnsureLoadedLocked();
             if (_cache == null) return;
+            var now = DateTime.UtcNow;
+            var cutoff = now.AddDays(-_cache.Settings.HistoryDays);
+            if (entry.Timestamp < cutoff) return;
+            ForkCache();
+            _cache!.History = _cache.History.Where(item => item.Timestamp >= cutoff).ToList();
             _cache.History.Add(entry.Clone());
-
-            var cutoff = DateTime.UtcNow.AddDays(-_cache.Settings.HistoryDays);
-            _cache.History.RemoveAll(h => h.Timestamp < cutoff);
-
-            AppendHistoryLine(entry);
+            // Новая запись уже входит в компактацию; повторный append в этой ветке исключён.
+            if (now - _lastHistoryCompactionUtc >= TimeSpan.FromHours(1))
+            {
+                var lines = _cache.History.Select(item => JsonSerializer.Serialize(item, _historyOptions));
+                WriteSectionAtomic(HistoryPath, string.Join(Environment.NewLine, lines) + Environment.NewLine);
+                _lastHistoryCompactionUtc = now;
+            }
+            else
+            {
+                AppendHistoryLine(entry);
+            }
             Interlocked.Increment(ref _revision);
         }
     }
@@ -695,13 +849,15 @@ public class JsonDataStore
     /// <summary>Добавляет запись в бэкап удалённых (или обновляет существующую по OriginalEntryId).</summary>
     public void AddRemovedEntry(RemovedEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
             // Один бэкап на запись: повторное срабатывание правила не плодит дубликаты
-            _cache.RemovedEntries.RemoveAll(r => r.OriginalEntryId == entry.OriginalEntryId);
-            _cache.RemovedEntries.Add(entry);
+            ForkCache();
+            _cache!.RemovedEntries = _cache.RemovedEntries.Where(item => item.OriginalEntryId != entry.OriginalEntryId).ToList();
+            _cache.RemovedEntries.Add(entry.Clone());
             SaveRemoved();
         }
     }
@@ -721,8 +877,10 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return 0;
+            ForkCache();
+            _cache!.RemovedEntries = [.. _cache.RemovedEntries];
             var count = _cache.RemovedEntries.RemoveAll(r => string.Equals(r.RemovalReason, reason, StringComparison.OrdinalIgnoreCase));
             if (count > 0)
             {
@@ -737,8 +895,10 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
+            ForkCache();
+            _cache!.RemovedEntries = [.. _cache.RemovedEntries];
             var count = _cache.RemovedEntries.RemoveAll(r => r.OriginalEntryId == entryId);
             if (count > 0)
             {
@@ -752,8 +912,10 @@ public class JsonDataStore
     {
         lock (_lock)
         {
-            Load();
+            EnsureLoadedLocked();
             if (_cache == null) return;
+            ForkCache();
+            _cache!.RemovedEntries = [.. _cache.RemovedEntries];
             _cache.RemovedEntries.RemoveAll(r => r.Id == removedId);
             SaveRemoved();
         }

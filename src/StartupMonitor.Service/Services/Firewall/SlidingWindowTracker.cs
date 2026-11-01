@@ -260,6 +260,19 @@ public sealed class SlidingWindowTracker
     /// <summary>Сбрасывает историю для IP (алиас Remove).</summary>
     public bool Reset(string ip) => Remove(ip);
 
+    /// <summary>Сбрасывает независимые счётчики всех правил, относящиеся к одному адресу.</summary>
+    /// <param name="ip">Адрес, использованный как префикс составного ключа IP|правило.</param>
+    public void ResetRulesForIp(string ip)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ip);
+        var prefix = ip.Trim() + "|";
+        lock (_sync)
+        {
+            foreach (var key in _entries.Keys.Where(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray())
+                Remove(key);
+        }
+    }
+
     /// <summary>Полная очистка всей истории.</summary>
     public void Clear()
     {

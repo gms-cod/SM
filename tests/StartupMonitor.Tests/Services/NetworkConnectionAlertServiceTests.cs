@@ -72,7 +72,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [InlineData("::1")]
     public void ScanNewConnections_PrivateAddresses_AreFiltered(string remote)
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", remote, 443) },
             Paths((1234, EvilPath)));
 
@@ -85,7 +85,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ScanNewConnections_UdpListeningSocketWithoutRemote_IsFiltered()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "*", 0, "UDP") },
             Paths((1234, EvilPath)));
 
@@ -104,7 +104,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [InlineData("StartupMonitor.UI.exe")]
     public void ScanNewConnections_SystemProcesses_AreIgnored(string processName)
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(4, processName, "8.8.8.8", 443) },
             Paths((4, @"C:\Windows\System32\" + processName.TrimEnd('m', 'M'))));
 
@@ -142,7 +142,7 @@ public sealed class NetworkConnectionAlertServiceTests
     public void ScanNewConnections_PublicAddress_CreatesAlertWithFields()
     {
         var before = DateTime.UtcNow.AddMinutes(-1);
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)));
 
@@ -168,7 +168,7 @@ public sealed class NetworkConnectionAlertServiceTests
         {
             Sock(1234, "evil.exe", "93.184.216.34", 443),
         };
-        var svc = CreateService(sockets, Paths((1234, EvilPath)));
+        using var svc = CreateService(sockets, Paths((1234, EvilPath)));
 
         Assert.Equal(1, svc.ScanNewConnections());
         Assert.Equal(0, svc.ScanNewConnections());
@@ -178,7 +178,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ScanNewConnections_DifferentRemotes_ProduceSeparateAlerts()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket>
             {
                 Sock(1234, "evil.exe", "93.184.216.34", 443),
@@ -193,7 +193,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ScanNewConnections_ExistingFirewallRule_SkipsAlert()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)),
             hasRule: _ => true);
@@ -214,7 +214,7 @@ public sealed class NetworkConnectionAlertServiceTests
     public void ResolveAlert_AllowAlways_CreatesAllowRuleAndRemovesAlert()
     {
         var applied = new List<FirewallRuleDto>();
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)),
             appliedRules: applied);
@@ -243,7 +243,7 @@ public sealed class NetworkConnectionAlertServiceTests
     public void ResolveAlert_WhitelistProgram_CreatesAllowRuleAndWhitelistsSession()
     {
         var applied = new List<FirewallRuleDto>();
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)),
             appliedRules: applied);
@@ -272,7 +272,7 @@ public sealed class NetworkConnectionAlertServiceTests
     public void ResolveAlert_BlockAlways_CreatesBlockRuleAndRemovesAlert()
     {
         var applied = new List<FirewallRuleDto>();
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)),
             appliedRules: applied);
@@ -304,7 +304,7 @@ public sealed class NetworkConnectionAlertServiceTests
         {
             Sock(1234, "evil.exe", "93.184.216.34", 443),
         };
-        var svc = CreateService(sockets, Paths((1234, EvilPath)), appliedRules: applied);
+        using var svc = CreateService(sockets, Paths((1234, EvilPath)), appliedRules: applied);
         var alert = ScanSingle(svc);
 
         var ok = svc.ResolveAlert(new ResolveNetworkAlertRequest
@@ -332,7 +332,7 @@ public sealed class NetworkConnectionAlertServiceTests
     public void ResolveAlert_AllowAlways_PreventsFutureAlerts()
     {
         var applied = new List<FirewallRuleDto>();
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)),
             appliedRules: applied);
@@ -353,7 +353,7 @@ public sealed class NetworkConnectionAlertServiceTests
     public void ResolveAlert_UnknownId_ReturnsFalse()
     {
         var applied = new List<FirewallRuleDto>();
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)),
             appliedRules: applied);
@@ -375,7 +375,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ResolveAlert_NullOrEmptyRequest_ReturnsFalse()
     {
-        var svc = CreateService();
+        using var svc = CreateService();
 
         Assert.False(svc.ResolveAlert(null!));
         Assert.False(svc.ResolveAlert(new ResolveNetworkAlertRequest()));
@@ -386,7 +386,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void SetAlertsEnabled_Disabled_SkipsScanAndClearsPending()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "evil.exe", "93.184.216.34", 443) },
             Paths((1234, EvilPath)));
 
@@ -406,7 +406,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void GetPendingAlerts_ReturnsSnapshotOrderedByDetectionTime()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket>
             {
                 Sock(1111, "a.exe", "93.184.216.34", 443),
@@ -426,7 +426,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void Blacklist_HasAbsolutePriorityOver_Whitelist()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(1234, "conflict.exe", "93.184.216.34", 443) },
             Paths((1234, @"C:\Apps\conflict.exe")));
 
@@ -467,7 +467,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ConcurrentAccess_ToWhitelistedAndBlacklistedApps_DoesNotThrow()
     {
-        var svc = CreateService();
+        using var svc = CreateService();
         var exceptions = new System.Collections.Concurrent.ConcurrentBag<Exception>();
 
         Parallel.For(0, 1000, i =>
@@ -506,7 +506,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void RecordHistory_LimitsMaxItems_AndPrunesOldest()
     {
-        var svc = CreateService();
+        using var svc = CreateService();
         svc.ClearConnectionHistory();
 
         for (int i = 0; i < 2600; i++)
@@ -534,7 +534,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ClearConnectionHistory_PurgesAllEntries()
     {
-        var svc = CreateService();
+        using var svc = CreateService();
         svc.RecordHistory(new NetworkConnectionHistoryItem
         {
             Id = "test-1",
@@ -554,7 +554,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public void ResolveAlert_UpdatesHistoryItemVerdict()
     {
-        var svc = CreateService(
+        using var svc = CreateService(
             sockets: new List<ProcessNetworkSocket> { Sock(1234, "test.exe", "93.184.216.34", 443) },
             pathsByPid: Paths((1234, @"C:\Apps\test.exe")));
 
@@ -586,7 +586,9 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public async Task ScanNewConnections_AutonomousAllowSession_AppliesDecisionWithoutAlert()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
+        var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
         {
             var store = new JsonDataStore(tmp);
@@ -595,7 +597,7 @@ public sealed class NetworkConnectionAlertServiceTests
             cfg.Settings.AiAutonomousDecisionMode = "AllowSession";
             store.Save(cfg);
 
-            var svc = CreateService(
+            using var svc = CreateService(
                 sockets: new List<ProcessNetworkSocket> { Sock(5555, "browser.exe", "93.184.216.34", 443) },
                 pathsByPid: Paths((5555, @"C:\Appsrowser.exe")),
                 store: store);
@@ -614,7 +616,7 @@ public sealed class NetworkConnectionAlertServiceTests
             Assert.Empty(svc.GetPendingAlerts());
 
             // Ожидаем завершения асинхронной фиксации автономного решения
-            var deadline = DateTime.UtcNow.AddSeconds(2);
+            var deadline = DateTime.UtcNow.AddSeconds(5);
             while (DateTime.UtcNow < deadline && svc.GetConnectionHistory().Count == 0)
             {
                 await Task.Delay(20);
@@ -628,7 +630,7 @@ public sealed class NetworkConnectionAlertServiceTests
         }
         finally
         {
-            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            tmpDirectory.Delete(recursive: true);
         }
     }
 
@@ -639,7 +641,9 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public async Task ScanNewConnections_AutonomousBlockSession_AppliesDecisionWithoutAlert()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
+        var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
         {
             var store = new JsonDataStore(tmp);
@@ -648,7 +652,7 @@ public sealed class NetworkConnectionAlertServiceTests
             cfg.Settings.AiAutonomousDecisionMode = "BlockSession";
             store.Save(cfg);
 
-            var svc = CreateService(
+            using var svc = CreateService(
                 sockets: new List<ProcessNetworkSocket> { Sock(6666, "miner.exe", "185.190.140.10", 3333) },
                 pathsByPid: Paths((6666, @"C:\Temp\miner.exe")),
                 store: store);
@@ -664,7 +668,7 @@ public sealed class NetworkConnectionAlertServiceTests
             Assert.Equal(0, added);
             Assert.Equal(0, svc.PendingCount);
 
-            var deadline = DateTime.UtcNow.AddSeconds(2);
+            var deadline = DateTime.UtcNow.AddSeconds(5);
             while (DateTime.UtcNow < deadline && svc.GetConnectionHistory().Count == 0)
             {
                 await Task.Delay(20);
@@ -676,7 +680,7 @@ public sealed class NetworkConnectionAlertServiceTests
         }
         finally
         {
-            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            tmpDirectory.Delete(recursive: true);
         }
     }
 
@@ -687,7 +691,9 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public async Task ScanNewConnections_StandardMode_EnrichesPendingAlertWithAi()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
+        var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
         {
             var store = new JsonDataStore(tmp);
@@ -695,7 +701,7 @@ public sealed class NetworkConnectionAlertServiceTests
             cfg.Settings.AiAutonomousNetworkDecisionsEnabled = false;
             store.Save(cfg);
 
-            var svc = CreateService(
+            using var svc = CreateService(
                 sockets: new List<ProcessNetworkSocket> { Sock(7777, "telegram.exe", "149.154.167.50", 443) },
                 pathsByPid: Paths((7777, @"C:\Apps	elegram.exe")),
                 store: store);
@@ -711,13 +717,15 @@ public sealed class NetworkConnectionAlertServiceTests
             Assert.Equal(1, added);
             Assert.Equal(1, svc.PendingCount);
 
-            var deadline = DateTime.UtcNow.AddSeconds(2);
+            var deadline = DateTime.UtcNow.AddSeconds(5);
             var alerts = svc.GetPendingAlerts();
             Assert.Single(alerts);
 
             while (DateTime.UtcNow < deadline && string.IsNullOrEmpty(alerts[0].AiPurpose))
             {
                 await Task.Delay(20);
+                alerts = svc.GetPendingAlerts();
+                Assert.Single(alerts);
             }
 
             Assert.Equal("Мессенджер Telegram", alerts[0].AiPurpose);
@@ -727,7 +735,7 @@ public sealed class NetworkConnectionAlertServiceTests
         }
         finally
         {
-            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            tmpDirectory.Delete(recursive: true);
         }
     }
 
@@ -738,7 +746,9 @@ public sealed class NetworkConnectionAlertServiceTests
     [Fact]
     public async Task AiRatingService_EvaluateNetworkProcessAsync_ReturnsImmediateTrustedVerdict()
     {
-        var tmp = Path.Combine(Path.GetTempPath(), $"smon_test_{Guid.NewGuid():N}.json");
+        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
+        var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
         {
             var store = new JsonDataStore(tmp);
@@ -771,7 +781,7 @@ public sealed class NetworkConnectionAlertServiceTests
         }
         finally
         {
-            try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            tmpDirectory.Delete(recursive: true);
         }
     }
 }

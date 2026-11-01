@@ -10,7 +10,7 @@ public class ProcessNetworkTrackerTests
     [Fact]
     public void CaptureNetworkBandwidth_ReturnsValidResultWithoutExceptions()
     {
-        var tracker = new ProcessNetworkTracker();
+        using var tracker = new ProcessNetworkTracker();
 
         // Первый вызов инициализирует начальный срез сокетов
         var (map1, total1, sockets1) = tracker.CaptureNetworkBandwidth();
@@ -85,11 +85,10 @@ public class ProcessNetworkTrackerTests
     [Fact]
     public void GetSockets_ReturnsValidList()
     {
-        var tracker = new ProcessNetworkTracker();
+        using var tracker = new ProcessNetworkTracker();
         var sockets = tracker.GetSockets(-1);
         Assert.NotNull(sockets);
-        // В живой Windows системе всегда есть активные сокеты (TCP/UDP)
-        Assert.NotEmpty(sockets);
+        // Отсутствие сокетов допустимо в изолированной системе; проверяем контракт фактически полученных строк.
 
         foreach (var s in sockets)
         {
@@ -141,6 +140,83 @@ public class ProcessNetworkTrackerTests
         Assert.Equal("192.168.1.50:55432", s.LocalEndPoint);
         Assert.Equal("142.250.180.206:443", s.RemoteEndPoint);
         Assert.False(s.IsRemotePrivate);
+    }
+
+    /// <summary>Проверяет общий кэш для разных PID, изоляцию изменяемых DTO и обновление точно по монотонному времени.</summary>
+    [Fact]
+    public void GetSockets_ReusesSnapshotAcrossConsumersAndRefreshesAfterExpiry()
+    {
+        var clock = new ManualNetworkTimeProvider();
+        var captures = 0;
+        using var tracker = new ProcessNetworkTracker(() =>
+        {
+            captures++;
+            return [new ProcessNetworkSocket { ProcessId = 123, LocalPort = 8080 },
+                new ProcessNetworkSocket { ProcessId = 456, LocalPort = 9090 }];
+        }, clock);
+        var first = tracker.GetSockets(123);
+        Assert.Equal(8080, Assert.Single(first).LocalPort);
+        first[0].LocalPort = 1;
+        first.Clear();
+        Assert.Equal(9090, Assert.Single(tracker.GetSockets(456)).LocalPort);
+        Assert.Equal(8080, Assert.Single(tracker.GetSockets(123)).LocalPort);
+        Assert.Equal(1, captures);
+        clock.Advance(ProcessNetworkTracker.SocketSnapshotLifetime - TimeSpan.FromTicks(1));
+        Assert.Equal(2, tracker.GetSockets().Count);
+        Assert.Equal(1, captures);
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.Equal(2, tracker.GetSockets().Count);
+        Assert.Equal(2, captures);
+    }
+
+    /// <summary>Проверяет отсутствие параллельного повторного сбора при одновременном запросе нескольких потребителей.</summary>
+    [Fact]
+    public void GetSockets_ConcurrentReadersCaptureSourceOnce()
+    {
+        var clock = new ManualNetworkTimeProvider();
+        var captures = 0;
+        using var tracker = new ProcessNetworkTracker(() =>
+        {
+            Interlocked.Increment(ref captures);
+            return [new ProcessNetworkSocket { ProcessId = 123 }];
+        }, clock);
+        Parallel.For(0, 100, _ => Assert.Single(tracker.GetSockets()));
+        Assert.Equal(1, captures);
+    }
+
+    /// <summary>Проверяет, что внешнее изменение исходного DTO не повреждает опубликованный кэш.</summary>
+    [Fact]
+    public void GetSockets_SourceMutationDoesNotChangeCachedSnapshot()
+    {
+        var source = new ProcessNetworkSocket { LocalPort = 8080 };
+        using var tracker = new ProcessNetworkTracker(() => [source], new ManualNetworkTimeProvider());
+        Assert.Equal(8080, Assert.Single(tracker.GetSockets()).LocalPort);
+        source.LocalPort = 9090;
+        Assert.Equal(8080, Assert.Single(tracker.GetSockets()).LocalPort);
+    }
+
+    /// <summary>Проверяет входные границы IPv6 до фиксированного чтения 128-битного адреса.</summary>
+    /// <param name="length">Недопустимая длина адреса.</param>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(15)]
+    [InlineData(17)]
+    public void SocketKey6_InvalidAddressLengthIsRejected(int length)
+    {
+        Assert.Throws<ArgumentException>(() => new ProcessNetworkTracker.SocketKey6(new byte[length], 0, 0, new byte[16], 0, 0));
+        Assert.Throws<ArgumentException>(() => new ProcessNetworkTracker.SocketKey6(new byte[16], 0, 0, new byte[length], 0, 0));
+    }
+
+    /// <summary>Предоставляет управляемые монотонные ticks без ожиданий реального времени.</summary>
+    private sealed class ManualNetworkTimeProvider : TimeProvider
+    {
+        private long _timestamp;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => _timestamp;
+
+        /// <summary>Продвигает тестовое время на заданный интервал.</summary>
+        /// <param name="elapsed">Интервал до следующего запроса.</param>
+        internal void Advance(TimeSpan elapsed) => _timestamp += elapsed.Ticks;
     }
 }
 

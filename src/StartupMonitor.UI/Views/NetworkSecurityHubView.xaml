@@ -952,7 +952,7 @@
 
 
 
-                <ui:Button x:Name="TabBtnAccessMatrix" Content="Контроль приложений (ACL)"
+                <ui:Button x:Name="TabBtnAccessMatrix" Content="{Binding NetTabAclMatrix, Source={StaticResource Loc}}"
 
 
 
@@ -1032,7 +1032,7 @@
 
 
 
-                <ui:Button x:Name="TabBtnHistory" Content="История подключений"
+                <ui:Button x:Name="TabBtnHistory" Content="{Binding [NetConnectionHistoryTitle], Source={StaticResource Loc}}"
 
 
 
@@ -1220,7 +1220,7 @@
 
 
 
-                                    <TextBlock Text="Таймлайн сетевой активности (Live / 60 FPS)" FontSize="12.5" FontWeight="Bold"
+                                    <TextBlock Text="{Binding [TimelineTitle], Source={StaticResource Loc}}" FontSize="12.5" FontWeight="Bold"
 
 
 
@@ -1248,7 +1248,7 @@
 
 
 
-                                    <RadioButton x:Name="RbTimeWindow1h" Content="1 час" IsChecked="True"
+                                    <RadioButton x:Name="RbTimeWindow1h" Content="{Binding [TimelineHour], Source={StaticResource Loc}}" IsChecked="True"
 
 
 
@@ -1260,7 +1260,7 @@
 
 
 
-                                    <RadioButton x:Name="RbTimeWindow24h" Content="24 часа"
+                                    <RadioButton x:Name="RbTimeWindow24h" Content="{Binding [TimelineDay], Source={StaticResource Loc}}"
 
 
 
@@ -1272,7 +1272,7 @@
 
 
 
-                                    <RadioButton x:Name="RbTimeWindow7d" Content="7 дней"
+                                    <RadioButton x:Name="RbTimeWindow7d" Content="{Binding [TimelineWeek], Source={StaticResource Loc}}"
 
 
 
@@ -1284,7 +1284,7 @@
 
 
 
-                                    <ui:Button x:Name="BtnResetTimelineFilter" Appearance="Secondary" Content="↩ Сброс среза"
+                                    <ui:Button x:Name="BtnResetTimelineFilter" Appearance="Secondary" Content="{Binding [TimelineReset], Source={StaticResource Loc}}"
 
 
 
@@ -1292,7 +1292,7 @@
 
 
 
-                                               Click="OnResetTimelineFilterClick" ToolTip="Вернуться к полному Live-потоку сокетов" />
+                                               Click="OnResetTimelineFilterClick" ToolTip="{Binding [TimelineResetTip], Source={StaticResource Loc}}" />
 
 
 

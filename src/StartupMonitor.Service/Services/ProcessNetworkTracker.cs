@@ -89,6 +89,11 @@ public class ProcessNetworkTracker : IDisposable
             uint remoteScopeId,
             uint remotePortNetworkOrder)
         {
+            // Адреса из внешнего вызова обязаны иметь ровно 128 бит до чтения фиксированных половин.
+            ArgumentNullException.ThrowIfNull(localAddr);
+            ArgumentNullException.ThrowIfNull(remoteAddr);
+            if (localAddr.Length != 16) throw new ArgumentException("IPv6-адрес должен содержать 16 байт.", nameof(localAddr));
+            if (remoteAddr.Length != 16) throw new ArgumentException("IPv6-адрес должен содержать 16 байт.", nameof(remoteAddr));
             var localSpan = localAddr.AsSpan();
             var remoteSpan = remoteAddr.AsSpan();
             LocalAddrHi = BinaryPrimitives.ReadUInt64LittleEndian(localSpan.Slice(0, 8));
@@ -159,6 +164,29 @@ public class ProcessNetworkTracker : IDisposable
 
     // Единая блокировка для доступа к общим буферам и кэшу предыдущего среза.
     private readonly object _sync = new();
+    /// <summary>Срок повторного использования одного системного снимка всеми потребителями.</summary>
+    internal static readonly TimeSpan SocketSnapshotLifetime = TimeSpan.FromMilliseconds(500);
+    private readonly TimeProvider _timeProvider;
+    private readonly Func<List<ProcessNetworkSocket>>? _socketProvider;
+    private List<ProcessNetworkSocket> _socketSnapshot = [];
+    private long _socketSnapshotTimestamp;
+    private bool _hasSocketSnapshot;
+    private bool _disposed;
+
+    /// <summary>Создаёт системный сборщик с общим краткосрочным кэшем сокетов.</summary>
+    public ProcessNetworkTracker()
+    {
+        _timeProvider = TimeProvider.System;
+    }
+
+    /// <summary>Создаёт сборщик с управляемым источником и временем для проверки кэша без сетевых вызовов.</summary>
+    /// <param name="socketProvider">Поставщик актуального снимка сокетов.</param>
+    /// <param name="timeProvider">Монотонный источник времени.</param>
+    internal ProcessNetworkTracker(Func<List<ProcessNetworkSocket>> socketProvider, TimeProvider timeProvider)
+    {
+        _socketProvider = socketProvider ?? throw new ArgumentNullException(nameof(socketProvider));
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    }
 
     /// <summary>
     /// Снимает показания сети и рассчитывает скорость передачи (Байт/с) для каждого процесса, суммарно по системе и количество сокетов.
@@ -168,6 +196,7 @@ public class ProcessNetworkTracker : IDisposable
         using var _prof = ExecutionProfiler.Measure("Service.Network.CaptureBandwidth");
         lock (_sync)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var now = DateTime.UtcNow;
             var elapsedSec = (now - _lastSampleTime).TotalSeconds;
             if (elapsedSec < 0.05) elapsedSec = 0.05;
@@ -253,8 +282,10 @@ public class ProcessNetworkTracker : IDisposable
                     dwRemotePort = row.dwRemotePort
                 };
 
-                // Включаем сбор статистики (идемпотентно и сверхбыстро в драйвере ядра)
-                SetPerTcpConnectionEStats(ref tcpRow, TcpConnectionEstatsData, _rwEnableCollection, 0, _rwEnableCollection.Length, 0);
+                var key = new SocketKey4(row.dwLocalAddr, row.dwLocalPort, row.dwRemoteAddr, row.dwRemotePort);
+                // Успешно опрошенный живой сокет уже имеет включённую статистику; повторный Set не нужен.
+                if (!_prevSocketBytes4.ContainsKey(key))
+                    SetPerTcpConnectionEStats(ref tcpRow, TcpConnectionEstatsData, _rwEnableCollection, 0, _rwEnableCollection.Length, 0);
 
                 // Читаем накопленные байты
                 uint getRes = GetPerTcpConnectionEStats(ref tcpRow, TcpConnectionEstatsData, IntPtr.Zero, 0, 0, IntPtr.Zero, 0, 0, rodBuffer, 0, _rodSize);
@@ -263,7 +294,6 @@ public class ProcessNetworkTracker : IDisposable
                     var rod = Marshal.PtrToStructure<TCP_ESTATS_DATA_ROD_v0>(rodBuffer);
                     ulong totalBytes = rod.DataBytesIn + rod.DataBytesOut;
 
-                    var key = new SocketKey4(row.dwLocalAddr, row.dwLocalPort, row.dwRemoteAddr, row.dwRemotePort);
                     currentSocketBytes[key] = totalBytes;
 
                     if (_prevSocketBytes4.TryGetValue(key, out var oldTotal) && totalBytes > oldTotal)
@@ -274,7 +304,7 @@ public class ProcessNetworkTracker : IDisposable
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
     }
 
     /// <summary>CollectIpv6Sockets: Собирает метрики TCP IPv6 и накапливает дельты байт по PID.</summary>
@@ -324,7 +354,12 @@ public class ProcessNetworkTracker : IDisposable
                     dwRemotePort = row.dwRemotePort
                 };
 
-                SetPerTcp6ConnectionEStats(ref tcpRow, TcpConnectionEstatsData, _rwEnableCollection, 0, _rwEnableCollection.Length, 0);
+                var key = new SocketKey6(
+                    row.ucLocalAddr, row.dwLocalScopeId, row.dwLocalPort,
+                    row.ucRemoteAddr, row.dwRemoteScopeId, row.dwRemotePort);
+                // Сохраняем активацию ESTATS между замерами одного и того же TCPv6-соединения.
+                if (!_prevSocketBytes6.ContainsKey(key))
+                    SetPerTcp6ConnectionEStats(ref tcpRow, TcpConnectionEstatsData, _rwEnableCollection, 0, _rwEnableCollection.Length, 0);
 
                 uint getRes = GetPerTcp6ConnectionEStats(ref tcpRow, TcpConnectionEstatsData, IntPtr.Zero, 0, 0, IntPtr.Zero, 0, 0, rodBuffer, 0, _rodSize);
                 if (getRes == 0)
@@ -332,9 +367,6 @@ public class ProcessNetworkTracker : IDisposable
                     var rod = Marshal.PtrToStructure<TCP_ESTATS_DATA_ROD_v0>(rodBuffer);
                     ulong totalBytes = rod.DataBytesIn + rod.DataBytesOut;
 
-                    var key = new SocketKey6(
-                        row.ucLocalAddr, row.dwLocalScopeId, row.dwLocalPort,
-                        row.ucRemoteAddr, row.dwRemoteScopeId, row.dwRemotePort);
                     currentSocketBytes[key] = totalBytes;
 
                     if (_prevSocketBytes6.TryGetValue(key, out var oldTotal) && totalBytes > oldTotal)
@@ -345,7 +377,7 @@ public class ProcessNetworkTracker : IDisposable
                 }
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
     }
 
     /// <summary>CollectUdpPids: Собирает количество UDP сокетов по PID (IPv4 + IPv6).</summary>
@@ -380,7 +412,7 @@ public class ProcessNetworkTracker : IDisposable
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
             }
         }
 
@@ -413,7 +445,7 @@ public class ProcessNetworkTracker : IDisposable
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
             }
         }
     }
@@ -451,69 +483,105 @@ public class ProcessNetworkTracker : IDisposable
         using var _prof = ExecutionProfiler.Measure("Service.Network.GetSockets");
         lock (_sync)
         {
-            var sockets = new List<ProcessNetworkSocket>(64);
-            var now = DateTime.UtcNow;
-
-            // Периодическая очистка устаревших PID из кэша имён для предотвращения утечек памяти
-            if (_procNameCache.Count > 128)
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var timestamp = _timeProvider.GetTimestamp();
+            if (!_hasSocketSnapshot || _timeProvider.GetElapsedTime(_socketSnapshotTimestamp, timestamp) >= SocketSnapshotLifetime)
             {
-                foreach (var kvp in _procNameCache)
-                {
-                    if (kvp.Value.ExpiresAt <= now)
-                    {
-                        _procNameCache.TryRemove(kvp.Key, out _);
-                    }
-                }
+                // Все PID используют один источник, иначе запросы разных окон заново читают четыре таблицы ядра.
+                _socketSnapshot = (_socketProvider is null ? CollectSocketSnapshot() : _socketProvider())
+                    .Where(socket => socket is not null).Select(CloneSocket).ToList();
+                _socketSnapshotTimestamp = timestamp;
+                _hasSocketSnapshot = true;
             }
 
-            string GetProcName(int pid)
-            {
-                if (pid == 0) return "System (Kernel/Idle)";
-                if (pid == 4) return "System";
-                if (pid < 0) return string.Empty;
-                if (_procNameCache.TryGetValue(pid, out var cached) && cached.ExpiresAt > now)
-                    return cached.Name;
+            return _socketSnapshot.Where(socket => targetPid <= 0 || socket.ProcessId == targetPid)
+                .Select(CloneSocket).ToList();
+        }
+    }
 
-                string name = string.Empty;
+    /// <summary>Копирует изменяемый DTO, изолируя общий кэш от изменений со стороны потребителей.</summary>
+    /// <param name="socket">Исходный сокет.</param>
+    /// <returns>Независимая копия сетевых атрибутов.</returns>
+    private static ProcessNetworkSocket CloneSocket(ProcessNetworkSocket socket) => new()
+    {
+        ProcessId = socket.ProcessId,
+        ProcessName = socket.ProcessName,
+        Protocol = socket.Protocol,
+        LocalAddress = socket.LocalAddress,
+        LocalPort = socket.LocalPort,
+        RemoteAddress = socket.RemoteAddress,
+        RemotePort = socket.RemotePort,
+        State = socket.State,
+        IsRemotePrivate = socket.IsRemotePrivate
+    };
+
+    /// <summary>Считывает системные TCP/UDP-таблицы только при истечении общего срока кэша.</summary>
+    /// <returns>Новый полный снимок сокетов системы.</returns>
+    private List<ProcessNetworkSocket> CollectSocketSnapshot()
+    {
+        var sockets = new List<ProcessNetworkSocket>(64);
+        var now = DateTime.UtcNow;
+
+        // Периодическая очистка устаревших PID из кэша имён для предотвращения утечек памяти
+        if (_procNameCache.Count > 128)
+        {
+            foreach (var kvp in _procNameCache)
+            {
+                if (kvp.Value.ExpiresAt <= now)
+                {
+                    _procNameCache.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
+
+        string GetProcName(int pid)
+        {
+            if (pid == 0) return "System (Kernel/Idle)";
+            if (pid == 4) return "System";
+            if (pid < 0) return string.Empty;
+            if (_procNameCache.TryGetValue(pid, out var cached) && cached.ExpiresAt > now)
+                return cached.Name;
+
+            string name = string.Empty;
+            try
+            {
+                // Быстрый путь через QueryFullProcessImageName без создания объекта Process
+                var path = ProcessMetadataEnricher.TryGetProcessPath(pid);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    name = System.IO.Path.GetFileName(path);
+                }
+            }
+            catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
+
+            if (string.IsNullOrEmpty(name))
+            {
                 try
                 {
-                    // Быстрый путь через QueryFullProcessImageName без создания объекта Process
-                    var path = ProcessMetadataEnricher.TryGetProcessPath(pid);
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        name = System.IO.Path.GetFileName(path);
-                    }
+                    using var p = Process.GetProcessById(pid);
+                    name = p.ProcessName + ".exe";
                 }
-                catch { }
-
-                if (string.IsNullOrEmpty(name))
+                catch (Exception ex)
                 {
-                    try
-                    {
-                        using var p = Process.GetProcessById(pid);
-                        name = p.ProcessName + ".exe";
-                    }
-                    catch
-                    {
-                        name = string.Empty;
-                    }
+                    Serilog.Log.Debug(ex, "ProcessNetworkTracker: процесс {Pid} завершился или недоступен", pid);
+                    name = string.Empty;
                 }
-
-                _procNameCache[pid] = (name, now.AddSeconds(15));
-                return name;
             }
 
-            // 1. TCP IPv4
-            CollectTcp4Sockets(sockets, targetPid, GetProcName);
-            // 2. TCP IPv6
-            CollectTcp6Sockets(sockets, targetPid, GetProcName);
-            // 3. UDP IPv4
-            CollectUdp4Sockets(sockets, targetPid, GetProcName);
-            // 4. UDP IPv6
-            CollectUdp6Sockets(sockets, targetPid, GetProcName);
-
-            return sockets;
+            _procNameCache[pid] = (name, now.AddSeconds(15));
+            return name;
         }
+
+        // 1. TCP IPv4
+        CollectTcp4Sockets(sockets, -1, GetProcName);
+        // 2. TCP IPv6
+        CollectTcp6Sockets(sockets, -1, GetProcName);
+        // 3. UDP IPv4
+        CollectUdp4Sockets(sockets, -1, GetProcName);
+        // 4. UDP IPv6
+        CollectUdp6Sockets(sockets, -1, GetProcName);
+
+        return sockets;
     }
 
     /// <summary>CollectTcp4Sockets: Собирает список TCP IPv4 соединений.</summary>
@@ -564,7 +632,7 @@ public class ProcessNetworkTracker : IDisposable
                 });
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
     }
 
     /// <summary>CollectTcp6Sockets: Собирает список TCP IPv6 соединений.</summary>
@@ -615,7 +683,7 @@ public class ProcessNetworkTracker : IDisposable
                 });
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
     }
 
     /// <summary>CollectUdp4Sockets: Собирает список UDP IPv4 сокетов.</summary>
@@ -663,7 +731,7 @@ public class ProcessNetworkTracker : IDisposable
                 });
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
     }
 
     /// <summary>CollectUdp6Sockets: Собирает список UDP IPv6 сокетов.</summary>
@@ -711,7 +779,7 @@ public class ProcessNetworkTracker : IDisposable
                 });
             }
         }
-        catch { }
+        catch (Exception ex) { Serilog.Log.Debug(ex, "ProcessNetworkTracker: не удалось прочитать системный снимок или метаданные процесса"); }
     }
 
     /// <summary>Нормализует порт из сетевого порядка байт (big-endian) в хост-порядок.</summary>
@@ -750,6 +818,10 @@ public class ProcessNetworkTracker : IDisposable
     {
         lock (_sync)
         {
+            if (_disposed) return;
+            _disposed = true;
+            _socketSnapshot.Clear();
+            _procNameCache.Clear();
             FreeBuffer(ref _tcp4Buffer, ref _tcp4Capacity);
             FreeBuffer(ref _tcp6Buffer, ref _tcp6Capacity);
             FreeBuffer(ref _udp4Buffer, ref _udp4Capacity);

@@ -89,6 +89,7 @@ public class KasperskyScanService
                 Status = parsed.FileStatus
             };
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             return new KasperskyTestResult
@@ -111,8 +112,17 @@ public class KasperskyScanService
     /// <summary>
     /// Проверяет отдельную запись автозапуска через Kaspersky OpenTIP.
     /// </summary>
-    public async Task<bool> ScanEntryAsync(StartupEntry entry, CancellationToken ct = default)
+    public Task<bool> ScanEntryAsync(StartupEntry entry, CancellationToken ct = default)
+        => ScanEntryCoreAsync(entry, ct, persist: true);
+
+    /// <summary>Проверяет запись; batch-вызов откладывает сохранение репутации до одной общей операции.</summary>
+    /// <param name="entry">Проверяемая запись.</param>
+    /// <param name="ct">Токен отмены.</param>
+    /// <param name="persist">Нужно ли немедленно сохранять результат.</param>
+    /// <returns>Признак полученного результата проверки.</returns>
+    private async Task<bool> ScanEntryCoreAsync(StartupEntry entry, CancellationToken ct, bool persist)
     {
+        ArgumentNullException.ThrowIfNull(entry);
         using var _prof = ExecutionProfiler.Measure("Service.Kaspersky.ScanEntry");
         // Наш собственный сервис и UI всегда считаем доверенными
         if (EntryOperations.IsOwnService(entry))
@@ -120,7 +130,7 @@ public class KasperskyScanService
             entry.KasperskyZone = "Green";
             entry.KasperskyFileStatus = "Trusted";
             entry.KasperskyDetection = "";
-            _store.UpdateEntry(entry);
+            if (persist) _store.UpdateEntryReputations([entry]);
             return true;
         }
 
@@ -133,28 +143,29 @@ public class KasperskyScanService
                 entry.KasperskyZone = "Grey";
                 entry.KasperskyFileStatus = "NoHash";
                 entry.KasperskyDetection = "";
-                _store.UpdateEntry(entry);
+                if (persist) _store.UpdateEntryReputations([entry]);
                 return false;
             }
         }
 
-        var cfg = _store.Load();
-        if (!cfg.Settings.KasperskyEnabled)
+        // Чтение настроек не клонирует все записи автозапуска и историю.
+        var settings = _store.GetSettings();
+        if (!settings.KasperskyEnabled)
         {
             _logger.LogDebug("KasperskyScanService: проверка отключена в настройках");
             return false;
         }
 
-        var apiKey = cfg.Settings.KasperskyApiKey;
+        var apiKey = settings.KasperskyApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
         {
             _logger.LogWarning("KasperskyScanService: API-токен не настроен");
             return false;
         }
 
-        var apiUrl = string.IsNullOrWhiteSpace(cfg.Settings.KasperskyApiUrl)
+        var apiUrl = string.IsNullOrWhiteSpace(settings.KasperskyApiUrl)
             ? "https://opentip.kaspersky.com/api/v1/search/hash"
-            : cfg.Settings.KasperskyApiUrl.TrimEnd('/');
+            : settings.KasperskyApiUrl.TrimEnd('/');
 
         try
         {
@@ -164,7 +175,7 @@ public class KasperskyScanService
                 entry.KasperskyZone = result.Zone;
                 entry.KasperskyDetection = result.DetectionName;
                 entry.KasperskyFileStatus = result.FileStatus;
-                _store.UpdateEntry(entry);
+                if (persist) _store.UpdateEntryReputations([entry]);
                 return true;
             }
         }
@@ -185,6 +196,7 @@ public class KasperskyScanService
     /// </summary>
     public async Task ScanAllAsync(List<StartupEntry> entries, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(entries);
         using var _profKaspersky = ExecutionProfiler.Profile("Service.KasperskyScan");
         using var _prof = ExecutionProfiler.Measure("Service.Kaspersky.ScanAll");
         if (!await _scanLock.WaitAsync(0, ct))
@@ -193,10 +205,12 @@ public class KasperskyScanService
             return;
         }
 
+        var completed = new List<StartupEntry>();
         try
         {
-            var cfg = _store.Load();
-            if (!cfg.Settings.KasperskyEnabled || string.IsNullOrWhiteSpace(cfg.Settings.KasperskyApiKey))
+            // Чтение настроек не клонирует все записи автозапуска и историю.
+            var settings = _store.GetSettings();
+            if (!settings.KasperskyEnabled || string.IsNullOrWhiteSpace(settings.KasperskyApiKey))
             {
                 return;
             }
@@ -222,7 +236,7 @@ public class KasperskyScanService
                     entry.KasperskyFileStatus = "Trusted";
                     entry.KasperskyDetection = "";
                     _sessionScanned.Add(entry.Id);
-                    _store.UpdateEntry(entry);
+                    completed.Add(entry);
                     ok++;
                     continue;
                 }
@@ -237,7 +251,8 @@ public class KasperskyScanService
                     continue;
                 }
 
-                var scanned = await ScanEntryAsync(entry, ct);
+                var scanned = await ScanEntryCoreAsync(entry, ct, persist: false);
+                completed.Add(entry);
                 if (scanned && !string.IsNullOrEmpty(entry.KasperskyZone))
                     ok++;
                 else
@@ -253,7 +268,8 @@ public class KasperskyScanService
         }
         finally
         {
-            _scanLock.Release();
+            try { _store.UpdateEntryReputations(completed); }
+            finally { _scanLock.Release(); }
         }
     }
 

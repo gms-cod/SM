@@ -4,13 +4,14 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.UI.Controls;
 
 /// <summary>
 /// Нативный высокопроизводительный график сетевой активности и событий безопасности.
 /// Отрисовка выполняется через аппаратный DrawingContext (MIL Core) без сторонних библиотек.
-/// Обеспечивает 60 FPS, Zero-Alloc в цикле отрисовки и 0% фоновой нагрузки на CPU.
+/// Кэширует геометрию до изменения данных или размера и не использует фоновый таймер отрисовки.
 /// </summary>
 public sealed class NetworkTimelineChartControl : FrameworkElement
 {
@@ -36,13 +37,24 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
         /// <summary>Количество предупреждений и интерактивных алертов в бакете.</summary>
         public readonly int AlertCount;
 
-        public ChartDataPoint(DateTime timestamp, double inBps, double outBps, int blocked, int alerts)
+        /// <summary>Есть ли действительное измерение скорости в этом временном бакете.</summary>
+        public readonly bool HasMeasurement;
+
+        /// <summary>Создаёт временной бакет, отличая отсутствие измерения от измеренного нулевого трафика.</summary>
+        /// <param name="timestamp">UTC-время бакета.</param>
+        /// <param name="inBps">Измеренная входящая скорость.</param>
+        /// <param name="outBps">Измеренная исходящая скорость.</param>
+        /// <param name="blocked">Число блокировок.</param>
+        /// <param name="alerts">Число предупреждений.</param>
+        /// <param name="hasMeasurement">Наличие действительного измерения, включая измеренный ноль.</param>
+        public ChartDataPoint(DateTime timestamp, double inBps, double outBps, int blocked, int alerts, bool hasMeasurement = true)
         {
             Timestamp = timestamp;
             InboundBps = inBps;
             OutboundBps = outBps;
             BlockedCount = blocked;
             AlertCount = alerts;
+            HasMeasurement = hasMeasurement;
         }
     }
 
@@ -70,6 +82,26 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
     private static readonly Brush TooltipBackgroundBrush = Freeze(new SolidColorBrush(Color.FromArgb(235, 0x12, 0x18, 0x24)));
     private static readonly Pen TooltipBorderPen = Freeze(new Pen(new SolidColorBrush(Color.FromArgb(120, 0x00, 0xD2, 0xD3)), 1.0));
     private static readonly Brush TextWhiteBrush = Freeze(new SolidColorBrush(Colors.White));
+    private static readonly Brush MarkerGlowBrush = Freeze(new SolidColorBrush(Color.FromArgb(80, 0x00, 0xD2, 0xD3)));
+    private static readonly Brush MarkerBrush = Freeze(new SolidColorBrush(CyanColor));
+    private static readonly Brush TrafficFillBrush = Freeze(new LinearGradientBrush(
+        Color.FromArgb(55, 0x00, 0xD2, 0xD3), Color.FromArgb(2, 0x00, 0xD2, 0xD3), 90.0));
+    private static readonly Pen OutboundPen = Freeze(new Pen(new SolidColorBrush(Color.FromRgb(0x60, 0xA5, 0xFA)), 1.5));
+    private static readonly Typeface TooltipTypeface = new(new FontFamily("Segoe UI Variable Text, Segoe UI"),
+        FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+
+    /// <summary>Замороженный рисунок меняется только при обновлении данных или фактического размера.</summary>
+    private DrawingGroup? _cachedDrawing;
+    private Size _cachedSize;
+    private bool _dataDirty = true;
+    private double _cachedMinimum;
+    private double _cachedSpan = 1024;
+    private bool _hasMeasurements;
+    private int _hoveredIndex = -1;
+    private int _tooltipIndex = -1;
+    private string _tooltipCulture = string.Empty;
+    private double _tooltipDpi;
+    private FormattedText? _cachedTooltip;
 
     private Point? _cursorPosition;
     private ChartDataPoint? _hoveredPoint;
@@ -127,11 +159,25 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
     /// <param name="dataPoints">Последовательность точек данных активности.</param>
     public void SetDataPoints(IEnumerable<ChartDataPoint>? dataPoints)
     {
+        VerifyAccess();
         _points.Clear();
         if (dataPoints != null)
         {
-            _points.AddRange(dataPoints);
+            foreach (var point in dataPoints)
+            {
+                if (_points.Count >= 4096) break;
+                var valid = point.HasMeasurement && double.IsFinite(point.InboundBps) && double.IsFinite(point.OutboundBps)
+                    && point.InboundBps >= 0 && point.OutboundBps >= 0
+                    && point.InboundBps <= long.MaxValue && point.OutboundBps <= long.MaxValue;
+                _points.Add(new ChartDataPoint(point.Timestamp, valid ? point.InboundBps : 0,
+                    valid ? point.OutboundBps : 0, Math.Max(0, point.BlockedCount), Math.Max(0, point.AlertCount), valid));
+            }
         }
+        _dataDirty = true;
+        _hoveredIndex = -1;
+        _tooltipIndex = -1;
+        _cursorPosition = null;
+        _hoveredPoint = null;
         InvalidateVisual();
     }
 
@@ -142,179 +188,147 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
     protected override void OnRender(DrawingContext dc)
     {
         base.OnRender(dc);
-
-        double width = ActualWidth;
-        double height = ActualHeight;
-
-        if (width < 30 || height < 30)
-            return;
-
-        // 1. Отрисовка фоновой сетки и временных меток
+        var width = ActualWidth;
+        var height = ActualHeight;
+        if (width < 30 || height < 30) return;
         DrawBackgroundGrid(dc, width, height);
-
-        if (_points.Count < 2)
-            return;
-
-        // 2. Расчет адаптивного динамического диапазона (Auto-Gain Control / AGC)
-        const double topPadding = 12.0;
-        const double bottomPadding = 10.0;
-        double usableHeight = Math.Max(10.0, height - topPadding - bottomPadding);
-
-        double minTraffic = double.MaxValue;
-        double maxTraffic = 0.0;
-        int maxBlocked = 1;
-
-        for (int i = 0; i < _points.Count; i++)
+        if (_dataDirty || _cachedDrawing == null || _cachedSize != RenderSize)
+            RebuildDrawing(width, height);
+        if (_cachedDrawing != null)
+            dc.DrawDrawing(_cachedDrawing);
+        if (!_hasMeasurements)
         {
-            var p = _points[i];
-            double traffic = Math.Max(p.InboundBps, p.OutboundBps);
-            if (traffic < minTraffic) minTraffic = traffic;
-            if (traffic > maxTraffic) maxTraffic = traffic;
-            if (p.BlockedCount > maxBlocked) maxBlocked = p.BlockedCount;
+            var emptyText = new FormattedText(LocalizationService.Instance["TimelineNoMeasurements"],
+                CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, TooltipTypeface, 11,
+                TextWhiteBrush, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            dc.DrawText(emptyText, new Point(8, Math.Max(0, (height - emptyText.Height) * 0.5)));
         }
+        if (_cursorPosition.HasValue && _hoveredPoint is { HasMeasurement: true } point)
+            DrawInteractiveHairline(dc, _cursorPosition.Value.X, height, point, ProjectTraffic(point.InboundBps, height));
+    }
 
-        if (minTraffic > maxTraffic)
+    /// <summary>Вычисляет конечный диапазон обеих измеренных скоростей для рабочего алгоритма AGC.</summary>
+    /// <param name="minimum">Минимальная конечная неотрицательная скорость.</param>
+    /// <param name="maximum">Максимальная конечная неотрицательная скорость.</param>
+    /// <returns>Нижняя и верхняя границы без вырожденного диапазона.</returns>
+    internal static (double Minimum, double Maximum) CalculateTrafficRange(double minimum, double maximum)
+    {
+        if (!double.IsFinite(minimum) || !double.IsFinite(maximum) || minimum < 0 || maximum < minimum
+            || maximum > long.MaxValue)
+            return (0, 1024);
+        if (maximum < 10) return (0, 1024);
+        var range = maximum - minimum;
+        if (range >= maximum * 0.40) return (0, maximum * 1.15);
+        var midpoint = (maximum + minimum) * 0.5;
+        var span = Math.Max(range * 2, maximum * 0.35);
+        var lower = Math.Max(0, midpoint - span * 0.5);
+        return (lower, lower + span);
+    }
+
+    /// <summary>Проецирует проверенную скорость в вертикальную координату с ограничением границ.</summary>
+    /// <param name="value">Конечная измеренная скорость.</param>
+    /// <param name="height">Доступная высота графика.</param>
+    /// <returns>Координата внутри диапазона рисунка.</returns>
+    private double ProjectTraffic(double value, double height)
+        => height - 10 - Math.Clamp((value - _cachedMinimum) / _cachedSpan, 0, 1) * Math.Max(10, height - 22);
+
+    /// <summary>Создаёт и замораживает рисунок только при изменении данных или размера.</summary>
+    /// <param name="width">Ширина графика в DIP.</param>
+    /// <param name="height">Высота графика в DIP.</param>
+    private void RebuildDrawing(double width, double height)
+    {
+        var minimum = double.MaxValue;
+        var maximum = 0.0;
+        var maxBlocked = 1;
+        _hasMeasurements = false;
+        foreach (var point in _points)
         {
-            minTraffic = 0.0;
-            maxTraffic = 1024.0;
+            maxBlocked = Math.Max(maxBlocked, point.BlockedCount);
+            if (!point.HasMeasurement) continue;
+            _hasMeasurements = true;
+            minimum = Math.Min(minimum, Math.Min(point.InboundBps, point.OutboundBps));
+            maximum = Math.Max(maximum, Math.Max(point.InboundBps, point.OutboundBps));
         }
-
-        double range = maxTraffic - minTraffic;
-        double effectiveMin;
-        double effectiveMax;
-
-        if (maxTraffic < 10.0)
+        var range = CalculateTrafficRange(minimum, maximum);
+        _cachedMinimum = range.Minimum;
+        _cachedSpan = Math.Max(1, range.Maximum - range.Minimum);
+        var drawing = new DrawingGroup();
+        using (var context = drawing.Open())
         {
-            // Практически нулевой трафик — привязка к baseline с окном 1 КБ/с
-            effectiveMin = 0.0;
-            effectiveMax = 1024.0;
-        }
-        else if (range < maxTraffic * 0.40)
-        {
-            // Малая амплитуда (высокое постоянное смещение / DC offset):
-            // AGC центрирует вариацию на ~55% полезной высоты холста для четкой видимости динамики
-            double mid = (maxTraffic + minTraffic) * 0.5;
-            double desiredSpan = Math.Max(range * 2.0, maxTraffic * 0.35);
-            effectiveMin = Math.Max(0.0, mid - desiredSpan * 0.5);
-            effectiveMax = effectiveMin + desiredSpan;
-        }
-        else
-        {
-            // Выраженный динамический диапазон: масштабирование от 0 с запасом 15% сверху
-            effectiveMin = 0.0;
-            effectiveMax = maxTraffic * 1.15;
-        }
-
-        double trafficSpan = Math.Max(1.0, effectiveMax - effectiveMin);
-
-        // Функция проекции величины трафика в экранную координату Y
-        double ValueToY(double val)
-        {
-            double norm = (val - effectiveMin) / trafficSpan;
-            if (norm < 0.0) norm = 0.0;
-            if (norm > 1.0) norm = 1.0;
-            return (height - bottomPadding) - (norm * usableHeight);
-        }
-
-        int n = _points.Count;
-        double stepX = width / (n - 1);
-        Point[] pts = new Point[n];
-
-        for (int i = 0; i < n; i++)
-        {
-            pts[i] = new Point(i * stepX, ValueToY(_points[i].InboundBps));
-        }
-
-        // 3. Построение сглаженной кубической геометрии Безье (Smooth Cubic Bezier Spline)
-        var trafficGeometry = new StreamGeometry();
-        var trafficFillGeometry = new StreamGeometry();
-        var blockedGeometry = new StreamGeometry();
-
-        const double tension = 0.40; // Оптимальный коэффициент натяжения для предотвращения перерегулирования
-
-        using (var ctxLine = trafficGeometry.Open())
-        using (var ctxFill = trafficFillGeometry.Open())
-        {
-            ctxLine.BeginFigure(pts[0], false, false);
-
-            ctxFill.BeginFigure(new Point(pts[0].X, height), true, true);
-            ctxFill.LineTo(pts[0], true, false);
-
-            for (int i = 0; i < n - 1; i++)
+            if (_points.Count > 0)
             {
-                Point pPrev = (i > 0) ? pts[i - 1] : new Point(2 * pts[0].X - pts[1].X, 2 * pts[0].Y - pts[1].Y);
-                Point p0 = pts[i];
-                Point p1 = pts[i + 1];
-                Point pNext = (i < n - 2) ? pts[i + 2] : new Point(2 * pts[n - 1].X - pts[n - 2].X, 2 * pts[n - 1].Y - pts[n - 2].Y);
-
-                // Расчет контрольных точек Безье из сплайна Кэтмулла-Рома
-                double cp1X = p0.X + (p1.X - pPrev.X) * (tension / 3.0);
-                double cp1Y = p0.Y + (p1.Y - pPrev.Y) * (tension / 3.0);
-
-                double cp2X = p1.X - (pNext.X - p0.X) * (tension / 3.0);
-                double cp2Y = p1.Y - (pNext.Y - p0.Y) * (tension / 3.0);
-
-                // Ограничение контрольных точек по вертикали (Overshoot Clamping)
-                cp1Y = Math.Clamp(cp1Y, topPadding, height - bottomPadding);
-                cp2Y = Math.Clamp(cp2Y, topPadding, height - bottomPadding);
-
-                Point cp1 = new Point(cp1X, cp1Y);
-                Point cp2 = new Point(cp2X, cp2Y);
-
-                ctxLine.BezierTo(cp1, cp2, p1, true, true);
-                ctxFill.BezierTo(cp1, cp2, p1, true, true);
-            }
-
-            ctxFill.LineTo(new Point(pts[n - 1].X, height), true, false);
-        }
-
-        // Построение геометрии блокировок (Crimson Spikes)
-        using (var ctxBlocked = blockedGeometry.Open())
-        {
-            for (int i = 0; i < n; i++)
-            {
-                if (_points[i].BlockedCount > 0)
+                var step = _points.Count > 1 ? width / (_points.Count - 1) : 0;
+                var inbound = BuildTrafficGeometry(step, height, outbound: false, fill: false);
+                var outbound = BuildTrafficGeometry(step, height, outbound: true, fill: false);
+                var fill = BuildTrafficGeometry(step, height, outbound: false, fill: true);
+                context.DrawGeometry(TrafficFillBrush, null, fill);
+                context.DrawGeometry(null, CyanGlowPen, inbound);
+                context.DrawGeometry(null, CyanLinePen, inbound);
+                context.DrawGeometry(null, OutboundPen, outbound);
+                var blocked = new StreamGeometry();
+                using (var geometry = blocked.Open())
                 {
-                    double x = i * stepX;
-                    double barH = Math.Min(height * 0.75, (_points[i].BlockedCount / (double)maxBlocked) * (usableHeight * 0.85) + 6.0);
-                    double y = (height - bottomPadding) - barH;
-
-                    ctxBlocked.BeginFigure(new Point(x, height - bottomPadding), false, false);
-                    ctxBlocked.LineTo(new Point(x, y), true, false);
+                    for (var i = 0; i < _points.Count; i++)
+                    {
+                        if (_points[i].BlockedCount == 0) continue;
+                        var x = i * step;
+                        var barHeight = Math.Min(height * 0.75, _points[i].BlockedCount / (double)maxBlocked
+                            * (Math.Max(10, height - 22) * 0.85) + 6);
+                        geometry.BeginFigure(new Point(x, height - 10), false, false);
+                        geometry.LineTo(new Point(x, height - 10 - barHeight), true, false);
+                    }
                 }
+                blocked.Freeze();
+                context.DrawGeometry(null, CrimsonGlowPen, blocked);
+                context.DrawGeometry(null, CrimsonLinePen, blocked);
             }
         }
+        drawing.Freeze();
+        _cachedDrawing = drawing;
+        _cachedSize = RenderSize;
+        _dataDirty = false;
+    }
 
-        trafficGeometry.Freeze();
-        trafficFillGeometry.Freeze();
-        blockedGeometry.Freeze();
-
-        // 4. Отрисовка заливки с неоновым градиентом
-        var fillBrush = new LinearGradientBrush(
-            Color.FromArgb(55, 0x00, 0xD2, 0xD3),
-            Color.FromArgb(2, 0x00, 0xD2, 0xD3),
-            90.0);
-        fillBrush.Freeze();
-
-        dc.DrawGeometry(fillBrush, null, trafficFillGeometry);
-
-        // 5. Отрисовка сглаженной линии со свечением (Neon Glow)
-        dc.DrawGeometry(null, CyanGlowPen, trafficGeometry);
-        dc.DrawGeometry(null, CyanLinePen, trafficGeometry);
-
-        // 6. Отрисовка спайков блокировок
-        if (maxBlocked > 0)
+    /// <summary>Строит сглаженную кривую, разрывая её на каждом бакете без измерения.</summary>
+    /// <param name="step">Горизонтальный шаг между временными бакетами.</param>
+    /// <param name="height">Высота графика.</param>
+    /// <param name="outbound">Выбрать исходящую скорость вместо входящей.</param>
+    /// <param name="fill">Замкнуть фигуры для заливки под входящей кривой.</param>
+    /// <returns>Замороженная геометрия без интерполяции через отсутствующие измерения.</returns>
+    private StreamGeometry BuildTrafficGeometry(double step, double height, bool outbound, bool fill)
+    {
+        var geometry = new StreamGeometry();
+        using (var context = geometry.Open())
         {
-            dc.DrawGeometry(null, CrimsonGlowPen, blockedGeometry);
-            dc.DrawGeometry(null, CrimsonLinePen, blockedGeometry);
+            for (var start = 0; start < _points.Count; start++)
+            {
+                if (!_points[start].HasMeasurement) continue;
+                var end = start;
+                while (end + 1 < _points.Count && _points[end + 1].HasMeasurement) end++;
+                Point At(int index) => new(index * step, ProjectTraffic(outbound ? _points[index].OutboundBps : _points[index].InboundBps, height));
+                var first = At(start);
+                context.BeginFigure(fill ? new Point(first.X, height) : first, fill, fill);
+                if (fill) context.LineTo(first, true, false);
+                if (end == start) context.LineTo(new Point(first.X + 0.5, first.Y), true, false);
+                for (var i = start; i < end; i++)
+                {
+                    var a = At(i);
+                    var b = At(i + 1);
+                    var previous = i > start ? At(i - 1) : new Point(2 * a.X - b.X, 2 * a.Y - b.Y);
+                    var next = i + 1 < end ? At(i + 2) : new Point(2 * b.X - a.X, 2 * b.Y - a.Y);
+                    const double tension = 0.40 / 3.0;
+                    var controlA = new Point(a.X + (b.X - previous.X) * tension,
+                        Math.Clamp(a.Y + (b.Y - previous.Y) * tension, 12, height - 10));
+                    var controlB = new Point(b.X - (next.X - a.X) * tension,
+                        Math.Clamp(b.Y - (next.Y - a.Y) * tension, 12, height - 10));
+                    context.BezierTo(controlA, controlB, b, true, true);
+                }
+                if (fill) context.LineTo(new Point(end * step, height), true, false);
+                start = end;
+            }
         }
-
-        // 7. Интерактивный курсор и карточка тултипа при наведении мыши
-        if (_cursorPosition.HasValue && _hoveredPoint.HasValue)
-        {
-            double markerY = ValueToY(_hoveredPoint.Value.InboundBps);
-            DrawInteractiveHairline(dc, _cursorPosition.Value.X, height, _hoveredPoint.Value, markerY);
-        }
+        geometry.Freeze();
+        return geometry;
     }
 
     /// <summary>
@@ -344,63 +358,54 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
     /// </summary>
     private void DrawInteractiveHairline(DrawingContext dc, double x, double height, ChartDataPoint pt, double markerY)
     {
-        // Вертикальная линия визира
         dc.DrawLine(HairlinePen, new Point(x, 0), new Point(x, height));
-
-        // Подсвечиваемый маркер прямо на кривой Безье с неоновым ореолом
-        dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(80, 0x00, 0xD2, 0xD3)), null, new Point(x, markerY), 7.0, 7.0);
-        dc.DrawEllipse(new SolidColorBrush(CyanColor), null, new Point(x, markerY), 3.5, 3.5);
-
-        // Формирование текста тултипа
-        string timeStr = pt.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        string trafficStr = FormatBytesPerSec(pt.InboundBps);
-        string blockedStr = pt.BlockedCount > 0 ? $" | 🚫 Блоков: {pt.BlockedCount}" : string.Empty;
-        string text = $"⏱️ {timeStr} • ⚡ {trafficStr}{blockedStr}";
-
-        var typeface = new Typeface(new FontFamily("Segoe UI Variable Text, Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
-        var formattedText = new FormattedText(
-            text,
-            CultureInfo.CurrentUICulture,
-            FlowDirection.LeftToRight,
-            typeface,
-            11.5,
-            TextWhiteBrush,
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
-
-        double boxWidth = formattedText.Width + 18;
-        double boxHeight = formattedText.Height + 10;
-
-        double boxX = x + 10;
-        if (boxX + boxWidth > ActualWidth)
+        dc.DrawEllipse(MarkerGlowBrush, null, new Point(x, markerY), 7, 7);
+        dc.DrawEllipse(MarkerBrush, null, new Point(x, markerY), 3.5, 3.5);
+        var culture = CultureInfo.CurrentUICulture.Name;
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        if (_cachedTooltip == null || _tooltipIndex != _hoveredIndex || _tooltipCulture != culture || _tooltipDpi != dpi)
         {
-            boxX = x - boxWidth - 10;
+            var loc = LocalizationService.Instance;
+            var blocked = pt.BlockedCount > 0 ? string.Format(CultureInfo.CurrentUICulture,
+                loc["TimelineBlockedFormat"], pt.BlockedCount) : string.Empty;
+            var text = string.Format(CultureInfo.CurrentUICulture, loc["TimelineTooltipFormat"],
+                pt.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.CurrentUICulture),
+                FormatBytesPerSec(pt.InboundBps), FormatBytesPerSec(pt.OutboundBps), blocked);
+            _cachedTooltip = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                TooltipTypeface, 11.5, TextWhiteBrush, dpi);
+            _tooltipIndex = _hoveredIndex;
+            _tooltipCulture = culture;
+            _tooltipDpi = dpi;
         }
-
-        double boxY = Math.Clamp(markerY - boxHeight - 8, 8.0, height - boxHeight - 8.0);
-
-        var tooltipRect = new Rect(boxX, boxY, boxWidth, boxHeight);
-        dc.DrawRoundedRectangle(TooltipBackgroundBrush, TooltipBorderPen, tooltipRect, 6.0, 6.0);
-        dc.DrawText(formattedText, new Point(boxX + 9, boxY + 5));
+        var boxWidth = _cachedTooltip.Width + 18;
+        var boxHeight = _cachedTooltip.Height + 10;
+        if (height < boxHeight + 16 || ActualWidth < boxWidth + 16) return;
+        var boxX = Math.Clamp(x + 10, 8, ActualWidth - boxWidth - 8);
+        var boxY = Math.Clamp(markerY - boxHeight - 8, 8, height - boxHeight - 8);
+        dc.DrawRoundedRectangle(TooltipBackgroundBrush, TooltipBorderPen,
+            new Rect(boxX, boxY, boxWidth, boxHeight), 6, 6);
+        dc.DrawText(_cachedTooltip, new Point(boxX + 9, boxY + 5));
     }
 
+    /// <summary>Меняет интерактивный срез только при переходе курсора в другой бакет.</summary>
+    /// <param name="sender">Источник события мыши.</param>
+    /// <param name="e">Координаты курсора.</param>
     private void OnChartMouseMove(object sender, MouseEventArgs e)
     {
-        if (_points.Count < 2) return;
-
-        Point pos = e.GetPosition(this);
-        double stepX = ActualWidth / (_points.Count - 1);
-        int index = (int)Math.Round(pos.X / stepX);
-
-        if (index >= 0 && index < _points.Count)
-        {
-            _cursorPosition = new Point(index * stepX, pos.Y);
-            _hoveredPoint = _points[index];
-            InvalidateVisual();
-        }
+        if (_points.Count < 2 || ActualWidth <= 0) return;
+        var position = e.GetPosition(this);
+        var step = ActualWidth / (_points.Count - 1);
+        var index = Math.Clamp((int)Math.Round(position.X / step), 0, _points.Count - 1);
+        if (index == _hoveredIndex) return;
+        _hoveredIndex = index;
+        _cursorPosition = new Point(index * step, position.Y);
+        _hoveredPoint = _points[index];
+        InvalidateVisual();
     }
 
     private void OnChartMouseLeave(object sender, MouseEventArgs e)
     {
+        _hoveredIndex = -1;
         _cursorPosition = null;
         _hoveredPoint = null;
         InvalidateVisual();
@@ -419,9 +424,10 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
     /// </summary>
     private static string FormatBytesPerSec(double bytesPerSec)
     {
-        if (bytesPerSec < 1024) return $"{bytesPerSec:0} Б/с";
-        if (bytesPerSec < 1024 * 1024) return $"{bytesPerSec / 1024.0:F1} КБ/с";
-        return $"{bytesPerSec / (1024.0 * 1024.0):F2} МБ/с";
+        var loc = LocalizationService.Instance;
+        if (bytesPerSec < 1024) return $"{bytesPerSec:0} {loc["UnitBytesPerSecond"]}";
+        if (bytesPerSec < 1024 * 1024) return $"{bytesPerSec / 1024:F1} {loc["UnitKilobytesPerSecond"]}";
+        return $"{bytesPerSec / (1024 * 1024):F2} {loc["UnitMegabytesPerSecond"]}";
     }
 
     /// <summary>

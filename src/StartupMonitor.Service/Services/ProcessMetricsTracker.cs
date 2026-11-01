@@ -27,7 +27,10 @@ public class ProcessMetricsTracker : IDisposable
 {
     private readonly ProcessMetadataEnricher _enricher;
     private readonly ProcessStartupLinker _linker;
-    private readonly ProcessNetworkTracker _networkTracker = new();
+    private readonly ProcessNetworkTracker _networkTracker;
+    /// <summary>Признак владения сборщиком, когда он не был внедрён общим DI-контейнером.</summary>
+    private readonly bool _ownsNetworkTracker;
+    private bool _disposed;
     private readonly ConcurrentDictionary<int, ProcessMetricHistory> _history = new();
     private readonly Timer _pollTimer;
     private readonly int _processorCount = Math.Max(1, Environment.ProcessorCount);
@@ -79,11 +82,15 @@ public class ProcessMetricsTracker : IDisposable
     /// <summary>Инициализирует трекер с переиспользуемым нативным буфером.</summary>
     /// <param name="enricher">Обогатитель метаданных процессов.</param>
     /// <param name="linker">Связыватель процессов с автозапуском.</param>
-    public ProcessMetricsTracker(ProcessMetadataEnricher enricher, ProcessStartupLinker linker, Microsoft.Extensions.Logging.ILogger<ProcessMetricsTracker>? logger = null)
+    /// <param name="logger">Необязательный журнал диагностики.</param>
+    /// <param name="networkTracker">Общий сетевой сборщик; при отсутствии создаётся принадлежащий этому экземпляру.</param>
+    public ProcessMetricsTracker(ProcessMetadataEnricher enricher, ProcessStartupLinker linker, Microsoft.Extensions.Logging.ILogger<ProcessMetricsTracker>? logger = null, ProcessNetworkTracker? networkTracker = null)
     {
-        _enricher = enricher;
-        _linker = linker;
+        _enricher = enricher ?? throw new ArgumentNullException(nameof(enricher));
+        _linker = linker ?? throw new ArgumentNullException(nameof(linker));
         _logger = logger;
+        _networkTracker = networkTracker ?? new ProcessNetworkTracker();
+        _ownsNetworkTracker = networkTracker is null;
 
         // Выделяем переиспользуемый нативный буфер в неуправляемой памяти
         _nativeBuffer = Marshal.AllocHGlobal(_nativeBufferSize);
@@ -168,6 +175,7 @@ public class ProcessMetricsTracker : IDisposable
     {
         lock (_collectLock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var _profSnapshot = ExecutionProfiler.Profile("Service.ProcessMetricsSnapshot");
             using var _prof = ExecutionProfiler.Measure("Service.ProcessMetrics.Collect");
         var now = DateTime.UtcNow;
@@ -503,11 +511,14 @@ public class ProcessMetricsTracker : IDisposable
     /// <summary>Освобождает занятые ресурсы объекта и неуправляемый нативный буфер.</summary>
     public void Dispose()
     {
-        _pollTimer.Dispose();
-        _networkTracker.Dispose();
-        _enricher.Dispose();
+        // Таймер прекращается до освобождения буферов; внедрённые singleton-зависимости освобождает контейнер.
+        _pollTimer.DisposeAsync().AsTask().GetAwaiter().GetResult();
         lock (_collectLock)
         {
+            if (_disposed) return;
+            _disposed = true;
+            if (_ownsNetworkTracker)
+                _networkTracker.Dispose();
             if (_nativeBuffer != IntPtr.Zero)
             {
                 Marshal.FreeHGlobal(_nativeBuffer);

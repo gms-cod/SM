@@ -68,7 +68,8 @@ try
         msg => Log.Information("PERF REPORT (Service):\n{Report}", msg));
 
     // Загрузчик данных — единая точка доступа к конфигурации
-    var dataStore = new JsonDataStore(configPath);
+    // Диагностика восстановления секций направляется в журнал службы без зависимости Shared от Serilog.
+    var dataStore = new JsonDataStore(configPath, (message, exception) => Log.Warning(exception, "{Message}", message));
     var cfg = dataStore.Load();
 
     // При старте завершаем процессы заблокированных записей и любые процессы,
@@ -95,7 +96,12 @@ try
             services.AddSingleton<NotificationService>();
             services.AddSingleton<BlacklistManager>();
             services.AddSingleton<WindowsFirewallService>();
+            // Адаптер позволяет проверять отказы firewall без изменения правил настоящей машины в unit-тестах.
+            services.AddSingleton<IPortDefenderFirewall>(sp => sp.GetRequiredService<WindowsFirewallService>());
             services.AddSingleton<ProcessNetworkTracker>();
+            // Локальные RX/TX собираются одним дешёвым воркером, независимо от тяжёлой телеметрии процессов.
+            services.AddSingleton<NetworkTrafficHistoryService>();
+            services.AddHostedService(sp => sp.GetRequiredService<NetworkTrafficHistoryService>());
             services.AddSingleton<StartupMonitor.Service.Services.Firewall.NetworkConnectionAlertService>();
             services.AddSingleton<StartupMonitor.Service.Services.Firewall.AccessMatrixCoordinatorService>();
             services.AddSingleton<ProcessPortDefenderService>();

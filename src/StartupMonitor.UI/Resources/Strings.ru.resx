@@ -2143,4 +2143,19 @@
   <data name="NetAclRowBlacklistTip" xml:space="preserve"><value>Заблокировать (в чёрный список)</value></data>
   <data name="NetAclRowKillProcessTip" xml:space="preserve"><value>Завершить процесс</value></data>
   <data name="NetAclEmptyText" xml:space="preserve"><value>В матрице доступа нет приложений по выбранному фильтру.</value></data>
+  <data name="TimelineTitle" xml:space="preserve"><value>Трафик сетевых интерфейсов</value></data>
+  <data name="TimelineNoMeasurements" xml:space="preserve"><value>В этом интервале нет измерений</value></data>
+  <data name="TimelineTooltipFormat" xml:space="preserve"><value>{0} • ↓ {1} • ↑ {2}{3}</value></data>
+  <data name="TimelineBlockedFormat" xml:space="preserve"><value> | Блокировок: {0}</value></data>
+  <data name="TimelineSliceFormat" xml:space="preserve"><value>• Срез: {0:HH:mm:ss}</value></data>
+  <data name="TimelineHour" xml:space="preserve"><value>1 час</value></data>
+  <data name="TimelineDay" xml:space="preserve"><value>24 часа</value></data>
+  <data name="TimelineWeek" xml:space="preserve"><value>7 дней</value></data>
+  <data name="TimelineReset" xml:space="preserve"><value>↩ Сброс среза</value></data>
+  <data name="TimelineResetTip" xml:space="preserve"><value>Вернуться ко всем текущим соединениям</value></data>
+  <data name="UnitBytesPerSecond" xml:space="preserve"><value>Б/с</value></data>
+  <data name="UnitKilobytesPerSecond" xml:space="preserve"><value>КБ/с</value></data>
+  <data name="UnitMegabytesPerSecond" xml:space="preserve"><value>МБ/с</value></data>
+  <data name="UnitGigabytes" xml:space="preserve"><value>ГБ</value></data>
+  <data name="NetConnectionHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
 </root>

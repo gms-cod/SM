@@ -5,6 +5,7 @@ using System.Management;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StartupMonitor.Service.Services.Wmi;
@@ -27,7 +28,11 @@ public class WmiSubscriptionWatcher : BackgroundService
     private readonly MonitoringStateCoordinator _coordinator;
 
     private readonly SemaphoreSlim _scanLock = new(1, 1);
-    private CancellationTokenSource? _debounceCts;
+    /// <summary>Одна очередь коалесцирует шторм WMI-событий без создания CTS и Task на каждое событие.</summary>
+    private readonly Channel<string> _rescanRequests = Channel.CreateBounded<string>(new BoundedChannelOptions(1)
+    {
+        SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.DropOldest
+    });
 
     public WmiSubscriptionWatcher(
         JsonDataStore store,
@@ -48,6 +53,7 @@ public class WmiSubscriptionWatcher : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("WmiSubscriptionWatcher started");
+        var debounceTask = ProcessRescanRequestsAsync(stoppingToken);
 
         // 1. Начальное сканирование и синхронизация при старте службы
         await RescanSubscriptionsAsync("InitialScan", isInitialScan: true, stoppingToken);
@@ -112,7 +118,8 @@ public class WmiSubscriptionWatcher : BackgroundService
             try { createWatcher?.Stop(); createWatcher?.Dispose(); } catch { }
             try { modWatcher?.Stop(); modWatcher?.Dispose(); } catch { }
             try { delWatcher?.Stop(); delWatcher?.Dispose(); } catch { }
-            _debounceCts?.Dispose();
+            _rescanRequests.Writer.TryComplete();
+            await debounceTask;
             _logger.LogInformation("WmiSubscriptionWatcher штатно остановлен");
         }
     }
@@ -124,32 +131,38 @@ public class WmiSubscriptionWatcher : BackgroundService
     private void ScheduleRescan(string reason)
     {
         if (_coordinator.IsPaused) return;
+        _rescanRequests.Writer.TryWrite(reason);
+    }
 
+    /// <summary>Последовательно обрабатывает объединённые запросы; остановка ожидает завершения этого единственного worker.</summary>
+    /// <param name="stoppingToken">Токен завершения службы.</param>
+    /// <returns>Задача жизненного цикла debounce-обработчика.</returns>
+    private async Task ProcessRescanRequestsAsync(CancellationToken stoppingToken)
+    {
         try
         {
-            _debounceCts?.Cancel();
-            _debounceCts?.Dispose();
+            while (await _rescanRequests.Reader.WaitToReadAsync(stoppingToken))
+            {
+                if (!_rescanRequests.Reader.TryRead(out var reason)) continue;
+                while (true)
+                {
+                    await Task.Delay(1000, stoppingToken);
+                    var changed = false;
+                    while (_rescanRequests.Reader.TryRead(out var next)) { reason = next; changed = true; }
+                    if (!changed) break;
+                }
+                if (!_coordinator.IsPaused)
+                    await RescanSubscriptionsAsync($"WmiEvent:{reason}", false, stoppingToken);
+            }
         }
-        catch { }
-
-        _debounceCts = new CancellationTokenSource();
-        var ct = _debounceCts.Token;
-
-        _ = Task.Run(async () =>
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                await Task.Delay(1000, ct);
-                if (ct.IsCancellationRequested || _coordinator.IsPaused) return;
-
-                await RescanSubscriptionsAsync($"WmiEvent:{reason}", isInitialScan: false, ct);
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "WmiSubscriptionWatcher: ошибка отложенного пересканирования");
-            }
-        }, ct);
+            _logger.LogDebug("WmiSubscriptionWatcher: debounce завершён отменой службы");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "WmiSubscriptionWatcher: ошибка debounce-обработчика");
+        }
     }
 
     /// <summary>

@@ -74,10 +74,10 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (PerformanceSnapshot == null || PerformanceSnapshot.TotalMemoryBytes == 0) return "0 / 0 ГБ";
+            if (PerformanceSnapshot == null || PerformanceSnapshot.TotalMemoryBytes == 0) return $"0 / 0 {LocalizationService.Instance["UnitGigabytes"]}";
             var usedGb = PerformanceSnapshot.UsedMemoryBytes / (1024.0 * 1024 * 1024);
             var totalGb = PerformanceSnapshot.TotalMemoryBytes / (1024.0 * 1024 * 1024);
-            return $"{usedGb:F1} / {totalGb:F1} ГБ ({PerformanceSnapshot.TotalMemoryPercent:F0}%)";
+            return $"{usedGb:F1} / {totalGb:F1} {LocalizationService.Instance["UnitGigabytes"]} ({PerformanceSnapshot.TotalMemoryPercent:F0}%)";
         }
     }
     public double TotalMemoryValue => PerformanceSnapshot?.TotalMemoryPercent ?? 0;
@@ -86,11 +86,11 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (PerformanceSnapshot == null) return "0 КБ/с";
+            if (PerformanceSnapshot == null) return $"0 {LocalizationService.Instance["UnitKilobytesPerSecond"]}";
             var bytes = PerformanceSnapshot.TotalDiskIoBytesPerSec;
             if (bytes >= 1024 * 1024)
-                return $"{bytes / (1024.0 * 1024):F1} МБ/с";
-            return $"{bytes / 1024.0:F0} КБ/с";
+                return $"{bytes / (1024.0 * 1024):F1} {LocalizationService.Instance["UnitMegabytesPerSecond"]}";
+            return $"{bytes / 1024.0:F0} {LocalizationService.Instance["UnitKilobytesPerSecond"]}";
         }
     }
 
@@ -113,6 +113,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     {
         _pipeClient = pipeClient;
         _pipeClient.Connected += OnPipeClientConnected;
+        LocalizationService.Instance.PropertyChanged += OnLanguageChanged;
         _viewMode = MainViewModel.LoadSetting("taskManagerViewMode", "flat");
 
         _searchDebounceTimer = new DispatcherTimer
@@ -124,6 +125,15 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
             _searchDebounceTimer.Stop();
             ApplyFilterAndSort();
         };
+    }
+
+    /// <summary>Обновляет подписи единиц измерения при смене языка без нового снимка производительности.</summary>
+    /// <param name="sender">Сервис локализации.</param>
+    /// <param name="e">Сведения об обновлении ресурсов.</param>
+    private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(TotalMemoryDisplay));
+        OnPropertyChanged(nameof(TotalDiskDisplay));
     }
 
     /// <summary>OnPipeClientConnected: Обрабатывает событие OnPipeClientConnected.</summary>
@@ -1007,6 +1017,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
     public void Dispose()
     {
+        LocalizationService.Instance.PropertyChanged -= OnLanguageChanged;
         _searchDebounceTimer.Stop();
         _pipeClient.Connected -= OnPipeClientConnected;
         if (_isActive)

@@ -441,6 +441,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Освобождает ресурсы: таймеры, токены, pipe-клиент.</summary>
     public void Dispose()
     {
+        // Статический издатель не должен удерживать завершившую работу модель и её коллекции.
+        AppIconService.IconLoaded -= OnIconLoaded;
         _pipeClient.Connected -= OnPipeClientConnected;
         _pipeClient.EventsReceived -= OnPipeClientEventsReceived;
         _pipeClient.Disconnected -= OnPipeClientDisconnected;
@@ -1655,7 +1657,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _networkAlertPollerTimer?.Dispose();
         _networkAlertPollerTimer = null;
         _pollingTimer?.Dispose();
-        if (!IsMonitoringPaused)
+        if (!IsMonitoringPaused && !IsAllBackgroundSuspended)
         {
             _pollingTimer = new Timer(async _ => await LoadDataIfChanged(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
         }
@@ -2284,8 +2286,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Blacklist = new ObservableCollection<BlacklistRule>(rules);
             IsDataLoaded = true;
 
-            // Отменяем предыдущие фоновые циклы — иначе они плодятся при переподключениях
+            // Скрытое окно не возобновляет циклы, которые ранее отменило сворачивание.
+            if (IsAllBackgroundSuspended) return;
+            // Отменяем предыдущие фоновые циклы — иначе они плодятся при переподключениях.
             _backgroundCts?.Cancel();
+            _backgroundCts?.Dispose();
             _backgroundCts = new CancellationTokenSource();
             var ct = _backgroundCts.Token;
             _ = LoadRatingsAsync(entries, ct);

@@ -62,6 +62,9 @@ public partial class NetworkConnectionAlertWindow : Window
     private int _isClosed;
 
     /// <summary>Признак паузы таймера из-за наведения курсора (изменяется только в UI-потоке).</summary>
+    /// <summary>Выполнено ли первоначальное размещение на мониторе владельца или курсора.</summary>
+    private bool _initialPlacementComplete;
+
     private bool _isPausedByHover;
 
     /// <summary>Признак ручного перемещения окна пользователем (изменяется только в UI-потоке).</summary>
@@ -109,9 +112,9 @@ public partial class NetworkConnectionAlertWindow : Window
         MouseEnter += OnWindowMouseEnter;
         MouseLeave += OnWindowMouseLeave;
 
-        // Стартовая позиция до первого показа: правый нижний угол основной рабочей области.
+        // Стартовая позиция до первого показа: правый нижний угол рабочей области владельца или курсора.
         // Это исключает кратковременный «прыжок» окна из координаты (0,0) до первого RepositionWindow.
-        var fallbackArea = SystemParameters.WorkArea;
+        var fallbackArea = WindowHelper.GetCurrentMonitorWorkArea(this, initialPlacement: true);
         var fallbackWidth = GetPreferredWidth(fallbackArea);
         Left = Math.Max(fallbackArea.Left + ScreenMargin, fallbackArea.Right - fallbackWidth - ScreenMargin);
         Top = Math.Max(fallbackArea.Top + ScreenMargin, fallbackArea.Bottom - FallbackWindowHeight - ScreenMargin);
@@ -306,100 +309,59 @@ public partial class NetworkConnectionAlertWindow : Window
         RepositionWindow(animate: false);
     }
 
-    /// <summary>
-    /// Вычисляет суммарную высоту всех не-AI элементов окна:
-    /// внешние отступы Window/Border, верхняя панель (заголовок, процесс, адрес),
-    /// футер (таймер, 5 кнопок, прогресс-бар) и постоянные отступы карточки ИИ.
-    /// </summary>
-    /// <returns>Высота в DIP, необходимая для гарантированного отображения не-AI контента.</returns>
-    private double CalculateNonAiHeight()
-    {
-        var currentWidth = ActualWidth > 0 ? ActualWidth : (Width > 0 ? Width : DefaultWindowWidth);
-
-        UpperPanel.Measure(new Size(currentWidth, double.PositiveInfinity));
-        FooterPanel.Measure(new Size(currentWidth, double.PositiveInfinity));
-
-        var upperHeight = UpperPanel.DesiredSize.Height;
-        var footerHeight = FooterPanel.DesiredSize.Height;
-
-        if (upperHeight <= 0) upperHeight = 166.0;
-        if (footerHeight <= 0) footerHeight = 142.0;
-
-        const double windowChromeHeight = 52.0;
-        const double aiCardChromeHeight = 32.0;
-        const double safetyBuffer = 6.0;
-
-        return upperHeight + footerHeight + windowChromeHeight + aiCardChromeHeight + safetyBuffer;
+    /// <summary>Измеряет неподвижную панель действий с учётом реальной внутренней ширины и оформления окна.</summary>
+    /// <returns>Высота панели действий и внешних отступов в DIP.</returns>
+    private double CalculateFixedHeight()
+    {
+        var chromeWidth = RootBorder.Margin.Left + RootBorder.Margin.Right + RootBorder.Padding.Left
+            + RootBorder.Padding.Right + RootBorder.BorderThickness.Left + RootBorder.BorderThickness.Right;
+        var chromeHeight = RootBorder.Margin.Top + RootBorder.Margin.Bottom + RootBorder.Padding.Top
+            + RootBorder.Padding.Bottom + RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+        FooterPanel.Measure(new Size(Math.Max(1.0, Width - chromeWidth), double.PositiveInfinity));
+        return FooterPanel.DesiredSize.Height + chromeHeight;
     }
 
-    /// <summary>
-    /// Динамически вычисляет и применяет MaxHeight для AiScrollViewer на основе
-    /// доступной высоты экрана (workArea.Height - nonAiHeight), чтобы окно никогда
-    /// не выходило за пределы монитора, а футер с кнопками оставался полностью видимым.
-    /// </summary>
-    /// <param name="workArea">Рабочая область текущего монитора в DIP.</param>
-    private void UpdateAiScrollViewerMaxHeight(Rect workArea)
-    {
-        var maxAllowedWindowHeight = Math.Max(MinimumWindowHeight, workArea.Height - (ScreenMargin * 2));
-        var nonAiHeight = CalculateNonAiHeight();
-        var availableAiHeight = maxAllowedWindowHeight - nonAiHeight;
-        var targetMaxHeight = Math.Max(80.0, availableAiHeight);
-
-        AiScrollViewer.MaxHeight = targetMaxHeight;
+    /// <summary>Ограничивает общую прокрутку сведений, оставляя доступное место панели действий.</summary>
+    /// <param name="workArea">Рабочая область выбранного монитора в DIP.</param>
+    private void UpdateContentViewport(Rect workArea)
+    {
+        var availableHeight = Math.Max(1.0, workArea.Height - ScreenMargin * 2);
+        var fixedHeight = CalculateFixedHeight();
+        var chromeHeight = RootBorder.Margin.Top + RootBorder.Margin.Bottom + RootBorder.Padding.Top
+            + RootBorder.Padding.Bottom + RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
+        ContentScrollViewer.MaxHeight = Math.Max(0.0, availableHeight - fixedHeight);
+        FooterScrollViewer.MaxHeight = Math.Max(1.0, availableHeight - chromeHeight);
+        AiScrollViewer.MaxHeight = double.PositiveInfinity;
     }
 
-    /// <summary>
-    /// Динамически подбирает ширину и максимальные размеры окна под рабочую область монитора.
-    /// Ширина плавно уменьшается на компактных экранах и никогда не выходит за границы экрана.
-    /// </summary>
-    /// <param name="workArea">Рабочая область текущего монитора в DIP.</param>
-    private void ApplyAdaptiveGeometry(Rect workArea)
-    {
-        var availableWidth = Math.Max(MinimumWindowWidth, workArea.Width - (ScreenMargin * 2));
-        var targetWidth = GetPreferredWidth(workArea);
-        var maxHeight = Math.Max(MinimumWindowHeight, workArea.Height - (ScreenMargin * 2));
-
-        MinWidth = Math.Min(MinimumWindowWidth, availableWidth);
-        MaxWidth = Math.Min(AdaptiveMaxWindowWidth, availableWidth);
-        MinHeight = Math.Min(MinimumWindowHeight, maxHeight);
-        MaxHeight = maxHeight;
-
-        // Меняем ширину только при существенном расхождении — это предотвращает
-        // бесконечный цикл SizeChanged -> RepositionWindow -> Width -> SizeChanged.
-        if (double.IsNaN(Width) || Math.Abs(Width - targetWidth) > 1.0)
-            Width = targetWidth;
-
-        UpdateAiScrollViewerMaxHeight(workArea);
+    /// <summary>Подбирает размеры окна и области прокрутки в пределах фактической рабочей области.</summary>
+    /// <param name="workArea">Рабочая область монитора в DIP с положительными конечными размерами.</param>
+    internal void ApplyAdaptiveGeometry(Rect workArea)
+    {
+        if (workArea.IsEmpty || !double.IsFinite(workArea.Width) || !double.IsFinite(workArea.Height)
+            || workArea.Width <= 0 || workArea.Height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(workArea), "Рабочая область должна иметь конечные положительные размеры.");
+        var availableWidth = Math.Max(1.0, workArea.Width - ScreenMargin * 2);
+        var availableHeight = Math.Max(1.0, workArea.Height - ScreenMargin * 2);
+        MinWidth = Math.Min(MinimumWindowWidth, availableWidth);
+        MaxWidth = Math.Min(AdaptiveMaxWindowWidth, availableWidth);
+        MinHeight = Math.Min(MinimumWindowHeight, availableHeight);
+        MaxHeight = availableHeight;
+        var targetWidth = GetPreferredWidth(workArea);
+        if (double.IsNaN(Width) || Math.Abs(Width - targetWidth) > 1.0)
+            Width = targetWidth;
+        UpdateContentViewport(workArea);
     }
 
-    /// <summary>
-    /// Вычисляет предпочтительную ширину окна для заданной рабочей области.
-    /// На экранах с ограниченной высотой (<= 750 DIP) окно расширяется до 560 DIP,
-    /// чтобы многострочный текст занимал меньше места по вертикали.
-    /// На мониторах умеренной высоты (<= 850 DIP) используется 520 DIP,
-    /// а на просторных мониторах сохраняется каноничная ширина 490 DIP.
-    /// </summary>
-    /// <param name="workArea">Рабочая область монитора в DIP.</param>
-    /// <returns>Ширина окна в DIP.</returns>
-    private static double GetPreferredWidth(Rect workArea)
-    {
-        var availableWidth = Math.Max(MinimumWindowWidth, workArea.Width - (ScreenMargin * 2));
-
-        double targetWidth;
-        if (workArea.Height <= 750.0)
-        {
-            targetWidth = AdaptiveMaxWindowWidth;
-        }
-        else if (workArea.Height <= 850.0)
-        {
-            targetWidth = 520.0;
-        }
-        else
-        {
-            targetWidth = DefaultWindowWidth;
-        }
-
-        return Math.Clamp(targetWidth, MinimumWindowWidth, Math.Min(AdaptiveMaxWindowWidth, availableWidth));
+    /// <summary>Выбирает удобную ширину, не превышающую фактически доступное место.</summary>
+    /// <param name="workArea">Рабочая область текущего монитора в DIP.</param>
+    /// <returns>Предпочтительная ширина окна в DIP.</returns>
+    internal static double GetPreferredWidth(Rect workArea)
+    {
+        var availableWidth = Math.Max(1.0, workArea.Width - ScreenMargin * 2);
+        var targetWidth = workArea.Height <= 750.0 ? AdaptiveMaxWindowWidth
+            : workArea.Height <= 850.0 ? 520.0 : DefaultWindowWidth;
+        return Math.Min(targetWidth, availableWidth);
     }
 
     /// <summary>
@@ -416,7 +378,8 @@ public partial class NetworkConnectionAlertWindow : Window
             if (Volatile.Read(ref _isClosed) != 0)
                 return;
 
-            var workArea = WindowHelper.GetCurrentMonitorWorkArea(this);
+            var workArea = WindowHelper.GetCurrentMonitorWorkArea(this, initialPlacement: !_initialPlacementComplete);
+            _initialPlacementComplete = true;
             if (workArea.Width <= 0 || workArea.Height <= 0)
                 return;
 

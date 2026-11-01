@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using StartupMonitor.Service.Services.Firewall;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models.Firewall;
 
@@ -26,7 +29,7 @@ namespace StartupMonitor.Service.Services;
 /// Если файрвол выключен для профиля — правила всё равно создаются (persist),
 /// но трафик не фильтруется; <see cref="GetStatus"/> это явно показывает.
 /// </remarks>
-public sealed class WindowsFirewallService
+public sealed class WindowsFirewallService : IPortDefenderFirewall
 {
     // --- Имена и константы -------------------------------------------------
 
@@ -202,9 +205,10 @@ public sealed class WindowsFirewallService
 
                 removedAny |= RemoveSingleIpRules(normalized, request.Direction);
 
-                return removedAny
-                    ? FirewallOperationResult.Ok($"IP {normalized} разблокирован.")
-                    : FirewallOperationResult.Fail($"IP {normalized} не найден в правилах StartupMonitor.");
+                // Отсутствующее управляемое правило уже удовлетворяет требуемому состоянию разбана.
+                return FirewallOperationResult.Ok(removedAny
+                    ? $"IP {normalized} разблокирован."
+                    : $"Управляемая блокировка IP {normalized} уже отсутствует.");
             }
             catch (Exception ex)
             {
@@ -342,6 +346,16 @@ public sealed class WindowsFirewallService
                 {
                     var name = PortRuleName(request.Port, request.Protocol, wantDir, app);
                     if (RemoveRuleByName(rules, name)) removed++;
+                    // Старое имя без хеша удаляем только после проверки полного пути, чтобы не затронуть одноимённое приложение.
+                    dynamic? legacy = FindLegacyPortRule(rules, request.Port, request.Protocol, wantDir, app);
+                    if (legacy is not null)
+                    {
+                        try
+                        {
+                            if (RemoveRuleByName(rules, (string)legacy.Name)) removed++;
+                        }
+                        finally { Release(legacy); }
+                    }
                 }
 
                 return removed > 0
@@ -377,6 +391,7 @@ public sealed class WindowsFirewallService
             {
                 var name = PortRuleName(port, protocol, wantDir, app);
                 dynamic? rule = FindRule(rules, name);
+                rule ??= FindLegacyPortRule(rules, port, protocol, wantDir, app);
                 if (rule is null) continue;
                 try
                 {
@@ -1312,6 +1327,11 @@ public sealed class WindowsFirewallService
         }
     }
 
+    /// <summary>Применяет ограничения правила; отказ обязательного COM-свойства передаётся в результат ошибки операции.</summary>
+    /// <param name="comRule">Изменяемое COM-правило.</param>
+    /// <param name="dto">Параметры правила.</param>
+    /// <param name="name">Имя правила.</param>
+    /// <param name="direction">Направление трафика.</param>
     private static void ApplyDtoToComRule(dynamic comRule, FirewallRuleDto dto, string name, int direction)
     {
         comRule.Name = name;
@@ -1333,23 +1353,23 @@ public sealed class WindowsFirewallService
             comRule.ApplicationName = app;
         if (!string.IsNullOrWhiteSpace(dto.ServiceName))
         {
-            try { comRule.ServiceName = dto.ServiceName; } catch { }
+            comRule.ServiceName = dto.ServiceName;
         }
 
         if (comRule.Protocol is ProtoTcp or ProtoUdp)
         {
             if (!string.IsNullOrWhiteSpace(dto.LocalPorts))
             {
-                try { comRule.LocalPorts = dto.LocalPorts.Trim(); } catch { }
+                comRule.LocalPorts = dto.LocalPorts.Trim();
             }
             if (!string.IsNullOrWhiteSpace(dto.RemotePorts))
             {
-                try { comRule.RemotePorts = dto.RemotePorts.Trim(); } catch { }
+                comRule.RemotePorts = dto.RemotePorts.Trim();
             }
         }
         if (!string.IsNullOrWhiteSpace(dto.RemoteAddresses))
         {
-            try { comRule.RemoteAddresses = dto.RemoteAddresses.Trim(); } catch { }
+            comRule.RemoteAddresses = dto.RemoteAddresses.Trim();
         }
         if (!string.IsNullOrWhiteSpace(dto.Grouping))
             comRule.Grouping = dto.Grouping;
@@ -1417,19 +1437,25 @@ public sealed class WindowsFirewallService
         return false;
     }
 
+    /// <summary>Меняет состояние профилей без ложного успеха при отказе одного из них.</summary>
+    /// <param name="policy">Политика Windows Firewall.</param>
+    /// <param name="enabled">Требуемое состояние профилей.</param>
     private static void SetFirewallEnabledAll(dynamic policy, bool enabled)
     {
         foreach (var profile in new[] { ProfileDomain, ProfilePrivate, ProfilePublic })
         {
-            try { policy.FirewallEnabled[profile] = enabled; } catch { }
+            policy.FirewallEnabled[profile] = enabled;
         }
     }
 
+    /// <summary>Устанавливает действие исходящего трафика, передавая отказ профиля вызывающей операции.</summary>
+    /// <param name="policy">Политика Windows Firewall.</param>
+    /// <param name="action">Действие исходящего трафика.</param>
     private static void SetDefaultOutboundAll(dynamic policy, int action)
     {
         foreach (var profile in new[] { ProfileDomain, ProfilePrivate, ProfilePublic })
         {
-            try { policy.DefaultOutboundAction[profile] = action; } catch { }
+            policy.DefaultOutboundAction[profile] = action;
         }
     }
 
@@ -1614,6 +1640,9 @@ public sealed class WindowsFirewallService
             rule = FindRule(rules, name);
             if (rule is not null)
             {
+                // Идентичность существующего правила подтверждается полным путём, включая внешние изменения COM-правила.
+                if (!string.IsNullOrEmpty(appPath))
+                    rule.ApplicationName = appPath;
                 rule.Enabled = true;
                 return name;
             }
@@ -1914,12 +1943,47 @@ public sealed class WindowsFirewallService
         return p;
     }
 
-    private static string PortRuleName(int port, FirewallProtocol protocol, int direction, string? appPath)
+    /// <summary>Формирует имя правила с идентичностью полного пути приложения, исключая коллизии одноимённых EXE.</summary>
+    /// <param name="port">Локальный порт.</param>
+    /// <param name="protocol">Сетевой протокол.</param>
+    /// <param name="direction">Направление правила Windows Firewall.</param>
+    /// <param name="appPath">Полный путь приложения либо null для системного правила.</param>
+    /// <returns>Стабильное имя управляемого правила.</returns>
+    internal static string PortRuleName(int port, FirewallProtocol protocol, int direction, string? appPath)
     {
         var scope = string.IsNullOrEmpty(appPath)
             ? "System"
-            : $"App_{Path.GetFileNameWithoutExtension(appPath)}";
+            : $"App_{Path.GetFileNameWithoutExtension(appPath)}_{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(appPath).ToUpperInvariant())))}";
         return $"{RulePrefix}Block_Port_{protocol}_{port}_{(direction == DirOut ? "Out" : "In")}_{scope}";
+    }
+
+    /// <summary>Находит совместимое правило старого формата только при точном совпадении пути приложения.</summary>
+    /// <param name="rules">Коллекция COM-правил.</param>
+    /// <param name="port">Локальный порт.</param>
+    /// <param name="protocol">Сетевой протокол.</param>
+    /// <param name="direction">Направление правила.</param>
+    /// <param name="appPath">Путь целевого приложения.</param>
+    /// <returns>COM-правило, которое должен освободить вызывающий код, либо null.</returns>
+    private static object? FindLegacyPortRule(dynamic rules, int port, FirewallProtocol protocol, int direction, string? appPath)
+    {
+        if (string.IsNullOrEmpty(appPath)) return null;
+        var legacyName = $"{RulePrefix}Block_Port_{protocol}_{port}_{(direction == DirOut ? "Out" : "In")}_App_{Path.GetFileNameWithoutExtension(appPath)}";
+        object? candidate = FindRule(rules, legacyName);
+        if (candidate is null) return null;
+        try
+        {
+            dynamic legacy = candidate;
+            var actualPath = (string?)legacy.ApplicationName;
+            if (!string.IsNullOrEmpty(actualPath) && string.Equals(
+                    Path.GetFullPath(actualPath), Path.GetFullPath(appPath), StringComparison.OrdinalIgnoreCase))
+            {
+                var matched = candidate;
+                candidate = null;
+                return matched;
+            }
+            return null;
+        }
+        finally { Release(candidate); }
     }
 
     private static IEnumerable<int> WantedDirs(FirewallDirection direction)

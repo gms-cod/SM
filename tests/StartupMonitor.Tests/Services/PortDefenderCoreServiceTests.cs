@@ -13,7 +13,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     private readonly JsonDataStore _store;
     private readonly InitialScanTracker _scanTracker;
     private readonly NotificationService _notificationService;
-    private readonly WindowsFirewallService _firewallService;
+    private readonly TestPortDefenderFirewall _firewallService;
     private readonly ProcessNetworkTracker _networkTracker;
     private readonly ProcessPortDefenderService _defender;
 
@@ -26,7 +26,8 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
         _scanTracker = new InitialScanTracker();
         _scanTracker.MarkCompleted();
         _notificationService = new NotificationService(_scanTracker);
-        _firewallService = new WindowsFirewallService();
+        // Unit-тесты подтверждают логику без изменения настоящего Windows Firewall и зависимости от прав пользователя.
+        _firewallService = new TestPortDefenderFirewall();
         _networkTracker = new ProcessNetworkTracker();
 
         _defender = new ProcessPortDefenderService(
@@ -34,7 +35,8 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
             _networkTracker,
             _notificationService,
             _store,
-            NullLogger<ProcessPortDefenderService>.Instance);
+            NullLogger<ProcessPortDefenderService>.Instance,
+            startMonitoring: false);
     }
 
     [Fact]
@@ -337,12 +339,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     public void Dispose()
     {
         _defender.Dispose();
+        _networkTracker.Dispose();
         _notificationService.Dispose();
-        try
-        {
-            if (Directory.Exists(_tempDir))
-                Directory.Delete(_tempDir, recursive: true);
-        }
-        catch { }
+        if (Directory.Exists(_tempDir))
+            Directory.Delete(_tempDir, recursive: true);
     }
 }

@@ -193,14 +193,24 @@ public static class WindowHelper
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, [In, Out] MONITORINFO lpmi);
 
+    /// <summary>Получает DPI целевого монитора до создания или переноса HWND уведомления.</summary>
+    /// <param name="monitor">Дескриптор выбранного монитора.</param>
+    /// <param name="dpiType">Тип DPI: ноль означает эффективный DPI.</param>
+    /// <param name="dpiX">Горизонтальный DPI.</param>
+    /// <param name="dpiY">Вертикальный DPI.</param>
+    /// <returns>HRESULT результата системного запроса.</returns>
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
+
     /// <summary>
     /// Возвращает рабочую область монитора (в аппаратно-независимых единицах WPF DIP с учётом Per-Monitor DPI),
     /// на котором находится окно, либо на котором находится курсор мыши / окно-владелец.
     /// Гарантирует корректное определение экранных границ в многомониторных конфигурациях.
     /// </summary>
     /// <param name="window">Экземпляр окна WPF.</param>
+    /// <param name="initialPlacement">При первом показе предпочитать монитор владельца или курсора собственному HWND.</param>
     /// <returns>Прямоугольник рабочей области в координатах DIP рабочего стола.</returns>
-    public static Rect GetCurrentMonitorWorkArea(Window window)
+    public static Rect GetCurrentMonitorWorkArea(Window window, bool initialPlacement = false)
     {
         ArgumentNullException.ThrowIfNull(window);
 
@@ -210,7 +220,17 @@ public static class WindowHelper
             var hWnd = helper.Handle;
             var hMonitor = IntPtr.Zero;
 
-            if (hWnd != IntPtr.Zero)
+            // Первый показ выбирает монитор пользователя до закрепления окна на основном экране.
+            if (initialPlacement && window.Owner != null)
+            {
+                var ownerHwnd = new WindowInteropHelper(window.Owner).Handle;
+                if (ownerHwnd != IntPtr.Zero)
+                    hMonitor = MonitorFromWindow(ownerHwnd, MONITOR_DEFAULTTONEAREST);
+            }
+            if (initialPlacement && hMonitor == IntPtr.Zero && GetCursorPos(out POINT initialPoint))
+                hMonitor = MonitorFromPoint(initialPoint, MONITOR_DEFAULTTONEAREST);
+
+            if (hMonitor == IntPtr.Zero && hWnd != IntPtr.Zero)
             {
                 hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
             }
@@ -243,6 +263,12 @@ public static class WindowHelper
             var dpi = VisualTreeHelper.GetDpi(window);
             var dpiX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
             var dpiY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+            if (GetDpiForMonitor(hMonitor, 0, out var monitorDpiX, out var monitorDpiY) == 0
+                && monitorDpiX > 0 && monitorDpiY > 0)
+            {
+                dpiX = monitorDpiX / 96.0;
+                dpiY = monitorDpiY / 96.0;
+            }
 
             var left = mi.rcWork.Left / dpiX;
             var top = mi.rcWork.Top / dpiY;
@@ -256,8 +282,9 @@ public static class WindowHelper
 
             return new Rect(left, top, width, height);
         }
-        catch
+        catch (Exception ex)
         {
+            App.Log($"WindowHelper.GetCurrentMonitorWorkArea: {ex.Message}");
             return SystemParameters.WorkArea;
         }
     }

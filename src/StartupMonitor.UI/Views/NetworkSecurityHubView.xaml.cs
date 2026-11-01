@@ -102,6 +102,12 @@ public partial class NetworkSecurityHubView : UserControl
 
     private bool _isLoadingConn;
 
+    /// <summary>Разрешена ли визуальная работа страницы; фоновые продолжения не возобновляют скрытый хаб.</summary>
+    private bool _isActive;
+    private bool _isRefreshingTimeline;
+    private DateTime _lastTimelineRefreshUtc;
+
+
 
 
     private List<FirewallAppEntry> _allWhitelistApps = new();
@@ -653,6 +659,8 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
+            if (!IsVisible || Window.GetWindow(this)?.WindowState == WindowState.Minimized) return;
+            _isActive = true;
             await RefreshAllAsync();
 
             // Live-соединения: первичная загрузка + автообновление по чекбоксу.
@@ -661,7 +669,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                if (ChkAutoRefreshConn.IsChecked == true && !_liveConnTimer.IsEnabled)
+                if (_isActive && IsVisible && ChkAutoRefreshConn.IsChecked == true && !_liveConnTimer.IsEnabled)
 
                     _liveConnTimer.Start();
 
@@ -672,6 +680,11 @@ public partial class NetworkSecurityHubView : UserControl
         };
 
         Unloaded += (_, _) => Deactivate();
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible) Deactivate();
+            else if (IsLoaded && Window.GetWindow(this)?.WindowState != WindowState.Minimized) Activate();
+        };
 
     }
 
@@ -793,6 +806,7 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
+        _isActive = false;
         try { _banTimer?.Stop(); } catch { }
 
         try { _bansRefreshTimer?.Stop(); } catch { }
@@ -839,6 +853,8 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
+            if (!IsVisible || Window.GetWindow(this)?.WindowState == WindowState.Minimized) return;
+            _isActive = true;
             if (_banTimer != null && !_banTimer.IsEnabled)
 
                 _banTimer.Start();
@@ -885,7 +901,7 @@ public partial class NetworkSecurityHubView : UserControl
 
     {
 
-        if (_isLoading)
+        if (_isLoading || !_isActive || !IsVisible)
 
             return;
 
@@ -915,11 +931,11 @@ public partial class NetworkSecurityHubView : UserControl
 
             SetStatus($"Обновлено в {DateTime.Now:HH:mm:ss} • Матрица: {_allMatrixItems.Count} • Правил: {_allRules.Count} • Соединений: {_allConnections.Count}");
 
-            if (!_banTimer.IsEnabled)
+            if (_isActive && IsVisible && !_banTimer.IsEnabled)
 
                 _banTimer.Start();
 
-            if (!_bansRefreshTimer.IsEnabled)
+            if (_isActive && IsVisible && !_bansRefreshTimer.IsEnabled)
 
                 _bansRefreshTimer.Start();
 
@@ -2851,7 +2867,7 @@ public partial class NetworkSecurityHubView : UserControl
 
     {
 
-        if (_isLoadingConn)
+        if (_isLoadingConn || !_isActive || !IsVisible)
 
             return;
 
@@ -2987,6 +3003,8 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
+            if (!_isActive || !IsVisible) return;
+
             _allConnections = rows
 
                 .OrderBy(r => r.ProcessName)
@@ -2995,7 +3013,7 @@ public partial class NetworkSecurityHubView : UserControl
 
                 .ToList();
 
-            UpdateTimelineData();
+            await UpdateTimelineDataAsync();
 
             ApplyConnFilter();
 
@@ -4149,7 +4167,7 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-    private void OnTimeWindowClick(object sender, RoutedEventArgs e)
+    private async void OnTimeWindowClick(object sender, RoutedEventArgs e)
 
     {
 
@@ -4169,7 +4187,7 @@ public partial class NetworkSecurityHubView : UserControl
 
                     TimelineChart.TimeWindow = _currentTimeWindow;
 
-                    UpdateTimelineData();
+                    await UpdateTimelineDataAsync(force: true);
 
                 }
 
@@ -4203,7 +4221,8 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                TxtTimelineActiveSlice.Text = $"• Срез: {sliceTime.ToLocalTime():HH:mm:ss}";
+                TxtTimelineActiveSlice.Text = string.Format(System.Globalization.CultureInfo.CurrentUICulture,
+                    LocalizationService.Instance["TimelineSliceFormat"], sliceTime.ToLocalTime());
 
             }
 
@@ -4273,125 +4292,68 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-    /// <summary>
-    /// Формирует дискретные бакеты сетевой телеметрии на основе реальной истории событий,
-    /// живых сокетов соединений и мультигармонического синтеза активности.
-    /// </summary>
-    private void UpdateTimelineData()
+    /// <summary>Загружает измеренные скорости интерфейсов из службы без синтетического заполнения истории.</summary>
+    /// <param name="force">Перезагрузить данные после смены временного диапазона без ожидания очередного интервала.</param>
+    /// <returns>Задача получения и отображения измеренных бакетов.</returns>
+    private async Task UpdateTimelineDataAsync(bool force = false)
     {
+        if (!_isActive || !IsVisible || _isRefreshingTimeline || TimelineChart == null) return;
+        var now = DateTime.UtcNow;
+        if (!force && now - _lastTimelineRefreshUtc < TimeSpan.FromSeconds(5)) return;
+        _isRefreshingTimeline = true;
+        var timeWindow = _currentTimeWindow;
+        var fromUtc = now - timeWindow;
         try
         {
-            if (TimelineChart == null) return;
-
-            int buckets = 60;
-            var points = new List<StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint>(buckets);
-            var now = DateTime.UtcNow;
-            var windowStart = now - _currentTimeWindow;
-            double totalSeconds = Math.Max(60.0, _currentTimeWindow.TotalSeconds);
-            double bucketSeconds = totalSeconds / buckets;
-
-            // 1. Агрегация реальных событий безопасности из _hubHistoryAll по 60 бакетам
-            int[] blockedInBucket = new int[buckets];
-            int[] alertsInBucket = new int[buckets];
-            int[] eventsInBucket = new int[buckets];
-
-            if (_hubHistoryAll != null && _hubHistoryAll.Count > 0)
-            {
-                for (int h = 0; h < _hubHistoryAll.Count; h++)
-                {
-                    var item = _hubHistoryAll[h];
-                    if (item.Timestamp >= windowStart && item.Timestamp <= now)
-                    {
-                        int bIdx = (int)((item.Timestamp - windowStart).TotalSeconds / bucketSeconds);
-                        if (bIdx >= 0 && bIdx < buckets)
-                        {
-                            eventsInBucket[bIdx]++;
-                            if (item.Verdict is NetworkConnectionVerdict.Blocked
-                                       or NetworkConnectionVerdict.BlockSession
-                                       or NetworkConnectionVerdict.Blacklisted)
-                            {
-                                blockedInBucket[bIdx]++;
-                            }
-                            else if (item.Verdict == NetworkConnectionVerdict.PendingAlert)
-                            {
-                                alertsInBucket[bIdx]++;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Взвешенный расчет базовой сетевой активности по типам сокетов _allConnections
-            int establishedWan = 0;
-            int establishedLan = 0;
-            int udpCount = 0;
-            int listeningCount = 0;
-
-            if (_allConnections != null)
-            {
-                for (int s = 0; s < _allConnections.Count; s++)
-                {
-                    var conn = _allConnections[s];
-                    if (conn.Protocol.StartsWith("UDP", StringComparison.OrdinalIgnoreCase))
-                    {
-                        udpCount++;
-                    }
-                    else if (string.Equals(conn.State, "Established", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (conn.IsPrivate) establishedLan++;
-                        else establishedWan++;
-                    }
-                    else if (string.Equals(conn.State, "Listen", StringComparison.OrdinalIgnoreCase) ||
-                             string.Equals(conn.State, "Listening", StringComparison.OrdinalIgnoreCase))
-                    {
-                        listeningCount++;
-                    }
-                }
-            }
-
-            // Расчет базовой пропускной способности (Б/с)
-            double socketsBaseBps = (establishedWan * 2800.0)
-                                  + (establishedLan * 950.0)
-                                  + (udpCount * 450.0)
-                                  + (listeningCount * 120.0);
-
-            // Ambient Baseline Pulse: фоновый пульс ОС (DHCP, ARP, DNS probe, SSDP)
-            const double ambientBase = 320.0;
-            double effectiveBase = Math.Max(ambientBase, socketsBaseBps);
-
-            // 3. Формирование 60 бакетов хронологически слева направо (от windowStart к now)
-            for (int i = 0; i < buckets; i++)
-            {
-                var ptTime = windowStart + TimeSpan.FromSeconds(bucketSeconds * (i + 0.5));
-
-                // Мультигармоническая суперпозиция Фурье (4 несоизмеримые частоты на базе золотого сечения)
-                double harmonic1 = Math.Sin(i * 0.18 + 0.3) * 0.35;      // Медленный тренд активности
-                double harmonic2 = Math.Sin(i * 0.47 + 1.2) * 0.25;      // Сессионные перепады
-                double harmonic3 = Math.Cos(i * 1.15 + 2.1) * 0.15;      // Пачки пакетов
-                double harmonic4 = Math.Sin(i * 2.37) * 0.08;            // Высокочастотный TCP-джиттер
-
-                double waveModulation = Math.Max(0.35, 1.0 + harmonic1 + harmonic2 + harmonic3 + harmonic4);
-
-                // Пакетный всплеск от реальных событий в бакете
-                double historyBurstBps = eventsInBucket[i] * 4200.0;
-
-                double inBps = (effectiveBase * waveModulation) + historyBurstBps;
-                // Асимметричный исходящий трафик (40-70% от входящего с фазовым сдвигом)
-                double outBps = inBps * (0.48 + 0.18 * Math.Cos(i * 0.38 + 0.7));
-
-                int bCount = blockedInBucket[i];
-                int aCount = alertsInBucket[i];
-
-                points.Add(new StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint(
-                    ptTime, inBps, outBps, bCount, aCount));
-            }
-
-            TimelineChart.SetDataPoints(points);
+            var telemetry = await _pipeClient.GetNetworkTrafficHistoryAsync(fromUtc, now, 60);
+            if (!_isActive || !IsVisible || _currentTimeWindow != timeWindow) return;
+            TimelineChart.SetDataPoints(BuildTimelinePoints(telemetry, _hubHistoryAll, fromUtc, now));
+            _lastTimelineRefreshUtc = now;
         }
         catch (Exception ex)
         {
-            SetStatus($"Ошибка обновления таймлайна активности: {ex.Message}");
+            App.Log($"NetworkSecurityHubView.UpdateTimeline: {ex.Message}");
+            TimelineChart.SetDataPoints(null);
         }
+        finally
+        {
+            _isRefreshingTimeline = false;
+        }
+    }
+
+    /// <summary>Совмещает реальные измерения скорости с событиями защиты, сохраняя пропуски измерений.</summary>
+    /// <param name="telemetry">Бакеты скорости, полученные от службы.</param>
+    /// <param name="history">Реальные события сетевой защиты.</param>
+    /// <param name="fromUtc">Начало временного диапазона UTC.</param>
+    /// <param name="toUtc">Конец временного диапазона UTC.</param>
+    /// <returns>Точки графика без вымышленных скоростей или интерполяции отсутствующей истории.</returns>
+    internal static List<StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint> BuildTimelinePoints(
+        IReadOnlyList<NetworkTrafficHistoryPoint> telemetry, IReadOnlyList<NetworkConnectionHistoryItem> history,
+        DateTime fromUtc, DateTime toUtc)
+    {
+        ArgumentNullException.ThrowIfNull(telemetry);
+        ArgumentNullException.ThrowIfNull(history);
+        if (toUtc <= fromUtc) throw new ArgumentOutOfRangeException(nameof(toUtc));
+        var points = new List<StartupMonitor.UI.Controls.NetworkTimelineChartControl.ChartDataPoint>(telemetry.Count);
+        var blocked = new int[telemetry.Count];
+        var alerts = new int[telemetry.Count];
+        var bucketSeconds = (toUtc - fromUtc).TotalSeconds / Math.Max(1, telemetry.Count);
+        foreach (var item in history)
+        {
+            if (item is null || item.Timestamp < fromUtc || item.Timestamp >= toUtc) continue;
+            var index = (int)((item.Timestamp - fromUtc).TotalSeconds / bucketSeconds);
+            if (index < 0 || index >= telemetry.Count) continue;
+            if (item.Verdict is NetworkConnectionVerdict.Blocked or NetworkConnectionVerdict.BlockSession or NetworkConnectionVerdict.Blacklisted)
+                blocked[index]++;
+            else if (item.Verdict == NetworkConnectionVerdict.PendingAlert)
+                alerts[index]++;
+        }
+        for (var i = 0; i < telemetry.Count; i++)
+        {
+            var sample = telemetry[i];
+            points.Add(new(sample.Timestamp, sample.InboundBps, sample.OutboundBps, blocked[i], alerts[i], sample.HasMeasurement));
+        }
+        return points;
     }
 
     // =========================================================================

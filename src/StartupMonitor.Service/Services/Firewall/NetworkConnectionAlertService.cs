@@ -252,21 +252,11 @@ public sealed class NetworkConnectionAlertService : IDisposable
         _loop = null;
         if (cts == null) return;
 
-        try { cts.Cancel(); } catch (ObjectDisposedException) { }
-
-        // CTS нельзя освобождать сразу: цикл может ещё наблюдать токен.
-        // Освобождаем его только после фактического завершения задачи.
-        if (loop != null)
-        {
-            _ = loop.ContinueWith(_ =>
-            {
-                try { cts.Dispose(); } catch (ObjectDisposedException) { }
-            }, TaskScheduler.Default);
-        }
-        else
-        {
-            try { cts.Dispose(); } catch (ObjectDisposedException) { }
-        }
+        // Перед возвратом подтверждаем завершение: последующий Dispose шлюза не гоняется с WaitAsync.
+        cts.Cancel();
+        try { loop?.GetAwaiter().GetResult(); }
+        catch (OperationCanceledException) { Log.Debug("NetworkAlerts: фоновый сборщик остановлен"); }
+        finally { cts.Dispose(); }
     }
 
     /// <summary>
@@ -304,7 +294,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             },
             ct);
 
-    /// <summary>Освобождает таймер фонового опроса.</summary>
+    /// <summary>Отменяет и дожидается сборщика до освобождения используемого им шлюза активности.</summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -357,6 +347,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
             }
 
             int added = 0;
+            // Один PID может иметь сотни соединений: путь запрашивается один раз в пределах снимка.
+            // Кэш не переживает снимок и потому не подменяет путь при переиспользовании PID другой программой.
+            var pathsByPid = new Dictionary<int, string?>();
             // Кэш настроек обновляется только при изменении ревизии хранилища:
             // больше нет глубокого клонирования всего конфига (включая историю) каждые 5 секунд.
             RefreshSettingsCache();
@@ -391,7 +384,11 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     continue;
 
                 var processName = (socket.ProcessName ?? string.Empty).Trim();
-                var processPath = ResolveProcessPath(socket.ProcessId, processName);
+                if (!pathsByPid.TryGetValue(socket.ProcessId, out var processPath))
+                {
+                    processPath = ResolveProcessPath(socket.ProcessId, processName);
+                    pathsByPid[socket.ProcessId] = processPath;
+                }
 
                 var sessionKey = BuildSessionKey(processPath, processName);
                 var nameKey = BuildNameSessionKey(processName);
@@ -954,12 +951,16 @@ public sealed class NetworkConnectionAlertService : IDisposable
         return "name:" + (processName ?? string.Empty).Trim().ToLowerInvariant();
     }
 
+    /// <summary>Получает актуальный путь одного PID; завершение процесса оставляет явно отсутствующий путь.</summary>
+    /// <param name="pid">Идентификатор процесса из текущего снимка сокетов.</param>
+    /// <param name="processName">Имя процесса для диагностики без раскрытия командной строки.</param>
+    /// <returns>Полный путь либо null при недоступном процессе.</returns>
     private string? ResolveProcessPath(int pid, string processName)
     {
         if (ProcessPathResolver != null)
         {
             try { return ProcessPathResolver(pid); }
-            catch { return null; }
+            catch (Exception ex) { Log.Debug(ex, "NetworkAlerts: источник пути PID {Pid} недоступен", pid); return null; }
         }
 
         if (pid <= 0)
@@ -970,8 +971,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
             var fastPath = ProcessMetadataEnricher.TryGetProcessPath(pid);
             return string.IsNullOrWhiteSpace(fastPath) ? null : fastPath;
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Debug(ex, "NetworkAlerts: путь процесса {Process} PID {Pid} недоступен", processName, pid);
             return null;
         }
     }

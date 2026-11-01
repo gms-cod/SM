@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.IO.Pipes;
+using System.Threading.Channels;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
@@ -17,23 +18,24 @@ namespace StartupMonitor.Service.Pipe;
 public class EventPipeServer : BackgroundService
 {
     // Имя событийного канала (отдельное от основного командно-ответного)
-    private const string EventPipeName = "StartupMonitorEvents";
+    private readonly string _eventPipeName;
     // Сервис уведомлений, отсюда приходят батчи сообщений
     private readonly NotificationService _notificationService;
     // Логгер
     private readonly ILogger<EventPipeServer> _logger;
     /// <summary>
-    /// Обертка подключенного клиента с собственным асинхронным семафором для исключения блокировок потоков ОС.
+    /// Обёртка клиента; единственный worker рассылки обеспечивает последовательный доступ к writer.
     /// </summary>
     private sealed class ConnectedClient : IDisposable
     {
         public int Id { get; }
         public NamedPipeServerStream Pipe { get; }
         public StreamWriter Writer { get; }
-        public SemaphoreSlim Lock { get; } = new(1, 1);
+        private readonly ILogger _logger;
 
-        public ConnectedClient(int id, NamedPipeServerStream pipe, StreamWriter writer)
+        public ConnectedClient(int id, NamedPipeServerStream pipe, StreamWriter writer, ILogger logger)
         {
+            _logger = logger;
             Id = id;
             Pipe = pipe;
             Writer = writer;
@@ -41,15 +43,22 @@ public class EventPipeServer : BackgroundService
 
         public void Dispose()
         {
-            try { Writer.Dispose(); } catch { }
-            try { Pipe.Dispose(); } catch { }
-            try { Lock.Dispose(); } catch { }
+            // Сначала закрывается pipe: синхронный Dispose writer не должен ждать клиента, переставшего читать.
+            Pipe.Dispose();
+            try { Writer.Dispose(); }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+            { _logger.LogDebug(ex, "EventPipeServer: writer закрыт после разрыва транспорта"); }
         }
     }
 
     // Словарь подключённых клиентов: ID → ConnectedClient
     private readonly ConcurrentDictionary<int, ConnectedClient> _clients = new();
     private static int _nextClientId;
+    /// <summary>Ограниченная очередь исключает рост незавершённых рассылок при медленных клиентах.</summary>
+    private readonly Channel<List<PipeMessage>> _batches = Channel.CreateBounded<List<PipeMessage>>(new BoundedChannelOptions(128)
+    {
+        SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait
+    });
     // Настройки JSON-сериализации
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -64,11 +73,22 @@ public class EventPipeServer : BackgroundService
     /// <param name="logger">Логгер</param>
     public EventPipeServer(
         NotificationService notificationService,
-        ILogger<EventPipeServer> logger)
+        ILogger<EventPipeServer> logger,
+        string pipeName = "StartupMonitorEvents")
     {
+        ArgumentNullException.ThrowIfNull(notificationService);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentException.ThrowIfNullOrWhiteSpace(pipeName);
         _notificationService = notificationService;
         _logger = logger;
+        _eventPipeName = pipeName;
     }
+
+    /// <summary>Количество живых подключений для диагностики жизненного цикла сервера.</summary>
+    internal int ConnectedClientCount => _clients.Count;
+
+    /// <summary>Общее число принятых подключений за время работы сервера для детерминированной проверки в тестах.</summary>
+    internal int TotalAcceptedClients => Volatile.Read(ref _nextClientId);
 
     /// <summary>
     /// Основной цикл: подписывается на уведомления, слушает входящие соединения
@@ -78,82 +98,70 @@ public class EventPipeServer : BackgroundService
     /// <param name="stoppingToken">Токен отмены остановки службы</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Подписываемся на батчи уведомлений
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         _notificationService.MessagesBatchReady += OnMessagesBatchReady;
-        _logger.LogInformation("EventPipeServer запущен");
-        StartHeartbeat(stoppingToken);
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            NamedPipeServerStream? pipe = null;
-            try
-            {
-                // Создаём pipe только на запись (out) — клиенты только слушают (буфер 64 КБ)
-                pipe = NamedPipeServerStreamAcl.Create(
-                    EventPipeName,
-                    PipeDirection.Out,
-                    maxNumberOfServerInstances: 10,
-                    PipeTransmissionMode.Message,
-                    PipeOptions.Asynchronous,
-                    inBufferSize: 0,
-                    outBufferSize: 65536,
-                    PipeSecurityFactory.CreateDefault());
-
-                await pipe.WaitForConnectionAsync(stoppingToken);
-                _logger.LogInformation("Event-клиент подключился");
-
-                var writer = new StreamWriter(pipe) { AutoFlush = true };
-                var id = Interlocked.Increment(ref _nextClientId);
-                var client = new ConnectedClient(id, pipe, writer);
-                _clients[id] = client;
-                pipe = null; // Владение стримом передано в ConnectedClient
-
-                // Фоновая задача отслеживает отмену службы для освобождения ресурсов
-                _ = Task.Run(async () =>
-                {
-                    try { await Task.Delay(Timeout.Infinite, stoppingToken); }
-                    catch (OperationCanceledException) { }
-                    RemoveClient(id);
-                }, stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                try { pipe?.Dispose(); } catch { }
-                break;
-            }
-            catch (IOException ex)
-            {
-                try { pipe?.Dispose(); } catch { }
-                // Все инстансы заняты (клиенты не успели отключиться) — не спамим Error
-                _logger.LogDebug(ex, "EventPipeServer: канал временно занят");
-                await Task.Delay(1000, stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                try { pipe?.Dispose(); } catch { }
-                _logger.LogError(ex, "Ошибка EventPipeServer");
-                await Task.Delay(1000, stoppingToken);
-            }
-        }
-
-        // Отписываемся при остановке службы
-        _notificationService.MessagesBatchReady -= OnMessagesBatchReady;
-    }
-
-    /// <summary>
-    /// Периодическая проверка живучести клиентов: неблокирующая отправка пустого батча.
-    /// </summary>
-    private void StartHeartbeat(CancellationToken stoppingToken)
-    {
-        _ = Task.Run(async () =>
+        var broadcast = RunBroadcastLoopAsync(lifetime.Token);
+        var heartbeat = RunHeartbeatAsync(lifetime.Token);
+        try
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                try { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); }
-                catch (OperationCanceledException) { break; }
-                OnMessagesBatchReady(this, []);
+                NamedPipeServerStream? pending = null;
+                try
+                {
+                    pending = NamedPipeServerStreamAcl.Create(_eventPipeName, PipeDirection.Out, NamedPipeServerStream.MaxAllowedServerInstances,
+                        PipeTransmissionMode.Message, PipeOptions.Asynchronous, 0, 65536, PipeSecurityFactory.CreateDefault());
+                    await pending.WaitForConnectionAsync(stoppingToken);
+                    var id = Interlocked.Increment(ref _nextClientId);
+                    _clients[id] = new ConnectedClient(id, pending, new StreamWriter(pending) { AutoFlush = true }, _logger);
+                    pending = null;
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "EventPipeServer: соединение временно недоступно");
+                    try { await Task.Delay(1000, stoppingToken); }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+                }
+                finally { pending?.Dispose(); }
             }
-        }, stoppingToken);
+        }
+        finally
+        {
+            _notificationService.MessagesBatchReady -= OnMessagesBatchReady;
+            _batches.Writer.TryComplete();
+            lifetime.Cancel();
+            await Task.WhenAll(broadcast, heartbeat);
+            foreach (var id in _clients.Keys) RemoveClient(id);
+        }
+    }
+
+    /// <summary>Последовательная рассылка сохраняет порядок батчей без semaphore и задач на каждое событие.</summary>
+    /// <param name="ct">Токен остановки серверных обработчиков.</param>
+    /// <returns>Задача жизненного цикла рассылки.</returns>
+    private async Task RunBroadcastLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var batch in _batches.Reader.ReadAllAsync(ct))
+                await BroadcastBatchAsync(batch, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        { _logger.LogDebug("EventPipeServer: рассылка завершена отменой службы"); }
+    }
+
+    /// <summary>Периодически проверяет живучесть клиентов через ту же последовательную очередь.</summary>
+    /// <param name="ct">Токен завершения службы.</param>
+    /// <returns>Задача жизненного цикла heartbeat.</returns>
+    private async Task RunHeartbeatAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+            while (await timer.WaitForNextTickAsync(ct)) OnMessagesBatchReady(this, []);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        { _logger.LogDebug("EventPipeServer: heartbeat завершён отменой службы"); }
     }
 
     /// <summary>
@@ -173,13 +181,14 @@ public class EventPipeServer : BackgroundService
     /// </summary>
     private void OnMessagesBatchReady(object? sender, List<PipeMessage> batch)
     {
-        _ = BroadcastBatchAsync(batch);
+        if (!_clients.IsEmpty && !_batches.Writer.TryWrite(batch))
+            _logger.LogWarning("EventPipeServer: очередь уведомлений заполнена; медленные клиенты не успевают читать события");
     }
 
     /// <summary>
     /// Неблокирующая параллельная широковещательная рассылка батча клиентам с жестким таймаутом 2 секунды.
     /// </summary>
-    private async Task BroadcastBatchAsync(List<PipeMessage> batch)
+    private async Task BroadcastBatchAsync(List<PipeMessage> batch, CancellationToken stoppingToken)
     {
         if (_clients.IsEmpty) return;
 
@@ -194,6 +203,11 @@ public class EventPipeServer : BackgroundService
             return;
         }
 
+        if (json.Length > BoundedLineReader.MaximumFrameCharacters)
+        {
+            _logger.LogWarning("EventPipeServer: батч превышает допустимый размер кадра");
+            return;
+        }
         var dead = new List<int>();
 
         // Рассылаем параллельно всем подключенным клиентам с таймаутом на каждого
@@ -202,30 +216,17 @@ public class EventPipeServer : BackgroundService
             var id = kvp.Key;
             var client = kvp.Value;
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(2));
             try
             {
-                // Защита от одновременной записи в один стрим с таймаутом ожидания
-                if (!await client.Lock.WaitAsync(TimeSpan.FromSeconds(2), cts.Token))
-                {
-                    _logger.LogWarning("Event-клиент {Id} не освободил лок записи за 2 сек — клиент завис", id);
-                    return (id, false);
-                }
-
-                try
-                {
-                    await client.Writer.WriteLineAsync(json.AsMemory(), cts.Token);
-                    await client.Writer.FlushAsync(cts.Token);
-                    return (id, true);
-                }
-                finally
-                {
-                    client.Lock.Release();
-                }
+                await client.Writer.WriteLineAsync(json.AsMemory(), cts.Token);
+                await client.Writer.FlushAsync(cts.Token);
+                return (id, true);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException)
             {
-                _logger.LogDebug(ex, "Ошибка отправки батча клиенту {Id} (клиент отключен или завис)", id);
+                _logger.LogDebug(ex, "EventPipeServer: клиент {Id} отключён или перестал читать", id);
                 return (id, false);
             }
         });

@@ -22,14 +22,14 @@
 
     <!--
         Корневой контейнер с тенью и адаптивной разметкой:
-        * Row 0 (Auto) — UpperPanel: заголовок, процесс, удаленный адрес (всегда видимы);
-        * Row 1 (*)    — AiCardBorder: карточка ИИ со специализированным AiScrollViewer,
-                         чей MaxHeight динамически вычисляется из доступной высоты экрана;
-        * Row 2 (Auto) — FooterPanel: закрепленные снизу таймер, 5 кнопок действий и прогресс-бар.
+        * Row 0 (*)    — общая прокручиваемая информация и ответ ИИ;
+        * Row 1 (Auto) — FooterPanel: закрепленные снизу таймер, 5 кнопок действий и прогресс-бар.
+        При малой рабочей области прокручивается вся информация, поэтому верхняя панель
+        не вытесняет кнопки действий за нижний край окна.
         Нижняя кромка окна зафиксирована над панелью задач (Bottom-Anchoring),
         поэтому при росте карточки ИИ координаты кнопок на экране не меняются.
     -->
-    <Border
+    <Border x:Name="RootBorder"
         Margin="12"
         CornerRadius="14"
         Background="{DynamicResource WindowBackgroundBrush}"
@@ -46,13 +46,16 @@
 
         <Grid Background="{DynamicResource WindowBackgroundBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Верхняя информационная секция (всегда видима без скроллинга) -->
-            <StackPanel Grid.Row="0" x:Name="UpperPanel">
+            <!-- Общая область прокрутки ограничивает сведения и ИИ доступной высотой над кнопками. -->
+            <ScrollViewer x:Name="ContentScrollViewer" Grid.Row="0"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          CanContentScroll="False" Focusable="False">
+                <StackPanel>
+            <StackPanel x:Name="UpperPanel">
                 <!-- Заголовок: иконка щита/сети, текст, кнопка закрытия -->
                 <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
@@ -164,7 +167,7 @@
             </StackPanel>
 
             <!-- Карточка вердикта ИИ: назначение, риски блокировки, рекомендация -->
-            <Border Grid.Row="1" x:Name="AiCardBorder" Margin="0,0,0,10" Padding="12,10"
+            <Border x:Name="AiCardBorder" Margin="0,0,0,10" Padding="12,10"
                     CornerRadius="8"
                     Background="{ui:ThemeResource CardBackgroundFillColorSecondaryBrush}"
                     BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
@@ -182,7 +185,7 @@
                     <!-- Развёрнутый вердикт нейросети внутри AiScrollViewer с динамическим MaxHeight -->
                     <ScrollViewer x:Name="AiScrollViewer"
                                   Visibility="Collapsed"
-                                  VerticalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Disabled"
                                   HorizontalScrollBarVisibility="Disabled"
                                   Focusable="False"
                                   Padding="0,0,4,0">
@@ -233,9 +236,14 @@
                     </ScrollViewer>
                 </Grid>
             </Border>
+                </StackPanel>
+            </ScrollViewer>
 
             <!-- Закреплённый снизу футер: таймер, кнопки действий и прогресс-бар -->
-            <StackPanel Grid.Row="2" x:Name="FooterPanel">
+            <ScrollViewer x:Name="FooterScrollViewer" Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                          CanContentScroll="False" Focusable="False">
+            <StackPanel x:Name="FooterPanel">
                 <TextBlock x:Name="TxtCountdown"
                            FontSize="11"
                            Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"
@@ -320,6 +328,7 @@
                              Foreground="{ui:ThemeResource SystemAccentColorPrimaryBrush}"
                              BorderThickness="0" />
             </StackPanel>
+            </ScrollViewer>
         </Grid>
     </Border>
 </Window>

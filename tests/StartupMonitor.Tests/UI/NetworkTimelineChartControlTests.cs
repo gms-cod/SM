@@ -61,7 +61,7 @@ public sealed class NetworkTimelineChartControlTests
 
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        thread.Join();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "STA-проверка не завершилась за 10 секунд.");
 
         Assert.Null(threadEx);
     }
@@ -72,29 +72,8 @@ public sealed class NetworkTimelineChartControlTests
     [InlineData(100.0, 1000000.0)] // Широкий динамический диапазон
     public void DynamicRangeCalculation_ExpandsSpanAdequately(double minVal, double maxVal)
     {
-        // Arrange
-        double range = maxVal - minVal;
-        double effectiveMin;
-        double effectiveMax;
-
-        // Act - математическая логика AGC из NetworkTimelineChartControl
-        if (maxVal < 10.0)
-        {
-            effectiveMin = 0.0;
-            effectiveMax = 1024.0;
-        }
-        else if (range < maxVal * 0.40)
-        {
-            double mid = (maxVal + minVal) * 0.5;
-            double desiredSpan = Math.Max(range * 2.0, maxVal * 0.35);
-            effectiveMin = Math.Max(0.0, mid - desiredSpan * 0.5);
-            effectiveMax = effectiveMin + desiredSpan;
-        }
-        else
-        {
-            effectiveMin = 0.0;
-            effectiveMax = maxVal * 1.15;
-        }
+        // Проверяем рабочий алгоритм, а не его независимую копию в тесте.
+        var (effectiveMin, effectiveMax) = NetworkTimelineChartControl.CalculateTrafficRange(minVal, maxVal);
 
         double span = effectiveMax - effectiveMin;
 

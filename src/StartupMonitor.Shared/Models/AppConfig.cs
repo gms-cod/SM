@@ -234,7 +234,13 @@ public class AppSettings
             TargetPort = b.TargetPort,
             TargetProcess = b.TargetProcess,
             Protocol = b.Protocol,
-            BanStartedUtc = b.BanStartedUtc
+            BanStartedUtc = b.BanStartedUtc,
+            // Глубокий снимок сохраняет срок действия, идентификатор правила и диагностику бана.
+            ExpiresAtUtc = b.ExpiresAtUtc,
+            AttackRate = b.AttackRate,
+            Reason = b.Reason,
+            RepeatCount = b.RepeatCount,
+            RuleName = b.RuleName
         }).ToList();
         copy.FirewallAllowedPorts = [..FirewallAllowedPorts];
         copy.FirewallWhitelistedApps = [..FirewallWhitelistedApps];

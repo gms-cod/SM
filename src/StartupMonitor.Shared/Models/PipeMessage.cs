@@ -104,6 +104,11 @@ public static class PipeMessageTypes
     public const string UnsubscribeProcessMetrics = "UnsubscribeProcessMetrics";
     /// <summary>Разовый запрос актуального снимка процессов.</summary>
     public const string GetProcesses = "GetProcesses";
+
+    /// <summary>Запрос реальных временных интервалов сетевого трафика.</summary>
+    public const string GetNetworkTrafficHistory = "GetNetworkTrafficHistory";
+    /// <summary>Ответ с измеренной сетевой историей.</summary>
+    public const string GetNetworkTrafficHistoryResponse = "GetNetworkTrafficHistoryResponse";
     /// <summary>Ответ службы со снимком процессов и системной нагрузки.</summary>
     public const string ProcessesSnapshot = "ProcessesSnapshot";
     /// <summary>Завершить процесс по идентификатору (PID).</summary>

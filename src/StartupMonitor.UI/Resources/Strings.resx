@@ -2144,4 +2144,19 @@ Import with overwrite of existing rules?</value>
   <data name="NetAclRowBlacklistTip" xml:space="preserve"><value>Block (add to blacklist)</value></data>
   <data name="NetAclRowKillProcessTip" xml:space="preserve"><value>Terminate process</value></data>
   <data name="NetAclEmptyText" xml:space="preserve"><value>No applications match the selected filter in the access matrix.</value></data>
+  <data name="TimelineTitle" xml:space="preserve"><value>Network interface traffic</value></data>
+  <data name="TimelineNoMeasurements" xml:space="preserve"><value>No measurements in this interval</value></data>
+  <data name="TimelineTooltipFormat" xml:space="preserve"><value>{0} • ↓ {1} • ↑ {2}{3}</value></data>
+  <data name="TimelineBlockedFormat" xml:space="preserve"><value> | Blocked: {0}</value></data>
+  <data name="TimelineSliceFormat" xml:space="preserve"><value>• Slice: {0:HH:mm:ss}</value></data>
+  <data name="TimelineHour" xml:space="preserve"><value>1 hour</value></data>
+  <data name="TimelineDay" xml:space="preserve"><value>24 hours</value></data>
+  <data name="TimelineWeek" xml:space="preserve"><value>7 days</value></data>
+  <data name="TimelineReset" xml:space="preserve"><value>↩ Reset slice</value></data>
+  <data name="TimelineResetTip" xml:space="preserve"><value>Return to all current connections</value></data>
+  <data name="UnitBytesPerSecond" xml:space="preserve"><value>B/s</value></data>
+  <data name="UnitKilobytesPerSecond" xml:space="preserve"><value>KB/s</value></data>
+  <data name="UnitMegabytesPerSecond" xml:space="preserve"><value>MB/s</value></data>
+  <data name="UnitGigabytes" xml:space="preserve"><value>GB</value></data>
+  <data name="NetConnectionHistoryTitle" xml:space="preserve"><value>Connection history</value></data>
 </root>

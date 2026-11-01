@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -23,7 +23,7 @@ public sealed class ProcessPortDefenderService : IDisposable
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly WindowsFirewallService _firewall;
+    private readonly IPortDefenderFirewall _firewall;
     private readonly ProcessNetworkTracker _networkTracker;
     private readonly NotificationService _notifications;
     private readonly JsonDataStore _dataStore;
@@ -31,6 +31,9 @@ public sealed class ProcessPortDefenderService : IDisposable
 
     private readonly SlidingWindowTracker _windowTracker = new();
     private readonly object _sync = new();
+    /// <summary>Предвычисленный индекс включённых правил; пересоздаётся только при изменении конфигурации.</summary>
+    private Dictionary<int, (int Id, PortDefenderRuleConfig Rule)[]> _rulesByPort = new();
+    private bool _needsProcessPaths;
 
     private readonly string _bansFilePath;
     private readonly string _configFilePath;
@@ -49,9 +52,7 @@ public sealed class ProcessPortDefenderService : IDisposable
     // Конфигурация службы
     private PortDefenderConfigDto _config = new();
 
-    // ── Фоновый цикл в режиме 0% CPU Idle ──
-    // Опрос сокетов выполняется только при наличии активного UI-клиента И включённых
-    // правил. Во всех остальных случаях цикл спит неограниченно долго (0% CPU).
+    // Включённая защита работает без UI; при отсутствии активных правил цикл ждёт смены конфигурации.
     private readonly ActivityGate _wake = new();
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -62,11 +63,29 @@ public sealed class ProcessPortDefenderService : IDisposable
     /// Инициализирует службу ProcessPortDefenderService.
     /// </summary>
     public ProcessPortDefenderService(
-        WindowsFirewallService firewall,
+        IPortDefenderFirewall firewall,
         ProcessNetworkTracker networkTracker,
         NotificationService notifications,
         JsonDataStore dataStore,
         ILogger<ProcessPortDefenderService> logger)
+        : this(firewall, networkTracker, notifications, dataStore, logger, startMonitoring: true)
+    {
+    }
+
+    /// <summary>Инициализирует ядро с управляемым запуском опроса для изолированной проверки снимков.</summary>
+    /// <param name="firewall">Адаптер подтверждённых операций брандмауэра.</param>
+    /// <param name="networkTracker">Общий сборщик снимков сокетов.</param>
+    /// <param name="notifications">Очередь уведомлений.</param>
+    /// <param name="dataStore">Хранилище приложения.</param>
+    /// <param name="logger">Журнал диагностических событий.</param>
+    /// <param name="startMonitoring">Признак запуска настоящего фонового опроса.</param>
+    internal ProcessPortDefenderService(
+        IPortDefenderFirewall firewall,
+        ProcessNetworkTracker networkTracker,
+        NotificationService notifications,
+        JsonDataStore dataStore,
+        ILogger<ProcessPortDefenderService> logger,
+        bool startMonitoring)
     {
         _firewall = firewall ?? throw new ArgumentNullException(nameof(firewall));
         _networkTracker = networkTracker ?? throw new ArgumentNullException(nameof(networkTracker));
@@ -79,48 +98,59 @@ public sealed class ProcessPortDefenderService : IDisposable
         _configFilePath = Path.Combine(baseDir, "firewall-defender.json");
 
         LoadConfig();
+        RebuildRuleIndex();
         LoadActiveBans();
 
-        // Запуск адаптивного цикла опроса: активен только при UI-клиенте и правилах,
-        // иначе — глубокий сон (0% CPU) до Pulse/смены конфигурации.
-        StartLoop();
+        // Тесты анализируют внедрённые снимки без нативного опроса и изменений firewall машины.
+        if (startMonitoring)
+            StartLoop();
     }
 
-    /// <summary>Регистрирует наличие/отсутствие активного UI-клиента (вызывается PipeServer).</summary>
+    /// <summary>Сохраняет диагностическое состояние UI, не прерывая независимую фоновую защиту.</summary>
     public void SetUiActive(bool active)
     {
         if (_uiActive == active) return;
         _uiActive = active;
-        _wake.Pulse();
     }
 
-    /// <summary>Есть ли работа: активен UI-клиент И включён хотя бы один порт-правило.</summary>
-    private bool HasWork()
+    /// <summary>Определяет наличие включённых правил независимо от присутствия UI, без повторного построения индекса.</summary>
+    /// <returns>Признак необходимости фоновой защиты.</returns>
+    internal bool HasWork()
     {
-        if (!_uiActive) return false;
         lock (_sync)
         {
-            return _config.IsGloballyEnabled &&
-                   (_config.Rules.Any(r => r.IsEnabled) || (_config.ProtectedPorts != null && _config.ProtectedPorts.Count > 0));
+            return !_disposed && _config.IsGloballyEnabled && _rulesByPort.Count > 0;
         }
     }
 
     private void StartLoop()
     {
         if (_loop is { IsCompleted: false }) return;
-        try { _cts?.Dispose(); } catch { }
+        _cts?.Dispose();
         _cts = new CancellationTokenSource();
         _loop = RunAsync(_cts.Token);
     }
 
+    /// <summary>Отменяет опрос и дожидается его завершения перед освобождением шлюза и токена.</summary>
     private void StopLoop()
     {
         var cts = _cts;
         _cts = null;
-        _loop = null;
         if (cts == null) return;
-        try { cts.Cancel(); } catch { }
-        cts.Dispose();
+        try
+        {
+            cts.Cancel();
+            _loop?.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogDebug(ex, "PortDefender: фоновый опрос отменён при освобождении ресурсов");
+        }
+        finally
+        {
+            _loop = null;
+            cts.Dispose();
+        }
     }
 
     /// <summary>
@@ -143,8 +173,7 @@ public sealed class ProcessPortDefenderService : IDisposable
                 try
                 {
                     var sockets = _networkTracker.GetSockets();
-                    if (sockets != null && sockets.Count > 0)
-                        ProcessSocketSnapshot(sockets);
+                    ProcessSocketSnapshot(sockets);
                 }
                 catch (Exception ex)
                 {
@@ -164,31 +193,39 @@ public sealed class ProcessPortDefenderService : IDisposable
     {
         lock (_sync)
         {
-            return new PortDefenderConfigDto
-            {
-                IsGloballyEnabled = _config.IsGloballyEnabled,
-                DefaultBanDurationMinutes = _config.DefaultBanDurationMinutes,
-                TrustPrivateNetworks = _config.TrustPrivateNetworks,
-                WhitelistIps = [.. _config.WhitelistIps],
-                ProtectedPorts = [.. _config.ProtectedPorts],
-                MaxAttempts = _config.MaxAttempts,
-                WindowUnit = _config.WindowUnit,
-                WindowSeconds = _config.WindowSeconds,
-                BanDurationMinutes = _config.BanDurationMinutes,
-                AutoEscalate = _config.AutoEscalate,
-                Rules = _config.Rules.Select(r => new PortDefenderRuleConfig
-                {
-                    LocalPort = r.LocalPort,
-                    ProcessPath = r.ProcessPath,
-                    IsEnabled = r.IsEnabled,
-                    ThresholdCount = r.ThresholdCount,
-                    WindowUnit = r.WindowUnit,
-                    BanDurationMinutes = r.BanDurationMinutes,
-                    AutoEscalate = r.AutoEscalate,
-                    WhitelistIps = [.. r.WhitelistIps]
-                }).ToList()
-            };
+            return CopyConfiguration(_config);
         }
+    }
+
+    /// <summary>Создаёт независимую копию конфигурации, не позволяя вызывающему коду менять работающий индекс правил.</summary>
+    /// <param name="source">Исходная конфигурация.</param>
+    /// <returns>Копия всех списков и правил с безопасными пустыми коллекциями.</returns>
+    private static PortDefenderConfigDto CopyConfiguration(PortDefenderConfigDto source)
+    {
+        return new PortDefenderConfigDto
+        {
+            IsGloballyEnabled = source.IsGloballyEnabled,
+            DefaultBanDurationMinutes = source.DefaultBanDurationMinutes,
+            TrustPrivateNetworks = source.TrustPrivateNetworks,
+            WhitelistIps = [.. source.WhitelistIps ?? []],
+            ProtectedPorts = [.. source.ProtectedPorts ?? []],
+            MaxAttempts = source.MaxAttempts,
+            WindowUnit = source.WindowUnit,
+            WindowSeconds = source.WindowSeconds,
+            BanDurationMinutes = source.BanDurationMinutes,
+            AutoEscalate = source.AutoEscalate,
+            Rules = (source.Rules ?? []).Where(r => r is not null).Select(r => new PortDefenderRuleConfig
+            {
+                LocalPort = r.LocalPort,
+                ProcessPath = r.ProcessPath,
+                IsEnabled = r.IsEnabled,
+                ThresholdCount = r.ThresholdCount,
+                WindowUnit = r.WindowUnit,
+                BanDurationMinutes = r.BanDurationMinutes,
+                AutoEscalate = r.AutoEscalate,
+                WhitelistIps = [.. r.WhitelistIps ?? []]
+            }).ToList()
+        };
     }
 
     /// <summary>
@@ -196,33 +233,21 @@ public sealed class ProcessPortDefenderService : IDisposable
     /// </summary>
     public void SaveConfig(PortDefenderConfigDto config)
     {
-        if (config == null) return;
+        ArgumentNullException.ThrowIfNull(config);
+        var snapshot = CopyConfiguration(config);
         lock (_sync)
         {
-            var oldPorts = new HashSet<int>(_config.ProtectedPorts ?? Enumerable.Empty<int>());
-            NormalizeAndSynchronizeRules(config);
-            var newPorts = new HashSet<int>(config.ProtectedPorts ?? Enumerable.Empty<int>());
-
-            // Очищаем ключи удаленных портов из дедупликатора
-            var removedPorts = oldPorts.Except(newPorts).ToHashSet();
-            if (removedPorts.Count > 0 && _previousConnectionKeys.Count > 0)
-            {
-                _previousConnectionKeys.RemoveWhere(k =>
-                {
-                    int arrowIdx = k.LastIndexOf("->", StringComparison.Ordinal);
-                    if (arrowIdx >= 0 && int.TryParse(k.Substring(arrowIdx + 2), out var p))
-                    {
-                        return removedPorts.Contains(p);
-                    }
-                    return false;
-                });
-            }
-
-            _config = config;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            NormalizeAndSynchronizeRules(snapshot);
+            _config = snapshot;
+            // Новая конфигурация начинает независимые окна, не наследуя счётчики прежних правил.
+            _previousConnectionKeys.Clear();
+            _windowTracker.Clear();
+            RebuildRuleIndex();
             SaveConfigToFile();
         }
         _logger.LogInformation("PortDefender: Конфигурация обновлена. Портов: {PortCount}, Правил: {RuleCount}, Активен: {Enabled}",
-            config.ProtectedPorts?.Count ?? 0, config.Rules?.Count ?? 0, config.IsGloballyEnabled);
+            snapshot.ProtectedPorts.Count, snapshot.Rules.Count, snapshot.IsGloballyEnabled);
 
         // Смена правил → немедленный пересчёт режима сна (активный опрос либо 0% CPU Idle).
         _wake.Pulse();
@@ -235,7 +260,20 @@ public sealed class ProcessPortDefenderService : IDisposable
     /// </summary>
     public IReadOnlyList<ActiveBanDto> GetActiveBans()
     {
-        return _activeBans.Values.ToList();
+        // Наружу передаются независимые DTO: UI не может изменить срок действующего бана.
+        return _activeBans.Values.Select(ban => new ActiveBanDto
+        {
+            Ip = ban.Ip,
+            TargetPort = ban.TargetPort,
+            TargetProcess = ban.TargetProcess,
+            Protocol = ban.Protocol,
+            BanStartedUtc = ban.BanStartedUtc,
+            ExpiresAtUtc = ban.ExpiresAtUtc,
+            AttackRate = ban.AttackRate,
+            Reason = ban.Reason,
+            RepeatCount = ban.RepeatCount,
+            RuleName = ban.RuleName
+        }).ToList();
     }
 
     /// <summary>
@@ -245,28 +283,35 @@ public sealed class ProcessPortDefenderService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(ip)) return false;
         var normalized = ip.Trim();
-
-        _activeBans.TryRemove(normalized, out var ban);
-        _windowTracker.Reset(normalized);
-
-        try
+        // Изменение firewall и учётного состояния сериализовано с обработкой новых снимков и банов.
+        lock (_sync)
         {
-            var res = _firewall.UnblockIp(new UnblockIpRequest
+            try
             {
-                Ip = normalized,
-                Direction = FirewallDirection.Inbound
-            });
+                var res = _firewall.UnblockIp(new UnblockIpRequest
+                {
+                    Ip = normalized,
+                    Direction = FirewallDirection.Inbound
+                });
 
-            _logger.LogInformation("PortDefender: IP {Ip} разблокирован. Результат: {Result}",
-                normalized, res.Success ? "Успешно" : res.Message);
+                if (!res.Success)
+                {
+                    _logger.LogWarning("PortDefender: IP {Ip} не разблокирован, сохранён для повтора: {Message}", normalized, res.Message);
+                    return false;
+                }
 
-            SaveActiveBansToFile();
-            return res.Success;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "PortDefender: Ошибка при разблокировке IP {Ip}", normalized);
-            return false;
+                _activeBans.TryRemove(normalized, out _);
+                _windowTracker.ResetRulesForIp(normalized);
+                _logger.LogInformation("PortDefender: IP {Ip} разблокирован", normalized);
+
+                SaveActiveBansToFile();
+                return res.Success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "PortDefender: Ошибка при разблокировке IP {Ip}", normalized);
+                return false;
+            }
         }
     }
 
@@ -281,9 +326,7 @@ public sealed class ProcessPortDefenderService : IDisposable
         {
             if (UnbanIp(b.Ip)) count++;
         }
-        _activeBans.Clear();
-        _windowTracker.Clear();
-        SaveActiveBansToFile();
+        // Неудачно снятые блокировки остаются в состоянии для следующего повтора.
         return count;
     }
 
@@ -292,23 +335,27 @@ public sealed class ProcessPortDefenderService : IDisposable
     /// </summary>
     public int ProcessExpiredBans()
     {
-        var now = DateTime.UtcNow;
-        var expiredBans = _activeBans.Values
-            .Where(b => b.ExpiresAtUtc.HasValue && b.ExpiresAtUtc.Value <= now)
-            .ToList();
-
-        int unbanned = 0;
-        foreach (var b in expiredBans)
+        // Проверка срока и разбан выполняются под одним lock, чтобы не снять новый бан того же IP.
+        lock (_sync)
         {
-            _logger.LogInformation("PortDefender: Срок бана IP {Ip} истёк ({ExpiresUtc:u}). Авторазбан.",
-                b.Ip, b.ExpiresAtUtc);
-            if (UnbanIp(b.Ip))
-            {
-                unbanned++;
-            }
-        }
+            var now = DateTime.UtcNow;
+            var expiredBans = _activeBans.Values
+                .Where(b => b.ExpiresAtUtc.HasValue && b.ExpiresAtUtc.Value <= now)
+                .ToList();
 
-        return unbanned;
+            int unbanned = 0;
+            foreach (var b in expiredBans)
+            {
+                _logger.LogInformation("PortDefender: Срок бана IP {Ip} истёк ({ExpiresUtc:u}). Авторазбан.",
+                    b.Ip, b.ExpiresAtUtc);
+                if (UnbanIp(b.Ip))
+                {
+                    unbanned++;
+                }
+            }
+
+            return unbanned;
+        }
     }
 
     // ───────────────────────────── Обработка сетевых снимков ─────────────────────────────
@@ -318,7 +365,23 @@ public sealed class ProcessPortDefenderService : IDisposable
     /// </summary>
     public void ProcessSocketSnapshot(IReadOnlyList<TcpSocketInfo> sockets)
     {
-        if (sockets == null || sockets.Count == 0) return;
+        ArgumentNullException.ThrowIfNull(sockets);
+        lock (_sync)
+        {
+            if (_disposed) return;
+            ProcessSocketSnapshotCore(sockets);
+        }
+    }
+
+    /// <summary>Обрабатывает один снимок под общей блокировкой конфигурации, дедупликации и подтверждённых банов.</summary>
+    /// <param name="sockets">Текущие TCP-сокеты, включая пустой снимок для сброса дедупликации.</param>
+    private void ProcessSocketSnapshotCore(IReadOnlyList<TcpSocketInfo> sockets)
+    {
+        if (sockets.Count == 0)
+        {
+            _previousConnectionKeys.Clear();
+            return;
+        }
 
         PortDefenderConfigDto cfg;
         lock (_sync)
@@ -329,27 +392,20 @@ public sealed class ProcessPortDefenderService : IDisposable
         if (!cfg.IsGloballyEnabled)
             return;
 
-        var activeRules = GetEffectiveRules(cfg);
-        if (activeRules.Count == 0)
+        if (_rulesByPort.Count == 0)
             return;
-
-        // Индексируем активные правила по LocalPort
-        var rulesByPort = activeRules
-            .Where(r => r.IsEnabled)
-            .ToLookup(r => r.LocalPort);
-
-        if (!rulesByPort.Any()) return;
 
         var currentConnectionKeys = new HashSet<string>(Math.Max(16, sockets.Count), StringComparer.OrdinalIgnoreCase);
 
         foreach (var sock in sockets)
         {
+            if (sock is null || sock.Protocol?.StartsWith("TCP", StringComparison.OrdinalIgnoreCase) != true) continue;
             // Фильтруем входящие TCP-соединения (ESTABLISHED, SYN_RCVD)
             if (!IsIncomingTcpState(sock.State))
                 continue;
 
             // Ключ уникального соединения: RemoteIP:RemotePort -> LocalPort
-            var connKey = $"{sock.RemoteAddress}:{sock.RemotePort}->{sock.LocalPort}";
+            var connKey = $"{sock.ProcessId}|{sock.LocalAddress}:{sock.LocalPort}|{sock.RemoteAddress}:{sock.RemotePort}";
             currentConnectionKeys.Add(connKey);
 
             // Если соединение уже наблюдалось на предыдущей секунде — пропускаем дедупликацию
@@ -357,8 +413,7 @@ public sealed class ProcessPortDefenderService : IDisposable
                 continue;
 
             // Проверяем, отслеживается ли целевой локальный порт
-            var matchingRules = rulesByPort[sock.LocalPort];
-            if (!matchingRules.Any())
+            if (!_rulesByPort.TryGetValue(sock.LocalPort, out var matchingRules))
                 continue;
 
             var remoteIp = sock.RemoteAddress;
@@ -383,8 +438,9 @@ public sealed class ProcessPortDefenderService : IDisposable
             if (_activeBans.ContainsKey(remoteIp))
                 continue;
 
-            foreach (var rule in matchingRules)
+            foreach (var match in matchingRules)
             {
+                var rule = match.Rule;
                 // Если в правиле задан конкретный процесс — сопоставляем путь/имя
                 if (!string.IsNullOrWhiteSpace(rule.ProcessPath))
                 {
@@ -399,14 +455,15 @@ public sealed class ProcessPortDefenderService : IDisposable
                 // Передаём в трекер скользящего окна
                 var windowTimeSpan = GetTimeSpanForUnit(rule.WindowUnit);
                 bool exceeded = _windowTracker.RecordConnectionAndCheckThreshold(
-                    remoteIp,
+                    $"{remoteIp}|{match.Id}",
                     rule.ThresholdCount,
                     windowTimeSpan,
                     out int currentRate);
 
                 if (exceeded)
                 {
-                    TriggerBan(remoteIp, rule, currentRate, sock.ProcessName ?? sock.ProcessPath ?? "System");
+                    if (!TriggerBan(remoteIp, rule, currentRate, sock.ProcessName ?? sock.ProcessPath ?? "System"))
+                        currentConnectionKeys.Remove(connKey);
                     break;
                 }
             }
@@ -420,18 +477,38 @@ public sealed class ProcessPortDefenderService : IDisposable
     /// </summary>
     public void ProcessSocketSnapshot(IReadOnlyList<ProcessNetworkSocket> sockets)
     {
-        if (sockets == null || sockets.Count == 0) return;
+        ArgumentNullException.ThrowIfNull(sockets);
         var tcpList = new List<TcpSocketInfo>(sockets.Count);
+        bool needsProcessPaths;
+        lock (_sync)
+            needsProcessPaths = _needsProcessPaths;
+        var processPaths = needsProcessPaths ? new Dictionary<int, string?>() : null;
         for (int i = 0; i < sockets.Count; i++)
         {
-            tcpList.Add(new TcpSocketInfo(sockets[i]));
+            var socket = sockets[i];
+            if (socket is null || socket.Protocol?.StartsWith("TCP", StringComparison.OrdinalIgnoreCase) != true)
+                continue;
+            string? processPath = null;
+            if (processPaths is not null && socket.ProcessId > 0 && !processPaths.TryGetValue(socket.ProcessId, out processPath))
+            {
+                // Полный путь запрашивается один раз на PID и только для правил, которым он необходим.
+                processPath = ProcessMetadataEnricher.TryGetProcessPath(socket.ProcessId);
+                processPaths[socket.ProcessId] = processPath;
+            }
+            tcpList.Add(new TcpSocketInfo(socket, processPath));
         }
         ProcessSocketSnapshot(tcpList);
     }
 
     // ───────────────────────────── Логика бана и эскалации ─────────────────────────────
 
-    private void TriggerBan(string ip, PortDefenderRuleConfig rule, int attackRate, string processName)
+    /// <summary>Фиксирует бан и отправляет уведомление только после подтверждения изменения Windows Firewall.</summary>
+    /// <param name="ip">Атакующий адрес.</param>
+    /// <param name="rule">Сработавшее правило.</param>
+    /// <param name="attackRate">Число наблюдённых соединений в окне.</param>
+    /// <param name="processName">Имя защищаемого процесса.</param>
+    /// <returns>Признак подтверждённого бана; false сохраняет возможность повторной попытки.</returns>
+    private bool TriggerBan(string ip, PortDefenderRuleConfig rule, int attackRate, string processName)
     {
         try
         {
@@ -446,19 +523,19 @@ public sealed class ProcessPortDefenderService : IDisposable
             if (cfgSnapshot.TrustPrivateNetworks && ProcessNetworkSocket.CheckIsPrivateAddress(ip))
             {
                 _logger.LogDebug("PortDefender: Бан IP {Ip} пропущен (частная сеть, TrustPrivateNetworks=true).", ip);
-                return;
+                return false;
             }
 
             if (IsIpWhitelisted(ip, cfgSnapshot.WhitelistIps))
             {
                 _logger.LogDebug("PortDefender: Бан IP {Ip} пропущен (глобальный WhitelistIps).", ip);
-                return;
+                return false;
             }
 
             if (IsIpWhitelisted(ip, rule.WhitelistIps))
             {
                 _logger.LogDebug("PortDefender: Бан IP {Ip} пропущен (whitelist правила, порт {Port}).", ip, rule.LocalPort);
-                return;
+                return false;
             }
 
             var now = DateTime.UtcNow;
@@ -470,10 +547,9 @@ public sealed class ProcessPortDefenderService : IDisposable
                 // Если предыдущая атака была менее 24 часов назад — инкрементируем счётчик повторов
                 if ((now - hist.LastBanUtc).TotalHours <= 24)
                 {
-                    repeatCount = hist.RepeatCount + 1;
+                    repeatCount = hist.RepeatCount < int.MaxValue ? Math.Max(1, hist.RepeatCount + 1) : int.MaxValue;
                 }
             }
-            _repeatHistory[ip] = (repeatCount, now);
 
             // Длительность бана
             int banMinutes = CalculateEscalatedDuration(rule.BanDurationMinutes, repeatCount, rule.AutoEscalate);
@@ -500,6 +576,12 @@ public sealed class ProcessPortDefenderService : IDisposable
             };
 
             var fwResult = _firewall.BlockIp(blockReq);
+            if (!fwResult.Success)
+            {
+                _logger.LogWarning("PortDefender: IP {Ip} не заблокирован: {Message}", ip, fwResult.Message);
+                return false;
+            }
+            _repeatHistory[ip] = (repeatCount, now);
             _logger.LogWarning("PortDefender: Атака с IP {Ip} заблокирована на {Minutes}м (рецидив: {Repeat}). Результат FW: {Result}",
                 ip, banMinutes, repeatCount, fwResult.Message);
 
@@ -512,14 +594,15 @@ public sealed class ProcessPortDefenderService : IDisposable
                 ExpiresAtUtc = expiresUtc,
                 AttackRate = attackRate,
                 Reason = reason,
-                RepeatCount = repeatCount
+                RepeatCount = repeatCount,
+                RuleName = fwResult.RuleName
             };
 
             _activeBans[ip] = ban;
             SaveActiveBansToFile();
 
             // Сброс истории в трекере для этого IP
-            _windowTracker.Reset(ip);
+            _windowTracker.ResetRulesForIp(ip);
 
             // Уведомление через Named Pipe
             try
@@ -546,10 +629,12 @@ public sealed class ProcessPortDefenderService : IDisposable
             {
                 _logger.LogWarning(exNotification, "PortDefender: Не удалось отправить уведомление о бане {Ip}", ip);
             }
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "PortDefender: Ошибка при обработке бана для IP {Ip}", ip);
+            return false;
         }
     }
 
@@ -592,6 +677,10 @@ public sealed class ProcessPortDefenderService : IDisposable
     {
         if (string.IsNullOrWhiteSpace(targetRulePath)) return true;
         var ruleTrim = targetRulePath.Trim();
+
+        // Правило полного пути не может совпадать с другим EXE только из-за одинакового имени файла.
+        if (Path.IsPathRooted(ruleTrim))
+            return !string.IsNullOrWhiteSpace(procPath) && string.Equals(ruleTrim, procPath, StringComparison.OrdinalIgnoreCase);
 
         if (!string.IsNullOrEmpty(procPath) &&
             string.Equals(procPath, ruleTrim, StringComparison.OrdinalIgnoreCase))
@@ -723,6 +812,15 @@ public sealed class ProcessPortDefenderService : IDisposable
 
         config.ProtectedPorts ??= new List<int>();
         config.Rules ??= new List<PortDefenderRuleConfig>();
+        config.Rules.RemoveAll(rule => rule is null || rule.LocalPort is < 1 or > 65535);
+        // Ограничиваем значения, используемые в счётчиках и DateTime.AddMinutes, до безопасных диапазонов.
+        foreach (var rule in config.Rules)
+        {
+            rule.ThresholdCount = Math.Clamp(rule.ThresholdCount, 1, 1_000_000);
+            rule.BanDurationMinutes = Math.Clamp(rule.BanDurationMinutes, 0, 525_600);
+            if (!Enum.IsDefined(rule.WindowUnit)) rule.WindowUnit = TimeWindowUnit.Minute;
+            rule.WhitelistIps ??= [];
+        }
 
         // Очищаем и нормализуем защищаемые порты (только валидные 1..65535, без дубликатов)
         var validProtectedPorts = config.ProtectedPorts
@@ -790,7 +888,8 @@ public sealed class ProcessPortDefenderService : IDisposable
 
         if (cfg.ProtectedPorts != null && cfg.ProtectedPorts.Count > 0)
         {
-            var coveredPorts = result.Select(r => r.LocalPort).ToHashSet();
+            // Выключенное явное правило также занимает порт и запрещает включённый fallback.
+            var coveredPorts = (cfg.Rules ?? []).Select(r => r.LocalPort).ToHashSet();
             foreach (var port in cfg.ProtectedPorts)
             {
                 if (port is >= 1 and <= 65535 && !coveredPorts.Contains(port))
@@ -810,6 +909,16 @@ public sealed class ProcessPortDefenderService : IDisposable
         }
 
         return result;
+    }
+
+    /// <summary>Подготавливает индекс правил и их независимые ключи один раз при смене конфигурации.</summary>
+    private void RebuildRuleIndex()
+    {
+        _rulesByPort = GetEffectiveRules(_config)
+            .Select((rule, id) => (Id: id, Rule: rule))
+            .GroupBy(item => item.Rule.LocalPort)
+            .ToDictionary(group => group.Key, group => group.ToArray());
+        _needsProcessPaths = _rulesByPort.Values.Any(rules => rules.Any(item => !string.IsNullOrWhiteSpace(item.Rule.ProcessPath)));
     }
 
     private void SaveConfigToFile()
@@ -839,12 +948,13 @@ public sealed class ProcessPortDefenderService : IDisposable
                     bool fileChanged = false;
                     foreach (var b in loaded)
                     {
+                        if (b is null || string.IsNullOrWhiteSpace(b.Ip))
+                            continue;
                         // P0: Просроченные баны НЕ просто пропускаем — их необходимо
                         // УДАЛИТЬ из правила брандмауэра, иначе после перезагрузки
                         // остаются вечные 'зомби'-правила в Windows Firewall.
                         if (b.ExpiresAtUtc.HasValue && b.ExpiresAtUtc.Value <= now)
                         {
-                            fileChanged = true;
                             try
                             {
                                 var res = _firewall.UnblockIp(new UnblockIpRequest
@@ -855,13 +965,17 @@ public sealed class ProcessPortDefenderService : IDisposable
                                 _logger.LogInformation(
                                     "PortDefender: Просроченный бан IP {Ip} (истёк {ExpiresUtc:u}) удалён из firewall при старте. Результат: {Result}",
                                     b.Ip, b.ExpiresAtUtc, res.Success ? "Успешно" : res.Message);
+                                if (res.Success)
+                                {
+                                    fileChanged = true;
+                                    continue;
+                                }
                             }
                             catch (Exception exUnblock)
                             {
                                 _logger.LogWarning(exUnblock,
                                     "PortDefender: Не удалось удалить просроченный бан IP {Ip} из firewall при старте", b.Ip);
                             }
-                            continue;
                         }
 
                         _activeBans[b.Ip] = b;
@@ -908,8 +1022,12 @@ public sealed class ProcessPortDefenderService : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        // Не удерживаем _sync во время ожидания: завершающийся цикл сам проверяет HasWork под этой блокировкой.
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
         StopLoop();
         _wake.Dispose();
     }

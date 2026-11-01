@@ -7,6 +7,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Channels;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared.Diagnostics;
@@ -29,24 +30,34 @@ public record CachedProcessMetadata(
 );
 
 /// <summary>Сервис обогащения метаданных процессов с кэшированием и Time-Sliced квантованием (защита от скачков CPU).</summary>
-public class ProcessMetadataEnricher : IDisposable
+public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
 {
     // Кэш по ключу (PID, StartTimeTicks)
     private readonly ConcurrentDictionary<(int Pid, long StartTimeTicks), CachedProcessMetadata> _cache = new();
     // Очередь процессов, требующих обогащения метаданными
-    private readonly ConcurrentQueue<ProcessInfo> _enrichQueue = new();
+    /// <summary>Ограниченная очередь будит единственный worker только при поступлении работы.</summary>
+    private readonly Channel<ProcessInfo> _enrichQueue = Channel.CreateBounded<ProcessInfo>(new BoundedChannelOptions(1024)
+    {
+        SingleReader = true,
+        FullMode = BoundedChannelFullMode.Wait
+    });
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _workerTask;
+    /// <summary>Защищает отмену и освобождение CTS от повторного Dispose через владельцев DI.</summary>
+    private int _disposed;
 
     /// <summary>ProcessMetadataEnricher: Выполняет операцию ProcessMetadataEnricher.</summary>
     public ProcessMetadataEnricher()
     {
-        _workerTask = Task.Run(ProcessEnrichmentLoopAsync);
+        var ct = _cts.Token;
+        _workerTask = Task.Run(() => ProcessEnrichmentLoopAsync(ct));
     }
 
     /// <summary>Применяет метаданные из кэша (мгновенно). Если в кэше нет — ставит в Time-Sliced очередь.</summary>
     public void EnrichOrQueue(ProcessInfo proc, IntPtr processHandle)
     {
+        ArgumentNullException.ThrowIfNull(proc);
+        if (Volatile.Read(ref _disposed) != 0) return;
         using var _prof = ExecutionProfiler.Measure("Service.ProcessEnrich.EnrichOrQueue");
         var key = (proc.ProcessId, proc.StartTime.Ticks);
         if (_cache.TryGetValue(key, out var cached))
@@ -121,18 +132,22 @@ public class ProcessMetadataEnricher : IDisposable
         }
 
         // Ставим в очередь на глубокое обогащение (цифровая подпись Authenticode)
-        _enrichQueue.Enqueue(proc);
+        if (!_enrichQueue.Writer.TryWrite(proc))
+            Serilog.Log.Debug("Очередь метаданных заполнена или остановлена; процесс {Pid} будет проверен при следующем снимке", proc.ProcessId);
     }
 
-    /// <summary>Фоновый сглаживающий цикл обработки очереди порциями по 5 процессов за такт с микропаузами.</summary>
-    private async Task ProcessEnrichmentLoopAsync()
+    /// <summary>Обрабатывает очередь порциями; пустой канал не создаёт периодических пробуждений CPU.</summary>
+    /// <param name="ct">Захваченный токен жизненного цикла worker, независимый от освобождения общего CTS.</param>
+    /// <returns>Задача завершения обработчика.</returns>
+    private async Task ProcessEnrichmentLoopAsync(CancellationToken ct)
     {
-        while (!_cts.Token.IsCancellationRequested)
+        while (!ct.IsCancellationRequested)
         {
             try
             {
+                if (!await _enrichQueue.Reader.WaitToReadAsync(ct).ConfigureAwait(false)) break;
                 int processedInBatch = 0;
-                while (processedInBatch < 5 && _enrichQueue.TryDequeue(out var proc))
+                while (processedInBatch < 5 && _enrichQueue.Reader.TryRead(out var proc))
                 {
                     var key = (proc.ProcessId, proc.StartTime.Ticks);
                     if (_cache.TryGetValue(key, out var cached))
@@ -214,10 +229,18 @@ public class ProcessMetadataEnricher : IDisposable
                 }
 
                 // Микропауза между квантами для сглаживания нагрузки на CPU
-                await Task.Delay(processedInBatch > 0 ? 30 : 200, _cts.Token);
+                if (processedInBatch > 0)
+                    await Task.Delay(30, ct).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) { break; }
-            catch { await Task.Delay(200, _cts.Token); }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                Serilog.Log.Debug("Обогащение метаданных остановлено");
+                break;
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Не удалось обработать элемент очереди метаданных процессов");
+            }
         }
     }
 
@@ -353,12 +376,21 @@ public class ProcessMetadataEnricher : IDisposable
     private static extern bool QueryFullProcessImageName(IntPtr hProcess, int flags, [Out] StringBuilder lpExeName, ref int lpdwSize);
     #endregion
 
-    /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
+    /// <summary>Идемпотентно останавливает worker и освобождает CTS после завершения его использования.</summary>
     public void Dispose()
     {
-        _cts.Cancel();
-        try { _workerTask.Wait(TimeSpan.FromMilliseconds(500)); } catch { }
-        _cts.Dispose();
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <summary>Отменяет единственный обработчик до освобождения токена; повторный вызов безопасен.</summary>
+    /// <returns>Задача завершения отмены и освобождения ресурсов.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _enrichQueue.Writer.TryComplete();
+        await _cts.CancelAsync().ConfigureAwait(false);
+        try { await _workerTask.ConfigureAwait(false); }
+        finally { _cts.Dispose(); }
     }
 }
 
