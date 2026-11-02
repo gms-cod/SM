@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.UI.Controls;
 using Xunit;
@@ -12,8 +11,15 @@ namespace StartupMonitor.Tests.UI;
 /// Модульные тесты для контрола таймлайна сетевой телеметрии NetworkTimelineChartControl
 /// и математического алгоритма адаптивного масштабирования (Dynamic AGC).
 /// </summary>
+[Collection("WpfNetworkRendering")]
 public sealed class NetworkTimelineChartControlTests
 {
+    private readonly NetworkRenderingTestHost _host;
+
+    /// <summary>Использует общий STA-диспетчер и ресурсы WPF, исключая отдельные конкурирующие потоки холодной инициализации.</summary>
+    /// <param name="host">Единственный WPF-хост тестовой коллекции.</param>
+    public NetworkTimelineChartControlTests(NetworkRenderingTestHost host) => _host = host;
+
     [Fact]
     public void ChartDataPoint_Constructor_InitializesAllPropertiesCorrectly()
     {
@@ -35,36 +41,20 @@ public sealed class NetworkTimelineChartControlTests
         Assert.Equal(alerts, point.AlertCount);
     }
 
+    /// <summary>Проверяет пустые и настоящие данные графика на том же STA, которому принадлежат ресурсы приложения.</summary>
     [Fact]
     public void NetworkTimelineChartControl_SetDataPoints_HandlesNullAndEmptyGracefully()
-    {
-        Exception? threadEx = null;
-
-        var thread = new Thread(() =>
+        => _host.Run(() =>
         {
-            try
+            var control = new NetworkTimelineChartControl();
+            control.SetDataPoints(null);
+            control.SetDataPoints(Enumerable.Empty<NetworkTimelineChartControl.ChartDataPoint>());
+            control.SetDataPoints(new List<NetworkTimelineChartControl.ChartDataPoint>
             {
-                var control = new NetworkTimelineChartControl();
-                control.SetDataPoints(null);
-                control.SetDataPoints(Enumerable.Empty<NetworkTimelineChartControl.ChartDataPoint>());
-                control.SetDataPoints(new List<NetworkTimelineChartControl.ChartDataPoint>
-                {
-                    new(DateTime.UtcNow.AddMinutes(-5), 1024, 512, 0, 0),
-                    new(DateTime.UtcNow, 2048, 1024, 1, 0)
-                });
-            }
-            catch (Exception ex)
-            {
-                threadEx = ex;
-            }
+                new(DateTime.UtcNow.AddMinutes(-5), 1024, 512, 0, 0),
+                new(DateTime.UtcNow, 2048, 1024, 1, 0)
+            });
         });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "STA-проверка не завершилась за 10 секунд.");
-
-        Assert.Null(threadEx);
-    }
 
     [Theory]
     [InlineData(0.0, 0.0)]

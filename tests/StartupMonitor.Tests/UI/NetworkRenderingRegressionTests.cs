@@ -18,11 +18,11 @@ namespace StartupMonitor.Tests.UI;
 
 /// <summary>Изолирует глобальное WPF-приложение от остальных тестовых коллекций.</summary>
 [CollectionDefinition("WpfNetworkRendering", DisableParallelization = true)]
-public sealed class WpfNetworkRenderingCollection;
+public sealed class WpfNetworkRenderingCollection : ICollectionFixture<NetworkRenderingTestHost>;
 
 /// <summary>Проверяет производственную разметку и renderer вместо копирования формул в тестах.</summary>
 [Collection("WpfNetworkRendering")]
-public sealed partial class NetworkRenderingRegressionTests : IClassFixture<NetworkRenderingTestHost>
+public sealed partial class NetworkRenderingRegressionTests
 {
     private readonly NetworkRenderingTestHost _host;
 
