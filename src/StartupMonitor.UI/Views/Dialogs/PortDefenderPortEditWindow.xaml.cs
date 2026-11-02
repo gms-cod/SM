@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using StartupMonitor.UI.Models;
+using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.UI.Views.Dialogs;
 
@@ -17,6 +19,10 @@ public partial class PortDefenderPortEditWindow
 {
     private readonly int? _originalPort;
     private readonly HashSet<int> _existingPorts;
+    /// <summary>Перестроение переведённых шаблонов не должно менять введённый пользователем номер.</summary>
+    private bool _updatingLanguage;
+    private string? _errorKey;
+    private object?[] _errorArguments = [];
 
     /// <summary>
     /// Результирующий валидный номер порта после подтверждения пользователем.
@@ -43,6 +49,7 @@ public partial class PortDefenderPortEditWindow
 
         PopulatePresets();
         SetupMode(currentPort);
+        PropertyChangedEventManager.AddHandler(LocalizationService.Instance, OnLanguageChanged, string.Empty);
     }
 
     /// <summary>
@@ -52,7 +59,7 @@ public partial class PortDefenderPortEditWindow
     private void SetupMode(int? port)
     {
         bool isEdit = port.HasValue;
-        var title = isEdit ? "Редактирование защищаемого порта" : "Добавление защищаемого порта";
+        var title = LocalizationService.Instance[isEdit ? "DefenderEditTitle" : "DefenderAddTitle"];
         Title = title;
         DialogTitleBar.Title = title;
         TxtHeaderTitle.Text = title;
@@ -61,13 +68,13 @@ public partial class PortDefenderPortEditWindow
         {
             TxtPort.Text = port!.Value.ToString();
             UpdatePreview(port.Value);
-            BtnSave.Content = "Применить";
+            BtnSave.Content = LocalizationService.Instance["DefenderApply"];
         }
         else
         {
             TxtPort.Text = string.Empty;
             UpdatePreview(3389); // Дефолтный предпросмотр популярного RDP
-            BtnSave.Content = "Добавить";
+            BtnSave.Content = LocalizationService.Instance["DefenderAdd"];
         }
     }
 
@@ -76,15 +83,34 @@ public partial class PortDefenderPortEditWindow
     /// </summary>
     private void PopulatePresets()
     {
+        var selectedPort = (CmbPresets.SelectedItem as ComboBoxItem)?.Tag as int? ?? 0;
         CmbPresets.Items.Clear();
-        CmbPresets.Items.Add(new ComboBoxItem { Content = "— Выберите шаблон из каталога —", Tag = 0 });
+        CmbPresets.Items.Add(new ComboBoxItem { Content = LocalizationService.Instance["DefenderChoosePreset"], Tag = 0 });
 
         foreach (var (port, title) in PortDefenderPortHelper.GetPresets())
         {
             CmbPresets.Items.Add(new ComboBoxItem { Content = title, Tag = port });
         }
 
-        CmbPresets.SelectedIndex = 0;
+        CmbPresets.SelectedItem = CmbPresets.Items.Cast<ComboBoxItem>().FirstOrDefault(item => (int)item.Tag == selectedPort)
+            ?? CmbPresets.Items[0];
+    }
+
+    /// <summary>Переводит открытый редактор, сохраняя введённый порт, выбранный шаблон и ошибку валидации.</summary>
+    /// <param name="sender">Сервис ресурсов.</param>
+    /// <param name="e">Уведомление о смене языка.</param>
+    private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        var loc = LocalizationService.Instance;
+        Title = loc[_originalPort.HasValue ? "DefenderEditTitle" : "DefenderAddTitle"];
+        DialogTitleBar.Title = Title;
+        TxtHeaderTitle.Text = Title;
+        BtnSave.Content = loc[_originalPort.HasValue ? "DefenderApply" : "DefenderAdd"];
+        _updatingLanguage = true;
+        try { PopulatePresets(); }
+        finally { _updatingLanguage = false; }
+        UpdatePreviewFromInput();
+        if (_errorKey is not null) TxtError.Text = loc.Format(_errorKey, _errorArguments);
     }
 
     /// <summary>
@@ -92,7 +118,7 @@ public partial class PortDefenderPortEditWindow
     /// </summary>
     private void OnPresetSelected(object sender, SelectionChangedEventArgs e)
     {
-        if (CmbPresets.SelectedItem is ComboBoxItem { Tag: int port } && port > 0)
+        if (!_updatingLanguage && CmbPresets.SelectedItem is ComboBoxItem { Tag: int port } && port > 0)
         {
             TxtPort.Text = port.ToString();
             TxtPort.CaretIndex = TxtPort.Text.Length;
@@ -107,17 +133,22 @@ public partial class PortDefenderPortEditWindow
     private void OnPortTextChanged(object sender, TextChangedEventArgs e)
     {
         HideError();
+        UpdatePreviewFromInput();
+    }
 
+    /// <summary>Обновляет описание введённого порта на текущем языке, не меняя текст и состояние ошибки.</summary>
+    private void UpdatePreviewFromInput()
+    {
         if (int.TryParse(TxtPort.Text.Trim(), out var port) && port is >= 1 and <= 65535)
         {
             UpdatePreview(port);
         }
         else
         {
-            TxtPreviewService.Text = "Служба: —";
-            TxtPreviewDesc.Text = "Введите номер порта от 1 до 65535";
+            TxtPreviewService.Text = LocalizationService.Instance.Format("DefenderServiceFormat", "—");
+            TxtPreviewDesc.Text = LocalizationService.Instance["DefenderPortRangeHint"];
             TxtPreviewPortBadge.Text = "#?";
-            TxtPreviewRisk.Text = "Неизвестно";
+            TxtPreviewRisk.Text = LocalizationService.Instance["DefenderUnknown"];
             BorderRiskBadge.Background = new SolidColorBrush(Color.FromRgb(128, 128, 128));
         }
     }
@@ -130,7 +161,7 @@ public partial class PortDefenderPortEditWindow
     {
         var (name, desc, risk) = PortDefenderPortHelper.GetPortInfo(port);
 
-        TxtPreviewService.Text = $"Служба: {name}";
+        TxtPreviewService.Text = LocalizationService.Instance.Format("DefenderServiceFormat", name);
         TxtPreviewDesc.Text = desc;
         TxtPreviewPortBadge.Text = $"#{port}";
         TxtPreviewRisk.Text = PortDefenderPortHelper.GetRiskBadgeText(risk);
@@ -145,8 +176,9 @@ public partial class PortDefenderPortEditWindow
             var textColor = (Color)ColorConverter.ConvertFromString(textHex);
             TxtPreviewRisk.Foreground = new SolidColorBrush(textColor);
         }
-        catch
+        catch (Exception ex) when (ex is FormatException or NotSupportedException)
         {
+            App.Log($"PortDefenderPortEditWindow: некорректный цвет бейджа риска: {ex.Message}");
             BorderRiskBadge.Background = new SolidColorBrush(Color.FromRgb(0, 137, 123));
             TxtPreviewRisk.Foreground = Brushes.White;
         }
@@ -161,28 +193,28 @@ public partial class PortDefenderPortEditWindow
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            ShowError("Укажите номер порта для защиты.");
+            ShowError("DefenderPortRequired");
             TxtPort.Focus();
             return;
         }
 
         if (!int.TryParse(text, out var port))
         {
-            ShowError("Номер порта должен быть целым числом.");
+            ShowError("DefenderPortInteger");
             TxtPort.Focus();
             return;
         }
 
         if (port is < 1 or > 65535)
         {
-            ShowError("Номер порта должен находиться в диапазоне от 1 до 65535.");
+            ShowError("DefenderPortRangeError");
             TxtPort.Focus();
             return;
         }
 
         if (_existingPorts.Contains(port))
         {
-            ShowError($"Порт {port} уже присутствует в списке отслеживаемых Port Defender.");
+            ShowError("DefenderDuplicatePortFormat", port);
             TxtPort.Focus();
             return;
         }
@@ -195,9 +227,13 @@ public partial class PortDefenderPortEditWindow
     /// <summary>
     /// Отображает сообщение об ошибке валидации.
     /// </summary>
-    private void ShowError(string message)
+    /// <param name="key">Ключ сообщения ошибки.</param>
+    /// <param name="arguments">Параметры локализованного шаблона.</param>
+    private void ShowError(string key, params object?[] arguments)
     {
-        TxtError.Text = message;
+        _errorKey = key;
+        _errorArguments = arguments;
+        TxtError.Text = LocalizationService.Instance.Format(key, arguments);
         TxtError.Visibility = Visibility.Visible;
     }
 
@@ -206,6 +242,8 @@ public partial class PortDefenderPortEditWindow
     /// </summary>
     private void HideError()
     {
+        _errorKey = null;
+        _errorArguments = [];
         TxtError.Text = string.Empty;
         TxtError.Visibility = Visibility.Collapsed;
     }

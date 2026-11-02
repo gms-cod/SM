@@ -54,6 +54,27 @@ public class KasperskyScanServiceTests : IDisposable
         Assert.Empty(result.DetectionName);
     }
 
+    /// <summary>Отмена активного запроса при остановке службы не превращается в ложный отказ проверки.</summary>
+    /// <returns>Задача проверки распространения отмены без реальных сетевых обращений.</returns>
+    [Fact]
+    public async Task ScanEntryAsync_CallerCancellationPropagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var config = _store.Load();
+        config.Settings.KasperskyEnabled = true;
+        config.Settings.KasperskyApiKey = "unit-key";
+        _store.Save(config);
+        using var handler = new MockHttpMessageHandler(_ =>
+        {
+            cancellation.Cancel();
+            throw new OperationCanceledException(cancellation.Token);
+        });
+        using var http = new HttpClient(handler);
+        var service = new KasperskyScanService(_store, NullLogger<KasperskyScanService>.Instance, http);
+        var entry = new StartupEntry { Name = "CancellationProbe", SHA256 = new string('a', 64) };
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ScanEntryAsync(entry, cancellation.Token));
+    }
+
     [Fact]
     public void ParseKasperskyResponse_MalwareFile_ExtractsDetections()
     {

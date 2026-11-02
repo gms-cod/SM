@@ -390,7 +390,7 @@ public class PipeServer : BackgroundService
                 NamedPipeServerStream? pending = null;
                 try
                 {
-                    pending = NamedPipeServerStreamAcl.Create(PipeName, PipeDirection.InOut, 10,
+                    pending = NamedPipeServerStreamAcl.Create(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                         PipeTransmissionMode.Message, PipeOptions.Asynchronous, 65536, 65536, PipeSecurityFactory.CreateDefault());
                     await pending.WaitForConnectionAsync(stoppingToken);
                     var pipe = pending;
@@ -422,11 +422,13 @@ public class PipeServer : BackgroundService
         }
     }
 
-    /// <summary>Обрабатывает ограниченные строковые кадры с авторизацией команд и отменяемой записью.</summary>
+    /// <summary>Обрабатывает кадры с авторизацией; подписка метрик принадлежит соединению и снимается при любом завершении.</summary>
     /// <param name="pipe">Подключённый канал, принадлежащий обработчику.</param>
     /// <param name="ct">Токен завершения службы.</param>
+    /// <returns>Задача обработки и освобождения ресурсов одной клиентской сессии.</returns>
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
+        var metricsSubscribed = false;
         OnUiClientConnected();
         try
         {
@@ -447,9 +449,35 @@ public class PipeServer : BackgroundService
                         throw new JsonException("IPC: запрос не содержит типа команды.");
                     // Олицетворение выполняется после первого чтения: Windows получает токен именно отправившего данные клиента.
                     administrator ??= IsAdministratorClient(pipe);
-                    var response = IsCommandAllowed(message.Type, administrator.Value)
-                        ? await ProcessMessage(message, ct)
-                        : new PipeMessage { Type = PipeMessageTypes.Error, Payload = "Для этой команды требуются права администратора." };
+                    PipeMessage response;
+                    if (!IsCommandAllowed(message.Type, administrator.Value))
+                    {
+                        response = new PipeMessage { Type = PipeMessageTypes.Error, Payload = "Для этой команды требуются права администратора." };
+                    }
+                    else if (message.Type == PipeMessageTypes.SubscribeProcessMetrics)
+                    {
+                        // Повторная команда этой сессии не создаёт дополнительного владельца таймера.
+                        if (!metricsSubscribed)
+                        {
+                            _metricsTracker.Subscribe();
+                            metricsSubscribed = true;
+                        }
+                        response = new PipeMessage { Type = PipeMessageTypes.Success };
+                    }
+                    else if (message.Type == PipeMessageTypes.UnsubscribeProcessMetrics)
+                    {
+                        // Клиент без собственной подписки не может выключить метрики другого UI.
+                        if (metricsSubscribed)
+                        {
+                            _metricsTracker.Unsubscribe();
+                            metricsSubscribed = false;
+                        }
+                        response = new PipeMessage { Type = PipeMessageTypes.Success };
+                    }
+                    else
+                    {
+                        response = await ProcessMessage(message, ct);
+                    }
                     var json = JsonSerializer.Serialize(response, JsonOptions);
                     if (json.Length > BoundedLineReader.MaximumFrameCharacters)
                         throw new InvalidDataException("IPC: ответ превышает допустимый размер кадра.");
@@ -463,7 +491,14 @@ public class PipeServer : BackgroundService
         catch (IOException ex) { _logger.LogDebug(ex, "PipeServer: клиент отключён или нарушил протокол"); }
         catch (ObjectDisposedException ex) { _logger.LogDebug(ex, "PipeServer: транспорт завершён при остановке"); }
         catch (Exception ex) { _logger.LogWarning(ex, "PipeServer: ошибка обработки клиента"); }
-        finally { OnUiClientDisconnected(); }
+        finally
+        {
+            try
+            {
+                if (metricsSubscribed) _metricsTracker.Unsubscribe();
+            }
+            finally { OnUiClientDisconnected(); }
+        }
     }
 
     /// <summary>Проверяет административный токен клиента; ошибки олицетворения закрывают привилегированный доступ.</summary>
@@ -3146,6 +3181,8 @@ public class PipeServer : BackgroundService
                     catch (Exception ex)
 
                     {
+
+                        _logger.LogError(ex, "Pipe: Ошибка сохранения конфигурации Port Defender: {Message}", ex.Message);
 
                         response.Type = PipeMessageTypes.FirewallOperationResponse;
 

@@ -286,22 +286,8 @@ public partial class App : Application
         menu.Items.Add(new System.Windows.Controls.Separator());
 
         var exit = new System.Windows.Controls.MenuItem { Header = loc.TrayExit };
-        exit.Click += async (_, _) =>
-        {
-            // Мягкая остановка службы через pipe, затем гарантированная через SCM/kill.
-            try
-            {
-                using var pipeClient = new PipeClient();
-                await pipeClient.ConnectAsync();
-                await pipeClient.RequestServiceShutdownAsync();
-            }
-            catch (Exception ex)
-            {
-                Log($"OnExit: мягкая остановка службы не удалась: {ex.Message}");
-            }
-            try { ServiceManager.StopService(); } catch (Exception ex) { Log($"OnExit: StopService не удался: {ex.Message}"); }
-            Current.Shutdown();
-        };
+        // Закрытие пользовательского интерфейса не останавливает системную защиту без UI.
+        exit.Click += (_, _) => Current.Shutdown();
         menu.Items.Add(exit);
 
         return menu;
@@ -382,17 +368,18 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Очищает ресурсы при завершении приложения.</summary>
+    /// <summary>Освобождает ресурсы UI при выходе; системная служба продолжает защиту независимо от наличия окна.</summary>
+    /// <param name="e">Код завершения интерфейса.</param>
     protected override void OnExit(ExitEventArgs e)
     {
         Log($"OnExit: приложение завершается, код {e.ApplicationExitCode}");
-        try { ServiceManager.StopService(); } catch (Exception ex) { Log($"OnExit: защитный StopService не удался: {ex.Message}"); }
         _trayAggregator?.Dispose();
         _trayAggregator = null;
         _trayIcon?.Dispose();
         if (_instanceMutex != null)
         {
-            try { _instanceMutex.ReleaseMutex(); } catch { }
+            try { _instanceMutex.ReleaseMutex(); }
+            catch (ApplicationException ex) { Log($"OnExit: mutex уже освобождён или не принадлежит текущему потоку: {ex.GetType().Name}"); }
             _instanceMutex.Dispose();
         }
         base.OnExit(e);

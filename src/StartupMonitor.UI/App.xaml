@@ -5,8 +5,9 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:converters="clr-namespace:StartupMonitor.UI.Converters"
     xmlns:services="clr-namespace:StartupMonitor.UI.Services"
-    ShutdownMode="OnExplicitShutdown">
+    ShutdownMode="OnMainWindowClose">
     <Application.Resources>
+        <!-- Закрытие главного окна завершает только UI; сворачивание и Hide сохраняют работу трея и фоновой службы. -->
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary />

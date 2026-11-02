@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
+using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.UI.Models;
 
@@ -30,30 +32,30 @@ public static class PortDefenderPortHelper
 {
     private static readonly Dictionary<int, (string Name, string Description, PortRiskLevel Risk)> KnownPorts = new()
     {
-        [21] = ("FTP", "Передача файлов (незащищённый протокол)", PortRiskLevel.High),
-        [22] = ("SSH", "Защищённая удалённая оболочка Secure Shell", PortRiskLevel.Medium),
-        [23] = ("Telnet", "Незащищённая консоль удалённого доступа", PortRiskLevel.Critical),
-        [25] = ("SMTP", "Простой протокол передачи почты", PortRiskLevel.Low),
-        [53] = ("DNS", "Служба доменных имён", PortRiskLevel.Low),
-        [80] = ("HTTP", "Веб-сервер без шифрования", PortRiskLevel.Medium),
-        [110] = ("POP3", "Получение почтовых сообщений", PortRiskLevel.Low),
-        [135] = ("RPC", "Удалённый вызов процедур Microsoft Windows", PortRiskLevel.Critical),
-        [139] = ("NetBIOS", "Служба сеансов NetBIOS Windows", PortRiskLevel.Critical),
-        [143] = ("IMAP", "Протокол доступа к электронной почте", PortRiskLevel.Low),
-        [443] = ("HTTPS", "Защищённый веб-трафик (TLS/SSL)", PortRiskLevel.Medium),
-        [445] = ("SMB", "Общий доступ к файлам и принтерам Windows", PortRiskLevel.Critical),
-        [993] = ("IMAPS", "Защищённый доступ к почте IMAP over TLS", PortRiskLevel.Low),
-        [995] = ("POP3S", "Защищённый доступ к почте POP3 over TLS", PortRiskLevel.Low),
-        [1433] = ("MSSQL", "Microsoft SQL Server Database Engine", PortRiskLevel.High),
-        [1521] = ("Oracle", "Oracle Database Listener", PortRiskLevel.High),
-        [3306] = ("MySQL", "Сервер баз данных MySQL / MariaDB", PortRiskLevel.High),
-        [3389] = ("RDP", "Удалённый рабочий стол Microsoft Windows", PortRiskLevel.Critical),
-        [5432] = ("PostgreSQL", "Сервер реляционной СУБД PostgreSQL", PortRiskLevel.High),
-        [5900] = ("VNC", "Удалённое графическое управление экраном", PortRiskLevel.High),
-        [6379] = ("Redis", "Сетевое хранилище данных в памяти Redis", PortRiskLevel.High),
-        [8080] = ("HTTP-Alt", "Альтернативный веб-порт / Прокси-сервер", PortRiskLevel.Medium),
-        [8443] = ("HTTPS-Alt", "Альтернативный защищённый веб-порт", PortRiskLevel.Medium),
-        [27017] = ("MongoDB", "Документоориентированная СУБД MongoDB", PortRiskLevel.High)
+        [21] = ("FTP", "DefenderPortDescription21", PortRiskLevel.High),
+        [22] = ("SSH", "DefenderPortDescription22", PortRiskLevel.Medium),
+        [23] = ("Telnet", "DefenderPortDescription23", PortRiskLevel.Critical),
+        [25] = ("SMTP", "DefenderPortDescription25", PortRiskLevel.Low),
+        [53] = ("DNS", "DefenderPortDescription53", PortRiskLevel.Low),
+        [80] = ("HTTP", "DefenderPortDescription80", PortRiskLevel.Medium),
+        [110] = ("POP3", "DefenderPortDescription110", PortRiskLevel.Low),
+        [135] = ("RPC", "DefenderPortDescription135", PortRiskLevel.Critical),
+        [139] = ("NetBIOS", "DefenderPortDescription139", PortRiskLevel.Critical),
+        [143] = ("IMAP", "DefenderPortDescription143", PortRiskLevel.Low),
+        [443] = ("HTTPS", "DefenderPortDescription443", PortRiskLevel.Medium),
+        [445] = ("SMB", "DefenderPortDescription445", PortRiskLevel.Critical),
+        [993] = ("IMAPS", "DefenderPortDescription993", PortRiskLevel.Low),
+        [995] = ("POP3S", "DefenderPortDescription995", PortRiskLevel.Low),
+        [1433] = ("MSSQL", "DefenderPortDescription1433", PortRiskLevel.High),
+        [1521] = ("Oracle", "DefenderPortDescription1521", PortRiskLevel.High),
+        [3306] = ("MySQL", "DefenderPortDescription3306", PortRiskLevel.High),
+        [3389] = ("RDP", "DefenderPortDescription3389", PortRiskLevel.Critical),
+        [5432] = ("PostgreSQL", "DefenderPortDescription5432", PortRiskLevel.High),
+        [5900] = ("VNC", "DefenderPortDescription5900", PortRiskLevel.High),
+        [6379] = ("Redis", "DefenderPortDescription6379", PortRiskLevel.High),
+        [8080] = ("HTTP-Alt", "DefenderPortDescription8080", PortRiskLevel.Medium),
+        [8443] = ("HTTPS-Alt", "DefenderPortDescription8443", PortRiskLevel.Medium),
+        [27017] = ("MongoDB", "DefenderPortDescription27017", PortRiskLevel.High)
     };
 
     /// <summary>
@@ -63,26 +65,30 @@ public static class PortDefenderPortHelper
     /// <returns>Кортеж с именем службы, описанием и категорией риска.</returns>
     public static (string Name, string Description, PortRiskLevel Risk) GetPortInfo(int port)
     {
+        if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
+        var loc = LocalizationService.Instance;
         if (KnownPorts.TryGetValue(port, out var info))
-            return info;
+            return (info.Name, loc[info.Description], info.Risk);
 
         if (port is >= 1 and <= 1023)
-            return ("System Port", $"Системный привилегированный порт TCP {port}", PortRiskLevel.Medium);
+            return (loc["DefenderSystemPort"], loc.Format("DefenderSystemPortFormat", port), PortRiskLevel.Medium);
 
-        return ("Custom Port", $"Пользовательский отслеживаемый TCP порт {port}", PortRiskLevel.Custom);
+        return (loc["DefenderCustomPort"], loc.Format("DefenderCustomPortFormat", port), PortRiskLevel.Custom);
     }
 
     /// <summary>
-    /// Возвращает текстовый бейдж уровня риска на русском языке.
+    /// Возвращает текстовый бейдж уровня риска на активном языке интерфейса.
     /// </summary>
-    public static string GetRiskBadgeText(PortRiskLevel risk) => risk switch
+    /// <param name="risk">Языконезависимая категория риска.</param>
+    /// <returns>Локализованная подпись бейджа.</returns>
+    public static string GetRiskBadgeText(PortRiskLevel risk) => LocalizationService.Instance[risk switch
     {
-        PortRiskLevel.Critical => "Критический",
-        PortRiskLevel.High => "Высокий",
-        PortRiskLevel.Medium => "Средний",
-        PortRiskLevel.Low => "Инфо",
-        _ => "Пользовательский"
-    };
+        PortRiskLevel.Critical => "DefenderRiskCritical",
+        PortRiskLevel.High => "DefenderRiskHigh",
+        PortRiskLevel.Medium => "DefenderRiskMedium",
+        PortRiskLevel.Low => "DefenderRiskLow",
+        _ => "DefenderRiskCustom"
+    }];
 
     /// <summary>
     /// Возвращает цвет фона бейджа риска (HEX) для WPF UI.
@@ -108,22 +114,14 @@ public static class PortDefenderPortHelper
     /// <summary>
     /// Возвращает список популярных предустановленных портов для быстрого выбора.
     /// </summary>
-    public static IReadOnlyList<(int Port, string Title)> GetPresets() => new List<(int, string)>
-    {
-        (3389, "RDP — Удалённый рабочий стол (3389)"),
-        (445, "SMB — Файловые шары Windows (445)"),
-        (22, "SSH — Защищённая консоль (22)"),
-        (1433, "MSSQL — Microsoft SQL Server (1433)"),
-        (3306, "MySQL — Сервер MySQL (3306)"),
-        (5432, "PostgreSQL — База данных (5432)"),
-        (6379, "Redis — Key-Value хранилище (6379)"),
-        (27017, "MongoDB — NoSQL СУБД (27017)"),
-        (80, "HTTP — Веб-трафик (80)"),
-        (443, "HTTPS — Защищённый веб-трафик (443)"),
-        (21, "FTP — Передача файлов (21)"),
-        (5900, "VNC — Удалённый доступ к экрану (5900)"),
-        (8080, "HTTP-Alt — Альтернативный веб-сервер (8080)")
-    };
+    /// <returns>Названия шаблонов с описаниями на текущем языке.</returns>
+    public static IReadOnlyList<(int Port, string Title)> GetPresets() =>
+        new[] { 3389, 445, 22, 1433, 3306, 5432, 6379, 27017, 80, 443, 21, 5900, 8080 }
+            .Select(port =>
+            {
+                var info = GetPortInfo(port);
+                return (port, $"{info.Name} — {info.Description} ({port})");
+            }).ToList();
 }
 
 /// <summary>
@@ -150,7 +148,14 @@ public sealed class PortDefenderPortItem : INotifyPropertyChanged
     public PortDefenderPortItem(int port)
     {
         UpdatePort(port);
+        // Слабая подписка не удерживает строки таблицы после обновления коллекции или закрытия диалога.
+        PropertyChangedEventManager.AddHandler(LocalizationService.Instance, OnLanguageChanged, string.Empty);
     }
+
+    /// <summary>Перечитывает описания и бейдж без смены номера порта при переключении языка.</summary>
+    /// <param name="sender">Сервис ресурсов.</param>
+    /// <param name="e">Уведомление об изменении языка.</param>
+    private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e) => UpdatePort(_port);
 
     /// <summary>
     /// Номер защищаемого TCP порта.

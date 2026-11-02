@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System;
 
 using System.Collections.Generic;
@@ -107,6 +107,11 @@ public partial class NetworkSecurityHubView : UserControl
     private bool _isActive;
     private bool _isRefreshingTimeline;
     private DateTime _lastTimelineRefreshUtc;
+    /// <summary>Ключ локализованного статуса и аргументы для обновления открытой страницы без повторного запроса.</summary>
+    private string? _localizedStatusKey;
+    private object?[] _localizedStatusArguments = [];
+    /// <summary>Сбой последней загрузки сохраняется отдельно от переведённых подписей сводки.</summary>
+    private string? _defenderLoadError;
 
 
 
@@ -688,7 +693,22 @@ public partial class NetworkSecurityHubView : UserControl
             if (!IsVisible) Deactivate();
             else if (IsLoaded && Window.GetWindow(this)?.WindowState != WindowState.Minimized) Activate();
         };
+        PropertyChangedEventManager.AddHandler(LocalizationService.Instance, OnLanguageChanged, string.Empty);
+        // XAML-события фильтров могли прийти до создания таблицы; первый полноценный расчёт выполняется после инициализации.
+        ApplyHubHistoryFilter();
 
+    }
+
+    /// <summary>Обновляет динамические счётчики и сообщения; выбор фильтров истории не зависит от переведённых подписей.</summary>
+    /// <param name="sender">Сервис ресурсов.</param>
+    /// <param name="e">Уведомление об обновлении языка.</param>
+    private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        UpdateDefenderPortsSummary();
+        UpdateDefenderConfigurationSummary();
+        ApplyHubHistoryFilter();
+        if (_localizedStatusKey is not null)
+            TxtStatus.Text = LocalizationService.Instance.Format(_localizedStatusKey, _localizedStatusArguments);
     }
 
 
@@ -1423,14 +1443,12 @@ public partial class NetworkSecurityHubView : UserControl
         {
 
             _defenderConfig = await _pipeClient.GetPortDefenderConfigAsync();
+            _defenderLoadError = null;
+            UpdateDefenderConfigurationSummary();
 
             if (_defenderConfig == null)
 
             {
-
-                TxtDefenderState.Text = "Port Defender: нет данных";
-
-                TxtDefenderDetails.Text = "Служба недоступна.";
 
                 TxtDefenderPorts.Text = "—";
 
@@ -1444,35 +1462,27 @@ public partial class NetworkSecurityHubView : UserControl
 
                 .Distinct().OrderBy(p => p).ToList();
 
-            TxtDefenderState.Text = _defenderConfig.Enabled
+            TxtDefenderPorts.Text = ports.Count > 0 ? string.Join(", ", ports) : LocalizationService.Instance["DefenderNoPorts"];
 
-                ? "Port Defender: защита активна"
-
-                : "Port Defender: защита выключена";
-
-            TxtDefenderDetails.Text =
-
-                $"Порог: {_defenderConfig.MaxAttempts} попыток / {_defenderConfig.WindowSeconds} с • " +
-
-                $"Бан: {FormatBanDuration(_defenderConfig.BanDurationMinutes)} • " +
-
-                $"Доверять локальным сетям: {(_defenderConfig.TrustPrivateNetworks ? "да" : "нет")}";
-
-            TxtDefenderPorts.Text = ports.Count > 0 ? string.Join(", ", ports) : "Нет защищаемых портов";
-
+            // Синхронизируем коллекцию для интерактивной таблицы защищаемых портов
+            _defenderPortsCollection.Clear();
+            foreach (var p in ports)
+            {
+                _defenderPortsCollection.Add(new PortDefenderPortItem(p));
+            }
+            UpdateDefenderPortsSummary();
         }
 
         catch (Exception ex)
 
         {
 
-            TxtDefenderState.Text = "Port Defender: ошибка";
-
-            TxtDefenderDetails.Text = ex.Message;
+            _defenderLoadError = ex.Message;
+            UpdateDefenderConfigurationSummary();
 
             TxtDefenderPorts.Text = "—";
 
-            SetStatus($"Не удалось загрузить конфигурацию Port Defender: {ex.Message}");
+            SetLocalizedStatus("DefenderConfigLoadErrorFormat", ex.Message);
 
         }
 
@@ -1480,9 +1490,35 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-    private static string FormatBanDuration(int minutes) =>
+    /// <summary>Переводит текущую сводку без повторной загрузки службы и изменения выбранных портов.</summary>
+    private void UpdateDefenderConfigurationSummary()
+    {
+        var loc = LocalizationService.Instance;
+        if (_defenderLoadError is not null)
+        {
+            TxtDefenderState.Text = loc["DefenderStateError"];
+            TxtDefenderDetails.Text = _defenderLoadError;
+        }
+        else if (_defenderConfig is null)
+        {
+            TxtDefenderState.Text = loc["DefenderStateMissing"];
+            TxtDefenderDetails.Text = loc["DefenderServiceUnavailable"];
+        }
+        else
+        {
+            TxtDefenderState.Text = loc[_defenderConfig.Enabled ? "DefenderStateActive" : "DefenderStateInactive"];
+            TxtDefenderDetails.Text = loc.Format("DefenderSummaryFormat", _defenderConfig.MaxAttempts,
+                _defenderConfig.WindowSeconds, FormatBanDuration(_defenderConfig.BanDurationMinutes),
+                loc[_defenderConfig.TrustPrivateNetworks ? "DefenderYes" : "DefenderNo"]);
+        }
+    }
 
-        minutes <= 0 ? "навсегда" : minutes >= 1440 ? $"{minutes / 1440} дн." : $"{minutes} мин.";
+    /// <summary>Форматирует длительность блокировки в единицах активного языка.</summary>
+    /// <param name="minutes">Число минут; неположительное значение означает бессрочную блокировку.</param>
+    /// <returns>Локализованная длительность.</returns>
+    private static string FormatBanDuration(int minutes) => minutes <= 0 ? LocalizationService.Instance["BanPermanent"]
+        : minutes >= 1440 ? LocalizationService.Instance.Format("DefenderDaysFormat", minutes / 1440)
+        : LocalizationService.Instance.Format("DefenderMinutesFormat", minutes);
 
 
 
@@ -2462,7 +2498,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                SetStatus("Конфигурация Port Defender обновлена.");
+                SetLocalizedStatus("DefenderConfigSaved");
 
                 _ = LoadDefenderAsync();
 
@@ -2474,7 +2510,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            SetStatus($"Не удалось открыть настройку Port Defender: {ex.Message}");
+            SetLocalizedStatus("DefenderOpenErrorFormat", ex.Message);
 
         }
 
@@ -2487,11 +2523,11 @@ public partial class NetworkSecurityHubView : UserControl
         try
         {
             await LoadDefenderAsync();
-            SetStatus("Сводка Port Defender обновлена.");
+            SetLocalizedStatus("DefenderSummaryRefreshed");
         }
         catch (Exception ex)
         {
-            SetStatus($"Ошибка обновления Port Defender: {ex.Message}");
+            SetLocalizedStatus("DefenderRefreshErrorFormat", ex.Message);
         }
     }
 
@@ -2515,7 +2551,7 @@ public partial class NetworkSecurityHubView : UserControl
         }
         catch (Exception ex)
         {
-            SetStatus($"Ошибка добавления порта: {ex.Message}");
+            SetLocalizedStatus("DefenderPortAddErrorFormat", ex.Message);
         }
     }
 
@@ -2530,7 +2566,7 @@ public partial class NetworkSecurityHubView : UserControl
         }
         else
         {
-            SetStatus("Выберите порт в таблице для редактирования.");
+            SetLocalizedStatus("DefenderSelectEdit");
         }
     }
 
@@ -2564,7 +2600,7 @@ public partial class NetworkSecurityHubView : UserControl
         }
         catch (Exception ex)
         {
-            SetStatus($"Ошибка редактирования порта: {ex.Message}");
+            SetLocalizedStatus("DefenderPortEditErrorFormat", ex.Message);
         }
     }
 
@@ -2579,7 +2615,7 @@ public partial class NetworkSecurityHubView : UserControl
         }
         else
         {
-            SetStatus("Выберите порт в таблице для удаления.");
+            SetLocalizedStatus("DefenderSelectDelete");
         }
     }
 
@@ -2595,73 +2631,100 @@ public partial class NetworkSecurityHubView : UserControl
     }
 
     /// <summary>
-    /// Удаляет выбранный порт из конфигурации Port Defender и синхронизирует со службой.
+    /// Удаляет порт вместе со всеми его общими и процессными правилами и сохраняет согласованную конфигурацию.
     /// </summary>
+    /// <param name="item">Удаляемый порт таблицы.</param>
     private async Task DeleteDefenderPortItemAsync(PortDefenderPortItem item)
     {
         try
         {
-            var config = _defenderConfig ?? await _pipeClient.GetPortDefenderConfigAsync() ?? new PortDefenderConfigDto();
+            var config = await _pipeClient.GetPortDefenderConfigAsync()
+                ?? throw new InvalidOperationException(LocalizationService.Instance["DefenderConfigUnavailable"]);
             var portToRemove = item.Port;
             var serviceName = item.ServiceName;
 
-            var updatedPorts = (config.ProtectedPorts ?? new List<int>())
-                .Where(p => p != portToRemove)
-                .Distinct()
-                .OrderBy(p => p)
-                .ToList();
+            ApplyDefenderPortChange(config, portToRemove, null);
 
-            config.ProtectedPorts = updatedPorts;
-
-            var ok = await _pipeClient.SetPortDefenderConfigAsync(config);
-            if (ok)
+            var result = await _pipeClient.SetPortDefenderConfigAsync(config);
+            if (result.Success)
             {
                 _defenderConfig = config;
                 _defenderPortsCollection.Remove(item);
                 UpdateDefenderPortsSummary();
-                SetStatus($"Порт #{portToRemove} ({serviceName}) удалён из мониторинга Port Defender.");
+                SetLocalizedStatus("DefenderPortRemovedFormat", portToRemove, serviceName);
             }
             else
             {
-                SetStatus($"Служба не подтвердила удаление порта #{portToRemove}.");
+                SetLocalizedStatus("DefenderPortRemoveFailedFormat", portToRemove, result.Message);
             }
         }
         catch (Exception ex)
         {
-            SetStatus($"Ошибка при удалении порта: {ex.Message}");
+            SetLocalizedStatus("DefenderPortDeleteErrorFormat", ex.Message);
         }
     }
 
     /// <summary>
-    /// Добавляет новый или обновляет существующий защищаемый порт с немедленной синхронизацией со службой.
+    /// Добавляет порт либо переносит все его правила с сохранением порогов, белых списков и выключенного состояния.
     /// </summary>
+    /// <param name="newPort">Новый номер TCP-порта.</param>
+    /// <param name="oldPort">Прежний номер при редактировании либо null при добавлении.</param>
+    /// <returns>Задача подтверждённого сохранения и обновления таблицы.</returns>
     private async Task AddOrUpdateDefenderPortAsync(int newPort, int? oldPort)
     {
-        var config = _defenderConfig ?? await _pipeClient.GetPortDefenderConfigAsync() ?? new PortDefenderConfigDto();
-        var ports = new HashSet<int>(config.ProtectedPorts ?? new List<int>());
+        var config = await _pipeClient.GetPortDefenderConfigAsync()
+            ?? throw new InvalidOperationException(LocalizationService.Instance["DefenderConfigUnavailable"]);
+        ApplyDefenderPortChange(config, oldPort, newPort);
 
-        if (oldPort.HasValue)
-        {
-            ports.Remove(oldPort.Value);
-        }
-        ports.Add(newPort);
-
-        config.ProtectedPorts = ports.OrderBy(p => p).ToList();
-
-        var ok = await _pipeClient.SetPortDefenderConfigAsync(config);
-        if (ok)
+        var result = await _pipeClient.SetPortDefenderConfigAsync(config);
+        if (result.Success)
         {
             _defenderConfig = config;
             await LoadDefenderAsync();
-            var msg = oldPort.HasValue
-                ? $"Порт #{oldPort.Value} успешно заменён на #{newPort} в Port Defender."
-                : $"Порт #{newPort} успешно добавлен в мониторинг Port Defender.";
-            SetStatus(msg);
+            if (oldPort.HasValue) SetLocalizedStatus("DefenderPortMovedFormat", oldPort.Value, newPort);
+            else SetLocalizedStatus("DefenderPortAddedFormat", newPort);
         }
         else
         {
-            SetStatus("Служба не подтвердила сохранение обновлённых портов.");
+            SetLocalizedStatus("DefenderPortsSaveFailedFormat", result.Message);
         }
+    }
+
+    /// <summary>
+    /// Согласованно меняет порт в двух представлениях конфигурации: удаление снимает все его правила,
+    /// а перенос меняет только LocalPort, сохраняя ограничения процесса, пороги и явное отключение.
+    /// </summary>
+    /// <param name="config">Актуальный независимый снимок конфигурации службы.</param>
+    /// <param name="oldPort">Удаляемый или переносимый порт; null при добавлении.</param>
+    /// <param name="newPort">Новый порт; null при удалении.</param>
+    internal static void ApplyDefenderPortChange(PortDefenderConfigDto config, int? oldPort, int? newPort)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (!oldPort.HasValue && !newPort.HasValue)
+            throw new ArgumentException("Для изменения требуется прежний или новый номер порта.");
+        if (oldPort is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(oldPort));
+        if (newPort is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(newPort));
+        config.ProtectedPorts ??= [];
+        config.Rules ??= [];
+        var ports = new HashSet<int>(config.ProtectedPorts);
+        if (newPort.HasValue && newPort != oldPort &&
+            (ports.Contains(newPort.Value) || config.Rules.Any(rule => rule.LocalPort == newPort.Value)))
+            throw new InvalidOperationException(LocalizationService.Instance.Format("DefenderDuplicatePortFormat", newPort.Value));
+        if (oldPort.HasValue)
+        {
+            ports.Remove(oldPort.Value);
+            if (newPort.HasValue)
+            {
+                foreach (var rule in config.Rules.Where(rule => rule.LocalPort == oldPort.Value))
+                    rule.LocalPort = newPort.Value;
+            }
+            else
+            {
+                config.Rules.RemoveAll(rule => rule.LocalPort == oldPort.Value);
+            }
+        }
+        if (newPort.HasValue) ports.Add(newPort.Value);
+        config.ProtectedPorts = ports.OrderBy(port => port).ToList();
     }
 
     /// <summary>
@@ -2692,16 +2755,10 @@ public partial class NetworkSecurityHubView : UserControl
     /// </summary>
     private void UpdateDefenderPortsSummary()
     {
-        TxtDefenderPortsCountBadge.Text = _defenderPortsCollection.Count switch
-        {
-            0 => "0 портов",
-            1 => "1 порт",
-            >= 2 and <= 4 => $"{_defenderPortsCollection.Count} порта",
-            _ => $"{_defenderPortsCollection.Count} портов"
-        };
+        TxtDefenderPortsCountBadge.Text = LocalizationService.Instance.Format("DefenderPortsCountFormat", _defenderPortsCollection.Count);
 
         var ports = _defenderPortsCollection.Select(p => p.Port).OrderBy(p => p).ToList();
-        TxtDefenderPorts.Text = ports.Count > 0 ? string.Join(", ", ports) : "Нет защищаемых портов";
+        TxtDefenderPorts.Text = ports.Count > 0 ? string.Join(", ", ports) : LocalizationService.Instance["DefenderNoPorts"];
     }
 
     // ===== Баны =====
@@ -5083,6 +5140,7 @@ public partial class NetworkSecurityHubView : UserControl
 
 
     /// <summary>Показывает сообщение в статусной строке (Zero-Crash: никогда не бросает).</summary>
+    /// <param name="message">Готовое сообщение службы или страницы.</param>
 
     private void SetStatus(string message)
 
@@ -5102,12 +5160,24 @@ public partial class NetworkSecurityHubView : UserControl
 
             }
 
+            _localizedStatusKey = null;
+            _localizedStatusArguments = [];
             TxtStatus.Text = message ?? string.Empty;
 
         }
 
-        catch { }
+        catch (Exception ex) { App.Log($"NetworkSecurityHubView: статус не обновлён: {ex.Message}"); }
 
+    }
+
+    /// <summary>Сохраняет ключ динамического сообщения, чтобы переключение языка переводило текущую статусную строку.</summary>
+    /// <param name="key">Ключ сообщения в ресурсах.</param>
+    /// <param name="arguments">Параметры шаблона.</param>
+    private void SetLocalizedStatus(string key, params object?[] arguments)
+    {
+        SetStatus(LocalizationService.Instance.Format(key, arguments));
+        _localizedStatusKey = key;
+        _localizedStatusArguments = arguments;
     }
 
 
@@ -5190,7 +5260,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            TxtHubHistSummary.Text = "Загрузка истории сетевых подключений...";
+            TxtHubHistSummary.Text = LocalizationService.Instance["NetHistoryLoading"];
 
             var items = await _pipeClient.GetConnectionHistoryAsync();
 
@@ -5204,7 +5274,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            TxtHubHistSummary.Text = $"Ошибка загрузки: {ex.Message}";
+            TxtHubHistSummary.Text = LocalizationService.Instance.Format("NetHistoryLoadErrorFormat", ex.Message);
 
         }
 
@@ -5212,11 +5282,12 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-    /// <summary>Применяет фильтры к встроенной таблице истории сетевых подключений.</summary>
+    /// <summary>Применяет фильтры после создания всех целевых контролов; ранние XAML-события не обращаются к незаданным полям.</summary>
 
     private void ApplyHubHistoryFilter()
 
     {
+        if (GridHubHistory is null || TxtHubHistSummary is null || !AreHistoryActionsInitialized()) return;
 
         try
 
@@ -5248,9 +5319,9 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-            var selectedVerdict = (CmbHubHistVerdict?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            var selectedVerdict = CmbHubHistVerdict?.SelectedIndex ?? 0;
 
-            if (!string.IsNullOrWhiteSpace(selectedVerdict) && !selectedVerdict.StartsWith("Все"))
+            if (selectedVerdict > 0)
 
             {
 
@@ -5258,17 +5329,17 @@ public partial class NetworkSecurityHubView : UserControl
 
                 {
 
-                    "Ожидает алерта" => query.Where(i => i.Verdict == NetworkConnectionVerdict.PendingAlert),
+                    1 => query.Where(i => i.Verdict == NetworkConnectionVerdict.PendingAlert),
 
-                    "Разрешено" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Allowed || i.Verdict == NetworkConnectionVerdict.AllowSession),
+                    2 => query.Where(i => i.Verdict == NetworkConnectionVerdict.Allowed || i.Verdict == NetworkConnectionVerdict.AllowSession),
 
-                    "Заблокировано" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Blocked || i.Verdict == NetworkConnectionVerdict.BlockSession),
+                    3 => query.Where(i => i.Verdict == NetworkConnectionVerdict.Blocked || i.Verdict == NetworkConnectionVerdict.BlockSession),
 
-                    "Белый список" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Whitelisted),
+                    4 => query.Where(i => i.Verdict == NetworkConnectionVerdict.Whitelisted),
 
-                    "Чёрный список" => query.Where(i => i.Verdict == NetworkConnectionVerdict.Blacklisted),
+                    5 => query.Where(i => i.Verdict == NetworkConnectionVerdict.Blacklisted),
 
-                    "Создано правило" => query.Where(i => i.Verdict == NetworkConnectionVerdict.RuleCreated),
+                    6 => query.Where(i => i.Verdict == NetworkConnectionVerdict.RuleCreated),
 
                     _ => query
 
@@ -5278,9 +5349,9 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
-            var selectedPeriod = (CmbHubHistPeriod?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            var selectedPeriod = CmbHubHistPeriod?.SelectedIndex ?? 0;
 
-            if (!string.IsNullOrWhiteSpace(selectedPeriod) && !selectedPeriod.StartsWith("Все"))
+            if (selectedPeriod > 0)
 
             {
 
@@ -5290,11 +5361,11 @@ public partial class NetworkSecurityHubView : UserControl
 
                 {
 
-                    "Последний час" => query.Where(i => (now - i.Timestamp).TotalHours <= 1),
+                    1 => query.Where(i => (now - i.Timestamp).TotalHours <= 1),
 
-                    "Сегодня" => query.Where(i => i.LocalTimestamp.Date == DateTime.Now.Date),
+                    2 => query.Where(i => i.LocalTimestamp.Date == DateTime.Now.Date),
 
-                    "Последние 24 ч" => query.Where(i => (now - i.Timestamp).TotalHours <= 24),
+                    3 => query.Where(i => (now - i.Timestamp).TotalHours <= 24),
 
                     _ => query
 
@@ -5306,7 +5377,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             var selectedProtocol = (CmbHubHistProtocol?.SelectedItem as ComboBoxItem)?.Content?.ToString();
 
-            if (!string.IsNullOrWhiteSpace(selectedProtocol) && !selectedProtocol.StartsWith("Все"))
+            if (CmbHubHistProtocol?.SelectedIndex > 0 && !string.IsNullOrWhiteSpace(selectedProtocol))
 
             {
 
@@ -5320,13 +5391,13 @@ public partial class NetworkSecurityHubView : UserControl
 
             GridHubHistory.ItemsSource = filtered;
 
-            TxtHubHistSummary.Text = $"Отображено записей: {filtered.Count} из {_hubHistoryAll.Count}";
+            TxtHubHistSummary.Text = LocalizationService.Instance.Format("NetHistoryCountFormat", filtered.Count, _hubHistoryAll.Count);
 
             UpdateHubHistButtons();
 
         }
 
-        catch { }
+        catch (Exception ex) { App.Log($"NetworkSecurityHubView: ошибка фильтрации истории: {ex.Message}"); }
 
     }
 
@@ -5350,9 +5421,9 @@ public partial class NetworkSecurityHubView : UserControl
 
         var result = MessageBox.Show(
 
-            "Вы действительно хотите полностью очистить журнал истории сетевых подключений?",
+            LocalizationService.Instance["NetHistoryClearConfirm"],
 
-            "Подтверждение очистки",
+            LocalizationService.Instance["NetHistoryClearTitle"],
 
             MessageBoxButton.YesNo,
 
@@ -5386,7 +5457,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            SetStatus($"Ошибка очистки истории: {ex.Message}");
+            SetLocalizedStatus("NetHistoryClearErrorFormat", ex.Message);
 
         }
 
@@ -5398,9 +5469,16 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
+    /// <summary>Проверяет готовность всех действий истории, создаваемых после фильтров в XAML.</summary>
+    /// <returns>True, когда обновление таблицы не может обратиться к отсутствующей кнопке.</returns>
+    private bool AreHistoryActionsInitialized() => BtnHubHistAllow is not null && BtnHubHistBlock is not null &&
+        BtnHubHistWhitelist is not null && BtnHubHistBlacklist is not null && BtnHubHistOpenFile is not null && BtnHubHistCopyIp is not null;
+
+    /// <summary>Обновляет доступность действий для выбранной записи только после завершения создания XAML-контролов.</summary>
     private void UpdateHubHistButtons()
 
     {
+        if (GridHubHistory is null || !AreHistoryActionsInitialized()) return;
 
         var item = GridHubHistory.SelectedItem as NetworkConnectionHistoryItem;
 
@@ -5466,7 +5544,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                SetStatus($"Создано разрешающее правило для программы {item.ProcessName}.");
+                SetLocalizedStatus("NetHistoryAllowCreatedFormat", item.ProcessName);
 
                 await LoadHubHistoryAsync();
 
@@ -5478,7 +5556,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            SetStatus($"Ошибка создания правила: {ex.Message}");
+            SetLocalizedStatus("NetHistoryRuleErrorFormat", ex.Message);
 
         }
 
@@ -5526,7 +5604,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                SetStatus($"Создано блокирующее правило для программы {item.ProcessName}.");
+                SetLocalizedStatus("NetHistoryBlockCreatedFormat", item.ProcessName);
 
                 await LoadHubHistoryAsync();
 
@@ -5538,7 +5616,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            SetStatus($"Ошибка создания правила: {ex.Message}");
+            SetLocalizedStatus("NetHistoryRuleErrorFormat", ex.Message);
 
         }
 
@@ -5566,7 +5644,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                SetStatus($"Программа «{item.ProcessName}» добавлена в белый список.");
+                SetLocalizedStatus("NetHistoryWhitelistedFormat", item.ProcessName);
 
                 await LoadHubHistoryAsync();
 
@@ -5578,7 +5656,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            SetStatus($"Ошибка белого списка: {ex.Message}");
+            SetLocalizedStatus("NetHistoryWhitelistErrorFormat", ex.Message);
 
         }
 
@@ -5606,7 +5684,7 @@ public partial class NetworkSecurityHubView : UserControl
 
             {
 
-                SetStatus($"Программа «{item.ProcessName}» добавлена в чёрный список.");
+                SetLocalizedStatus("NetHistoryBlacklistedFormat", item.ProcessName);
 
                 await LoadHubHistoryAsync();
 
@@ -5618,7 +5696,7 @@ public partial class NetworkSecurityHubView : UserControl
 
         {
 
-            SetStatus($"Ошибка чёрного списка: {ex.Message}");
+            SetLocalizedStatus("NetHistoryBlacklistErrorFormat", ex.Message);
 
         }
 

@@ -203,7 +203,11 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            // Диагностика доступна только при включённом Debug; командная строка процесса не журналируется.
+                            Serilog.Log.Debug(ex, "Не удалось прочитать описание файла процесса PID {Pid}", proc.ProcessId);
+                        }
                     }
 
                     // Проверяем защищенность процесса
@@ -256,9 +260,9 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         }
     }
 
-    /// <summary>TryGetCompanyName: Выполняет операцию TryGetCompanyName.</summary>
-    /// <param name="filePath">Входные данные: значение параметра filePath (string).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Читает имя издателя из версии файла; недоступность метаданных отмечается на уровне Debug.</summary>
+    /// <param name="filePath">Путь исполняемого файла.</param>
+    /// <returns>Имя издателя либо пустая строка при отсутствии или недоступности метаданных.</returns>
     private static string TryGetCompanyName(string filePath)
     {
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return string.Empty;
@@ -267,7 +271,11 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
             var vi = FileVersionInfo.GetVersionInfo(filePath);
             return vi.CompanyName ?? string.Empty;
         }
-        catch { return string.Empty; }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "Не удалось прочитать издателя файла {FilePath}", filePath);
+            return string.Empty;
+        }
     }
 
     /// <summary>TryGetProcessPath: Выполняет операцию TryGetProcessPath.</summary>
@@ -318,9 +326,9 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         int processInformationLength,
         out int returnLength);
 
-    /// <summary>TryGetProcessCommandLine: Выполняет операцию TryGetProcessCommandLine.</summary>
-    /// <param name="hProcess">Входные данные: значение параметра hProcess (IntPtr).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Читает командную строку по дескриптору; отказы диагностирует без раскрытия её содержимого.</summary>
+    /// <param name="hProcess">Дескриптор процесса с правом запроса сведений.</param>
+    /// <returns>Командная строка либо пустая строка, если завершившийся или защищённый процесс недоступен.</returns>
     private static string TryGetProcessCommandLine(IntPtr hProcess)
     {
         if (hProcess == IntPtr.Zero) return string.Empty;
@@ -328,7 +336,12 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         {
             // ProcessCommandLineInformation = 60
             int status = NtQueryInformationProcess(hProcess, 60, IntPtr.Zero, 0, out int returnLength);
-            if (returnLength <= 0) return string.Empty;
+            if (returnLength <= 0)
+            {
+                // Ожидаемые отказы защищённых и завершившихся процессов видны лишь в подробном Trace-журнале.
+                Serilog.Log.Verbose("Размер командной строки процесса недоступен: NTSTATUS {Status:X8}", status);
+                return string.Empty;
+            }
 
             IntPtr buf = Marshal.AllocHGlobal(returnLength);
             try
@@ -342,13 +355,20 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
                         return Marshal.PtrToStringUni(uniStr.Buffer, uniStr.Length / 2) ?? string.Empty;
                     }
                 }
+                else
+                {
+                    Serilog.Log.Verbose("Не удалось запросить командную строку процесса: NTSTATUS {Status:X8}", status);
+                }
             }
             finally
             {
                 Marshal.FreeHGlobal(buf);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "Ошибка чтения метаданных командной строки процесса по дескриптору");
+        }
         return string.Empty;
     }
 

@@ -21,6 +21,17 @@ public class LocalizationService : INotifyPropertyChanged
     /// <summary>Индексатор для доступа к строке по ключу через Resources.Strings.</summary>
     public string this[string key] => ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
 
+    /// <summary>Форматирует ресурс на активном языке, сохраняя единые правила чисел и дат для динамических подписей.</summary>
+    /// <param name="key">Ключ шаблона в локализованных ресурсах.</param>
+    /// <param name="arguments">Значения заполнителей шаблона.</param>
+    /// <returns>Готовая строка интерфейса.</returns>
+    public string Format(string key, params object?[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(arguments);
+        return string.Format(CultureInfo.CurrentUICulture, this[key], arguments);
+    }
+
     // ──── Статические строки UI, привязанные к ресурсам ────
 
     /// <summary>Метка настройки автоблокировки.</summary>

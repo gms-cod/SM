@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -23,6 +24,9 @@ public partial class PortDefenderConfigWindow
     private readonly ObservableCollection<PortDefenderPortItem> _portsCollection = new();
     private PortDefenderConfigDto? _config;
     private bool _isLoading;
+    /// <summary>Ключ и параметры текущего статуса позволяют переводить уже открытое окно без повторного IPC.</summary>
+    private string _statusKey = "NetStatusLoading";
+    private object?[] _statusArguments = [];
 
     /// <summary>
     /// Инициализирует окно настройки службы защиты портов.
@@ -38,6 +42,26 @@ public partial class PortDefenderConfigWindow
         GridProtectedPorts.ItemsSource = _portsCollection;
 
         Loaded += async (_, _) => await LoadConfigAsync();
+        PropertyChangedEventManager.AddHandler(LocalizationService.Instance, OnLanguageChanged, string.Empty);
+    }
+
+    /// <summary>Сохраняет семантику статуса и отображает её на активном языке.</summary>
+    /// <param name="key">Ресурс сообщения.</param>
+    /// <param name="arguments">Значения заполнителей.</param>
+    private void SetStatus(string key, params object?[] arguments)
+    {
+        _statusKey = key;
+        _statusArguments = arguments;
+        TxtStatus.Text = LocalizationService.Instance.Format(key, arguments);
+    }
+
+    /// <summary>Обновляет счётчик и текущий статус без потери несохранённых настроек.</summary>
+    /// <param name="sender">Сервис локализации.</param>
+    /// <param name="e">Уведомление о смене языка.</param>
+    private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        UpdatePortsCountBadge();
+        TxtStatus.Text = LocalizationService.Instance.Format(_statusKey, _statusArguments);
     }
 
     /// <summary>
@@ -50,7 +74,7 @@ public partial class PortDefenderConfigWindow
 
         try
         {
-            TxtStatus.Text = "Загрузка конфигурации Port Defender...";
+            SetStatus("DefenderConfigLoading");
             _config = await _pipeClient.GetPortDefenderConfigAsync() ?? new PortDefenderConfigDto();
 
             // Формируем уникальный отсортированный список портов
@@ -78,14 +102,13 @@ public partial class PortDefenderConfigWindow
             ChkTrustPrivate.IsChecked = _config.TrustPrivateNetworks;
             TxtWhitelist.Text = string.Join(", ", _config.WhitelistIps ?? new List<string>());
 
-            TxtStatus.Text = _initialPort.HasValue
-                ? $"Порт {_initialPort.Value} успешно добавлен в список для настройки."
-                : "Конфигурация успешно загружена.";
+            if (_initialPort.HasValue) SetStatus("DefenderInitialAddedFormat", _initialPort.Value);
+            else SetStatus("DefenderConfigLoaded");
         }
         catch (Exception ex)
         {
             _config ??= new PortDefenderConfigDto();
-            TxtStatus.Text = $"Не удалось загрузить конфигурацию: {ex.Message}";
+            SetStatus("DefenderConfigLoadErrorFormat", ex.Message);
         }
         finally
         {
@@ -98,13 +121,7 @@ public partial class PortDefenderConfigWindow
     /// </summary>
     private void UpdatePortsCountBadge()
     {
-        TxtPortsCountBadge.Text = _portsCollection.Count switch
-        {
-            0 => "0 портов",
-            1 => "1 порт",
-            >= 2 and <= 4 => $"{_portsCollection.Count} порта",
-            _ => $"{_portsCollection.Count} портов"
-        };
+        TxtPortsCountBadge.Text = LocalizationService.Instance.Format("DefenderPortsCountFormat", _portsCollection.Count);
     }
 
     /// <summary>
@@ -129,7 +146,7 @@ public partial class PortDefenderConfigWindow
             _portsCollection.Insert(index, newItem);
             GridProtectedPorts.SelectedItem = newItem;
             UpdatePortsCountBadge();
-            TxtStatus.Text = $"Порт #{newPort} ({newItem.ServiceName}) добавлен в список отслеживания.";
+            SetStatus("DefenderListAddedFormat", newPort, newItem.ServiceName);
         }
     }
 
@@ -144,7 +161,7 @@ public partial class PortDefenderConfigWindow
         }
         else
         {
-            TxtStatus.Text = "Выберите порт в таблице для редактирования.";
+            SetStatus("DefenderSelectEdit");
         }
     }
 
@@ -171,6 +188,10 @@ public partial class PortDefenderConfigWindow
         {
             int oldPort = item.Port;
             item.UpdatePort(dialog.ResultPort);
+            // Перенос сохраняет индивидуальные параметры и выключенное состояние всех правил исходного порта.
+            if (_config?.Rules is not null)
+                foreach (var rule in _config.Rules.Where(rule => rule is not null && rule.LocalPort == oldPort))
+                    rule.LocalPort = dialog.ResultPort;
 
             // Пересортировываем коллекцию
             var sorted = _portsCollection.OrderBy(p => p.Port).ToList();
@@ -180,7 +201,7 @@ public partial class PortDefenderConfigWindow
                 _portsCollection.Add(p);
             }
             GridProtectedPorts.SelectedItem = item;
-            TxtStatus.Text = $"Порт #{oldPort} изменён на #{dialog.ResultPort} ({item.ServiceName}).";
+            SetStatus("DefenderListMovedFormat", oldPort, dialog.ResultPort, item.ServiceName);
         }
     }
 
@@ -195,7 +216,7 @@ public partial class PortDefenderConfigWindow
         }
         else
         {
-            TxtStatus.Text = "Выберите порт в таблице для удаления.";
+            SetStatus("DefenderSelectDelete");
         }
     }
 
@@ -220,7 +241,7 @@ public partial class PortDefenderConfigWindow
 
         _portsCollection.Remove(item);
         UpdatePortsCountBadge();
-        TxtStatus.Text = $"Порт #{portNumber} ({serviceName}) удалён из списка отслеживаемых.";
+        SetStatus("DefenderListRemovedFormat", portNumber, serviceName);
     }
 
     /// <summary>
@@ -268,6 +289,19 @@ public partial class PortDefenderConfigWindow
     private static int ParsePositiveInt(string text, int fallback) =>
         int.TryParse((text ?? string.Empty).Trim(), out var value) && value >= 0 ? value : fallback;
 
+    /// <summary>Согласует оба представления портов после редактирования, сохраняя параметры оставшихся правил.</summary>
+    /// <param name="config">Изменяемая конфигурация, полученная службой при открытии диалога.</param>
+    /// <param name="ports">Полный список портов, подтверждённый пользователем; пустой список снимает всю защиту портов.</param>
+    internal static void SynchronizeProtectedPorts(PortDefenderConfigDto config, IEnumerable<int> ports)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(ports);
+        var protectedPorts = ports.ToHashSet();
+        if (protectedPorts.Any(port => port is < 1 or > 65535)) throw new ArgumentOutOfRangeException(nameof(ports));
+        config.ProtectedPorts = protectedPorts.OrderBy(port => port).ToList();
+        config.Rules?.RemoveAll(rule => rule is null || !protectedPorts.Contains(rule.LocalPort));
+    }
+
     /// <summary>
     /// Сохраняет обновленную конфигурацию Port Defender через именованный канал в системную службу.
     /// </summary>
@@ -275,17 +309,12 @@ public partial class PortDefenderConfigWindow
     {
         try
         {
-            TxtStatus.Text = "Синхронизация конфигурации со службой...";
+            SetStatus("DefenderConfigSaving");
             var config = _config ?? new PortDefenderConfigDto();
 
             config.Enabled = ChkEnabled.IsChecked == true;
-            config.ProtectedPorts = _portsCollection.Select(p => p.Port).Distinct().OrderBy(p => p).ToList();
-
-            // Если список пуст и был начальный порт — гарантируем его сохранение
-            if (config.ProtectedPorts.Count == 0 && _initialPort is >= 1 and <= 65535)
-            {
-                config.ProtectedPorts.Add(_initialPort.Value);
-            }
+            // Пустой список — явный выбор пользователя; предзаполнение при открытии не отменяет последующее удаление.
+            SynchronizeProtectedPorts(config, _portsCollection.Select(port => port.Port));
 
             config.MaxAttempts = ParsePositiveInt(TxtMaxAttempts.Text, 10);
             if (config.MaxAttempts == 0) config.MaxAttempts = 10;
@@ -296,21 +325,21 @@ public partial class PortDefenderConfigWindow
             config.TrustPrivateNetworks = ChkTrustPrivate.IsChecked == true;
             config.WhitelistIps = ParseWhitelist(TxtWhitelist.Text);
 
-            var ok = await _pipeClient.SetPortDefenderConfigAsync(config);
-            if (ok)
+            var result = await _pipeClient.SetPortDefenderConfigAsync(config);
+            if (result.Success)
             {
-                TxtStatus.Text = "Конфигурация Port Defender успешно синхронизирована.";
+                SetStatus("DefenderConfigSaved");
                 DialogResult = true;
                 Close();
             }
             else
             {
-                TxtStatus.Text = "Служба не подтвердила сохранение конфигурации.";
+                SetStatus("DefenderConfigSaveFailedFormat", result.Message);
             }
         }
         catch (Exception ex)
         {
-            TxtStatus.Text = $"Ошибка сохранения конфигурации: {ex.Message}";
+            SetStatus("DefenderConfigSaveErrorFormat", ex.Message);
         }
     }
 

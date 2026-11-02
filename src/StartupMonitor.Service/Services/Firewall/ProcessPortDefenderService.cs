@@ -229,8 +229,9 @@ public sealed class ProcessPortDefenderService : IDisposable
     }
 
     /// <summary>
-    /// Сохраняет новую конфигурацию правил защиты Port Defender.
+    /// Сохраняет новую конфигурацию правил защиты Port Defender; активирует её только после подтверждённой записи файла.
     /// </summary>
+    /// <param name="config">Полная конфигурация защиты; вызывающий объект не изменяется.</param>
     public void SaveConfig(PortDefenderConfigDto config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -239,18 +240,17 @@ public sealed class ProcessPortDefenderService : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             NormalizeAndSynchronizeRules(snapshot);
+            SaveConfigToFile(snapshot);
             _config = snapshot;
             // Новая конфигурация начинает независимые окна, не наследуя счётчики прежних правил.
             _previousConnectionKeys.Clear();
             _windowTracker.Clear();
             RebuildRuleIndex();
-            SaveConfigToFile();
+            // Сигнал под блокировкой не может гоняться с уничтожением шлюза при Dispose.
+            _wake.Pulse();
         }
         _logger.LogInformation("PortDefender: Конфигурация обновлена. Портов: {PortCount}, Правил: {RuleCount}, Активен: {Enabled}",
             snapshot.ProtectedPorts.Count, snapshot.Rules.Count, snapshot.IsGloballyEnabled);
-
-        // Смена правил → немедленный пересчёт режима сна (активный опрос либо 0% CPU Idle).
-        _wake.Pulse();
     }
 
     // ───────────────────────────── Активные баны ─────────────────────────────
@@ -921,16 +921,19 @@ public sealed class ProcessPortDefenderService : IDisposable
         _needsProcessPaths = _rulesByPort.Values.Any(rules => rules.Any(item => !string.IsNullOrWhiteSpace(item.Rule.ProcessPath)));
     }
 
-    private void SaveConfigToFile()
+    /// <summary>Записывает подготовленный снимок, передавая отказ сохранения вызывающей IPC-операции.</summary>
+    /// <param name="snapshot">Ещё не активированная конфигурация.</param>
+    private void SaveConfigToFile(PortDefenderConfigDto snapshot)
     {
         try
         {
-            var json = JsonSerializer.Serialize(_config, JsonOptions);
+            var json = JsonSerializer.Serialize(snapshot, JsonOptions);
             WriteAtomic(_configFilePath, json);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PortDefender: Ошибка при сохранении конфигурации в {Path}", _configFilePath);
+            throw;
         }
     }
 
@@ -1009,15 +1012,37 @@ public sealed class ProcessPortDefenderService : IDisposable
         }
     }
 
+    /// <summary>Сбрасывает содержимое на диск перед атомарной заменой целевого файла; не оставляет временный файл после отказа.</summary>
+    /// <param name="path">Полный путь секционного файла.</param>
+    /// <param name="content">Сериализованное содержимое.</param>
     private static void WriteAtomic(string path, string content)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        var tmp = path + ".tmp";
-        File.WriteAllText(tmp, content);
-        File.Move(tmp, path, overwrite: true);
+        var tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var stream = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                using (var writer = new StreamWriter(stream, leaveOpen: true))
+                {
+                    writer.Write(content);
+                    writer.Flush();
+                }
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(tmp, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tmp))
+            {
+                try { File.Delete(tmp); }
+                catch (Exception ex) { Serilog.Log.Warning(ex, "PortDefender: не удалось удалить временный файл {Path}", tmp); }
+            }
+        }
     }
 
     public void Dispose()

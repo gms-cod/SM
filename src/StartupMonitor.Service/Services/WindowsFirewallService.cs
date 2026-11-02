@@ -1504,13 +1504,7 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
                 return ruleName;
             }
 
-            var set = new HashSet<string>(SplitAddresses(SafeGet(rule, "RemoteAddresses") ?? "*"), StringComparer.OrdinalIgnoreCase);
-            set.Remove("*");
-            if (set.Add(normalizedIp))
-            {
-                rule.RemoteAddresses = string.Join(",", set.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
-                rule.Enabled = true;
-            }
+            UpdateAggregatedIpRule(rule, normalizedIp, direction);
 
             return ruleName;
         }
@@ -1520,6 +1514,33 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             Release(rulesObj);
             Release(policyObj);
         }
+    }
+
+    /// <summary>Восстанавливает обязательные свойства управляемой блокировки даже для уже содержащегося в ней IP.</summary>
+    /// <param name="ruleObject">Существующее COM-правило либо совместимый адаптер для проверки.</param>
+    /// <param name="normalizedIp">Нормализованный блокируемый адрес.</param>
+    /// <param name="direction">Направление входящего или исходящего трафика.</param>
+    internal static void UpdateAggregatedIpRule(object ruleObject, string normalizedIp, int direction)
+    {
+        ArgumentNullException.ThrowIfNull(ruleObject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(normalizedIp);
+        if (direction is not (DirIn or DirOut)) throw new ArgumentOutOfRangeException(nameof(direction));
+        dynamic rule = ruleObject;
+        // Ошибка чтения адресов не должна превращаться в потерю остальных IP агрегированного правила.
+        var addresses = (string?)rule.RemoteAddresses;
+        var set = new HashSet<string>(SplitAddresses(addresses ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+        var changed = set.Remove("*");
+        changed |= set.Add(normalizedIp);
+        if (changed)
+            rule.RemoteAddresses = string.Join(",", set.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+        rule.Direction = direction;
+        rule.Action = ActionBlock;
+        rule.Profiles = ProfilesAll;
+        rule.Protocol = ProtoAny;
+        rule.Enabled = true;
+        if (!(bool)rule.Enabled || (int)rule.Action != ActionBlock || (int)rule.Direction != direction ||
+            (int)rule.Protocol != ProtoAny || (int)rule.Profiles != ProfilesAll)
+            throw new InvalidOperationException("Брандмауэр не подтвердил обязательные свойства управляемой блокировки IP.");
     }
 
     private bool RemoveIpFromAggregated(string normalizedIp, string ruleName)
@@ -1536,7 +1557,8 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             rule = FindRule(rules, ruleName);
             if (rule is null) return false;
 
-            var set = new HashSet<string>(SplitAddresses(SafeGet(rule, "RemoteAddresses") ?? string.Empty), StringComparer.OrdinalIgnoreCase);
+            // При отказе COM-чтения нельзя объявлять адрес отсутствующим и терять возможность повторного разбана.
+            var set = new HashSet<string>(SplitAddresses((string?)rule.RemoteAddresses ?? string.Empty), StringComparer.OrdinalIgnoreCase);
             if (!set.Remove(normalizedIp)) return false;
 
             if (set.Count == 0)
@@ -1699,7 +1721,10 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             ?? throw new FirewallNotAvailableException("Не удалось создать INetFwRule."));
     }
 
-    /// <summary>Поиск правила по имени: сначала быстрый нативный Item(), затем линейный обход.</summary>
+    /// <summary>Ищет правило через Item и резервное перечисление; отказ чтения передаёт операции, не подменяя его отсутствием правила.</summary>
+    /// <param name="rules">Коллекция правил Windows Firewall.</param>
+    /// <param name="name">Искомое имя правила.</param>
+    /// <returns>Правило с переданным владением COM-объектом либо null при подтверждённом отсутствии.</returns>
     private static dynamic? FindRule(dynamic rules, string name)
     {
         // Быстрый нативный поиск O(1) без перечисления всей коллекции COM.
@@ -1714,9 +1739,11 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
                     _ = (string)direct.Name;
                     return direct; // владение RCW переходит вызывающему коду
                 }
-                catch
+                catch (Exception ex)
                 {
                     Release(direct);
+                    Log.Warning(ex, "Firewall: не удалось проверить правило {RuleName}", name);
+                    throw;
                 }
             }
             else
@@ -1724,8 +1751,14 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
                 Release(direct);
             }
         }
-        catch (COMException) { }
-        catch (FileNotFoundException) { }
+        catch (COMException ex) when (ex.ErrorCode is unchecked((int)0x80070002) or unchecked((int)0x80070490))
+        {
+            Log.Debug("Firewall: правило {RuleName} отсутствует в прямом индексе; проверяем перечисление", name);
+        }
+        catch (FileNotFoundException)
+        {
+            Log.Debug("Firewall: правило {RuleName} отсутствует в прямом индексе; проверяем перечисление", name);
+        }
 
         System.Collections.IEnumerator? enumerator = null;
         try
@@ -1733,15 +1766,17 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
             while (true)
             {
-                bool moved;
-                try { moved = enumerator.MoveNext(); }
-                catch { break; }
-                if (!moved) break;
+                if (!enumerator.MoveNext()) break;
 
                 dynamic current = enumerator.Current;
-                string? currentName = null;
+                string? currentName;
                 try { currentName = (string)current.Name; }
-                catch { Release(current); continue; }
+                catch (Exception ex)
+                {
+                    Release(current);
+                    Log.Warning(ex, "Firewall: отказ чтения коллекции при поиске правила {RuleName}", name);
+                    throw;
+                }
 
                 if (string.Equals(currentName, name, StringComparison.OrdinalIgnoreCase))
                     return current; // владение RCW переходит вызывающему коду
@@ -1757,16 +1792,26 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
         }
     }
 
-    private static bool RemoveRuleByName(dynamic rules, string name)
+    /// <summary>Удаляет правило, считая штатным только подтверждённое отсутствие; остальные ошибки передаёт вызывающему коду.</summary>
+    /// <param name="rules">Коллекция COM-правил либо совместимый адаптер.</param>
+    /// <param name="name">Точное имя удаляемого правила.</param>
+    /// <returns>True при удалении; false, если API явно сообщил, что правило отсутствует.</returns>
+    internal static bool RemoveRuleByName(dynamic rules, string name)
     {
+        ArgumentNullException.ThrowIfNull((object?)rules);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         try
         {
             rules.Remove(name);
             return true;
         }
-        catch
+        catch (FileNotFoundException)
         {
-            return false; // правило отсутствует — не ошибка
+            return false;
+        }
+        catch (COMException ex) when (ex.ErrorCode is unchecked((int)0x80070002) or unchecked((int)0x80070490))
+        {
+            return false;
         }
     }
 

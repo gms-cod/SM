@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
@@ -151,6 +152,17 @@ public sealed class NetworkTimelineChartControl : FrameworkElement
         MouseMove += OnChartMouseMove;
         MouseLeave += OnChartMouseLeave;
         MouseLeftButtonDown += OnChartMouseLeftButtonDown;
+        // Слабая подписка обновляет уже открытые подсказки и пустое состояние, не удерживая закрытый контрол.
+        PropertyChangedEventManager.AddHandler(LocalizationService.Instance, OnLanguageChanged, string.Empty);
+    }
+
+    /// <summary>Сбрасывает локализованный текст renderer сразу после смены языка, даже без новых данных и движения мыши.</summary>
+    /// <param name="sender">Источник ресурсов.</param>
+    /// <param name="e">Уведомление об изменении языка.</param>
+    private void OnLanguageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        _cachedTooltip = null;
+        InvalidateVisual();
     }
 
     /// <summary>

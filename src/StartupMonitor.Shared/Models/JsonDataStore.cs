@@ -231,14 +231,15 @@ public class JsonDataStore
             throw new JsonException("Настройки защиты портов содержат недопустимую коллекцию или enum.");
     }
 
-    /// <summary>Старый единый файл раскладывается по секционным и переименовывается в .migrated.</summary>
+    /// <summary>Раскладывает проверенный legacy-файл по секциям; отказ архивирования диагностируется без потери новых секций.</summary>
     private void MigrateLegacyIfNeeded()
     {
         if (!File.Exists(_legacyPath)) return;
         // Новые файлы уже есть — миграция выполнялась ранее, старый просто убираем
         if (File.Exists(EntriesPath) || File.Exists(SettingsPath))
         {
-            try { File.Move(_legacyPath, _legacyPath + ".migrated", overwrite: true); } catch { }
+            try { File.Move(_legacyPath, _legacyPath + ".migrated", overwrite: true); }
+            catch (Exception ex) { _logWarning("Не удалось архивировать уже перенесённую конфигурацию.", ex); }
             return;
         }
 
@@ -262,7 +263,8 @@ public class JsonDataStore
         foreach (var h in legacy.History)
             AppendHistoryLine(h);
 
-        try { File.Move(_legacyPath, _legacyPath + ".migrated", overwrite: true); } catch { }
+        try { File.Move(_legacyPath, _legacyPath + ".migrated", overwrite: true); }
+        catch (Exception ex) { _logWarning("Секции перенесены, но исходную конфигурацию не удалось архивировать.", ex); }
     }
 
     // ───────────────────────────── Section IO ─────────────────────────────
@@ -343,7 +345,8 @@ public class JsonDataStore
         }
     }
 
-    /// <summary>Читает history.jsonl (поддерживая как однострочный JSONL, так и многострочный legacy формат).</summary>
+    /// <summary>Читает JSONL и legacy-объекты; неполные фрагменты диагностирует один раз, сохраняя доступные события.</summary>
+    /// <returns>Восстановленные события без повреждённых или незавершённых записей.</returns>
     public List<HistoryEntry> ReadHistory()
     {
         var result = new List<HistoryEntry>();
@@ -368,12 +371,14 @@ public class JsonDataStore
                     var single = JsonSerializer.Deserialize<HistoryEntry>(line, _historyOptions);
                     if (single != null && !string.IsNullOrEmpty(single.Id))
                     {
+                        if (multiLineBuffer.Length > 0)
+                            _logWarning("Перед корректным событием истории пропущен повреждённый фрагмент JSON.", null);
                         result.Add(single);
                         multiLineBuffer.Clear();
                         continue;
                     }
                 }
-                catch
+                catch (JsonException)
                 {
                     // Не отдельная строка — возможно, блок многострочного JSON
                 }
@@ -393,12 +398,15 @@ public class JsonDataStore
                             multiLineBuffer.Clear();
                         }
                     }
-                    catch
+                    catch (JsonException)
                     {
                         // Ещё не закрытый объект или синтаксическая неполнота
                     }
                 }
             }
+
+            if (multiLineBuffer.Length > 0)
+                _logWarning("Файл истории заканчивается повреждённой или незавершённой записью JSON.", null);
 
             // Если были записи в legacy многострочном формате, мигрируем файл в чистый однострочный JSONL
             if (hadLegacyMultiline && result.Count > 0)
@@ -408,10 +416,10 @@ public class JsonDataStore
                     var lines = result.Select(h => JsonSerializer.Serialize(h, _historyOptions));
                     File.WriteAllText(HistoryPath, string.Join(Environment.NewLine, lines) + Environment.NewLine);
                 }
-                catch { }
+                catch (Exception ex) { _logWarning("Не удалось преобразовать файл истории в однострочный JSONL.", ex); }
             }
         }
-        catch { }
+        catch (Exception ex) { _logWarning("Не удалось полностью прочитать файл истории; возвращены восстановленные события.", ex); }
         return result;
     }
 
@@ -420,7 +428,9 @@ public class JsonDataStore
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(content)));
 
-    /// <summary>Атомарная запись секции с принудительным сбросом кэша диска (fsync) и ротируемым бэкапом (P0-03).</summary>
+    /// <summary>Атомарно записывает секцию с fsync; отказ обновления резервной копии диагностируется до замены основного файла.</summary>
+    /// <param name="path">Путь сохраняемой секции.</param>
+    /// <param name="json">Полное проверенное содержимое секции.</param>
     private void WriteSectionAtomic(string path, string json)
     {
         var hash = ContentHash(json);
@@ -440,7 +450,8 @@ public class JsonDataStore
         var backup = path + ".backup";
         if (File.Exists(path))
         {
-            try { File.Copy(path, backup, overwrite: true); } catch { }
+            try { File.Copy(path, backup, overwrite: true); }
+            catch (Exception ex) { _logWarning($"Не удалось обновить резервную копию секции {Path.GetFileName(path)}.", ex); }
         }
 
         File.Move(tmp, path, overwrite: true);
@@ -484,7 +495,8 @@ public class JsonDataStore
         Settings = _cache.Settings
     }, _options));
 
-    /// <summary>Сохраняет весь конфиг — все секции целиком.</summary>
+    /// <summary>Сохраняет изменения снимка, объединяя их с актуальными секциями; повторный вызов сравнивается с последним намерением этого writer.</summary>
+    /// <param name="config">Независимый снимок вызывающего кода; неизвестные ему конкурентные поля не откатываются.</param>
     public void Save(AppConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -497,16 +509,48 @@ public class JsonDataStore
             // Базовые состояния неизменяемы: независимые изменения объединяются только при устаревшем снимке.
             var current = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
             _cache = _snapshotOrigins.TryGetValue(config, out var original) && !ReferenceEquals(original, current)
-                ? ConfigurationMerge.Merge(original, config, current, _options)
+                ? ConfigurationMerge.Merge(GetSnapshotMergeBaseline(original, config), config, current, _options)
                 : CloneSnapshot(config);
             SaveEntries();
             SaveBlacklist();
             SaveRemoved();
             SaveSettings();
-            // Повторное сохранение того же снимка сравнивается с его первоначальной базой:
-            // отсутствующие в снимке конкурентные добавления не превращаются в запрос удаления.
-            _snapshotOrigins.GetValue(config, _ => _cache);
+            // База повторного сохранения содержит только известные writer данные, а не весь результат merge:
+            // это допускает возврат поля к прежнему значению и не превращает неизвестные добавления в удаление.
+            var writerBaseline = CloneSnapshot(config);
+            _snapshotOrigins.Remove(config);
+            _snapshotOrigins.Add(config, writerBaseline);
+            for (var index = 0; index < config.Entries.Count; index++)
+            {
+                _entryOrigins.Remove(config.Entries[index]);
+                _entryOrigins.Add(config.Entries[index], writerBaseline.Entries[index]);
+            }
         }
+    }
+
+    /// <summary>Учитывает успешные UpdateEntry того же writer перед общим Save, не меняя исходное членство коллекции.</summary>
+    /// <param name="original">Последнее известное writer состояние полного снимка.</param>
+    /// <param name="requested">Снимок с отдельными DTO, которые могли сохраняться через UpdateEntry.</param>
+    /// <returns>Оболочка исходной базы с актуальной для writer базой только первоначально присутствовавших записей.</returns>
+    private AppConfig GetSnapshotMergeBaseline(AppConfig original, AppConfig requested)
+    {
+        var entryOrigins = new Dictionary<string, StartupEntry>(StringComparer.Ordinal);
+        foreach (var entry in requested.Entries)
+        {
+            if (!string.IsNullOrEmpty(entry.Id) && _entryOrigins.TryGetValue(entry, out var origin) && origin.Id == entry.Id)
+                entryOrigins.TryAdd(entry.Id, origin);
+        }
+        return new AppConfig
+        {
+            Language = original.Language,
+            Theme = original.Theme,
+            Settings = original.Settings,
+            Blacklist = original.Blacklist,
+            RemovedEntries = original.RemovedEntries,
+            History = original.History,
+            Entries = original.Entries.Select(entry => !string.IsNullOrEmpty(entry.Id) && entryOrigins.TryGetValue(entry.Id, out var origin)
+                ? origin : entry).ToList()
+        };
     }
 
     // ───────────────────────────── Entries ─────────────────────────────
@@ -744,7 +788,8 @@ public class JsonDataStore
         }
     }
 
-    /// <summary>Обновляет запись (заменяет по Id).</summary>
+    /// <summary>Обновляет принадлежащие снимку изменения записи по Id; после успеха запоминает его новое известное состояние.</summary>
+    /// <param name="entry">Изменённый независимый снимок записи.</param>
     public void UpdateEntry(StartupEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -763,6 +808,8 @@ public class JsonDataStore
                 _cache!.Entries = [.. _cache.Entries];
                 _cache.Entries[idx] = replacement;
                 SaveEntries();
+                _entryOrigins.Remove(entry);
+                _entryOrigins.Add(entry, entry.Clone());
             }
         }
     }

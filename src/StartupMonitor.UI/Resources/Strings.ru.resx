@@ -2207,4 +2207,166 @@
   <data name="NavTip1" xml:space="preserve"><value>Правила блокировки нежелательного автозапуска.</value></data>
   <data name="NavTip3" xml:space="preserve"><value>Удалённые записи автозапуска.</value></data>
   <data name="NavTip5" xml:space="preserve"><value>События мониторинга и диагностика приложения.</value></data>
+
+  <!-- Локализованные подписи истории подключений и управления Port Defender. -->
+  <data name="DefenderCriticalTip" xml:space="preserve"><value>Критический системный компонент ядра ОС. Блокировка запрещена.</value></data>
+  <data name="DefenderHighRiskTip" xml:space="preserve"><value>Системный компонент Windows. Блокировка требует подтверждения.</value></data>
+  <data name="DefenderPortsEmpty" xml:space="preserve"><value>0 портов</value></data>
+  <data name="DefenderAddPort" xml:space="preserve"><value>Добавить порт</value></data>
+  <data name="DefenderEdit" xml:space="preserve"><value>Редактировать</value></data>
+  <data name="DefenderDelete" xml:space="preserve"><value>Удалить</value></data>
+  <data name="DefenderPortColumn" xml:space="preserve"><value>Порт</value></data>
+  <data name="DefenderServiceColumn" xml:space="preserve"><value>Служба</value></data>
+  <data name="DefenderRiskColumn" xml:space="preserve"><value>Уровень риска</value></data>
+  <data name="DefenderDescriptionColumn" xml:space="preserve"><value>Описание защиты</value></data>
+  <data name="DefenderActionsColumn" xml:space="preserve"><value>Действия</value></data>
+  <data name="DefenderEditPortTip" xml:space="preserve"><value>Редактировать порт</value></data>
+  <data name="DefenderDeletePortTip" xml:space="preserve"><value>Удалить порт</value></data>
+  <data name="DefenderRemoveProtectionTip" xml:space="preserve"><value>Удалить порт из защиты</value></data>
+  <data name="DefenderLiveHint" xml:space="preserve"><value>💡 Изменения защищаемых портов применяются на лету без перезапуска службы.</value></data>
+  <data name="DefenderActivePorts" xml:space="preserve"><value>Активные порты: </value></data>
+  <data name="DefenderEditHint" xml:space="preserve"><value>💡 Двойной щелчок по строке для редактирования. Клавиша Delete удаляет выбранный порт.</value></data>
+  <data name="NetHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
+  <data name="NetHistorySearch" xml:space="preserve"><value>Поиск по имени процесса, PID, IP или порту...</value></data>
+  <data name="NetHistoryAllVerdicts" xml:space="preserve"><value>Все вердикты</value></data>
+  <data name="NetHistoryPending" xml:space="preserve"><value>Ожидает алерта</value></data>
+  <data name="NetHistoryAllowed" xml:space="preserve"><value>Разрешено</value></data>
+  <data name="NetHistoryBlocked" xml:space="preserve"><value>Заблокировано</value></data>
+  <data name="NetHistoryWhitelist" xml:space="preserve"><value>Белый список</value></data>
+  <data name="NetHistoryBlacklist" xml:space="preserve"><value>Чёрный список</value></data>
+  <data name="NetHistoryRuleCreated" xml:space="preserve"><value>Создано правило</value></data>
+  <data name="NetHistoryAllTime" xml:space="preserve"><value>Все время</value></data>
+  <data name="NetHistoryLastHour" xml:space="preserve"><value>Последний час</value></data>
+  <data name="NetHistoryToday" xml:space="preserve"><value>Сегодня</value></data>
+  <data name="NetHistoryLastDay" xml:space="preserve"><value>Последние 24 ч</value></data>
+  <data name="NetHistoryAll" xml:space="preserve"><value>Все</value></data>
+  <data name="NetHistoryRefresh" xml:space="preserve"><value>Обновить</value></data>
+  <data name="NetHistoryRefreshTip" xml:space="preserve"><value>Обновить список истории</value></data>
+  <data name="NetHistoryClear" xml:space="preserve"><value>Очистить</value></data>
+  <data name="NetHistoryClearTip" xml:space="preserve"><value>Очистить весь журнал истории</value></data>
+  <data name="NetHistoryTimeColumn" xml:space="preserve"><value>Время</value></data>
+  <data name="NetHistoryProcessColumn" xml:space="preserve"><value>Процесс</value></data>
+  <data name="NetHistoryProtocolColumn" xml:space="preserve"><value>Протокол</value></data>
+  <data name="NetHistoryAddressColumn" xml:space="preserve"><value>Удалённый адрес / Порт</value></data>
+  <data name="NetHistoryCountryColumn" xml:space="preserve"><value>Страна</value></data>
+  <data name="NetHistoryVerdictColumn" xml:space="preserve"><value>Вердикт</value></data>
+  <data name="NetHistoryDetailsColumn" xml:space="preserve"><value>Детали</value></data>
+  <data name="NetHistoryAllow" xml:space="preserve"><value>Разрешить в брандмауэре</value></data>
+  <data name="NetHistoryAllowTip" xml:space="preserve"><value>Создать разрешающее исходящее правило Windows Firewall</value></data>
+  <data name="NetHistoryBlock" xml:space="preserve"><value>Заблокировать в брандмауэре</value></data>
+  <data name="NetHistoryBlockTip" xml:space="preserve"><value>Создать блокирующее исходящее правило Windows Firewall</value></data>
+  <data name="NetHistoryAddWhitelist" xml:space="preserve"><value>В белый список</value></data>
+  <data name="NetHistoryAddWhitelistTip" xml:space="preserve"><value>Добавить программу в постоянный белый список</value></data>
+  <data name="NetHistoryAddBlacklist" xml:space="preserve"><value>В чёрный список</value></data>
+  <data name="NetHistoryAddBlacklistTip" xml:space="preserve"><value>Добавить программу в постоянный чёрный список</value></data>
+  <data name="NetHistoryOpenFolder" xml:space="preserve"><value>Папка файла</value></data>
+  <data name="NetHistoryOpenFolderTip" xml:space="preserve"><value>Открыть папку с исполняемым файлом</value></data>
+  <data name="NetHistoryCopyIp" xml:space="preserve"><value>Копировать IP</value></data>
+  <data name="NetHistoryCopyIpTip" xml:space="preserve"><value>Скопировать удалённый IP-адрес в буфер обмена</value></data>
+  <data name="DefenderPortEditTitle" xml:space="preserve"><value>Настройка защищаемого порта</value></data>
+  <data name="DefenderPortHeader" xml:space="preserve"><value>Защищаемый порт</value></data>
+  <data name="DefenderPortRangeHint" xml:space="preserve"><value>Укажите номер порта TCP в диапазоне 1..65535</value></data>
+  <data name="DefenderPresetLabel" xml:space="preserve"><value>Популярный шаблон (быстрый выбор):</value></data>
+  <data name="DefenderNumberLabel" xml:space="preserve"><value>Номер TCP-порта (1..65535):</value></data>
+  <data name="DefenderNumberPlaceholder" xml:space="preserve"><value>Например: 3389, 22, 445</value></data>
+  <data name="DefenderPreviewService" xml:space="preserve"><value>Служба: RDP</value></data>
+  <data name="DefenderRiskCritical" xml:space="preserve"><value>Критический</value></data>
+  <data name="DefenderPreviewRdp" xml:space="preserve"><value>Удалённый рабочий стол Windows</value></data>
+  <data name="DefenderCancel" xml:space="preserve"><value>Отмена</value></data>
+  <data name="DefenderSave" xml:space="preserve"><value>Сохранить</value></data>
+  <data name="DefenderRiskHigh" xml:space="preserve"><value>Высокий</value></data>
+  <data name="DefenderRiskMedium" xml:space="preserve"><value>Средний</value></data>
+  <data name="DefenderRiskLow" xml:space="preserve"><value>Инфо</value></data>
+  <data name="DefenderRiskCustom" xml:space="preserve"><value>Пользовательский</value></data>
+  <data name="DefenderAddTitle" xml:space="preserve"><value>Добавление защищаемого порта</value></data>
+  <data name="DefenderEditTitle" xml:space="preserve"><value>Редактирование защищаемого порта</value></data>
+  <data name="DefenderApply" xml:space="preserve"><value>Применить</value></data>
+  <data name="DefenderAdd" xml:space="preserve"><value>Добавить</value></data>
+  <data name="DefenderChoosePreset" xml:space="preserve"><value>— Выберите шаблон из каталога —</value></data>
+  <data name="DefenderServiceFormat" xml:space="preserve"><value>Служба: {0}</value></data>
+  <data name="DefenderUnknown" xml:space="preserve"><value>Неизвестно</value></data>
+  <data name="DefenderPortRequired" xml:space="preserve"><value>Укажите номер порта для защиты.</value></data>
+  <data name="DefenderPortInteger" xml:space="preserve"><value>Номер порта должен быть целым числом.</value></data>
+  <data name="DefenderPortRangeError" xml:space="preserve"><value>Номер порта должен находиться в диапазоне от 1 до 65535.</value></data>
+  <data name="DefenderDuplicatePortFormat" xml:space="preserve"><value>Порт {0} уже присутствует в списке отслеживания.</value></data>
+  <data name="DefenderSystemPort" xml:space="preserve"><value>Системный порт</value></data>
+  <data name="DefenderCustomPort" xml:space="preserve"><value>Пользовательский порт</value></data>
+  <data name="DefenderSystemPortFormat" xml:space="preserve"><value>Системный привилегированный порт TCP {0}</value></data>
+  <data name="DefenderCustomPortFormat" xml:space="preserve"><value>Пользовательский отслеживаемый TCP порт {0}</value></data>
+  <data name="DefenderPortsCountFormat" xml:space="preserve"><value>Портов: {0}</value></data>
+  <data name="DefenderNoPorts" xml:space="preserve"><value>Нет защищаемых портов</value></data>
+  <data name="DefenderConfigLoading" xml:space="preserve"><value>Загрузка конфигурации Port Defender...</value></data>
+  <data name="DefenderInitialAddedFormat" xml:space="preserve"><value>Порт {0} успешно добавлен в список для настройки.</value></data>
+  <data name="DefenderConfigLoaded" xml:space="preserve"><value>Конфигурация успешно загружена.</value></data>
+  <data name="DefenderConfigLoadErrorFormat" xml:space="preserve"><value>Не удалось загрузить конфигурацию: {0}</value></data>
+  <data name="DefenderListAddedFormat" xml:space="preserve"><value>Порт #{0} ({1}) добавлен в список отслеживания.</value></data>
+  <data name="DefenderSelectEdit" xml:space="preserve"><value>Выберите порт в таблице для редактирования.</value></data>
+  <data name="DefenderListMovedFormat" xml:space="preserve"><value>Порт #{0} изменён на #{1} ({2}).</value></data>
+  <data name="DefenderSelectDelete" xml:space="preserve"><value>Выберите порт в таблице для удаления.</value></data>
+  <data name="DefenderListRemovedFormat" xml:space="preserve"><value>Порт #{0} ({1}) удалён из списка отслеживаемых.</value></data>
+  <data name="DefenderConfigSaving" xml:space="preserve"><value>Синхронизация конфигурации со службой...</value></data>
+  <data name="DefenderConfigSaved" xml:space="preserve"><value>Конфигурация Port Defender успешно синхронизирована.</value></data>
+  <data name="DefenderConfigSaveFailedFormat" xml:space="preserve"><value>Служба не подтвердила сохранение конфигурации: {0}</value></data>
+  <data name="DefenderConfigSaveErrorFormat" xml:space="preserve"><value>Ошибка сохранения конфигурации: {0}</value></data>
+  <data name="DefenderConfigUnavailable" xml:space="preserve"><value>Не удалось получить актуальную конфигурацию Port Defender.</value></data>
+  <data name="DefenderPortAddErrorFormat" xml:space="preserve"><value>Ошибка добавления порта: {0}</value></data>
+  <data name="DefenderPortEditErrorFormat" xml:space="preserve"><value>Ошибка редактирования порта: {0}</value></data>
+  <data name="DefenderPortDeleteErrorFormat" xml:space="preserve"><value>Ошибка при удалении порта: {0}</value></data>
+  <data name="DefenderPortsSaveFailedFormat" xml:space="preserve"><value>Служба не подтвердила сохранение обновлённых портов: {0}</value></data>
+  <data name="DefenderPortAddedFormat" xml:space="preserve"><value>Порт #{0} успешно добавлен в мониторинг Port Defender.</value></data>
+  <data name="DefenderPortMovedFormat" xml:space="preserve"><value>Порт #{0} успешно заменён на #{1} в Port Defender.</value></data>
+  <data name="DefenderPortRemovedFormat" xml:space="preserve"><value>Порт #{0} ({1}) удалён из мониторинга Port Defender.</value></data>
+  <data name="DefenderPortRemoveFailedFormat" xml:space="preserve"><value>Служба не подтвердила удаление порта #{0}: {1}</value></data>
+  <data name="NetHistoryLoading" xml:space="preserve"><value>Загрузка истории сетевых подключений...</value></data>
+  <data name="NetHistoryLoadErrorFormat" xml:space="preserve"><value>Ошибка загрузки: {0}</value></data>
+  <data name="NetHistoryCountFormat" xml:space="preserve"><value>Отображено записей: {0} из {1}</value></data>
+  <data name="NetHistoryClearConfirm" xml:space="preserve"><value>Очистить всю историю сетевых подключений?</value></data>
+  <data name="NetHistoryClearTitle" xml:space="preserve"><value>Подтверждение очистки</value></data>
+  <data name="NetHistoryClearErrorFormat" xml:space="preserve"><value>Ошибка очистки истории: {0}</value></data>
+  <data name="NetHistoryAllowCreatedFormat" xml:space="preserve"><value>Создано разрешающее правило для программы {0}.</value></data>
+  <data name="NetHistoryBlockCreatedFormat" xml:space="preserve"><value>Создано блокирующее правило для программы {0}.</value></data>
+  <data name="NetHistoryRuleErrorFormat" xml:space="preserve"><value>Ошибка создания правила: {0}</value></data>
+  <data name="NetHistoryWhitelistedFormat" xml:space="preserve"><value>Программа «{0}» добавлена в белый список.</value></data>
+  <data name="NetHistoryBlacklistedFormat" xml:space="preserve"><value>Программа «{0}» добавлена в чёрный список.</value></data>
+  <data name="NetHistoryWhitelistErrorFormat" xml:space="preserve"><value>Ошибка белого списка: {0}</value></data>
+  <data name="NetHistoryBlacklistErrorFormat" xml:space="preserve"><value>Ошибка чёрного списка: {0}</value></data>
+  <data name="DefenderPortDescription21" xml:space="preserve"><value>Передача файлов (незащищённый протокол)</value></data>
+  <data name="DefenderPortDescription22" xml:space="preserve"><value>Защищённая удалённая оболочка Secure Shell</value></data>
+  <data name="DefenderPortDescription23" xml:space="preserve"><value>Незащищённая консоль удалённого доступа</value></data>
+  <data name="DefenderPortDescription25" xml:space="preserve"><value>Простой протокол передачи почты</value></data>
+  <data name="DefenderPortDescription53" xml:space="preserve"><value>Служба доменных имён</value></data>
+  <data name="DefenderPortDescription80" xml:space="preserve"><value>Веб-сервер без шифрования</value></data>
+  <data name="DefenderPortDescription110" xml:space="preserve"><value>Получение почтовых сообщений</value></data>
+  <data name="DefenderPortDescription135" xml:space="preserve"><value>Удалённый вызов процедур Microsoft Windows</value></data>
+  <data name="DefenderPortDescription139" xml:space="preserve"><value>Служба сеансов NetBIOS Windows</value></data>
+  <data name="DefenderPortDescription143" xml:space="preserve"><value>Протокол доступа к электронной почте</value></data>
+  <data name="DefenderPortDescription443" xml:space="preserve"><value>Защищённый веб-трафик (TLS/SSL)</value></data>
+  <data name="DefenderPortDescription445" xml:space="preserve"><value>Общий доступ к файлам и принтерам Windows</value></data>
+  <data name="DefenderPortDescription993" xml:space="preserve"><value>Защищённый доступ к почте IMAP over TLS</value></data>
+  <data name="DefenderPortDescription995" xml:space="preserve"><value>Защищённый доступ к почте POP3 over TLS</value></data>
+  <data name="DefenderPortDescription1433" xml:space="preserve"><value>DefenderPortDescription1433</value></data>
+  <data name="DefenderPortDescription1521" xml:space="preserve"><value>DefenderPortDescription1521</value></data>
+  <data name="DefenderPortDescription3306" xml:space="preserve"><value>Сервер баз данных MySQL / MariaDB</value></data>
+  <data name="DefenderPortDescription3389" xml:space="preserve"><value>Удалённый рабочий стол Microsoft Windows</value></data>
+  <data name="DefenderPortDescription5432" xml:space="preserve"><value>Сервер реляционной СУБД PostgreSQL</value></data>
+  <data name="DefenderPortDescription5900" xml:space="preserve"><value>Удалённое графическое управление экраном</value></data>
+  <data name="DefenderPortDescription6379" xml:space="preserve"><value>Сетевое хранилище данных в памяти Redis</value></data>
+  <data name="DefenderPortDescription8080" xml:space="preserve"><value>Альтернативный веб-порт / Прокси-сервер</value></data>
+  <data name="DefenderPortDescription8443" xml:space="preserve"><value>Альтернативный защищённый веб-порт</value></data>
+  <data name="DefenderPortDescription27017" xml:space="preserve"><value>Документоориентированная СУБД MongoDB</value></data>
+  <data name="NetHistoryAllowedSession" xml:space="preserve"><value>Разрешено на сессию</value></data>
+  <data name="NetHistoryBlockedSession" xml:space="preserve"><value>Заблокировано на сессию</value></data>
+  <data name="DefenderStateError" xml:space="preserve"><value>Port Defender: ошибка</value></data>
+  <data name="DefenderStateMissing" xml:space="preserve"><value>Port Defender: нет данных</value></data>
+  <data name="DefenderStateActive" xml:space="preserve"><value>Port Defender: защита активна</value></data>
+  <data name="DefenderStateInactive" xml:space="preserve"><value>Port Defender: защита выключена</value></data>
+  <data name="DefenderServiceUnavailable" xml:space="preserve"><value>Служба недоступна.</value></data>
+  <data name="DefenderSummaryFormat" xml:space="preserve"><value>Порог: {0} попыток / {1} с • Бан: {2} • Доверять локальным сетям: {3}</value></data>
+  <data name="DefenderYes" xml:space="preserve"><value>да</value></data>
+  <data name="DefenderNo" xml:space="preserve"><value>нет</value></data>
+  <data name="DefenderDaysFormat" xml:space="preserve"><value>{0} дн.</value></data>
+  <data name="DefenderMinutesFormat" xml:space="preserve"><value>{0} мин.</value></data>
+  <data name="DefenderOpenErrorFormat" xml:space="preserve"><value>Не удалось открыть настройку Port Defender: {0}</value></data>
+  <data name="DefenderSummaryRefreshed" xml:space="preserve"><value>Сводка Port Defender обновлена.</value></data>
+  <data name="DefenderRefreshErrorFormat" xml:space="preserve"><value>Ошибка обновления Port Defender: {0}</value></data>
 </root>

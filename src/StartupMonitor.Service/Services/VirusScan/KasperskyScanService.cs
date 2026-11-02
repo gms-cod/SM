@@ -115,7 +115,7 @@ public class KasperskyScanService
     public Task<bool> ScanEntryAsync(StartupEntry entry, CancellationToken ct = default)
         => ScanEntryCoreAsync(entry, ct, persist: true);
 
-    /// <summary>Проверяет запись; batch-вызов откладывает сохранение репутации до одной общей операции.</summary>
+    /// <summary>Проверяет запись; batch-вызов откладывает сохранение репутации. Штатная отмена передаётся вызывающему коду без сообщения о сетевой ошибке.</summary>
     /// <param name="entry">Проверяемая запись.</param>
     /// <param name="ct">Токен отмены.</param>
     /// <param name="persist">Нужно ли немедленно сохранять результат.</param>
@@ -179,6 +179,7 @@ public class KasperskyScanService
                 return true;
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             _logger.LogWarning("KasperskyScanService: таймаут запроса для {Name} ({Hash})", entry.Name, entry.SHA256);

@@ -45,6 +45,9 @@ public class ProcessMetricsTracker : IDisposable
     private int _subscribersCount = 0;
     private int _isCollecting = 0;
 
+    /// <summary>Число действующих подписок для диагностики освобождения клиентских сессий.</summary>
+    internal int SubscriberCount => Volatile.Read(ref _subscribersCount);
+
     // Для замера общего системного CPU через GetSystemTimes
     private long _prevIdleTime;
     private long _prevKernelTime;

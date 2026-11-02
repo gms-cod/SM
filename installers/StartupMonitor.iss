@@ -3,7 +3,7 @@
 ; =====================================================================
 
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.10"
+  #define MyAppVersion "2.0.11"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -104,6 +104,8 @@ Filename: "sc.exe"; Parameters: "create {#MyServiceName} binPath= """"{app}\{#My
 Filename: "sc.exe"; Parameters: "config {#MyServiceName} binPath= """"{app}\{#MyServiceExeName}"""" start= auto DisplayName= """"Startup Monitor Service"""""; Flags: runhidden
 Filename: "sc.exe"; Parameters: "description {#MyServiceName} """"{cm:ServiceDescription}"""""; Flags: runhidden
 Filename: "sc.exe"; Parameters: "failure {#MyServiceName} reset= 86400 actions= restart/5000/restart/10000/restart/60000"; Flags: runhidden
+; Обычные пользователи могут запрашивать и запускать службу, но не останавливать или перенастраивать защиту.
+Filename: "sc.exe"; Parameters: "sdset {#MyServiceName} D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)"; Flags: runhidden
 ; Запуск службы после установки/обновления
 Filename: "sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden; StatusMsg: "{cm:StartService}"
 ; Опциональный запуск UI для пользователя при интерактивной установке

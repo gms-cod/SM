@@ -1,4 +1,4 @@
-﻿<UserControl
+<UserControl
 
 
 
@@ -1709,7 +1709,7 @@
 
 
 
-                                                                Padding="5,1" Margin="6,0,0,0" ToolTip="Критический системный компонент ядра ОС. Блокировка запрещена.">
+                                                                Padding="5,1" Margin="6,0,0,0" ToolTip="{Binding [DefenderCriticalTip], Source={StaticResource Loc}}">
 
 
 
@@ -1737,7 +1737,7 @@
 
 
 
-                                                                Padding="5,1" Margin="6,0,0,0" ToolTip="Системный компонент Windows. Блокировка требует подтверждения.">
+                                                                Padding="5,1" Margin="6,0,0,0" ToolTip="{Binding [DefenderHighRiskTip], Source={StaticResource Loc}}">
 
 
 
@@ -2728,10 +2728,10 @@
 
                             <!-- Шапка списка портов и кнопки действий -->
                             <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                                <TextBlock x:Name="TxtDefenderPortsCountBadge" Text="0 портов" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
-                                <WrapPanel Margin="0,8,0,0"><ui:Button x:Name="BtnAddDefenderPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить порт" Click="OnAddDefenderPortClick" Margin="0,0,6,0" />
-<ui:Button x:Name="BtnEditDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="Редактировать" Click="OnEditDefenderPortClick" Margin="0,0,6,0" />
-<ui:Button x:Name="BtnDeleteDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="Удалить" Click="OnDeleteDefenderPortClick" /></WrapPanel>
+                                <TextBlock x:Name="TxtDefenderPortsCountBadge" Text="{Binding [DefenderPortsEmpty], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                <WrapPanel Margin="0,8,0,0"><ui:Button x:Name="BtnAddDefenderPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="{Binding [DefenderAddPort], Source={StaticResource Loc}}" Click="OnAddDefenderPortClick" Margin="0,0,6,0" />
+<ui:Button x:Name="BtnEditDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="{Binding [DefenderEdit], Source={StaticResource Loc}}" Click="OnEditDefenderPortClick" Margin="0,0,6,0" />
+<ui:Button x:Name="BtnDeleteDefenderPort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="{Binding [DefenderDelete], Source={StaticResource Loc}}" Click="OnDeleteDefenderPortClick" /></WrapPanel>
                             </StackPanel>
 
                             <!-- Интерактивная таблица портов -->
@@ -2752,7 +2752,7 @@
                                       PreviewKeyDown="OnGridDefenderPortsKeyDown" EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                 <DataGrid.Columns>
                                     <!-- Номер порта -->
-                                    <DataGridTemplateColumn Header="Порт" Width="95">
+                                    <DataGridTemplateColumn Header="{Binding [DefenderPortColumn], Source={StaticResource Loc}}" Width="95">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Border CornerRadius="4" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
@@ -2763,7 +2763,7 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Служба -->
-                                    <DataGridTemplateColumn Header="Служба" Width="110">
+                                    <DataGridTemplateColumn Header="{Binding [DefenderServiceColumn], Source={StaticResource Loc}}" Width="110">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding ServiceName}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="4,0" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
@@ -2772,7 +2772,7 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Уровень риска -->
-                                    <DataGridTemplateColumn Header="Уровень риска" Width="120">
+                                    <DataGridTemplateColumn Header="{Binding [DefenderRiskColumn], Source={StaticResource Loc}}" Width="120">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
@@ -2780,16 +2780,16 @@
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="#00897B" />
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Критический">
+                                                                <DataTrigger Binding="{Binding RiskLevel}" Value="Critical">
                                                                     <Setter Property="Background" Value="#D32F2F" />
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Высокий">
+                                                                <DataTrigger Binding="{Binding RiskLevel}" Value="High">
                                                                     <Setter Property="Background" Value="#F57C00" />
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Средний">
+                                                                <DataTrigger Binding="{Binding RiskLevel}" Value="Medium">
                                                                     <Setter Property="Background" Value="#FBC02D" />
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Инфо">
+                                                                <DataTrigger Binding="{Binding RiskLevel}" Value="Low">
                                                                     <Setter Property="Background" Value="#1976D2" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -2800,7 +2800,7 @@
                                                             <Style TargetType="TextBlock">
                                                                 <Setter Property="Foreground" Value="#FFFFFF" />
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding RiskBadge}" Value="Средний">
+                                                                    <DataTrigger Binding="{Binding RiskLevel}" Value="Medium">
                                                                         <Setter Property="Foreground" Value="#212121" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
@@ -2813,17 +2813,17 @@
                                     </DataGridTemplateColumn>
 
                                     <!-- Описание защиты -->
-                                    <DataGridTextColumn Header="Описание защиты" Binding="{Binding Description}" Width="*" MinWidth="160" />
+                                    <DataGridTextColumn Header="{Binding [DefenderDescriptionColumn], Source={StaticResource Loc}}" Binding="{Binding Description}" Width="*" MinWidth="160" />
 
                                     <!-- Действия в строке -->
                                     <DataGridTemplateColumn Header="{Binding NetAclColActions, Source={StaticResource Loc}}" Width="85">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <ui:Button Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="Редактировать порт" Click="OnRowEditDefenderPortClick">
+                                                    <ui:Button Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="{Binding [DefenderEditPortTip], Source={StaticResource Loc}}" Click="OnRowEditDefenderPortClick">
                                                         <ui:SymbolIcon Symbol="Edit20" FontSize="14" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
                                                     </ui:Button>
-                                                    <ui:Button Appearance="Transparent" Padding="4" ToolTip="Удалить порт" Click="OnRowDeleteDefenderPortClick">
+                                                    <ui:Button Appearance="Transparent" Padding="4" ToolTip="{Binding [DefenderDeletePortTip], Source={StaticResource Loc}}" Click="OnRowDeleteDefenderPortClick">
                                                         <ui:SymbolIcon Symbol="Delete20" FontSize="14" Foreground="#FF5252" />
                                                     </ui:Button>
                                                 </StackPanel>
@@ -2839,9 +2839,9 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="💡 Изменения защищаемых портов применяются на лету без перезапуска службы." FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="0" Text="{Binding [DefenderLiveHint], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Активные порты: " FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
+                                    <TextBlock Text="{Binding [DefenderActivePorts], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" />
                                     <TextBlock x:Name="TxtDefenderPorts" Text="—" FontSize="11" FontFamily="Consolas, Segoe UI" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                             </Grid>
@@ -3102,7 +3102,7 @@
 
 
 
-            <TabItem Header="История подключений">
+            <TabItem Header="{Binding [NetHistoryTitle], Source={StaticResource Loc}}">
 
 
 
@@ -3143,7 +3143,7 @@
 
 
 
-                                    PlaceholderText="Поиск по имени процесса, PID, IP или порту..."
+                                    PlaceholderText="{Binding [NetHistorySearch], Source={StaticResource Loc}}"
 
 
 
@@ -3152,31 +3152,31 @@
 
 
 
-                                <ComboBoxItem Content="Все вердикты" IsSelected="True" />
+                                <ComboBoxItem Content="{Binding [NetHistoryAllVerdicts], Source={StaticResource Loc}}" IsSelected="True" />
 
 
 
-                                <ComboBoxItem Content="Ожидает алерта" />
+                                <ComboBoxItem Content="{Binding [NetHistoryPending], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Разрешено" />
+                                <ComboBoxItem Content="{Binding [NetHistoryAllowed], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Заблокировано" />
+                                <ComboBoxItem Content="{Binding [NetHistoryBlocked], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Белый список" />
+                                <ComboBoxItem Content="{Binding [NetHistoryWhitelist], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Чёрный список" />
+                                <ComboBoxItem Content="{Binding [NetHistoryBlacklist], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Создано правило" />
+                                <ComboBoxItem Content="{Binding [NetHistoryRuleCreated], Source={StaticResource Loc}}" />
 
 
 
@@ -3185,19 +3185,19 @@
 
 
 
-                                <ComboBoxItem Content="Все время" IsSelected="True" />
+                                <ComboBoxItem Content="{Binding [NetHistoryAllTime], Source={StaticResource Loc}}" IsSelected="True" />
 
 
 
-                                <ComboBoxItem Content="Последний час" />
+                                <ComboBoxItem Content="{Binding [NetHistoryLastHour], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Сегодня" />
+                                <ComboBoxItem Content="{Binding [NetHistoryToday], Source={StaticResource Loc}}" />
 
 
 
-                                <ComboBoxItem Content="Последние 24 ч" />
+                                <ComboBoxItem Content="{Binding [NetHistoryLastDay], Source={StaticResource Loc}}" />
 
 
 
@@ -3206,7 +3206,7 @@
 
 
 
-                                <ComboBoxItem Content="Все" IsSelected="True" />
+                                <ComboBoxItem Content="{Binding [NetHistoryAll], Source={StaticResource Loc}}" IsSelected="True" />
 
 
 
@@ -3219,16 +3219,16 @@
 
 
                             </ComboBox></StackPanel></WrapPanel>
-                        <WrapPanel Margin="0,0,0,6"><ui:Button x:Name="BtnRefreshHubHist" Content="Обновить" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                        <WrapPanel Margin="0,0,0,6"><ui:Button x:Name="BtnRefreshHubHist" Content="{Binding [NetHistoryRefresh], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon ArrowClockwise24}"
 
 
 
-                                       Appearance="Secondary" Click="OnRefreshHubHistClick" Margin="0,0,6,0" ToolTip="Обновить список истории" />
-<ui:Button x:Name="BtnClearHubHist" Content="Очистить" Icon="{ui:SymbolIcon Delete24}"
+                                       Appearance="Secondary" Click="OnRefreshHubHistClick" Margin="0,0,6,0" ToolTip="{Binding [NetHistoryRefreshTip], Source={StaticResource Loc}}" />
+<ui:Button x:Name="BtnClearHubHist" Content="{Binding [NetHistoryClear], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon Delete24}"
 
 
 
-                                       Appearance="Secondary" Click="OnClearHubHistClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" ToolTip="Очистить весь журнал истории" /></WrapPanel>
+                                       Appearance="Secondary" Click="OnClearHubHistClick" Foreground="{ui:ThemeResource SystemFillColorCriticalBrush}" ToolTip="{Binding [NetHistoryClearTip], Source={StaticResource Loc}}" /></WrapPanel>
                         <TextBlock x:Name="TxtHubHistSummary" Text="—" FontSize="11"
 
 
@@ -3270,11 +3270,11 @@
 
 
 
-                            <DataGridTextColumn Header="Время" Binding="{Binding LocalTimestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="140" />
+                            <DataGridTextColumn Header="{Binding [NetHistoryTimeColumn], Source={StaticResource Loc}}" Binding="{Binding LocalTimestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="140" />
 
 
 
-                            <DataGridTextColumn Header="Процесс" Binding="{Binding ProcessName}" Width="140" />
+                            <DataGridTextColumn Header="{Binding [NetHistoryProcessColumn], Source={StaticResource Loc}}" Binding="{Binding ProcessName}" Width="140" />
 
 
 
@@ -3282,11 +3282,11 @@
 
 
 
-                            <DataGridTextColumn Header="Протокол" Binding="{Binding Protocol}" Width="75" />
+                            <DataGridTextColumn Header="{Binding [NetHistoryProtocolColumn], Source={StaticResource Loc}}" Binding="{Binding Protocol}" Width="75" />
 
 
 
-                            <DataGridTemplateColumn Header="Удалённый адрес / Порт" Width="180">
+                            <DataGridTemplateColumn Header="{Binding [NetHistoryAddressColumn], Source={StaticResource Loc}}" Width="180">
 
 
 
@@ -3330,15 +3330,38 @@
 
 
 
-                            <DataGridTextColumn Header="Страна" Binding="{Binding CountryName}" Width="100" />
+                            <DataGridTextColumn Header="{Binding [NetHistoryCountryColumn], Source={StaticResource Loc}}" Binding="{Binding CountryName}" Width="100" />
 
 
 
-                            <DataGridTextColumn Header="Вердикт" Binding="{Binding Verdict}" Width="130" />
+                            <!-- Категория решения остаётся enum; подпись и её обновление зависят только от ресурсов. -->
+                            <DataGridTemplateColumn Header="{Binding [NetHistoryVerdictColumn], Source={StaticResource Loc}}" Width="130">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="{Binding [DefenderUnknown], Source={StaticResource Loc}}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.PendingAlert}"><Setter Property="Text" Value="{Binding [NetHistoryPending], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Allowed}"><Setter Property="Text" Value="{Binding [NetHistoryAllowed], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Blocked}"><Setter Property="Text" Value="{Binding [NetHistoryBlocked], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.AllowSession}"><Setter Property="Text" Value="{Binding [NetHistoryAllowedSession], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.BlockSession}"><Setter Property="Text" Value="{Binding [NetHistoryBlockedSession], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Whitelisted}"><Setter Property="Text" Value="{Binding [NetHistoryWhitelist], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Blacklisted}"><Setter Property="Text" Value="{Binding [NetHistoryBlacklist], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.RuleCreated}"><Setter Property="Text" Value="{Binding [NetHistoryRuleCreated], Source={StaticResource Loc}}" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
 
 
-                            <DataGridTextColumn Header="Детали" Binding="{Binding Details}" Width="*" MinWidth="160" />
+                            <DataGridTextColumn Header="{Binding [NetHistoryDetailsColumn], Source={StaticResource Loc}}" Binding="{Binding Details}" Width="*" MinWidth="160" />
 
 
 
@@ -3374,51 +3397,51 @@
 
 
 
-                            <ui:Button x:Name="BtnHubHistAllow" Content="Разрешить в брандмауэре" Icon="{ui:SymbolIcon ShieldCheckmark24}"
+                            <ui:Button x:Name="BtnHubHistAllow" Content="{Binding [NetHistoryAllow], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon ShieldCheckmark24}"
 
 
 
-                                       Appearance="Secondary" Click="OnHubHistAllowClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Создать разрешающее исходящее правило Windows Firewall" />
+                                       Appearance="Secondary" Click="OnHubHistAllowClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="{Binding [NetHistoryAllowTip], Source={StaticResource Loc}}" />
 
 
 
-                            <ui:Button x:Name="BtnHubHistBlock" Content="Заблокировать в брандмауэре" Icon="{ui:SymbolIcon ShieldDismiss24}"
+                            <ui:Button x:Name="BtnHubHistBlock" Content="{Binding [NetHistoryBlock], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon ShieldDismiss24}"
 
 
 
-                                       Appearance="Secondary" Click="OnHubHistBlockClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Создать блокирующее исходящее правило Windows Firewall" />
+                                       Appearance="Secondary" Click="OnHubHistBlockClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="{Binding [NetHistoryBlockTip], Source={StaticResource Loc}}" />
 
 
 
-                            <ui:Button x:Name="BtnHubHistWhitelist" Content="В белый список" Icon="{ui:SymbolIcon CheckmarkCircle24}"
+                            <ui:Button x:Name="BtnHubHistWhitelist" Content="{Binding [NetHistoryAddWhitelist], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon CheckmarkCircle24}"
 
 
 
-                                       Appearance="Secondary" Click="OnHubHistWhitelistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Добавить программу в постоянный белый список" />
+                                       Appearance="Secondary" Click="OnHubHistWhitelistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="{Binding [NetHistoryAddWhitelistTip], Source={StaticResource Loc}}" />
 
 
 
-                            <ui:Button x:Name="BtnHubHistBlacklist" Content="В чёрный список" Icon="{ui:SymbolIcon DismissCircle24}"
+                            <ui:Button x:Name="BtnHubHistBlacklist" Content="{Binding [NetHistoryAddBlacklist], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon DismissCircle24}"
 
 
 
-                                       Appearance="Secondary" Click="OnHubHistBlacklistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Добавить программу в постоянный чёрный список" />
+                                       Appearance="Secondary" Click="OnHubHistBlacklistClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="{Binding [NetHistoryAddBlacklistTip], Source={StaticResource Loc}}" />
 
 
 
-                            <ui:Button x:Name="BtnHubHistOpenFile" Content="Папка файла" Icon="{ui:SymbolIcon FolderOpen24}"
+                            <ui:Button x:Name="BtnHubHistOpenFile" Content="{Binding [NetHistoryOpenFolder], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon FolderOpen24}"
 
 
 
-                                       Appearance="Secondary" Click="OnHubHistOpenFileClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Открыть папку с исполняемым файлом" />
+                                       Appearance="Secondary" Click="OnHubHistOpenFileClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="{Binding [NetHistoryOpenFolderTip], Source={StaticResource Loc}}" />
 
 
 
-                            <ui:Button x:Name="BtnHubHistCopyIp" Content="Копировать IP" Icon="{ui:SymbolIcon Copy24}"
+                            <ui:Button x:Name="BtnHubHistCopyIp" Content="{Binding [NetHistoryCopyIp], Source={StaticResource Loc}}" Icon="{ui:SymbolIcon Copy24}"
 
 
 
-                                       Appearance="Secondary" Click="OnHubHistCopyIpClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="Скопировать удалённый IP-адрес в буфер обмена" />
+                                       Appearance="Secondary" Click="OnHubHistCopyIpClick" Margin="0,0,8,0" IsEnabled="False" ToolTip="{Binding [NetHistoryCopyIpTip], Source={StaticResource Loc}}" />
 
 
 
@@ -3471,6 +3494,5 @@
 
 
 </UserControl>
-
 
 

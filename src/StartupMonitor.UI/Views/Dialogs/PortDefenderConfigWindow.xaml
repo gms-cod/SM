@@ -53,14 +53,14 @@
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding PortDefenderProtectedPortsLabel, Source={StaticResource Loc}}" FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
                                 <Border CornerRadius="10" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="TxtPortsCountBadge" Text="0 портов" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock x:Name="TxtPortsCountBadge" Text="{Binding [DefenderPortsEmpty], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                                 </Border>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <ui:Button x:Name="BtnAddPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="Добавить порт" Click="OnAddPortClick" Margin="0,0,6,0" />
-                                <ui:Button x:Name="BtnEditPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="Редактировать" Click="OnEditPortClick" Margin="0,0,6,0" />
-                                <ui:Button x:Name="BtnDeletePort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="Удалить" Click="OnDeletePortClick" />
+                                <ui:Button x:Name="BtnAddPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="{Binding [DefenderAddPort], Source={StaticResource Loc}}" Click="OnAddPortClick" Margin="0,0,6,0" />
+                                <ui:Button x:Name="BtnEditPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="{Binding [DefenderEdit], Source={StaticResource Loc}}" Click="OnEditPortClick" Margin="0,0,6,0" />
+                                <ui:Button x:Name="BtnDeletePort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="{Binding [DefenderDelete], Source={StaticResource Loc}}" Click="OnDeletePortClick" />
                             </StackPanel>
                         </Grid>
 
@@ -82,7 +82,7 @@
                                   PreviewKeyDown="OnGridPortsKeyDown">
                             <DataGrid.Columns>
                                 <!-- Бейдж номера порта -->
-                                <DataGridTemplateColumn Header="Порт" Width="95">
+                                <DataGridTemplateColumn Header="{Binding [DefenderPortColumn], Source={StaticResource Loc}}" Width="95">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="4" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
@@ -93,7 +93,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Служба / Протокол -->
-                                <DataGridTemplateColumn Header="Служба" Width="105">
+                                <DataGridTemplateColumn Header="{Binding [DefenderServiceColumn], Source={StaticResource Loc}}" Width="105">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding ServiceName}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="4,0" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
@@ -102,7 +102,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Бейдж риска -->
-                                <DataGridTemplateColumn Header="Уровень риска" Width="115">
+                                <DataGridTemplateColumn Header="{Binding [DefenderRiskColumn], Source={StaticResource Loc}}" Width="115">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
@@ -110,16 +110,16 @@
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background" Value="#00897B" />
                                                         <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding RiskBadge}" Value="Критический">
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="Critical">
                                                                 <Setter Property="Background" Value="#D32F2F" />
                                                             </DataTrigger>
-                                                            <DataTrigger Binding="{Binding RiskBadge}" Value="Высокий">
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="High">
                                                                 <Setter Property="Background" Value="#F57C00" />
                                                             </DataTrigger>
-                                                            <DataTrigger Binding="{Binding RiskBadge}" Value="Средний">
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="Medium">
                                                                 <Setter Property="Background" Value="#FBC02D" />
                                                             </DataTrigger>
-                                                            <DataTrigger Binding="{Binding RiskBadge}" Value="Инфо">
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="Low">
                                                                 <Setter Property="Background" Value="#1976D2" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -130,7 +130,7 @@
                                                         <Style TargetType="TextBlock">
                                                             <Setter Property="Foreground" Value="#FFFFFF" />
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding RiskBadge}" Value="Средний">
+                                                                <DataTrigger Binding="{Binding RiskLevel}" Value="Medium">
                                                                     <Setter Property="Foreground" Value="#212121" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
@@ -143,17 +143,17 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Описание назначения -->
-                                <DataGridTextColumn Header="Описание защиты" Binding="{Binding Description}" Width="*" />
+                                <DataGridTextColumn Header="{Binding [DefenderDescriptionColumn], Source={StaticResource Loc}}" Binding="{Binding Description}" Width="*" />
 
                                 <!-- Кнопки быстрых действий в строке -->
-                                <DataGridTemplateColumn Header="Действия" Width="85">
+                                <DataGridTemplateColumn Header="{Binding [DefenderActionsColumn], Source={StaticResource Loc}}" Width="85">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                <ui:Button Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="Редактировать порт" Click="OnRowEditPortClick">
+                                                <ui:Button Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="{Binding [DefenderEditPortTip], Source={StaticResource Loc}}" Click="OnRowEditPortClick">
                                                     <ui:SymbolIcon Symbol="Edit20" FontSize="14" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
                                                 </ui:Button>
-                                                <ui:Button Appearance="Transparent" Padding="4" ToolTip="Удалить порт из защиты" Click="OnRowDeletePortClick">
+                                                <ui:Button Appearance="Transparent" Padding="4" ToolTip="{Binding [DefenderRemoveProtectionTip], Source={StaticResource Loc}}" Click="OnRowDeletePortClick">
                                                     <ui:SymbolIcon Symbol="Delete20" FontSize="14" Foreground="#FF5252" />
                                                 </ui:Button>
                                             </StackPanel>
@@ -163,7 +163,7 @@
                             </DataGrid.Columns>
                         </DataGrid>
 
-                        <TextBlock Text="💡 Двойной щелчок по строке для редактирования. Клавиша Delete удаляет выбранный порт." FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="2,6,0,0" />
+                        <TextBlock Text="{Binding [DefenderEditHint], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="2,6,0,0" />
                     </StackPanel>
                 </ui:Card>
 

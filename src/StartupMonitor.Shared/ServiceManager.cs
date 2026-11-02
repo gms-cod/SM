@@ -11,6 +11,8 @@ public static class ServiceManager
     private static readonly string ServiceExeName = "StartupMonitor.Service.exe";
     /// <summary>Имя службы Windows (для SCM).</summary>
     private const string ServiceName = "StartupMonitor";
+    /// <summary>Обычному интерактивному пользователю разрешены запросы и запуск; остановка и изменение службы доступны только системе и администраторам.</summary>
+    private const string DefaultServiceSecurityDescriptor = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
 
     /// <summary>Проверяет, запущен ли процесс с указанным именем (без .exe).</summary>
     /// <param name="processName">Имя процесса без расширения.</param>
@@ -179,9 +181,8 @@ public static class ServiceManager
             // Настройка перезапуска при сбоях
             await RunScElevated($"failure \"{ServiceName}\" reset=86400 actions=restart/5000/restart/10000/restart/30000", checkExitCode: false);
 
-            // Разрешаем интерактивным пользователям опрашивать, запускать и останавливать службу
-            var sddl = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPWPRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)S:(AU;FA;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;WD)";
-            await RunScElevated($"sdset \"{ServiceName}\" \"{sddl}\"", checkExitCode: false);
+            // Права SCM не должны позволять обойти административную авторизацию IPC прямой остановкой службы.
+            await RunScElevated($"sdset \"{ServiceName}\" \"{DefaultServiceSecurityDescriptor}\"", checkExitCode: true);
 
             status = CheckServiceStatus();
         }

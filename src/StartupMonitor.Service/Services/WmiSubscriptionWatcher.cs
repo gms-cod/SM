@@ -48,63 +48,64 @@ public class WmiSubscriptionWatcher : BackgroundService
         _coordinator = coordinator;
     }
 
-    /// <summary>ExecuteAsync: Выполняет операцию ExecuteAsync.</summary>
-    /// <param name="stoppingToken">Входные данные: значение параметра stoppingToken (CancellationToken).</param>
+    /// <summary>Мониторит WMI и гарантированно завершает debounce и подписки даже при отмене первоначального сканирования.</summary>
+    /// <param name="stoppingToken">Токен остановки всей службы.</param>
+    /// <returns>Задача жизненного цикла мониторинга, включая освобождение ресурсов.</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("WmiSubscriptionWatcher started");
-        var debounceTask = ProcessRescanRequestsAsync(stoppingToken);
-
-        // 1. Начальное сканирование и синхронизация при старте службы
-        await RescanSubscriptionsAsync("InitialScan", isInitialScan: true, stoppingToken);
-
-        // 2. Настраиваем WMI-подписки на события внутри пространства root\subscription
+        using var lifecycle = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var debounceTask = ProcessRescanRequestsAsync(lifecycle.Token);
         ManagementEventWatcher? createWatcher = null;
         ManagementEventWatcher? modWatcher = null;
         ManagementEventWatcher? delWatcher = null;
 
+        // Полный жизненный цикл начинается до первой отменяемой операции, а не после начального сканирования.
         try
         {
-            var scope = new ManagementScope(@"root\subscription");
-            scope.Connect();
+            await RescanSubscriptionsAsync("InitialScan", isInitialScan: true, stoppingToken);
+            stoppingToken.ThrowIfCancellationRequested();
 
-            // Создание консьюмера или биндинга
-            var createQuery = new WqlEventQuery(
-                "__InstanceCreationEvent",
-                TimeSpan.FromSeconds(30),
-                "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
-            createWatcher = new ManagementEventWatcher(scope, createQuery);
-            createWatcher.EventArrived += (s, e) => ScheduleRescan("Creation");
-            createWatcher.Start();
+            try
+            {
+                var scope = new ManagementScope(@"root\subscription");
+                scope.Connect();
 
-            // Модификация существующего консьюмера или биндинга
-            var modQuery = new WqlEventQuery(
-                "__InstanceModificationEvent",
-                TimeSpan.FromSeconds(30),
-                "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
-            modWatcher = new ManagementEventWatcher(scope, modQuery);
-            modWatcher.EventArrived += (s, e) => ScheduleRescan("Modification");
-            modWatcher.Start();
+                // Создание консьюмера или биндинга
+                var createQuery = new WqlEventQuery(
+                    "__InstanceCreationEvent",
+                    TimeSpan.FromSeconds(30),
+                    "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
+                createWatcher = new ManagementEventWatcher(scope, createQuery);
+                createWatcher.EventArrived += (s, e) => ScheduleRescan("Creation");
+                createWatcher.Start();
 
-            // Удаление консьюмера или биндинга
-            var delQuery = new WqlEventQuery(
-                "__InstanceDeletionEvent",
-                TimeSpan.FromSeconds(30),
-                "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
-            delWatcher = new ManagementEventWatcher(scope, delQuery);
-            delWatcher.EventArrived += (s, e) => ScheduleRescan("Deletion");
-            delWatcher.Start();
+                // Модификация существующего консьюмера или биндинга
+                var modQuery = new WqlEventQuery(
+                    "__InstanceModificationEvent",
+                    TimeSpan.FromSeconds(30),
+                    "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
+                modWatcher = new ManagementEventWatcher(scope, modQuery);
+                modWatcher.EventArrived += (s, e) => ScheduleRescan("Modification");
+                modWatcher.Start();
 
-            _logger.LogInformation("WmiSubscriptionWatcher: WMI-события root\\subscription успешно активированы");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "WmiSubscriptionWatcher: не удалось подключить события WMI root\\subscription, переход на резервный поллинг");
-        }
+                // Удаление консьюмера или биндинга
+                var delQuery = new WqlEventQuery(
+                    "__InstanceDeletionEvent",
+                    TimeSpan.FromSeconds(30),
+                    "TargetInstance ISA '__EventConsumer' OR TargetInstance ISA '__FilterToConsumerBinding'");
+                delWatcher = new ManagementEventWatcher(scope, delQuery);
+                delWatcher.EventArrived += (s, e) => ScheduleRescan("Deletion");
+                delWatcher.Start();
 
-        // 3. Резервный периодический поллинг (каждые 30 секунд) на случай пропущенных событий ядра
-        try
-        {
+                _logger.LogInformation("WmiSubscriptionWatcher: WMI-события root\\subscription успешно активированы");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "WmiSubscriptionWatcher: не удалось подключить события WMI root\\subscription, переход на резервный поллинг");
+            }
+
+            // Резервный поллинг дополняет callbacks при пропущенных WMI-событиях.
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
@@ -112,15 +113,34 @@ public class WmiSubscriptionWatcher : BackgroundService
                 await RescanSubscriptionsAsync("PeriodicPolling", isInitialScan: false, stoppingToken);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogDebug("WmiSubscriptionWatcher: мониторинг завершён штатной отменой службы");
+        }
         finally
         {
-            try { createWatcher?.Stop(); createWatcher?.Dispose(); } catch { }
-            try { modWatcher?.Stop(); modWatcher?.Dispose(); } catch { }
-            try { delWatcher?.Stop(); delWatcher?.Dispose(); } catch { }
+            await lifecycle.CancelAsync();
+            ReleaseWatcher(createWatcher, "Creation");
+            ReleaseWatcher(modWatcher, "Modification");
+            ReleaseWatcher(delWatcher, "Deletion");
             _rescanRequests.Writer.TryComplete();
             await debounceTask;
             _logger.LogInformation("WmiSubscriptionWatcher штатно остановлен");
+        }
+    }
+
+    /// <summary>Останавливает и освобождает подписку независимо: отказ Stop не препятствует попытке Dispose.</summary>
+    /// <param name="watcher">Созданная подписка либо null при неполной инициализации.</param>
+    /// <param name="kind">Тип событий для диагностики отказа очистки.</param>
+    private void ReleaseWatcher(ManagementEventWatcher? watcher, string kind)
+    {
+        if (watcher is null) return;
+        try { watcher.Stop(); }
+        catch (Exception ex) { _logger.LogWarning(ex, "WmiSubscriptionWatcher: не удалось остановить подписку {Kind}", kind); }
+        finally
+        {
+            try { watcher.Dispose(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "WmiSubscriptionWatcher: не удалось освободить подписку {Kind}", kind); }
         }
     }
 

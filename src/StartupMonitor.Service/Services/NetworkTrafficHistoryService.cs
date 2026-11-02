@@ -60,13 +60,17 @@ public sealed class NetworkTrafficCounterSource : INetworkTrafficCounterSource
 }
 
 /// <summary>
-/// Снимает локальные RX/TX раз в пять секунд, агрегирует минутные бакеты за семь суток.
+/// Снимает локальные RX/TX раз в пять секунд, хранит минутные средние и точное покрытие до семи суток и 4 МБ.
 /// Не перебирает процессы и сокеты, не создаёт сетевых запросов; файл записывается не чаще раза в пять минут.
 /// При сбросе счётчиков, смене адаптеров или длинной паузе отсутствующие данные не подменяются нулём.
 /// </summary>
 public sealed class NetworkTrafficHistoryService : BackgroundService
 {
     private static readonly TimeSpan Retention = TimeSpan.FromDays(7);
+    /// <summary>Лимит одинаков для загрузки и записи: история приложения всегда остаётся читаемой после перезапуска.</summary>
+    internal const int MaximumHistoryBytes = 4 * 1024 * 1024;
+    /// <summary>Не более 32 раздельных наблюдений в минуте; штатный пятисекундный опрос требует не более 13.</summary>
+    private const int MaximumCoverageIntervals = 32;
     private readonly object _sync = new();
     private readonly SortedDictionary<DateTime, MinuteTraffic> _minutes = new();
     private readonly INetworkTrafficCounterSource _source;
@@ -96,11 +100,21 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
     /// <summary>Минутное среднее по действительным наблюдениям с ограниченной точностью хранения.</summary>
     public sealed class MinuteTraffic
     {
+        /// <summary>Версия 2 сохраняет точные границы покрытия; ноль обозначает старый минутный формат.</summary>
+        public int FormatVersion { get; set; }
+        /// <summary>Пары смещений начала и конца действительно измеренных интервалов в тиках от начала минуты.</summary>
+        public List<long> CoverageTicks { get; set; } = [];
+        /// <summary>Начало минутного бакета UTC.</summary>
         public DateTime MinuteUtc { get; set; }
+        /// <summary>Первая граница действительного наблюдения UTC.</summary>
         public DateTime ObservedFromUtc { get; set; }
+        /// <summary>Последняя граница действительного наблюдения UTC.</summary>
         public DateTime ObservedToUtc { get; set; }
+        /// <summary>Байты приёма только за сохранённые интервалы покрытия.</summary>
         public double ReceivedBytes { get; set; }
+        /// <summary>Байты отправки только за сохранённые интервалы покрытия.</summary>
         public double SentBytes { get; set; }
+        /// <summary>Суммарная длительность действительных наблюдений, исключая разрывы.</summary>
         public double MeasuredSeconds { get; set; }
     }
 
@@ -180,13 +194,18 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
                 {
                     var minute = new DateTime(start.Ticks - start.Ticks % TimeSpan.TicksPerMinute, DateTimeKind.Utc);
                     var end = timestampUtc < minute.AddMinutes(1) ? timestampUtc : minute.AddMinutes(1);
-                    var seconds = (end - start).TotalSeconds;
                     if (!_minutes.TryGetValue(minute, out var bucket))
-                        _minutes[minute] = bucket = new() { MinuteUtc = minute, ObservedFromUtc = start };
-                    bucket.ObservedToUtc = end;
-                    bucket.ReceivedBytes += received * seconds / elapsed;
-                    bucket.SentBytes += sent * seconds / elapsed;
-                    bucket.MeasuredSeconds += seconds;
+                        _minutes[minute] = bucket = new() { FormatVersion = 2, MinuteUtc = minute, ObservedFromUtc = start };
+                    // После перезапуска или отката часов уже сохранённое время не учитывается повторно.
+                    var observedStart = start < bucket.ObservedToUtc ? bucket.ObservedToUtc : start;
+                    if (observedStart < end && AddCoverage(bucket, observedStart, end))
+                    {
+                        var seconds = (end - observedStart).TotalSeconds;
+                        bucket.ObservedToUtc = end;
+                        bucket.ReceivedBytes += received * seconds / elapsed;
+                        bucket.SentBytes += sent * seconds / elapsed;
+                        bucket.MeasuredSeconds += seconds;
+                    }
                     start = end;
                 }
             }
@@ -194,6 +213,26 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
             _previousUtc = timestampUtc;
             PruneLocked(timestampUtc);
         }
+    }
+
+    /// <summary>Добавляет фактическое покрытие; соседние интервалы сливаются, разрывы сохраняются явно.</summary>
+    /// <param name="bucket">Минутный бакет с упорядоченными непересекающимися интервалами.</param>
+    /// <param name="fromUtc">Начало нового наблюдения UTC.</param>
+    /// <param name="toUtc">Конец нового наблюдения UTC.</param>
+    /// <returns>False при исчерпании лимита раздельных интервалов: такой замер не объявляется сохранённым.</returns>
+    private static bool AddCoverage(MinuteTraffic bucket, DateTime fromUtc, DateTime toUtc)
+    {
+        var from = (fromUtc - bucket.MinuteUtc).Ticks;
+        var to = (toUtc - bucket.MinuteUtc).Ticks;
+        if (bucket.CoverageTicks.Count > 0 && bucket.CoverageTicks[^1] == from)
+            bucket.CoverageTicks[^1] = to;
+        else
+        {
+            if (bucket.CoverageTicks.Count >= MaximumCoverageIntervals * 2) return false;
+            bucket.CoverageTicks.Add(from);
+            bucket.CoverageTicks.Add(to);
+        }
+        return true;
     }
 
     /// <summary>Возвращает только реальные минутные средние; нет наблюдений — HasMeasurement=false.</summary>
@@ -214,20 +253,29 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
             {
                 if (minute.ObservedToUtc <= request.FromUtc || minute.ObservedFromUtc >= request.ToUtc || minute.MeasuredSeconds <= 0)
                     continue;
-                var first = Math.Clamp((int)((minute.ObservedFromUtc - request.FromUtc).Ticks / bucketTicks), 0, request.BucketCount - 1);
-                var last = Math.Clamp((int)((minute.ObservedToUtc - request.FromUtc).Ticks / bucketTicks), 0, request.BucketCount - 1);
-                for (var index = first; index <= last; index++)
+                // Минутное среднее применяется только к реальным интервалам; паузы внутри минуты остаются пропусками.
+                for (var coverageIndex = 0; coverageIndex < minute.CoverageTicks.Count; coverageIndex += 2)
                 {
-                    var from = request.FromUtc.AddTicks((long)(index * bucketTicks));
-                    var to = index == request.BucketCount - 1 ? request.ToUtc : request.FromUtc.AddTicks((long)((index + 1) * bucketTicks));
-                    var overlapStart = minute.ObservedFromUtc > from ? minute.ObservedFromUtc : from;
-                    var overlapEnd = minute.ObservedToUtc < to ? minute.ObservedToUtc : to;
-                    var seconds = (overlapEnd - overlapStart).TotalSeconds;
-                    if (seconds <= 0) continue;
-                    var weight = seconds / (minute.ObservedToUtc - minute.ObservedFromUtc).TotalSeconds;
-                    received[index] += minute.ReceivedBytes * weight;
-                    sent[index] += minute.SentBytes * weight;
-                    measured[index] += minute.MeasuredSeconds * weight;
+                    var observedFrom = minute.MinuteUtc.AddTicks(minute.CoverageTicks[coverageIndex]);
+                    var observedTo = minute.MinuteUtc.AddTicks(minute.CoverageTicks[coverageIndex + 1]);
+                    if (observedTo <= request.FromUtc || observedFrom >= request.ToUtc) continue;
+                    // Обрезаем до запроса перед переводом в индекс: микроскопический диапазон не переполняет int.
+                    var clippedFrom = observedFrom > request.FromUtc ? observedFrom : request.FromUtc;
+                    var clippedTo = observedTo < request.ToUtc ? observedTo : request.ToUtc;
+                    var first = Math.Clamp((int)((clippedFrom - request.FromUtc).Ticks / bucketTicks), 0, request.BucketCount - 1);
+                    var last = Math.Clamp((int)((clippedTo - request.FromUtc).Ticks / bucketTicks), 0, request.BucketCount - 1);
+                    for (var index = first; index <= last; index++)
+                    {
+                        var from = request.FromUtc.AddTicks((long)(index * bucketTicks));
+                        var to = index == request.BucketCount - 1 ? request.ToUtc : request.FromUtc.AddTicks((long)((index + 1) * bucketTicks));
+                        var overlapStart = observedFrom > from ? observedFrom : from;
+                        var overlapEnd = observedTo < to ? observedTo : to;
+                        var seconds = (overlapEnd - overlapStart).TotalSeconds;
+                        if (seconds <= 0) continue;
+                        received[index] += minute.ReceivedBytes * seconds / minute.MeasuredSeconds;
+                        sent[index] += minute.SentBytes * seconds / minute.MeasuredSeconds;
+                        measured[index] += seconds;
+                    }
                 }
             }
         }
@@ -257,7 +305,7 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
         if (!File.Exists(_path)) return;
         try
         {
-            if (new FileInfo(_path).Length > 4 * 1024 * 1024)
+            if (new FileInfo(_path).Length > MaximumHistoryBytes)
                 throw new InvalidDataException("История трафика превышает допустимые 4 МБ.");
             var buckets = JsonSerializer.Deserialize<List<MinuteTraffic>>(File.ReadAllText(_path));
             var now = _time.GetUtcNow().UtcDateTime;
@@ -266,17 +314,48 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
                 if (bucket is null || bucket.MinuteUtc < now - Retention || bucket.MinuteUtc > now ||
                     bucket.MinuteUtc.Ticks % TimeSpan.TicksPerMinute != 0 ||
                     bucket.ObservedFromUtc < bucket.MinuteUtc || bucket.ObservedToUtc > bucket.MinuteUtc.AddMinutes(1) ||
-                    bucket.ObservedToUtc <= bucket.ObservedFromUtc || bucket.MeasuredSeconds is <= 0 or > 60 ||
+                    bucket.ObservedToUtc > now || bucket.ObservedToUtc <= bucket.ObservedFromUtc || bucket.MeasuredSeconds is <= 0 or > 60 ||
                     !double.IsFinite(bucket.MeasuredSeconds) || !double.IsFinite(bucket.ReceivedBytes) || !double.IsFinite(bucket.SentBytes) ||
                     bucket.ReceivedBytes < 0 || bucket.SentBytes < 0)
                     continue;
+                if (!ValidateCoverage(bucket)) continue;
                 _minutes[bucket.MinuteUtc] = bucket;
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
         {
             _logger.LogWarning(ex, "История трафика недоступна или повреждена; новые измерения будут сохранены отдельно");
         }
+    }
+
+    /// <summary>Проверяет покрытие версии 2 либо безопасно мигрирует непрерывный старый бакет.</summary>
+    /// <param name="bucket">Загруженные границы, длительность и интервалы наблюдения.</param>
+    /// <returns>True только когда положение всех сохранённых наблюдений известно; старые бакеты с разрывами отбрасываются.</returns>
+    private static bool ValidateCoverage(MinuteTraffic bucket)
+    {
+        if (bucket.FormatVersion == 0)
+        {
+            // Старый формат не хранит положение пауз: восстанавливать их вымышленными замерами нельзя.
+            if (Math.Abs((bucket.ObservedToUtc - bucket.ObservedFromUtc).TotalSeconds - bucket.MeasuredSeconds) > 0.000001)
+                return false;
+            bucket.CoverageTicks = [(bucket.ObservedFromUtc - bucket.MinuteUtc).Ticks, (bucket.ObservedToUtc - bucket.MinuteUtc).Ticks];
+            bucket.FormatVersion = 2;
+        }
+        if (bucket.FormatVersion != 2 || bucket.CoverageTicks is null || bucket.CoverageTicks.Count == 0 ||
+            bucket.CoverageTicks.Count % 2 != 0 || bucket.CoverageTicks.Count > MaximumCoverageIntervals * 2)
+            return false;
+        long measuredTicks = 0, previousEnd = -1;
+        for (var index = 0; index < bucket.CoverageTicks.Count; index += 2)
+        {
+            var from = bucket.CoverageTicks[index];
+            var to = bucket.CoverageTicks[index + 1];
+            if (from < 0 || from < previousEnd || to <= from || to > TimeSpan.TicksPerMinute) return false;
+            measuredTicks += to - from;
+            previousEnd = to;
+        }
+        return bucket.MinuteUtc.AddTicks(bucket.CoverageTicks[0]) == bucket.ObservedFromUtc &&
+            bucket.MinuteUtc.AddTicks(bucket.CoverageTicks[^1]) == bucket.ObservedToUtc &&
+            Math.Abs(measuredTicks / (double)TimeSpan.TicksPerSecond - bucket.MeasuredSeconds) <= 0.000001;
     }
 
     /// <summary>Атомарно сохраняет ограниченный снимок; периодическая запись не блокирует читателей истории.</summary>
@@ -289,6 +368,13 @@ public sealed class NetworkTrafficHistoryService : BackgroundService
         {
             PruneLocked(_time.GetUtcNow().UtcDateTime);
             bytes = JsonSerializer.SerializeToUtf8Bytes(_minutes.Values);
+            // При фрагментированном покрытии срок хранения ограничен также размером файла, сохраняя самые свежие минуты.
+            while (bytes.Length > MaximumHistoryBytes && _minutes.Count > 0)
+            {
+                var removeCount = Math.Max(1, _minutes.Count - (int)((long)_minutes.Count * MaximumHistoryBytes / bytes.Length) + 1);
+                foreach (var key in _minutes.Keys.Take(removeCount).ToArray()) _minutes.Remove(key);
+                bytes = JsonSerializer.SerializeToUtf8Bytes(_minutes.Values);
+            }
         }
         var temporary = _path + ".tmp";
         await File.WriteAllBytesAsync(temporary, bytes, ct).ConfigureAwait(false);

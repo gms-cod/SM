@@ -1,6 +1,8 @@
 using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models;
@@ -24,6 +26,9 @@ public class PipeClient : IDisposable
 
     /// <summary>Признак завершения клиента.</summary>
     private bool _disposed;
+
+    /// <summary>Последнее предупреждение по операции; ограничивает повторные сообщения при периодическом опросе UI.</summary>
+    private readonly ConcurrentDictionary<string, long> _lastResponseFailureLogs = new(StringComparer.Ordinal);
 
     /// <summary>Писатель основного канала.</summary>
     private StreamWriter? _writer;
@@ -124,7 +129,7 @@ public class PipeClient : IDisposable
         _ = ConnectAndReadEventsAsync(_eventCts);
     }
 
-    /// <summary>Фоновый цикл: подключается к event-каналу и читает сообщения до отмены или разрыва.</summary>
+    /// <summary>Читает event-канал до отмены; повреждённые JSON-пакеты диагностируются без остановки приёма следующих событий.</summary>
     /// <param name="cts">Токен отмены для остановки цикла.</param>
     private async Task ConnectAndReadEventsAsync(CancellationTokenSource cts)
     {
@@ -149,8 +154,9 @@ public class PipeClient : IDisposable
                     {
                         batch = await DeserializeInBackgroundAsync<List<PipeMessage>>(line, JsonOptions);
                     }
-                    catch
+                    catch (Exception ex) when (ex is JsonException or NotSupportedException)
                     {
+                        LogResponseFailure(ex, "Events.Batch");
                         continue;
                     }
 
@@ -167,7 +173,8 @@ public class PipeClient : IDisposable
                                     if (snapshot != null)
                                         ProcessSnapshotReceived?.Invoke(this, snapshot);
                                 }
-                                catch { }
+                                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                                { LogResponseFailure(ex, "Events.ProcessSnapshot"); }
                             }
                             else if (msg.Type == PipeMessageTypes.DownloadUpdateProgress && !string.IsNullOrEmpty(msg.Payload))
                             {
@@ -177,7 +184,8 @@ public class PipeClient : IDisposable
                                     if (prog != null)
                                         UpdateProgressReceived?.Invoke(this, prog);
                                 }
-                                catch { }
+                                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                                { LogResponseFailure(ex, "Events.UpdateProgress"); }
                             }
                         }
                     }
@@ -194,7 +202,7 @@ public class PipeClient : IDisposable
     /// <summary>Отправляет запрос службе и ожидает ответ с таймаутом.</summary>
     /// <param name="request">Сообщение-запрос.</param>
     /// <param name="ct">Токен отмены операции.</param>
-    /// <returns>Ответ службы или null при таймауте/разрыве.</returns>
+    /// <returns>Ответ службы или null при таймауте, разрыве либо недостоверном кадре; сбойный транспорт закрывается.</returns>
     public async Task<PipeMessage?> SendAsync(PipeMessage request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -233,7 +241,7 @@ public class PipeClient : IDisposable
                 throw new JsonException("IPC: ответ не содержит обязательного типа сообщения.");
             return message;
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or JsonException or OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ObjectDisposedException or JsonException or OperationCanceledException)
         {
             if (ex is not OperationCanceledException)
                 App.Log($"PipeClient: обмен {request.Type} прерван ({ex.GetType().Name}): {ex.Message}");
@@ -329,15 +337,16 @@ public class PipeClient : IDisposable
                     if (delta != null && !delta.IsModified)
                         return (false, delta.NewRevision, null);
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
                 return await FallbackFullEntriesAsync(currentRevision);
             }
 
             // Старая версия сервера (не знает GetEntriesDelta): fallback на полный список
             return await FallbackFullEntriesAsync(currentRevision);
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return await FallbackFullEntriesAsync(currentRevision);
         }
     }
@@ -351,8 +360,9 @@ public class PipeClient : IDisposable
             // Ревизию не обновляем (сервер её не сообщил): следующий такт снова попробует дельту
             return (true, currentRevision, entries);
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return (false, currentRevision, null);
         }
     }
@@ -486,7 +496,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<AiConfigPayload>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return null;
     }
@@ -520,7 +530,7 @@ public class PipeClient : IDisposable
                 if (result != null)
                     return (result.Success, result.Message);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return (false, LocalizationService.Instance["PipeAiTestNoResult"]);
@@ -572,7 +582,7 @@ public class PipeClient : IDisposable
                 if (result != null)
                     return (result.Success, result.Message);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return (false, LocalizationService.Instance["PipeRemoteTestNoResult"]);
@@ -629,7 +639,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<KasperskyTestResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return new KasperskyTestResult
@@ -654,7 +664,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return null;
@@ -715,8 +725,9 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return null;
             }
         }
@@ -745,8 +756,9 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return null;
             }
         }
@@ -813,7 +825,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
@@ -834,7 +846,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
@@ -855,7 +867,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
@@ -876,7 +888,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
 
         return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
@@ -945,6 +957,7 @@ public class PipeClient : IDisposable
             }
             catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return (false, string.Format(LocalizationService.Instance["PipeSnapshotParseError"], ex.Message), null);
             }
         }
@@ -967,8 +980,9 @@ public class PipeClient : IDisposable
                 var list = JsonSerializer.Deserialize<List<BaselineSnapshot>>(response.Payload, JsonOptions);
                 return list ?? [];
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return [];
             }
         }
@@ -1007,6 +1021,7 @@ public class PipeClient : IDisposable
             }
             catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return (false, string.Format(LocalizationService.Instance["PipeCompareParseError"], ex.Message), null);
             }
         }
@@ -1029,8 +1044,9 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<StartupMonitor.Shared.Models.BootTime.BootTimeReport>(response.Payload, JsonOptions);
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return null;
             }
         }
@@ -1075,8 +1091,9 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<MonitoringStatePayload>(response.Payload, JsonOptions);
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return null;
             }
         }
@@ -1098,8 +1115,9 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<ServiceInfoPayload>(response.Payload, JsonOptions);
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return null;
             }
         }
@@ -1121,8 +1139,9 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<List<ProcessNetworkSocket>>(response.Payload, JsonOptions) ?? [];
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return [];
             }
         }
@@ -1152,6 +1171,7 @@ public class PipeClient : IDisposable
             }
             catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return new ProcessModulesResponse
                 {
                     ProcessId = pid,
@@ -1186,7 +1206,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<UpdateCheckResult>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return null;
     }
@@ -1211,7 +1231,7 @@ public class PipeClient : IDisposable
                 var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
                 return (success, msg);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return (false, response?.Payload ?? "Ошибка при запуске обновления.");
     }
@@ -1226,7 +1246,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<UpdateProgressInfo>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return null;
     }
@@ -1252,7 +1272,7 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<FirewallStatusDto>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return null;
     }
@@ -1276,7 +1296,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось заблокировать IP-адрес.");
     }
@@ -1301,7 +1321,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось разблокировать IP-адрес.");
     }
@@ -1325,7 +1345,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось заблокировать порт.");
     }
@@ -1354,7 +1374,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось разблокировать порт.");
     }
@@ -1369,21 +1389,33 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<PortDefenderConfigDto>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return null;
     }
 
     /// <summary>Отправляет новую конфигурацию правил защиты Port Defender.</summary>
-    public async Task<bool> SetPortDefenderConfigAsync(PortDefenderConfigDto config, CancellationToken ct = default)
+    public async Task<FirewallOperationResult> SetPortDefenderConfigAsync(PortDefenderConfigDto config, CancellationToken ct = default)
     {
-        if (config == null) return false;
+        if (config == null) return FirewallOperationResult.Fail("Конфигурация не может быть null.");
         var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.SetPortDefenderConfig,
             Payload = JsonSerializer.Serialize(config, JsonOptions)
         }, ct);
-        return response?.Type == PipeMessageTypes.Success;
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        if (response?.Type == PipeMessageTypes.Success)
+            return FirewallOperationResult.Ok("Конфигурация Port Defender успешно сохранена.");
+
+        return FirewallOperationResult.Fail(response != null ? "Служба отклонила запрос конфигурации." : "Таймаут или обрыв IPC-связи со службой.");
     }
 
     /// <summary>Запрашивает список текущих активных блокировок службы Port Defender.</summary>
@@ -1397,7 +1429,7 @@ public class PipeClient : IDisposable
                 var bans = JsonSerializer.Deserialize<List<ActiveBanDto>>(response.Payload, JsonOptions);
                 if (bans != null) return bans;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return new List<ActiveBanDto>();
     }
@@ -1420,12 +1452,12 @@ public class PipeClient : IDisposable
                 var payload = JsonSerializer.Deserialize<FirewallRulesPayload>(response.Payload, JsonOptions);
                 if (payload?.Rules != null) return payload.Rules;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
             try
             {
                 return JsonSerializer.Deserialize<List<FirewallRuleDto>>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return null;
     }
@@ -1447,7 +1479,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось создать правило брандмауэра.");
     }
@@ -1469,7 +1501,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось удалить правило брандмауэра.");
     }
@@ -1491,7 +1523,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось переключить правило брандмауэра.");
     }
@@ -1511,7 +1543,7 @@ public class PipeClient : IDisposable
                 var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
                 if (result != null) return result;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         if (response?.Type == PipeMessageTypes.Success)
             return FirewallOperationResult.Ok(response.Payload ?? "Режим фильтрации обновлён.");
@@ -1529,12 +1561,12 @@ public class PipeClient : IDisposable
                 var payload = JsonSerializer.Deserialize<FilteringModePayload>(response.Payload, JsonOptions);
                 if (payload != null) return payload.Mode;
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
             try
             {
                 return JsonSerializer.Deserialize<FirewallFilteringMode>(response.Payload, JsonOptions);
             }
-            catch { }
+            catch (Exception ex) { LogResponseFailure(ex); }
         }
         return FirewallFilteringMode.Normal;
     }
@@ -1553,8 +1585,9 @@ public class PipeClient : IDisposable
             }, cts.Token);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return false;
         }
     }
@@ -1587,16 +1620,18 @@ public class PipeClient : IDisposable
                     var result = JsonSerializer.Deserialize<ResolveNetworkAlertResultPayload>(response.Payload, JsonOptions);
                     return result?.Success ?? false;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    LogResponseFailure(ex);
                     return false;
                 }
             }
 
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return false;
         }
     }
@@ -1623,20 +1658,21 @@ public class PipeClient : IDisposable
                     if (payload?.Alerts != null)
                         return payload.Alerts;
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
                 // Fallback: служба может вернуть голый список алертов.
                 try
                 {
                     return JsonSerializer.Deserialize<List<NetworkConnectionAlertDto>>(response.Payload, JsonOptions)
                         ?? new List<NetworkConnectionAlertDto>();
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
             }
 
             return new List<NetworkConnectionAlertDto>();
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return new List<NetworkConnectionAlertDto>();
         }
     }
@@ -1662,8 +1698,9 @@ public class PipeClient : IDisposable
 
             return new List<NetworkConnectionHistoryItem>();
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return new List<NetworkConnectionHistoryItem>();
         }
     }
@@ -1680,8 +1717,9 @@ public class PipeClient : IDisposable
 
             return response != null && response.Type == PipeMessageTypes.ClearConnectionHistoryResponse;
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return false;
         }
     }
@@ -1748,20 +1786,22 @@ public class PipeClient : IDisposable
             // Ожидаемая отмена: пользователь принял решение или окно закрыто.
             return null;
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
-            // Служба не успела открыть отдельный канал за 3 секунды.
+            // Служба не успела открыть отдельный канал за 3 секунды; повторные отказы ограничены по частоте.
+            LogResponseFailure(ex);
             return null;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return null;
         }
         finally
         {
             // Закрытие отдельного канала гарантирует, что поздний ответ службы
             // уйдёт в уже закрытый pipe и не будет прочитан следующим запросом.
-            try { pipe?.Dispose(); } catch (ObjectDisposedException) { }
+            try { pipe?.Dispose(); } catch (ObjectDisposedException ex) { LogResponseFailure(ex); }
         }
     }
 
@@ -1777,7 +1817,7 @@ public class PipeClient : IDisposable
                 Payload = JsonSerializer.Serialize(payload, JsonOptions)
             }, ct);
         }
-        catch { }
+        catch (Exception ex) { LogResponseFailure(ex); }
     }
 
     /// <summary>Включает/выключает детектор новых сетевых подключений на стороне службы.</summary>
@@ -1794,8 +1834,9 @@ public class PipeClient : IDisposable
             }, ct);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return false;
         }
     }
@@ -1820,19 +1861,20 @@ public class PipeClient : IDisposable
                     if (payload != null)
                         return payload.Enabled;
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
                 // Fallback: служба может вернуть голый bool.
                 try
                 {
                     return JsonSerializer.Deserialize<bool>(response.Payload, JsonOptions);
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
             }
 
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return false;
         }
     }
@@ -1855,13 +1897,15 @@ public class PipeClient : IDisposable
             {
                 return JsonSerializer.Deserialize<FirewallBackupDto>(response.Payload, JsonOptions);
             }
-            catch
+            catch (Exception ex)
             {
+                LogResponseFailure(ex);
                 return null;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return null;
         }
     }
@@ -1892,13 +1936,14 @@ public class PipeClient : IDisposable
                     if (result != null)
                         return (result.Imported, result.Skipped);
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
             }
 
             return (0, 0);
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return (0, 0);
         }
     }
@@ -1925,19 +1970,21 @@ public class PipeClient : IDisposable
                     if (result != null)
                         return result.AppliedCount;
                 }
-                catch { }
+                catch (Exception ex) { LogResponseFailure(ex); }
             }
 
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return 0;
         }
     }
 
-    /// <summary>Возвращает дату создания/модификации исполняемого файла текущего процесса UI (UTC).</summary>
-    private static DateTime? GetLocalProcessDateUtc()
+    /// <summary>Возвращает дату бинарника UI в UTC; диагностика чтения метаданных ограничивается частотой этого клиента.</summary>
+    /// <returns>Дата файла либо null при недоступных метаданных.</returns>
+    private DateTime? GetLocalProcessDateUtc()
     {
         try
         {
@@ -1949,29 +1996,56 @@ public class PipeClient : IDisposable
                 return w > c ? w : c;
             }
         }
-        catch { }
+        catch (Exception ex) { LogResponseFailure(ex); }
         return null;
     }
 
 
-    /// <summary>Освобождает все ресурсы: каналы, читатели, писатели, токены отмены.</summary>
+    /// <summary>Отменяет чтение и освобождает принадлежащие клиенту ресурсы; сбой одного ресурса не мешает остальной очистке.</summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        try { _eventCts?.Cancel(); } catch { }
-        try { _eventReader?.Dispose(); } catch { }
-        try { _eventPipe?.Dispose(); } catch { }
-        try { _pipe?.Dispose(); } catch { }
-        try { _reader?.Dispose(); } catch { }
-        try { _writer?.Dispose(); } catch { }
-        try { _eventCts?.Dispose(); } catch { }
-        try { _sendLock?.Dispose(); } catch { }
+        try { _eventCts?.Cancel(); }
+        catch (Exception ex) { LogResponseFailure(ex, "Dispose.CancelEvents"); }
+        // Закрываем транспорт до обёрток, чтобы их освобождение не ожидало удалённого читателя.
+        ReleaseResource(_eventPipe, "событийный канал");
+        ReleaseResource(_pipe, "командный канал");
+        ReleaseResource(_eventReader, "читатель событий");
+        ReleaseResource(_reader, "читатель ответов");
+        ReleaseResource(_writer, "писатель запросов");
+        ReleaseResource(_eventCts, "источник отмены событий");
+        ReleaseResource(_sendLock, "семафор запросов");
         _pipe = null;
         _reader = null;
         _writer = null;
         _eventPipe = null;
         _eventReader = null;
+    }
+
+    /// <summary>Освобождает ресурс транспорта с контекстной диагностикой ошибок завершения.</summary>
+    /// <param name="resource">Принадлежащий клиенту ресурс либо null при отсутствии подключения.</param>
+    /// <param name="name">Название ресурса для журнала.</param>
+    private void ReleaseResource(IDisposable? resource, string name)
+    {
+        try { resource?.Dispose(); }
+        catch (Exception ex) { LogResponseFailure(ex, "Dispose." + name); }
+    }
+
+    /// <summary>Диагностирует отказ операции не чаще раза в 30 секунд без записи полезной нагрузки, ключей или текста исключения.</summary>
+    /// <param name="exception">Причина перехода к существующему безопасному результату метода.</param>
+    /// <param name="operation">Имя вызывающего метода для локализации отказа.</param>
+    private void LogResponseFailure(Exception exception, [CallerMemberName] string operation = "")
+    {
+        // Пользовательская отмена и завершение уже освобождённого клиента являются штатными исходами.
+        if (exception is OperationCanceledException || (_disposed && exception is ObjectDisposedException)) return;
+        var now = Environment.TickCount64;
+        if (_lastResponseFailureLogs.TryGetValue(operation, out var previous))
+        {
+            if (now - previous < 30_000 || !_lastResponseFailureLogs.TryUpdate(operation, now, previous)) return;
+        }
+        else if (!_lastResponseFailureLogs.TryAdd(operation, now)) return;
+        App.Log($"PipeClient: {operation}: операция завершилась с ошибкой {exception.GetType().Name}; используется резервный результат.");
     }
 
     /// <summary>Получает текущий статус тихого режима для сокетов PID = 0.</summary>
@@ -1986,7 +2060,7 @@ public class PipeClient : IDisposable
                 return payload?.Silent ?? true;
             }
         }
-        catch { }
+        catch (Exception ex) { LogResponseFailure(ex); }
         return true;
     }
 
@@ -2003,7 +2077,7 @@ public class PipeClient : IDisposable
             }, ct);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch { return false; }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
     }
 
     // ===== Белый список сетевых приложений брандмауэра (AppSettings.FirewallWhitelistedApps) =====
@@ -2019,7 +2093,7 @@ public class PipeClient : IDisposable
                 return JsonSerializer.Deserialize<List<string>>(response.Payload, JsonOptions) ?? new List<string>();
             }
         }
-        catch { }
+        catch (Exception ex) { LogResponseFailure(ex); }
         return new List<string>();
     }
 
@@ -2036,7 +2110,7 @@ public class PipeClient : IDisposable
             }, ct);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch { return false; }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
     }
 
     /// <summary>Удаляет путь к приложению из белого списка брандмауэра.</summary>
@@ -2052,7 +2126,7 @@ public class PipeClient : IDisposable
             }, ct);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch { return false; }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
     }
 
     // ===== Чёрный список сетевых приложений брандмауэра (AppSettings.FirewallBlacklistedApps) =====
@@ -2068,7 +2142,7 @@ public class PipeClient : IDisposable
                 return JsonSerializer.Deserialize<List<string>>(response.Payload, JsonOptions) ?? new List<string>();
             }
         }
-        catch { }
+        catch (Exception ex) { LogResponseFailure(ex); }
         return new List<string>();
     }
 
@@ -2085,7 +2159,7 @@ public class PipeClient : IDisposable
             }, ct);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch { return false; }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
     }
 
     /// <summary>Удаляет путь к приложению из чёрного списка брандмауэра (снимает блокирующее правило).</summary>
@@ -2101,7 +2175,7 @@ public class PipeClient : IDisposable
             }, ct);
             return response?.Type == PipeMessageTypes.Success;
         }
-        catch { return false; }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
     }
 
     /// <summary>Запрашивает консолидированный снимок Единой матрицы контроля доступа сетевых приложений.</summary>
@@ -2115,7 +2189,7 @@ public class PipeClient : IDisposable
                 return JsonSerializer.Deserialize<List<AppAccessMatrixItemDto>>(response.Payload, JsonOptions) ?? new List<AppAccessMatrixItemDto>();
             }
         }
-        catch { }
+        catch (Exception ex) { LogResponseFailure(ex); }
         return new List<AppAccessMatrixItemDto>();
     }
 
@@ -2138,6 +2212,7 @@ public class PipeClient : IDisposable
         }
         catch (Exception ex)
         {
+            LogResponseFailure(ex);
             return FirewallOperationResult.Fail(ex.Message);
         }
         return FirewallOperationResult.Fail("Нет связи со службой контроля доступа.");

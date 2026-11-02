@@ -13,6 +13,9 @@ public class MonitoringStateCoordinator
     private volatile bool _isPaused;
     /// <summary>Блокировка для сериализации параллельных вызовов SetPaused и защиты инварианта проверки-и-установки.</summary>
     private readonly object _stateLock = new();
+    /// <summary>Упорядоченная очередь переходов; единственный отправитель допускает повторный SetPaused из обработчика.</summary>
+    private readonly Queue<bool> _pendingStates = new();
+    private bool _isDispatching;
     private readonly JsonDataStore _store;
     private readonly NotificationService? _notifications;
     private readonly ILogger<MonitoringStateCoordinator> _logger;
@@ -40,18 +43,14 @@ public class MonitoringStateCoordinator
         _isPaused = store.Load()?.Settings?.IsMonitoringPaused ?? false;
     }
 
-    /// <summary>Устанавливает глобальное состояние паузы или возобновления мониторинга.</summary>
+    /// <summary>Устанавливает состояние и доставляет переходы в порядке фиксации, включая конкурентные и повторно входящие вызовы.</summary>
+    /// <param name="paused">True для паузы мониторинга.</param>
     public void SetPaused(bool paused)
     {
-        // Сериализуем параллельные вызовы: предотвращаем гонку check-then-set,
-        // при которой два потока одновременно проходят проверку и дублируют
-        // сохранение/событие StateChanged.
         lock (_stateLock)
         {
             if (_isPaused == paused) return;
 
-            // Сначала фиксируем флаг (volatile обеспечивает видимость между ядрами CPU),
-            // затем сохраняем в хранилище. Чтение _isPaused вне блокировки остаётся безопасным.
             _isPaused = paused;
             _logger.LogInformation("Глобальный мониторинг автозапуска переключен: IsPaused = {IsPaused}", paused);
 
@@ -65,22 +64,41 @@ public class MonitoringStateCoordinator
             {
                 _logger.LogWarning(ex, "Не удалось сохранить состояние IsMonitoringPaused в настройках");
             }
+            _pendingStates.Enqueue(paused);
+            // Другой вызов уже доставляет очередь; возвращаемся без ожидания пользовательского обработчика.
+            if (_isDispatching) return;
+            _isDispatching = true;
         }
 
-        // Событие и IPC-уведомление вызываются вне блокировки: подписчики могут
-        // синхронно вызывать SetPaused (reentrancy) без риска дедлока. Копия делегата
-        // обеспечивает потокобезопасный обход списка подписчиков.
-        var stateChangedHandler = StateChanged;
-        try
+        while (true)
         {
-            stateChangedHandler?.Invoke(this, paused);
+            bool nextState;
+            lock (_stateLock)
+            {
+                if (_pendingStates.Count == 0)
+                {
+                    _isDispatching = false;
+                    return;
+                }
+                nextState = _pendingStates.Dequeue();
+            }
+            PublishState(nextState);
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Исключение в обработчике StateChanged");
-        }
+    }
 
-        // Трансляция всем подключенным UI клиентам через событийный Named Pipe
+    /// <summary>Доставляет один переход всем подписчикам и IPC; отказ отдельного подписчика не прерывает очередь.</summary>
+    /// <param name="paused">Состояние зафиксированного перехода.</param>
+    private void PublishState(bool paused)
+    {
+        var handlers = StateChanged?.GetInvocationList();
+        if (handlers is not null)
+        {
+            foreach (var handler in handlers)
+            {
+                try { ((EventHandler<bool>)handler)(this, paused); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Исключение в обработчике StateChanged"); }
+            }
+        }
         try
         {
             _notifications?.Enqueue(new PipeMessage
@@ -95,6 +113,3 @@ public class MonitoringStateCoordinator
         }
     }
 }
-
-
-
