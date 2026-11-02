@@ -205,19 +205,34 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет удаление реестровых записей из Run/RunOnce (ключи всегда существуют в HKCU).
+    /// Создаёт ключ Run/RunOnce даже в чистом профиле CI и проверяет удаление реального
+    /// уникального значения с сохранением исходных данных в payload. Очистка не затрагивает чужие значения.
     /// </summary>
+    /// <param name="loc">Проверяемое расположение пользовательского автозапуска.</param>
     [Theory]
     [InlineData(EntryLocation.RegistryRun)]
     [InlineData(EntryLocation.RegistryRunOnce)]
     public void RemoveFromSystem_Registry_CommonKeys_Success(EntryLocation loc)
     {
-        Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\RunOnce")?.Dispose();
-        var uniqueName = "NonExistent_" + Guid.NewGuid().ToString("N");
+        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\" + (loc == EntryLocation.RegistryRun ? "Run" : "RunOnce"));
+        var uniqueName = "RemoveTest_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
-        var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
-        Assert.True(success);
-        Assert.NotNull(payload);
+        try
+        {
+            key.SetValue(uniqueName, entry.FilePath);
+            var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
+            Assert.True(success, error);
+            Assert.Null(key.GetValue(uniqueName));
+            Assert.NotNull(payload);
+            var saved = JsonSerializer.Deserialize<EntryOperations.RegistryPayload>(payload, JsonOptions);
+            Assert.NotNull(saved);
+            Assert.Equal(entry.FilePath, saved.ValueData);
+        }
+        finally
+        {
+            key.DeleteValue(uniqueName, throwOnMissingValue: false);
+        }
     }
 
     /// <summary>
@@ -408,15 +423,17 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет восстановление реестровой записи из RegistryPayload.
+    /// Проверяет восстановление уникального значения из RegistryPayload в явно созданном ключе.
+    /// После проверки значение удаляется даже при ошибке, без изменения пользовательских записей.
     /// </summary>
     [Fact]
     public void RestoreToSystem_Registry_RoundTrip()
     {
-        // RegistryPayload -> deserialize -> RestoreRegistry
+        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+        var uniqueName = "RestoreTest_" + Guid.NewGuid().ToString("N");
         var rp = new EntryOperations.RegistryPayload(
             @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
-            "TestValue", "dummy_data");
+            uniqueName, "dummy_data");
         var payload = JsonSerializer.Serialize(rp, JsonOptions);
 
         var removed = new RemovedEntry
@@ -425,9 +442,16 @@ public class EntryOperationsAnalysisTests
             RestorePayload = payload,
         };
 
-        var (success, error) = EntryOperations.RestoreToSystem(removed);
-        // RestoreRegistry откроет ключ и попробует записать — успех
-        Assert.True(success, error ?? "success");
+        try
+        {
+            var (success, error) = EntryOperations.RestoreToSystem(removed);
+            Assert.True(success, error);
+            Assert.Equal(rp.ValueData, key.GetValue(uniqueName));
+        }
+        finally
+        {
+            key.DeleteValue(uniqueName, throwOnMissingValue: false);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -634,19 +658,34 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что DisableRegistry удаляет значение реестра для Run/RunOnce.
+    /// Создаёт ключ и реальное уникальное значение Run/RunOnce, проверяет отключение
+    /// с сохранением данных и гарантированно удаляет тестовое значение при любом результате.
     /// </summary>
+    /// <param name="loc">Проверяемое расположение пользовательского автозапуска.</param>
     [Theory]
     [InlineData(EntryLocation.RegistryRun)]
     [InlineData(EntryLocation.RegistryRunOnce)]
     public void DisableRegistry_RemovesValue(EntryLocation loc)
     {
-        Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\RunOnce")?.Dispose();
+        using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\" + (loc == EntryLocation.RegistryRun ? "Run" : "RunOnce"));
         var uniqueName = "DisableTest_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
-        var (success, error) = EntryOperations.DisableRegistry(entry);
-        Assert.True(success, error ?? "");
-        Assert.NotEmpty(entry.DisablePayload);
+        try
+        {
+            key.SetValue(uniqueName, entry.FilePath);
+            var (success, error) = EntryOperations.DisableRegistry(entry);
+            Assert.True(success, error);
+            Assert.Null(key.GetValue(uniqueName));
+            Assert.NotEmpty(entry.DisablePayload);
+            var saved = JsonSerializer.Deserialize<EntryOperations.RegistryPayload>(entry.DisablePayload, JsonOptions);
+            Assert.NotNull(saved);
+            Assert.Equal(entry.FilePath, saved.ValueData);
+        }
+        finally
+        {
+            key.DeleteValue(uniqueName, throwOnMissingValue: false);
+        }
     }
 
     /// <summary>

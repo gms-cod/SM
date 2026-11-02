@@ -40,9 +40,22 @@ $backupDirectory = Join-Path $repoDirectory ('out\deployment-backup-' + [Guid]::
 $stopApplication = {
     if ($registered) {
         $service = Get-Service -Name 'StartupMonitor' -ErrorAction Stop
-        if ($service.Status -ne 'Stopped') {
-            Stop-Service -Name 'StartupMonitor' -ErrorAction Stop
-            $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+        # SCM может сообщить Stopped до завершения .NET-host: ожидаем освобождение EXE самим процессом.
+        # PID считывается заново при каждом вызове, включая откат после частичного запуска новой службы.
+        $serviceProcessId = (Get-CimInstance Win32_Service -Filter "Name = 'StartupMonitor'" -ErrorAction Stop).ProcessId
+        $serviceProcess = if ($serviceProcessId) { Get-Process -Id $serviceProcessId -ErrorAction SilentlyContinue } else { $null }
+        try {
+            if ($service.Status -ne 'Stopped') {
+                Stop-Service -Name 'StartupMonitor' -ErrorAction Stop
+                $service.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+            }
+            if ($serviceProcess -and -not $serviceProcess.WaitForExit(30000)) {
+                throw "Процесс службы $serviceProcessId не завершился после остановки SCM; замена EXE отменена."
+            }
+        }
+        finally {
+            if ($serviceProcess) { $serviceProcess.Dispose() }
+            $service.Dispose()
         }
     }
     Get-Process -Name 'StartupMonitor.UI' -ErrorAction SilentlyContinue | Where-Object { $_.Path -in $targetUiPaths } | ForEach-Object {
