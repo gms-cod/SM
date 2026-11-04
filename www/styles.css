@@ -480,6 +480,8 @@ section > p { color: var(--muted); margin: 0 0 20px; }
 .cards article h3 { margin: 0 0 8px; font-size: 1.05rem; }
 .cards article p { margin: 0 0 12px; color: var(--muted); font-size: .93rem; }
 .cards article .btn { margin-top: 4px; }
+/* <summary>Ссылка проверки целостности использует контрастный цвет текста текущей темы.</summary> */
+#download > p a { color: var(--text); }
 .steps { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap: 12px; list-style: none; margin: 0 0 32px; padding: 0; }
 .steps li { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
 .steps h3 { margin: 0 0 8px; }

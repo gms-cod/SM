@@ -36,30 +36,64 @@ public class PublisherBadgeConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
-/// <summary>Конвертер влияния на запуск (Boot Impact): "Низкое", "Среднее", "Высокое".</summary>
-public class LocationToImpactTextConverter : IValueConverter
+/// <summary>Локализует влияние на запуск и обновляет подпись при смене языка без изменения местоположения записи.</summary>
+public class LocationToImpactTextConverter : IValueConverter, IMultiValueConverter
 {
-    /// <summary>Convert: Выполняет преобразование данных .</summary>
-    /// <param name="value">Входные данные: значение параметра value (object?).</param>
-    /// <param name="targetType">Входные данные: значение параметра targetType (Type).</param>
-    /// <param name="parameter">Входные данные: значение параметра parameter (object?).</param>
-    /// <param name="culture">Входные данные: значение параметра culture (CultureInfo).</param>
-    /// <returns>Выходные данные: результирующее значение типа object.</returns>
+    /// <summary>Сохраняет совместимость одиночной привязки, используя текущую локализацию приложения.</summary>
+    /// <param name="value">Местоположение автозапуска; отсутствующее или неизвестное значение считается низким влиянием.</param>
+    /// <param name="targetType">Тип целевого свойства привязки.</param>
+    /// <param name="parameter">Неиспользуемый параметр конвертера.</param>
+    /// <param name="culture">Культура привязки; подписи берутся из активной локализации приложения.</param>
+    /// <returns>Локализованная подпись низкого, среднего или высокого влияния.</returns>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is not EntryLocation loc) return LocalizationService.Instance["ImpactLow"];
+        ArgumentNullException.ThrowIfNull(targetType);
+        ArgumentNullException.ThrowIfNull(culture);
+        return LocalizationService.Instance[GetImpactKey(value)];
+    }
 
-        return loc switch
+    /// <summary>Получает подпись из зависимостей MultiBinding, поэтому смена языка переоценивает даже неизменившуюся запись.</summary>
+    /// <param name="values">Местоположение и три актуальные подписи: низкое, среднее, высокое влияние.</param>
+    /// <param name="targetType">Тип целевого свойства привязки.</param>
+    /// <param name="parameter">Неиспользуемый параметр конвертера.</param>
+    /// <param name="culture">Культура привязки; при наличии подписи используется связанное значение, исключая задержку культуры WPF.</param>
+    /// <returns>Связанная локализованная подпись либо совместимый результат одиночного преобразования при неполной привязке.</returns>
+    public object Convert(object[]? values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(targetType);
+        ArgumentNullException.ThrowIfNull(culture);
+        if (values is null || values.Length == 0)
+            return Convert((object?)null, targetType, parameter, culture);
+
+        var labelIndex = GetImpactKey(values[0]) switch { "ImpactHigh" => 3, "ImpactMedium" => 2, _ => 1 };
+        if (values.Length > labelIndex && values[labelIndex] is string label && !string.IsNullOrWhiteSpace(label))
+            return label;
+        return Convert(values[0], targetType, parameter, culture);
+    }
+
+    /// <summary>Классифицирует местоположение одинаково для одиночной и составной привязки.</summary>
+    /// <param name="value">Местоположение записи автозапуска.</param>
+    /// <returns>Ключ подписи влияния; неизвестные значения используют низкое влияние.</returns>
+    private static string GetImpactKey(object? value)
+        => value switch
         {
             EntryLocation.BootExecute or EntryLocation.AppInitDll or EntryLocation.Driver
-                or EntryLocation.ImageFileExecutionOptions or EntryLocation.Drivers32 => LocalizationService.Instance["ImpactHigh"],
+                or EntryLocation.ImageFileExecutionOptions or EntryLocation.Drivers32 => "ImpactHigh",
 
             EntryLocation.Service or EntryLocation.Winlogon or EntryLocation.TaskScheduler
-                or EntryLocation.WmiEventSubscription or EntryLocation.ActiveSetup => LocalizationService.Instance["ImpactMedium"],
+                or EntryLocation.WmiEventSubscription or EntryLocation.ActiveSetup => "ImpactMedium",
 
-            _ => LocalizationService.Instance["ImpactLow"]
+            _ => "ImpactLow"
         };
-    }
+
+    /// <summary>Запрещает обратное преобразование: переведённая подпись не определяет исходное местоположение однозначно.</summary>
+    /// <param name="value">Отображаемая подпись.</param>
+    /// <param name="targetTypes">Типы источников составной привязки.</param>
+    /// <param name="parameter">Неиспользуемый параметр конвертера.</param>
+    /// <param name="culture">Культура привязки.</param>
+    /// <returns>Результат не возвращается, поскольку привязка поддерживает только направление к интерфейсу.</returns>
+    public object[] ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException("Подпись влияния на запуск поддерживает только одностороннюю привязку.");
 
     /// <summary>ConvertBack: Выполняет преобразование данных Back.</summary>
     /// <param name="value">Входные данные: значение параметра value (object?).</param>

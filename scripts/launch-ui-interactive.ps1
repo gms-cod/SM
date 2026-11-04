@@ -10,7 +10,7 @@
 #>
 param([Parameter(Mandatory)][string]$ExecutablePath, [Parameter(Mandatory)][string]$ResultPath, [switch]$CloseAfterLaunch)
 $ErrorActionPreference = 'Stop'
-$result = @{ Success = $false; Error = $null }
+$result = @{ Success = $false; ContentReady = $false; Error = $null }
 try {
     $exe = (Resolve-Path -LiteralPath $ExecutablePath).Path
     $sessionId = [Diagnostics.Process]::GetCurrentProcess().SessionId
@@ -39,8 +39,22 @@ public static class StartupMonitorInteractiveWindow {
     $null = [StartupMonitorInteractiveWindow]::ShowWindow($ui.MainWindowHandle, 9)
     $raised = [StartupMonitorInteractiveWindow]::BringWindowToTop($ui.MainWindowHandle)
     $focused = [StartupMonitorInteractiveWindow]::SetForegroundWindow($ui.MainWindowHandle)
+    # HWND и native visibility недостаточны: после Hide окно может быть видимым, пока WPF ещё не восстановил содержимое.
+    # Проверяем реальный UI Automation descendant с ограниченным ожиданием; значения пользовательских полей не читаются.
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+    $contentReady = $false
+    $contentWait = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $root = [Windows.Automation.AutomationElement]::FromHandle($ui.MainWindowHandle)
+        if ($root -and $root.FindFirst([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)) {
+            $contentReady = $true
+            break
+        }
+        Start-Sleep -Milliseconds 100
+    } while ($contentWait.Elapsed.TotalSeconds -lt 10)
+    if (-not $contentReady) { throw 'Окно интерфейса создано, но за 10 секунд не появилось содержимое WPF в UI Automation; интерактивный запуск не подтверждён.' }
     $result = @{ Success = $true; ProcessId = $ui.Id; SessionId = $ui.SessionId; ExecutablePath = $ui.Path
-        MainWindowHandle = $ui.MainWindowHandle.ToInt64(); Raised = $raised; Focused = $focused; Error = $null }
+        MainWindowHandle = $ui.MainWindowHandle.ToInt64(); Raised = $raised; Focused = $focused; ContentReady = $true; Error = $null }
     if ($CloseAfterLaunch) {
         Start-Sleep -Seconds 5
         if (-not $ui.CloseMainWindow()) { throw 'Окно не приняло запрос штатного закрытия.' }

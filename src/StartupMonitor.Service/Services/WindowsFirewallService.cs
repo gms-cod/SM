@@ -105,13 +105,8 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             bool p = IsEnabledSafe(policy, ProfilePrivate);
             bool pub = IsEnabledSafe(policy, ProfilePublic);
 
-            int managed = 0, blockedIps = 0;
-            foreach (var dto in EnumerateRules(rules))
-            {
-                if (dto.IsManaged) managed++;
-                if (dto.Name == AggregatedRuleNameIn || dto.Name == AggregatedRuleNameOut)
-                    blockedIps += CountAddresses(dto.RemoteAddresses);
-            }
+            // Статусу нужны только имена правил и адреса двух агрегатов, без полного чтения DTO каждого правила.
+            var (managed, blockedIps) = ReadManagedRuleCounts((object)rules);
 
             return new FirewallStatusDto
             {
@@ -1885,37 +1880,110 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
         };
     }
 
+    /// <summary>Считает управляемые правила и адреса агрегатов без чтения остальных COM-свойств.</summary>
+    /// <param name="rules">Настоящая коллекция COM-правил или совместимый перечисляемый адаптер.</param>
+    /// <returns>Количество правил с управляемым префиксом и число адресов в обоих агрегатах без изменения прежней семантики дубликатов.</returns>
+    internal static (int ManagedRulesCount, int BlockedIpsCount) ReadManagedRuleCounts(object rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        int managed = 0, blockedIps = 0;
+        System.Collections.IEnumerator? enumerator = null;
+        try
+        {
+            enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
+            while (true)
+            {
+                bool moved;
+                try { moved = enumerator.MoveNext(); }
+                catch (Exception ex) { Log.Debug(ex, "Firewall: перечисление имён для статуса прервано"); break; }
+                if (!moved) break;
+
+                var rule = enumerator.Current;
+                try
+                {
+                    var name = SafeGet(rule, "Name") ?? string.Empty;
+                    if (name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase)) managed++;
+                    // Имена агрегатов сравниваются точно, как при прежней проекции через ReadRule.
+                    if (name == AggregatedRuleNameIn || name == AggregatedRuleNameOut)
+                        blockedIps += CountAddresses(SafeGet(rule, "RemoteAddresses") ?? string.Empty);
+                }
+                finally { Release(rule); }
+            }
+        }
+        finally { Release(enumerator); }
+        return (managed, blockedIps);
+    }
+
+    /// <summary>Читает известное свойство через кэшируемый DLR-вызов вместо повторного Reflection InvokeMember для каждого правила.</summary>
+    /// <param name="rule">COM-правило либо совместимый объект с публичными свойствами.</param>
+    /// <param name="property">Точное имя свойства; неизвестные имена сохраняют прежний reflection-путь.</param>
+    /// <returns>Исходное значение свойства без изменения правил преобразования типов и fallback вызывающего метода.</returns>
+    internal static object? ReadRuleProperty(object rule, string property)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        ArgumentException.ThrowIfNullOrEmpty(property);
+        dynamic nativeRule = rule;
+        return property switch
+        {
+            "Name" => (object?)nativeRule.Name,
+            "Description" => (object?)nativeRule.Description,
+            "Direction" => (object?)nativeRule.Direction,
+            "Action" => (object?)nativeRule.Action,
+            "Protocol" => (object?)nativeRule.Protocol,
+            "Profiles" => (object?)nativeRule.Profiles,
+            "ApplicationName" => (object?)nativeRule.ApplicationName,
+            "LocalPorts" => (object?)nativeRule.LocalPorts,
+            "RemotePorts" => (object?)nativeRule.RemotePorts,
+            "RemoteAddresses" => (object?)nativeRule.RemoteAddresses,
+            "ServiceName" => (object?)nativeRule.ServiceName,
+            "Enabled" => (object?)nativeRule.Enabled,
+            "Grouping" => (object?)nativeRule.Grouping,
+            _ => rule.GetType().InvokeMember(property, System.Reflection.BindingFlags.GetProperty, null, rule, null),
+        };
+    }
+
+    /// <summary>Безопасно читает строковое свойство, сохраняя null при недоступном COM-поле.</summary>
+    /// <param name="rule">Правило брандмауэра.</param>
+    /// <param name="property">Имя запрашиваемого свойства.</param>
+    /// <returns>Строковое представление либо null; сбой диагностируется с именем свойства.</returns>
     private static string? SafeGet(dynamic rule, string property)
     {
         try
         {
-            object? v = rule.GetType().InvokeMember(property,
-                System.Reflection.BindingFlags.GetProperty, null, rule, null);
+            object? v = ReadRuleProperty((object)rule, property);
             return v?.ToString();
         }
-        catch { return null; }
+        catch (Exception ex) { Log.Debug(ex, "Firewall: свойство {Property} недоступно при строковом чтении", property); return null; }
     }
 
+    /// <summary>Читает целочисленное свойство с прежним Convert.ToInt32 и явным fallback при null или ошибке.</summary>
+    /// <param name="rule">Правило брандмауэра.</param>
+    /// <param name="property">Имя запрашиваемого свойства.</param>
+    /// <param name="fallback">Значение при недоступном либо непреобразуемом поле.</param>
+    /// <returns>Преобразованное значение или fallback с диагностикой ошибки.</returns>
     private static int SafeGetInt(dynamic rule, string property, int fallback)
     {
         try
         {
-            object? v = rule.GetType().InvokeMember(property,
-                System.Reflection.BindingFlags.GetProperty, null, rule, null);
+            object? v = ReadRuleProperty((object)rule, property);
             return v is null ? fallback : Convert.ToInt32(v);
         }
-        catch { return fallback; }
+        catch (Exception ex) { Log.Debug(ex, "Firewall: свойство {Property} недоступно при числовом чтении", property); return fallback; }
     }
 
+    /// <summary>Читает логическое свойство с прежним Convert.ToBoolean, не подменяя false значением fallback.</summary>
+    /// <param name="rule">Правило брандмауэра.</param>
+    /// <param name="property">Имя запрашиваемого свойства.</param>
+    /// <param name="fallback">Значение при null либо ошибке чтения/преобразования.</param>
+    /// <returns>Преобразованное значение или fallback с диагностикой ошибки.</returns>
     private static bool SafeGetBool(dynamic rule, string property, bool fallback)
     {
         try
         {
-            object? v = rule.GetType().InvokeMember(property,
-                System.Reflection.BindingFlags.GetProperty, null, rule, null);
+            object? v = ReadRuleProperty((object)rule, property);
             return v is null ? fallback : Convert.ToBoolean(v);
         }
-        catch { return fallback; }
+        catch (Exception ex) { Log.Debug(ex, "Firewall: свойство {Property} недоступно при логическом чтении", property); return fallback; }
     }
 
     private static bool IsEnabledSafe(dynamic policy, int profile)

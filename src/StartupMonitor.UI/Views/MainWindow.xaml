@@ -747,10 +747,19 @@
                                             Background="{Binding Location, Converter={StaticResource LocationToImpactBackgroundConverter}}"
                                             BorderBrush="{Binding Location, Converter={StaticResource LocationToImpactBorderConverter}}"
                                             BorderThickness="1" CornerRadius="10" Padding="8 2" MinWidth="65">
-                                        <TextBlock Text="{Binding Location, Converter={StaticResource LocationToImpactTextConverter}}"
-                                                   Foreground="{Binding Location, Converter={StaticResource LocationToImpactForegroundConverter}}"
+                                        <!-- Подписи являются зависимостями привязки: язык обновляется без изменения Location. -->
+                                        <TextBlock Foreground="{Binding Location, Converter={StaticResource LocationToImpactForegroundConverter}}"
                                                    FontSize="10.5" FontWeight="600"
-                                                   TextAlignment="Center" VerticalAlignment="Center" />
+                                                   TextAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{StaticResource LocationToImpactTextConverter}" Mode="OneWay">
+                                                    <Binding Path="Location" />
+                                                    <Binding Path="ImpactLow" Source="{StaticResource Loc}" />
+                                                    <Binding Path="ImpactMedium" Source="{StaticResource Loc}" />
+                                                    <Binding Path="ImpactHigh" Source="{StaticResource Loc}" />
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
                                     </Border>
 
                                     <!-- Колонка 4: AI-Рейтинг (Звезды) с подробным тултипом -->
@@ -1976,7 +1985,12 @@
                     BorderBrush="{DynamicResource TableContainerBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="10" Padding="0">
-                <Grid>
+                <!-- <summary>Общая горизонтальная прокрутка сохраняет место для имени и одновременно сдвигает заголовок и строки.
+                     Минимум 1120 DIP включает 778 DIP фиксированных колонок, 300 DIP имени, padding и вертикальный scrollbar;
+                     ограниченная высота оставляет вертикальную прокрутку и виртуализацию внутри ListBox.</summary> -->
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                              HorizontalContentAlignment="Stretch">
+                <Grid MinWidth="1120">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -2385,6 +2399,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </Grid>
+                </ScrollViewer>
             </Border>
         </Grid>
 

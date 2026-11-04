@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using StartupMonitor.Shared;
@@ -23,6 +24,10 @@ public partial class MainWindow
     private bool _hasShown;
     /// <summary>Флаг завершения последовательности запуска (StartupSequence).</summary>
     private bool _isStartupComplete;
+    /// <summary>Признак окончательного закрытия окна, исключающий выполнение отложенного Hide после освобождения ресурсов.</summary>
+    private bool _isClosed;
+    /// <summary>Отложенный перенос свёрнутого окна в трей после завершения обработки нативного WM_SIZE.</summary>
+    private DispatcherOperation? _pendingMinimizeToTray;
     /// <summary>Последнее неминимизированное состояние окна (Normal или Maximized).</summary>
     private WindowState _lastNonMinimizedState = WindowState.Normal;
     /// <summary>Индекс выбранной вкладки навигации.</summary>
@@ -41,6 +46,9 @@ public partial class MainWindow
     public MainWindow()
     {
         InitializeComponent();
+
+        // Нативный ShowWindow должен восстановить и скрытое через Hide визуальное дерево WPF.
+        WindowVisibilitySynchronizer.Attach(this, RestoreFromTray);
 
         _pipeClient = new PipeClient();
         _viewModel = new MainViewModel(_pipeClient);
@@ -173,6 +181,9 @@ public partial class MainWindow
         };
         Closed += (_, _) =>
         {
+            _isClosed = true;
+            _pendingMinimizeToTray?.Abort();
+            _pendingMinimizeToTray = null;
             App.Log("MainWindow: Closed event");
             try { FirewallHubView?.Deactivate(); } catch { }
             _viewModel.Dispose();
@@ -234,16 +245,32 @@ public partial class MainWindow
 
         StateChanged += (_, _) =>
         {
+            if (_isClosed) return;
             if (WindowState == WindowState.Minimized)
             {
                 // Окно свернуто/ушло в трей — полная заморозка фоновых таймеров (0% CPU)
                 _viewModel.SuspendAllBackgroundActivity();
                 try { FirewallHubView?.Deactivate(); } catch { }
-                if (_hasShown && _viewModel.MinimizeToTray)
-                    Hide();
+                if (_hasShown && _viewModel.MinimizeToTray && _pendingMinimizeToTray is null && !Dispatcher.HasShutdownStarted)
+                {
+                    // Hide внутри WM_SIZE повторно меняет HWND до обновления HwndTarget и может отсоединить visual tree.
+                    // Отложенная проверка также не скрывает окно, если пользователь уже успел восстановить его.
+                    _pendingMinimizeToTray = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+                    {
+                        try
+                        {
+                            if (!_isClosed && !Dispatcher.HasShutdownStarted && WindowState == WindowState.Minimized
+                                && IsVisible && _viewModel.MinimizeToTray)
+                                Hide();
+                        }
+                        finally { _pendingMinimizeToTray = null; }
+                    }));
+                }
             }
             else
             {
+                _pendingMinimizeToTray?.Abort();
+                _pendingMinimizeToTray = null;
                 _lastNonMinimizedState = WindowState;
                 if (IsVisible)
                     _viewModel.ResumeAllBackgroundActivity();
@@ -743,11 +770,15 @@ public partial class MainWindow
         await Task.CompletedTask;
     }
 
-    /// <summary>Восстанавливает главное окно из системного трея в его исходное состояние (Normal или Maximized).</summary>
+    /// <summary>Восстанавливает исходное Normal/Maximized до показа, чтобы Show не повторял нативное сворачивание и Hide.</summary>
     public void RestoreFromTray()
     {
-        Show();
+        App.Log($"RestoreFromTray: before Visibility={Visibility}, IsVisible={IsVisible}, WindowState={WindowState}");
         WindowState = _lastNonMinimizedState;
+        Show();
+        // Редкая lifecycle-диагностика подтверждает подключение настоящего HWND к визуальному корню WPF.
+        var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
+        App.Log($"RestoreFromTray: after Visibility={Visibility}, IsVisible={IsVisible}, WindowState={WindowState}, PresentationSource={PresentationSource.FromVisual(this) is not null}, RootVisual={ReferenceEquals(source?.RootVisual, this)}, VisualChildren={VisualTreeHelper.GetChildrenCount(this)}");
         _viewModel.ResumeAllBackgroundActivity();
         Activate();
         Focus();

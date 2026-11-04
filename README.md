@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-2.0.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white)
+![Version](https://img.shields.io/github/v/release/gms-cod/SM?label=version&color=00D2D3&style=for-the-badge&logo=windows&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white)
 ![Framework](https://img.shields.io/badge/.NET-8.0%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 ![Authenticode](https://img.shields.io/badge/code%20signing-SHA256%20Authenticode-success?style=for-the-badge&logo=hackthebox&logoColor=white)
@@ -22,7 +22,7 @@
 Современные приложения, обновления браузеров, рекламное ПО и вредоносные скрипты используют десятки скрытых механизмов операционной системы Windows для закрепления в системе. Традиционный «Диспетчер задач» отображает лишь малую часть записей реестра, игнорируя планировщик задач, шелл-расширения, службы, WMI-подписки и компоненты сессий.
 
 **Startup Monitor** решает эту проблему комплексно:
-1. **Фоновая служба Windows (`NT AUTHORITY\SYSTEM`)** непрерывно следит за 20+ категориями автозапуска через Win32 API и системные уведомления (`RegNotifyChangeKeyValue`, `FileSystemWatcher`, WMI события `root\subscription`), моментально фиксируя появление новых элементов без нагрузки на процессор (0% CPU).
+1. **Фоновая служба Windows (`NT AUTHORITY\SYSTEM`)** непрерывно следит за 20+ категориями автозапуска через Win32 API и системные уведомления (`RegNotifyChangeKeyValue`, `FileSystemWatcher`, WMI события `root\subscription`). Сбор метрик процессов включается по подписке интерфейса; фактическая нагрузка всей службы зависит от активности системы и внешних проверок.
 2. **Графический интерфейс в стиле Windows 11 Fluent 2** предоставляет исчерпывающий контроль: поиск, фильтры по 24 часам, дерево процессов с мониторингом трафика и сокетов, контрольные снимки системы «Было — Стало», анализатор времени старта Windows и генератор интерактивных отчетов аудита.
 3. **Двухуровневая безопасность**: сочетание строгой криптографической проверки цифровых подписей Authenticode (`WinVerifyTrust`), репутационного облака «Лаборатории Касперского» (Kaspersky Open Threat Intelligence Portal) и нейросетевого разбора аргументов запуска ИИ.
 
@@ -150,9 +150,9 @@ Startup Monitor объединяет в едином интерфейсе Fluent
 ## 🚀 Установка и быстрый старт
 
 ### Способ 1: Готовый инсталлятор с цифровой подписью (Рекомендуется)
-1. Скачайте актуальный файл установщика **`StartupMonitorSetup-2.0.10.exe`** из раздела [**Releases на GitHub**](https://github.com/gms-cod/SM/releases/latest).
-2. Запустите установщик. Все исполняемые файлы и инсталлятор подписаны сертификатом разработчика **Authenticode (SHA256, RFC 3161)**.
-   - **Контрольная сумма SHA-256**: `839fc6071c6f9432349a32e1dc685635869710a1d8de79553d115954f2d6b3ce`
+1. Скачайте файл **`StartupMonitorSetup-<Version>.exe`** из раздела [**актуального релиза на GitHub**](https://github.com/gms-cod/SM/releases/latest), где `<Version>` — номер выбранного выпуска.
+2. Перед запуском сверьте SHA-256 установщика с файлом **`StartupMonitorSetup-<Version>.exe.sha256`** из того же релиза, затем запустите установщик.
+   - EXE и установщик подписываются сертификатом разработчика **Authenticode (SHA-256)**. Доверие этому сертификату на машине сборки не означает публичного доверия на других ПК и не гарантирует отсутствие предупреждений Windows SmartScreen.
 3. Мастер установки автоматически:
    - Установит бинарники в `C:\Program Files\StartupMonitor\`;
    - Создаст и сконфигурирует службу Windows `StartupMonitor` с типом запуска `Автоматически` (`start=auto`);
@@ -162,7 +162,7 @@ Startup Monitor объединяет в едином интерфейсе Fluent
 > [!TIP]
 > **Тихая установка (Silent Install)**:  
 > Для автоматического развертывания в корпоративной сети или через скрипты запустите инсталлятор с параметрами:  
-> `StartupMonitorSetup-1.7.2.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+> `StartupMonitorSetup-<Version>.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
 
 ### Способ 2: Портативный запуск (Portable / SMon2)
 1. Скопируйте директорию `SMon2` в удобное место на диске. Программа полностью автономна (self-contained .NET 8 x64, установка среды .NET на компьютере не требуется).
@@ -342,7 +342,7 @@ cd SM
 # 2. Восстановление зависимостей и компиляция
 dotnet build StartupMonitor.sln -c Release
 
-# 3. Запуск модульных тестов (1247 тестов xUnit)
+# 3. Запуск модульных тестов (Release 2.0.14: 1426 пройдено, 0 ошибок, 0 пропусков)
 dotnet test tests/StartupMonitor.Tests -c Release
 
 # 4. Сборка автономного портативного пакета в SMon2/

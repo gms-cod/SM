@@ -33,6 +33,8 @@ public partial class App : Application
     private static readonly object _logLock = new();
     /// <summary>Mutex для обеспечения единственного экземпляра приложения.</summary>
     private static Mutex? _instanceMutex;
+    /// <summary>Признак владения mutex текущим UI-потоком; второй экземпляр не должен освобождать чужой mutex.</summary>
+    private static bool _ownsInstanceMutex;
 
     /// <summary>Записывает сообщение в лог-файл с автоматической ротацией при превышении 1 МБ.</summary>
     internal static void Log(string msg)
@@ -75,6 +77,8 @@ public partial class App : Application
                 createdNew = true;
             }
         }
+        // Владение фиксируется после попытки захвата существующего или оставленного mutex.
+        _ownsInstanceMutex = createdNew;
         if (!createdNew)
         {
             Log("OnStartup: второй экземпляр, завершаюсь");
@@ -325,11 +329,10 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Восстанавливает главное окно из трея (с сохранением состояния Maximized/Normal).</summary>
+    /// <summary>Восстанавливает окно из трея после нормализации состояния, не показывая ещё свёрнутое WPF-окно повторно.</summary>
     private void RestoreMainWindow()
     {
         if (MainWindow == null) return;
-        MainWindow.Show();
         if (MainWindow is Views.MainWindow mainWnd)
         {
             mainWnd.RestoreFromTray();
@@ -338,6 +341,7 @@ public partial class App : Application
         {
             if (MainWindow.WindowState == WindowState.Minimized)
                 MainWindow.WindowState = WindowState.Normal;
+            MainWindow.Show();
             MainWindow.Activate();
         }
     }
@@ -378,9 +382,12 @@ public partial class App : Application
         _trayIcon?.Dispose();
         if (_instanceMutex != null)
         {
-            try { _instanceMutex.ReleaseMutex(); }
+            // Отклонённый второй экземпляр только закрывает свой дескриптор, не выполняя ReleaseMutex.
+            try { if (_ownsInstanceMutex) _instanceMutex.ReleaseMutex(); }
             catch (ApplicationException ex) { Log($"OnExit: mutex уже освобождён или не принадлежит текущему потоку: {ex.GetType().Name}"); }
             _instanceMutex.Dispose();
+            _instanceMutex = null;
+            _ownsInstanceMutex = false;
         }
         base.OnExit(e);
     }

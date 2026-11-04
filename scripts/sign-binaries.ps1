@@ -1,3 +1,9 @@
+﻿<#
+.SYNOPSIS
+Подписывает проверяемые файлы доступным сертификатом издателя с закрытым ключом.
+.PARAMETER Files
+Точные пути подписываемых EXE; отсутствие файла или действительной подписи прерывает выпуск.
+#>
 param(
     [string[]]$Files = @()
 )
@@ -5,17 +11,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
-Write-Host "=== Podpis fajlov (Gms CodeWorks Authenticode) ===" -ForegroundColor Cyan
+Write-Host "=== Authenticode signing ===" -ForegroundColor Cyan
 
-# 1. Poisk sertifikata
-$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Subject -like "*Gms CodeWorks*" } | Select-Object -First 1
-if (-not $cert) {
-    $cert = Get-ChildItem Cert:\LocalMachine\My -CodeSigningCert | Where-Object { $_.Subject -like "*Gms CodeWorks*" } | Select-Object -First 1
-}
+# Сохраняем совместимость с прежним издателем и текущим локальным сертификатом Startup Monitor.
+# Выбирается только действующий сертификат Code Signing с доступным закрытым ключом.
+$cert = Get-ChildItem Cert:\CurrentUser\My, Cert:\LocalMachine\My -CodeSigningCert |
+    Where-Object { ($_.Subject -like '*Gms CodeWorks*' -or $_.Subject -eq 'CN=Startup Monitor, O=Startup Monitor, C=RU') -and
+        $_.HasPrivateKey -and $_.NotBefore -le (Get-Date) -and $_.NotAfter -gt (Get-Date) } |
+    Sort-Object @{ Expression = { $_.Subject -like '*Gms CodeWorks*' }; Descending = $true }, NotAfter -Descending |
+    Select-Object -First 1
 
 if (-not $cert) {
-    Write-Warning "Sertifikat Gms CodeWorks ne najden!"
-    return
+    throw 'Не найден действующий сертификат подписи издателя с закрытым ключом.'
 }
 
 Write-Host "Najden sertifikat: $($cert.Subject)" -ForegroundColor Green
@@ -36,8 +43,8 @@ if ($Files.Count -eq 0) {
 $timestampServer = "http://timestamp.digicert.com"
 
 foreach ($file in $Files) {
-    if (-not (Test-Path $file)) {
-        continue
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+        throw "Подписываемый файл не найден: $file"
     }
 
     Write-Host "Podpis: $file..." -ForegroundColor Cyan
@@ -45,10 +52,12 @@ foreach ($file in $Files) {
         $res = Set-AuthenticodeSignature -FilePath $file -Certificate $cert -TimestampServer $timestampServer -HashAlgorithm SHA256
         Write-Host "Status: $($res.Status)" -ForegroundColor Green
     } catch {
-        Write-Warning "Oshibka: $($_.Exception.Message)"
+        throw "Не удалось подписать ${file}: $($_.Exception.Message)"
     }
 
     $chk = Get-AuthenticodeSignature -FilePath $file
+    # Успех объявляется только после проверки реальной подписи, включая цепочку доверия этой машины.
+    if ($chk.Status -ne 'Valid') { throw "Подпись $file не подтверждена: $($chk.Status)." }
     Write-Host "Proverka: [$($chk.Status)] $($chk.SignerCertificate.Subject)" -ForegroundColor Cyan
 }
 
