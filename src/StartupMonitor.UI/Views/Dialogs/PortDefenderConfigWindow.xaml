@@ -1,0 +1,214 @@
+<ui:FluentWindow
+    x:Class="StartupMonitor.UI.Views.Dialogs.PortDefenderConfigWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="{Binding PortDefenderTitle, Source={StaticResource Loc}}"
+    WindowStartupLocation="CenterOwner"
+    Background="{ui:ThemeResource ApplicationBackgroundBrush}"
+    ExtendsContentIntoTitleBar="True"
+    ShowInTaskbar="False"
+    Width="620" Height="720"
+    MinHeight="580" MinWidth="520">
+
+    <Grid Margin="16,0,16,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar -->
+        <ui:TitleBar Grid.Row="0" Title="{Binding PortDefenderTitle, Source={StaticResource Loc}}" ShowMinimize="False" ShowMaximize="False" ShowClose="True" />
+
+        <!-- Заголовок -->
+        <ui:Card Grid.Row="1" Margin="0,4,0,12" Padding="14">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="40" Height="40" CornerRadius="8" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="Shield24" FontSize="20" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="{Binding PortDefenderTitle, Source={StaticResource Loc}}" FontSize="16" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                    <TextBlock Text="{Binding PortDefenderSubtitle, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+        </ui:Card>
+
+        <!-- Форма настроек -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,8,0">
+                <CheckBox x:Name="ChkEnabled" Content="{Binding PortDefenderEnabledToggle, Source={StaticResource Loc}}" IsChecked="True" Margin="0,0,0,12" FontWeight="SemiBold" />
+
+                <!-- Интерактивный блок списка защищаемых портов -->
+                <ui:Card Margin="0,0,0,14" Padding="14">
+                    <StackPanel>
+                        <!-- Заголовок секции портов и тулбар действий -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding PortDefenderProtectedPortsLabel, Source={StaticResource Loc}}" FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                <Border CornerRadius="10" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtPortsCountBadge" Text="{Binding [DefenderPortsEmpty], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:Button x:Name="BtnAddPort" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="{Binding [DefenderAddPort], Source={StaticResource Loc}}" Click="OnAddPortClick" Margin="0,0,6,0" />
+                                <ui:Button x:Name="BtnEditPort" Appearance="Secondary" Icon="{ui:SymbolIcon Edit24}" Content="{Binding [DefenderEdit], Source={StaticResource Loc}}" Click="OnEditPortClick" Margin="0,0,6,0" />
+                                <ui:Button x:Name="BtnDeletePort" Appearance="Secondary" Icon="{ui:SymbolIcon Delete24}" Content="{Binding [DefenderDelete], Source={StaticResource Loc}}" Click="OnDeletePortClick" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Таблица отслеживаемых портов -->
+                        <DataGrid x:Name="GridProtectedPorts"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserResizeRows="False"
+                                  HeadersVisibility="Column"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  MaxHeight="200"
+                                  MinHeight="110"
+                                  Background="Transparent"
+                                  BorderThickness="1"
+                                  BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}"
+                                  MouseDoubleClick="OnGridPortsMouseDoubleClick"
+                                  PreviewKeyDown="OnGridPortsKeyDown">
+                            <DataGrid.Columns>
+                                <!-- Бейдж номера порта -->
+                                <DataGridTemplateColumn Header="{Binding [DefenderPortColumn], Source={StaticResource Loc}}" Width="95">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Background="{ui:ThemeResource ControlFillColorDefaultBrush}" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
+                                                <TextBlock Text="{Binding FormattedPort}" FontFamily="Consolas, Segoe UI" FontWeight="Bold" FontSize="12" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Служба / Протокол -->
+                                <DataGridTemplateColumn Header="{Binding [DefenderServiceColumn], Source={StaticResource Loc}}" Width="105">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding ServiceName}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" Margin="4,0" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Бейдж риска -->
+                                <DataGridTemplateColumn Header="{Binding [DefenderRiskColumn], Source={StaticResource Loc}}" Width="115">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#00897B" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="Critical">
+                                                                <Setter Property="Background" Value="#D32F2F" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="High">
+                                                                <Setter Property="Background" Value="#F57C00" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="Medium">
+                                                                <Setter Property="Background" Value="#FBC02D" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding RiskLevel}" Value="Low">
+                                                                <Setter Property="Background" Value="#1976D2" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding RiskBadge}" FontSize="11" FontWeight="SemiBold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RiskLevel}" Value="Medium">
+                                                                    <Setter Property="Foreground" Value="#212121" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <!-- Описание назначения -->
+                                <DataGridTextColumn Header="{Binding [DefenderDescriptionColumn], Source={StaticResource Loc}}" Binding="{Binding Description}" Width="*" />
+
+                                <!-- Кнопки быстрых действий в строке -->
+                                <DataGridTemplateColumn Header="{Binding [DefenderActionsColumn], Source={StaticResource Loc}}" Width="85">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <ui:Button Appearance="Transparent" Padding="4" Margin="0,0,4,0" ToolTip="{Binding [DefenderEditPortTip], Source={StaticResource Loc}}" Click="OnRowEditPortClick">
+                                                    <ui:SymbolIcon Symbol="Edit20" FontSize="14" Foreground="{ui:ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                                </ui:Button>
+                                                <ui:Button Appearance="Transparent" Padding="4" ToolTip="{Binding [DefenderRemoveProtectionTip], Source={StaticResource Loc}}" Click="OnRowDeletePortClick">
+                                                    <ui:SymbolIcon Symbol="Delete20" FontSize="14" Foreground="#FF5252" />
+                                                </ui:Button>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Text="{Binding [DefenderEditHint], Source={StaticResource Loc}}" FontSize="11" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="2,6,0,0" />
+                    </StackPanel>
+                </ui:Card>
+
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding PortDefenderThresholdLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                        <ui:TextBox x:Name="TxtMaxAttempts" PlaceholderText="10"
+                                    ToolTip="{Binding PortDefenderThresholdTooltip, Source={StaticResource Loc}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{Binding PortDefenderWindowLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                        <ui:TextBox x:Name="TxtWindowSeconds" PlaceholderText="60"
+                                    ToolTip="{Binding PortDefenderWindowTooltip, Source={StaticResource Loc}}" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="{Binding PortDefenderBanDurationLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtBanDuration" PlaceholderText="15" Margin="0,0,0,12"
+                            ToolTip="{Binding PortDefenderBanDurationTooltip, Source={StaticResource Loc}}" />
+
+                <CheckBox x:Name="ChkAutoEscalate" Content="{Binding PortDefenderAutoEscalateToggle, Source={StaticResource Loc}}" IsChecked="True" Margin="0,0,0,8" />
+                <CheckBox x:Name="ChkTrustPrivate" Content="{Binding PortDefenderTrustPrivateToggle, Source={StaticResource Loc}}" IsChecked="True" Margin="0,0,0,12" />
+
+                <TextBlock Text="{Binding PortDefenderWhitelistLabel, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,4" />
+                <ui:TextBox x:Name="TxtWhitelist" PlaceholderText="{Binding PortDefenderWhitelistHint, Source={StaticResource Loc}}" TextWrapping="Wrap" MinHeight="60" Margin="0,0,0,12"
+                            ToolTip="{Binding PortDefenderWhitelistTooltip, Source={StaticResource Loc}}" />
+
+                <TextBlock x:Name="TxtStatus" Text="{Binding NetStatusLoading, Source={StaticResource Loc}}" FontSize="12" Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Кнопки -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ui:Button Grid.Column="1" Appearance="Secondary" Content="{Binding PortDefenderCloseButton, Source={StaticResource Loc}}" Click="OnCancelClick" Margin="0,0,8,0" MinWidth="100" />
+            <ui:Button Grid.Column="2" Appearance="Primary" Content="{Binding PortDefenderSaveButton, Source={StaticResource Loc}}" Click="OnSaveClick" MinWidth="120" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

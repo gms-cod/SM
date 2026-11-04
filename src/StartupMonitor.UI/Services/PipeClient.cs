@@ -1,0 +1,2220 @@
+using System.IO;
+using System.IO.Pipes;
+using System.Security.Principal;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using StartupMonitor.Shared.Models;
+using StartupMonitor.Shared.Models.Firewall;
+using StartupMonitor.Shared.Diagnostics;
+using StartupMonitor.Shared.Models.Snapshot;
+
+namespace StartupMonitor.UI.Services;
+
+/// <summary>Клиент именованного канала (Named Pipe) для общения со службой StartupMonitor.Service.</summary>
+public class PipeClient : IDisposable
+{
+    /// <summary>Основной канал для отправки запросов и получения ответов.</summary>
+    private NamedPipeClientStream? _pipe;
+
+    /// <summary>Читатель основного канала.</summary>
+    private StreamReader? _reader;
+
+    /// <summary>Ограниченный читатель ответов с сохранением границ кадров.</summary>
+    private BoundedLineReader? _responseFrames;
+
+    /// <summary>Признак завершения клиента.</summary>
+    private bool _disposed;
+
+    /// <summary>Последнее предупреждение по операции; ограничивает повторные сообщения при периодическом опросе UI.</summary>
+    private readonly ConcurrentDictionary<string, long> _lastResponseFailureLogs = new(StringComparer.Ordinal);
+
+    /// <summary>Писатель основного канала.</summary>
+    private StreamWriter? _writer;
+
+    /// <summary>Имя основного канала (совпадает с именем на стороне службы).</summary>
+    private readonly string _pipeName = "StartupMonitor";
+
+    /// <summary>Настройки JSON-сериализации (регистронезависимые имена свойств).</summary>
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    /// <summary>
+    /// Десериализует JSON на фоновом потоке, чтобы парсинг крупных полезных нагрузок
+    /// (снимок процессов ~195 КБ, список записей автозапуска) не блокировал UI Dispatcher.
+    /// </summary>
+    private static Task<T?> DeserializeInBackgroundAsync<T>(string json, JsonSerializerOptions options)
+        => Task.Run(() => JsonSerializer.Deserialize<T>(json, options));
+
+    /// <summary>Событие подключения к каналу.</summary>
+    public event EventHandler? Connected;
+
+    /// <summary>Событие отключения от канала.</summary>
+    public event EventHandler? Disconnected;
+
+    /// <summary>Событие получения батча сообщений от службы (event-pipe).</summary>
+    public event EventHandler<List<PipeMessage>>? EventsReceived;
+
+    /// <summary>Событие получения среза метрик процессов для Диспетчера задач.</summary>
+    public event EventHandler<SystemPerformanceSnapshot>? ProcessSnapshotReceived;
+
+    /// <summary>Событие обновления прогресса загрузки дистрибутива обновления.</summary>
+    public event EventHandler<UpdateProgressInfo>? UpdateProgressReceived;
+
+    /// <summary>Флаг подключения к основному каналу.</summary>
+    public bool IsConnected => _pipe?.IsConnected ?? false;
+
+    /// <summary>Семафор для последовательной отправки запросов (один запрос за раз).</summary>
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
+
+    /// <summary>Максимальное время ожидания ответа от службы (70 с — с запасом на сканирование).</summary>
+    private static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(70);
+
+    /// <summary>Отдельный канал для приёма событий от службы.</summary>
+    private NamedPipeClientStream? _eventPipe;
+
+    /// <summary>Читатель event-канала.</summary>
+    private StreamReader? _eventReader;
+
+    /// <summary>Токен отмены для цикла чтения event-канала.</summary>
+    private CancellationTokenSource? _eventCts;
+
+    /// <summary>Подключается к службе по именованному каналу. В случае успеха запускает event-pipe.</summary>
+    public async Task ConnectAsync()
+    {
+        if (_disposed) return;
+        await _sendLock.WaitAsync();
+        var connected = false;
+        try
+        {
+            if (_disposed) return;
+            _pipe?.Dispose();
+            _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut,
+                PipeOptions.Asynchronous, TokenImpersonationLevel.Impersonation);
+            await _pipe.ConnectAsync(3000);
+            _reader = new StreamReader(_pipe);
+            _responseFrames = new BoundedLineReader(_reader);
+            _writer = new StreamWriter(_pipe) { AutoFlush = true };
+            connected = true;
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or UnauthorizedAccessException or ObjectDisposedException)
+        {
+            App.Log($"PipeClient: подключение не установлено ({ex.GetType().Name}): {ex.Message}");
+            _pipe?.Dispose();
+            _pipe = null;
+            _reader = null;
+            _writer = null;
+            _responseFrames = null;
+        }
+        finally { _sendLock.Release(); }
+        if (connected)
+        {
+            Connected?.Invoke(this, EventArgs.Empty);
+            StartEventPipe();
+        }
+        else { Disconnected?.Invoke(this, EventArgs.Empty); }
+    }
+
+    /// <summary>Запускает фоновое чтение event-канала для получения асинхронных уведомлений от службы.</summary>
+    private void StartEventPipe()
+    {
+        _eventCts?.Cancel();
+        _eventCts?.Dispose();
+        _eventPipe?.Dispose();
+        _eventCts = new CancellationTokenSource();
+        _ = ConnectAndReadEventsAsync(_eventCts);
+    }
+
+    /// <summary>Читает event-канал до отмены; повреждённые JSON-пакеты диагностируются без остановки приёма следующих событий.</summary>
+    /// <param name="cts">Токен отмены для остановки цикла.</param>
+    private async Task ConnectAndReadEventsAsync(CancellationTokenSource cts)
+    {
+        // Цикл жизни соединения: сервер закрыл pipe или ошибка — пересоздаём и подключаемся заново
+        while (!cts.IsCancellationRequested)
+        {
+            try
+            {
+                _eventPipe?.Dispose();
+                _eventPipe = new NamedPipeClientStream(".", "StartupMonitorEvents", PipeDirection.In, PipeOptions.Asynchronous);
+                await _eventPipe.ConnectAsync(3000, cts.Token);
+                _eventReader = new StreamReader(_eventPipe);
+                var eventFrames = new BoundedLineReader(_eventReader);
+
+                while (!cts.IsCancellationRequested && _eventPipe.IsConnected)
+                {
+                    var line = await eventFrames.ReadLineAsync(cts.Token);
+                    if (line == null) break;
+
+                    List<PipeMessage>? batch = null;
+                    try
+                    {
+                        batch = await DeserializeInBackgroundAsync<List<PipeMessage>>(line, JsonOptions);
+                    }
+                    catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                    {
+                        LogResponseFailure(ex, "Events.Batch");
+                        continue;
+                    }
+
+                    if (batch != null && batch.Count > 0)
+                    {
+                        EventsReceived?.Invoke(this, batch);
+                        foreach (var msg in batch)
+                        {
+                            if (msg.Type == PipeMessageTypes.ProcessesSnapshot && !string.IsNullOrEmpty(msg.Payload))
+                            {
+                                try
+                                {
+                                    var snapshot = await DeserializeInBackgroundAsync<SystemPerformanceSnapshot>(msg.Payload, JsonOptions);
+                                    if (snapshot != null)
+                                        ProcessSnapshotReceived?.Invoke(this, snapshot);
+                                }
+                                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                                { LogResponseFailure(ex, "Events.ProcessSnapshot"); }
+                            }
+                            else if (msg.Type == PipeMessageTypes.DownloadUpdateProgress && !string.IsNullOrEmpty(msg.Payload))
+                            {
+                                try
+                                {
+                                    var prog = JsonSerializer.Deserialize<UpdateProgressInfo>(msg.Payload, JsonOptions);
+                                    if (prog != null)
+                                        UpdateProgressReceived?.Invoke(this, prog);
+                                }
+                                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                                { LogResponseFailure(ex, "Events.UpdateProgress"); }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex) { App.Log($"PipeClient: событийный канал прерван: {ex.Message}"); }
+
+            try { await Task.Delay(2000, cts.Token); }
+            catch (OperationCanceledException) { break; }
+        }
+    }
+
+    /// <summary>Отправляет запрос службе и ожидает ответ с таймаутом.</summary>
+    /// <param name="request">Сообщение-запрос.</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>Ответ службы или null при таймауте, разрыве либо недостоверном кадре; сбойный транспорт закрывается.</returns>
+    public async Task<PipeMessage?> SendAsync(PipeMessage request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Type);
+        if (_disposed) return null;
+        using var profile = ExecutionProfiler.Measure("UI.Pipe.Send." + request.Type);
+        using var queueCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        queueCts.CancelAfter(TimeSpan.FromSeconds(10));
+        try { await _sendLock.WaitAsync(queueCts.Token); }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException) { return null; }
+        NamedPipeClientStream? transport = null;
+        var exchangeStarted = false;
+        try
+        {
+            transport = _pipe;
+            var reader = _reader;
+            var writer = _writer;
+            if (_disposed || writer is null || reader is null || transport?.IsConnected != true) return null;
+            ct.ThrowIfCancellationRequested();
+            var json = JsonSerializer.Serialize(request, JsonOptions);
+            if (json.Length > BoundedLineReader.MaximumFrameCharacters)
+                throw new InvalidDataException("IPC: исходящий запрос превышает допустимый размер кадра.");
+            using var writeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            writeCts.CancelAfter(TimeSpan.FromSeconds(10));
+            // После начала записи отменённый обмен не переиспользуется: поздний ответ принадлежит старому каналу.
+            exchangeStarted = true;
+            await writer.WriteLineAsync(json.AsMemory(), writeCts.Token);
+            await writer.FlushAsync(writeCts.Token);
+            using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            responseCts.CancelAfter(ResponseTimeout);
+            var frames = _responseFrames ??= new BoundedLineReader(reader);
+            var response = await frames.ReadLineAsync(responseCts.Token);
+            if (response is null) { DropConnection(transport); return null; }
+            var message = JsonSerializer.Deserialize<PipeMessage>(response, JsonOptions);
+            if (message is null || string.IsNullOrWhiteSpace(message.Type))
+                throw new JsonException("IPC: ответ не содержит обязательного типа сообщения.");
+            return message;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ObjectDisposedException or JsonException or OperationCanceledException)
+        {
+            if (ex is not OperationCanceledException)
+                App.Log($"PipeClient: обмен {request.Type} прерван ({ex.GetType().Name}): {ex.Message}");
+            if (exchangeStarted || ex is not OperationCanceledException) DropConnection(transport);
+            return null;
+        }
+        finally
+        {
+            try { _sendLock.Release(); }
+            catch (ObjectDisposedException ex) { App.Log($"PipeClient: завершение обмена после Dispose: {ex.Message}"); }
+        }
+    }
+
+    /// <summary>Закрывает только транспорт сбойного обмена и сообщает о необходимости переподключения.</summary>
+    /// <param name="transport">Транспорт, захваченный до начала запроса.</param>
+    private void DropConnection(NamedPipeClientStream? transport)
+    {
+        if (transport is null || !ReferenceEquals(transport, _pipe)) return;
+        _pipe = null;
+        _reader = null;
+        _writer = null;
+        _responseFrames = null;
+        transport.Dispose();
+        if (!_disposed) Disconnected?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Получает реально измеренные интервалы сетевого трафика с явными пропусками измерений.</summary>
+    /// <param name="fromUtc">Начало интервала UTC.</param>
+    /// <param name="toUtc">Конец интервала UTC.</param>
+    /// <param name="bucketCount">Число временных интервалов.</param>
+    /// <param name="ct">Токен отмены запроса.</param>
+    /// <returns>Измеренные интервалы либо пустая коллекция при недоступной службе.</returns>
+    public async Task<List<NetworkTrafficHistoryPoint>> GetNetworkTrafficHistoryAsync(
+        DateTime fromUtc, DateTime toUtc, int bucketCount = 60, CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetNetworkTrafficHistory,
+            Payload = JsonSerializer.Serialize(new NetworkTrafficHistoryRequest(fromUtc, toUtc, bucketCount), JsonOptions)
+        }, ct);
+        if (response?.Type != PipeMessageTypes.GetNetworkTrafficHistoryResponse || string.IsNullOrWhiteSpace(response.Payload)) return [];
+        try { return await DeserializeInBackgroundAsync<List<NetworkTrafficHistoryPoint>>(response.Payload, JsonOptions) ?? []; }
+        catch (JsonException ex) { App.Log($"PipeClient: повреждена история сетевых измерений: {ex.Message}"); return []; }
+    }
+
+    /// <summary>Запрашивает у службы полный список записей автозапуска.</summary>
+    public async Task<List<StartupEntry>> GetAllEntriesAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetAllEntries
+        });
+
+        if (response?.Type == PipeMessageTypes.GetAllEntriesResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            return await DeserializeInBackgroundAsync<List<StartupEntry>>(response.Payload, JsonOptions) ?? [];
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Запрашивает дельту записей автозапуска по известной клиенту ревизии.
+    /// Быстрый путь опроса: при отсутствии изменений сервер отвечает NotModified
+    /// без сериализации списка (такт 0.5–1 мс, 0 аллокаций в LOH).
+    /// </summary>
+    /// <param name="currentRevision">Ревизия, известная клиенту (0 = первая синхронизация).</param>
+    /// <returns>(isModified, newRevision, entries). При isModified=false entries=null.</returns>
+    public async Task<(bool IsModified, long NewRevision, List<StartupEntry>? Entries)> GetEntriesDeltaAsync(long currentRevision)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetEntriesDelta,
+                Payload = JsonSerializer.Serialize(new EntriesRevisionRequest(currentRevision), JsonOptions)
+            });
+
+            if (response == null)
+                return await FallbackFullEntriesAsync(currentRevision);
+
+            // Быстрый путь: изменений нет — мгновенный выход, 0 аллокаций в LOH
+            if (response.Type == PipeMessageTypes.NotModified)
+                return (false, currentRevision, null);
+
+            if (response.Type == PipeMessageTypes.GetEntriesDeltaResponse && !string.IsNullOrEmpty(response.Payload))
+            {
+                try
+                {
+                    var delta = await DeserializeInBackgroundAsync<EntriesDeltaResponse>(response.Payload, JsonOptions);
+                    if (delta != null && delta.IsModified)
+                        return (true, delta.NewRevision, delta.Entries);
+                    if (delta != null && !delta.IsModified)
+                        return (false, delta.NewRevision, null);
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+                return await FallbackFullEntriesAsync(currentRevision);
+            }
+
+            // Старая версия сервера (не знает GetEntriesDelta): fallback на полный список
+            return await FallbackFullEntriesAsync(currentRevision);
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return await FallbackFullEntriesAsync(currentRevision);
+        }
+    }
+
+    /// <summary>Fallback: полный список записей при ошибке дельты или старой версии сервера.</summary>
+    private async Task<(bool IsModified, long NewRevision, List<StartupEntry>? Entries)> FallbackFullEntriesAsync(long currentRevision)
+    {
+        try
+        {
+            var entries = await GetAllEntriesAsync();
+            // Ревизию не обновляем (сервер её не сообщил): следующий такт снова попробует дельту
+            return (true, currentRevision, entries);
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return (false, currentRevision, null);
+        }
+    }
+
+    /// <summary>Запрашивает текущий чёрный список.</summary>
+    public async Task<List<BlacklistRule>> GetBlacklistAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetBlacklist
+        });
+
+        if (response?.Type == PipeMessageTypes.GetBlacklistResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            return JsonSerializer.Deserialize<List<BlacklistRule>>(response.Payload, JsonOptions) ?? [];
+        }
+
+        return [];
+    }
+
+    /// <summary>Отключает (помечает Disabled) запись автозапуска.</summary>
+    public async Task DisableEntryAsync(string entryId)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.DisableEntry,
+            Payload = JsonSerializer.Serialize(entryId, JsonOptions)
+        });
+    }
+
+    /// <summary>Включает (помечает Enabled) запись автозапуска.</summary>
+    public async Task EnableEntryAsync(string entryId)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.EnableEntry,
+            Payload = JsonSerializer.Serialize(entryId, JsonOptions)
+        });
+    }
+
+    /// <summary>Добавляет правило в чёрный список на стороне службы.</summary>
+    public async Task AddToBlacklistAsync(BlacklistRule rule)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.AddToBlacklist,
+            Payload = JsonSerializer.Serialize(rule, JsonOptions)
+        });
+    }
+
+    /// <summary>Удаляет правило из чёрного списка по его идентификатору.</summary>
+    public async Task RemoveFromBlacklistAsync(string ruleId)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.RemoveFromBlacklist,
+            Payload = JsonSerializer.Serialize(ruleId, JsonOptions)
+        });
+    }
+
+    /// <summary>Запрашивает текстовый статус службы.</summary>
+    public async Task<string?> GetStatusAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetStatus });
+
+        if (response?.Type == PipeMessageTypes.StatusResponse && !string.IsNullOrEmpty(response.Payload))
+            return response.Payload;
+
+        return null;
+    }
+
+    /// <summary>Удаляет запись из системы (реестр/файл) через службу.</summary>
+    public async Task<bool> RemoveFromSystemAsync(string entryId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.RemoveFromSystem,
+            Payload = JsonSerializer.Serialize(entryId, JsonOptions)
+        });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает список удалённых записей.</summary>
+    public async Task<List<RemovedEntry>> GetRemovedEntriesAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetRemovedEntries });
+        if (response?.Type == PipeMessageTypes.GetRemovedEntriesResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            return JsonSerializer.Deserialize<List<RemovedEntry>>(response.Payload, JsonOptions) ?? [];
+        }
+        return [];
+    }
+
+    /// <summary>Запрашивает историю изменений.</summary>
+    public async Task<List<HistoryEntry>> GetHistoryAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetHistory });
+        if (response?.Type == PipeMessageTypes.GetHistoryResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            return JsonSerializer.Deserialize<List<HistoryEntry>>(response.Payload, JsonOptions) ?? [];
+        }
+        return [];
+    }
+
+    /// <summary>Запрашивает словарь AI-рейтингов (Id → StartupRating).</summary>
+    public async Task<Dictionary<string, StartupRating>> GetRatingsAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetRatings });
+        if (response?.Type == PipeMessageTypes.GetRatingsResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, StartupRating>>(response.Payload, JsonOptions) ?? [];
+        }
+        return [];
+    }
+
+    /// <summary>Запускает очистку устаревших записей на стороне службы.</summary>
+    public async Task CleanStaleAsync()
+    {
+        await SendAsync(new PipeMessage { Type = PipeMessageTypes.CleanStale });
+    }
+
+    /// <summary>Отправляет службе настройки для AI-рейтинга (ключ API, URL, модель).</summary>
+    /// <summary>Запрашивает актуальную конфигурацию AI у системной службы.</summary>
+    /// <returns>Полезная нагрузка с настройками AI (ключ, URL, модель) или null при ошибке.</returns>
+    public async Task<AiConfigPayload?> GetAiConfigAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAiConfig });
+        if (response?.Type == PipeMessageTypes.GetAiConfigResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<AiConfigPayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Устанавливает конфигурацию AI (ключ API, URL, модель).</summary>
+    public async Task SetAiConfigAsync(string apiKey, string? apiUrl = null, string? model = null)
+    {
+        var payload = JsonSerializer.Serialize(new AiConfigPayload(apiKey, apiUrl, model), JsonOptions);
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetAiConfig,
+            Payload = payload
+        });
+    }
+
+    /// <summary>Проверяет подключение к AI-провайдеру через службу.</summary>
+    public async Task<(bool Success, string Message)> TestAiConnectionAsync(string apiKey, string? apiUrl = null, string? model = null)
+    {
+        var payload = JsonSerializer.Serialize(new AiConfigPayload(apiKey, apiUrl, model), JsonOptions);
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.TestAiConnection,
+            Payload = payload
+        });
+
+        if (response?.Type == PipeMessageTypes.TestAiConnectionResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<TestAiResultPayload>(response.Payload, JsonOptions);
+                if (result != null)
+                    return (result.Success, result.Message);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return (false, LocalizationService.Instance["PipeAiTestNoResult"]);
+    }
+
+    /// <summary>Отправляет конфигурацию удалённых уведомлений (Telegram / Discord) службе.</summary>
+    public async Task SetRemoteNotificationConfigAsync(
+        bool telegramEnabled,
+        string telegramBotToken,
+        string telegramChatId,
+        bool discordWebhookEnabled,
+        string discordWebhookUrl,
+        bool notifyOnNewEntry,
+        bool notifyOnThreat,
+        bool notifyOnBlocked)
+    {
+        var payload = JsonSerializer.Serialize(new RemoteNotificationConfigPayload(
+            telegramEnabled,
+            telegramBotToken,
+            telegramChatId,
+            discordWebhookEnabled,
+            discordWebhookUrl,
+            notifyOnNewEntry,
+            notifyOnThreat,
+            notifyOnBlocked), JsonOptions);
+
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetRemoteNotificationConfig,
+            Payload = payload
+        });
+    }
+
+    /// <summary>Запрашивает проверку канала удалённых уведомлений ("telegram", "discord" или "all").</summary>
+    public async Task<(bool Success, string Message)> TestRemoteNotificationAsync(string channel)
+    {
+        var payload = JsonSerializer.Serialize(new TestRemoteNotificationPayload(channel), JsonOptions);
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.TestRemoteNotification,
+            Payload = payload
+        });
+
+        if (response?.Type == PipeMessageTypes.TestRemoteNotificationResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<TestRemoteNotificationResultPayload>(response.Payload, JsonOptions);
+                if (result != null)
+                    return (result.Success, result.Message);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return (false, LocalizationService.Instance["PipeRemoteTestNoResult"]);
+    }
+
+    /// <summary>Отправляет конфигурацию Kaspersky OpenTIP службе.</summary>
+    public async Task SetKasperskyConfigAsync(bool enabled, string apiKey, string apiUrl)
+    {
+        var payload = JsonSerializer.Serialize(new KasperskyConfigDto
+        {
+            Enabled = enabled,
+            ApiKey = apiKey,
+            ApiUrl = apiUrl
+        }, JsonOptions);
+
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetKasperskyConfig,
+            Payload = payload
+        });
+    }
+
+    /// <summary>Отправляет конфигурацию автоматических политик защиты Auto-Guards службе.</summary>
+    public async Task SetAutoGuardConfigAsync(AutoGuardConfigPayload config)
+    {
+        var payload = JsonSerializer.Serialize(config, JsonOptions);
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetAutoGuardConfig,
+            Payload = payload
+        });
+    }
+
+    /// <summary>Проверяет подключение к API Kaspersky OpenTIP через службу.</summary>
+    public async Task<KasperskyTestResult> TestKasperskyConnectionAsync(string apiKey, string apiUrl)
+    {
+        var payload = JsonSerializer.Serialize(new KasperskyConfigDto
+        {
+            Enabled = true,
+            ApiKey = apiKey,
+            ApiUrl = apiUrl
+        }, JsonOptions);
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.TestKasperskyConnection,
+            Payload = payload
+        });
+
+        if (response?.Type == PipeMessageTypes.TestKasperskyConnectionResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<KasperskyTestResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return new KasperskyTestResult
+        {
+            Success = false,
+            Message = LocalizationService.Instance["PipeKasperskyTestNoResult"]
+        };
+    }
+
+    /// <summary>Запрашивает сканирование отдельной записи через Kaspersky OpenTIP.</summary>
+    public async Task<StartupEntry?> ScanKasperskyEntryAsync(string entryId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.ScanKasperskyEntry,
+            Payload = JsonSerializer.Serialize(entryId, JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.ScanKasperskyEntryResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return null;
+    }
+
+    /// <summary>Устанавливает настройку "убивать процесс при отключении".</summary>
+    public async Task SetKillOnDisableAsync(bool value)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetKillOnDisable,
+            Payload = JsonSerializer.Serialize(value, JsonOptions)
+        });
+    }
+
+    /// <summary>Отправляет настройки троттлинга сканирования реестра по загрузке CPU.</summary>
+    public async Task SetCpuThrottleAsync(bool enabled, int threshold)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetCpuThrottle,
+            Payload = JsonSerializer.Serialize(new CpuThrottlePayload(enabled, threshold), JsonOptions)
+        });
+    }
+
+    /// <summary>Отправляет настройку строгого режима (блокировка новых записей).</summary>
+    public async Task SetStrictModeAsync(bool enabled)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetStrictMode,
+            Payload = JsonSerializer.Serialize(new StrictModePayload(enabled), JsonOptions)
+        });
+    }
+
+    /// <summary>Синхронизирует язык интерфейса ("ru", "en") со службой.</summary>
+    public async Task SetLanguageAsync(string lang)
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetLanguage,
+            Payload = lang
+        });
+    }
+
+    /// <summary>Запрашивает немедленную переоценку AI-рейтинга для указанной записи и возвращает обновленные данные.</summary>
+    public async Task<StartupEntry?> ReRateEntryAsync(string entryId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.ReRateEntry,
+            Payload = JsonSerializer.Serialize(entryId, JsonOptions)
+        });
+
+        if (response?.Payload != null)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Устанавливает ручной рейтинг для записи (от 1 до 5 звёзд) или сбрасывает к автоматической AI-оценке.</summary>
+    public async Task<StartupEntry?> SetUserRatingAsync(string entryId, int stars, bool resetToAi = false)
+    {
+        var request = new SetUserRatingRequest
+        {
+            EntryId = entryId,
+            Stars = stars,
+            ResetToAi = resetToAi
+        };
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetUserRating,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        });
+
+        if (response?.Payload != null)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<StartupEntry>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Восстанавливает удалённую запись в системе.</summary>
+    public async Task<bool> RestoreEntryAsync(string removedId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.RestoreEntry,
+            Payload = JsonSerializer.Serialize(removedId, JsonOptions)
+        });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Подписывается на регулярный поток метрик процессов (для вкладки Диспетчера задач).</summary>
+    public async Task SubscribeProcessMetricsAsync()
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SubscribeProcessMetrics
+        });
+    }
+
+    /// <summary>Отписывается от потока метрик процессов (при уходе с вкладки, снижая CPU службы до 0%).</summary>
+    public async Task UnsubscribeProcessMetricsAsync()
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.UnsubscribeProcessMetrics
+        });
+    }
+
+    /// <summary>Запрашивает актуальный снимок процессов и системной нагрузки.</summary>
+    public async Task<SystemPerformanceSnapshot?> GetProcessesAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetProcesses
+        });
+
+        if (response?.Type == PipeMessageTypes.ProcessesSnapshot && !string.IsNullOrEmpty(response.Payload))
+        {
+            return await DeserializeInBackgroundAsync<SystemPerformanceSnapshot>(response.Payload, JsonOptions);
+        }
+
+        return null;
+    }
+
+    /// <summary>Завершает процесс по идентификатору (PID).</summary>
+    public virtual async Task<ProcessActionResultPayload?> KillProcessAsync(int pid, string? processName = null, long? expectedCreationFileTimeUtc = null)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.KillProcessById,
+            Payload = JsonSerializer.Serialize(new KillProcessPayload(pid, processName, expectedCreationFileTimeUtc), JsonOptions)
+        });
+
+        if (!string.IsNullOrEmpty(response?.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
+    }
+
+    /// <summary>Блокирует процесс в Чёрном списке и завершает его.</summary>
+    public virtual async Task<ProcessActionResultPayload?> BlockProcessAsync(int pid, string filePath, string? processName = null, long? expectedCreationFileTimeUtc = null)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.BlockProcess,
+            Payload = JsonSerializer.Serialize(new BlockProcessPayload(pid, filePath, processName, expectedCreationFileTimeUtc), JsonOptions)
+        });
+
+        if (!string.IsNullOrEmpty(response?.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
+    }
+
+    /// <summary>Приостанавливает выполнение процесса по PID.</summary>
+    public virtual async Task<ProcessActionResultPayload?> SuspendProcessAsync(int pid, string? processName = null, long? expectedCreationFileTimeUtc = null)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SuspendProcess,
+            Payload = JsonSerializer.Serialize(new SuspendProcessPayload(pid, processName, expectedCreationFileTimeUtc), JsonOptions)
+        });
+
+        if (!string.IsNullOrEmpty(response?.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
+    }
+
+    /// <summary>Возобновляет выполнение ранее приостановленного процесса по PID.</summary>
+    public virtual async Task<ProcessActionResultPayload?> ResumeProcessAsync(int pid, string? processName = null, long? expectedCreationFileTimeUtc = null)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.ResumeProcess,
+            Payload = JsonSerializer.Serialize(new ResumeProcessPayload(pid, processName, expectedCreationFileTimeUtc), JsonOptions)
+        });
+
+        if (!string.IsNullOrEmpty(response?.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ProcessActionResultPayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+
+        return new ProcessActionResultPayload(response?.Type == PipeMessageTypes.Success, response?.Payload ?? "");
+    }
+
+    /// <summary>Переводит запись в режим отложенного запуска с указанным интервалом задержки.</summary>
+    public async Task<(bool Success, string? Error)> SetDelayedEntryAsync(string entryId, int delaySeconds = 30)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetDelayedEntry,
+            Payload = JsonSerializer.Serialize(new SetDelayedEntryPayload(entryId, delaySeconds), JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.Success)
+            return (true, null);
+
+        return (false, response?.Payload ?? LocalizationService.Instance["PipeDelaySetError"]);
+    }
+
+    /// <summary>Отменяет отложенный запуск записи и возвращает обычный автозапуск.</summary>
+    public async Task<(bool Success, string? Error)> CancelDelayedEntryAsync(string entryId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CancelDelayedEntry,
+            Payload = JsonSerializer.Serialize(new CancelDelayedEntryPayload(entryId), JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.Success)
+            return (true, null);
+
+        return (false, response?.Payload ?? LocalizationService.Instance["PipeDelayCancelError"]);
+    }
+
+    /// <summary>Выполняет принудительный тестовый запуск отложенной программы.</summary>
+    public async Task<(bool Success, string Message)> LaunchDelayedEntryAsync(string entryId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.LaunchDelayedEntry,
+            Payload = JsonSerializer.Serialize(new LaunchDelayedEntryPayload(entryId), JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.Success)
+            return (true, response.Payload ?? LocalizationService.Instance["PipeLaunchSuccess"]);
+
+        return (false, response?.Payload ?? LocalizationService.Instance["PipeLaunchError"]);
+    }
+
+    /// <summary>Создаёт новый контрольный снимок автозапуска системы.</summary>
+    public async Task<(bool Success, string? Error, BaselineSnapshot? Snapshot)> CreateSnapshotAsync(string? name = null, string? description = null)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CreateSnapshot,
+            Payload = JsonSerializer.Serialize(new CreateSnapshotPayload(name, description), JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.Success && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                var snapshot = JsonSerializer.Deserialize<BaselineSnapshot>(response.Payload, JsonOptions);
+                return (true, null, snapshot);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return (false, string.Format(LocalizationService.Instance["PipeSnapshotParseError"], ex.Message), null);
+            }
+        }
+
+        return (false, response?.Payload ?? LocalizationService.Instance["PipeSnapshotCreateError"], null);
+    }
+
+    /// <summary>Запрашивает список всех сохранённых контрольных снимков.</summary>
+    public async Task<List<BaselineSnapshot>> GetSnapshotsAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetSnapshots
+        });
+
+        if (response?.Type == PipeMessageTypes.Success && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<BaselineSnapshot>>(response.Payload, JsonOptions);
+                return list ?? [];
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return [];
+            }
+        }
+
+        return [];
+    }
+
+    /// <summary>Удаляет контрольный снимок по его Id.</summary>
+    public async Task<(bool Success, string? Message)> DeleteSnapshotAsync(string snapshotId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.DeleteSnapshot,
+            Payload = JsonSerializer.Serialize(new DeleteSnapshotPayload(snapshotId), JsonOptions)
+        });
+
+        var ok = response?.Type == PipeMessageTypes.Success;
+        return (ok, response?.Payload);
+    }
+
+    /// <summary>Сравнивает текущее состояние автозапуска со снимком («Было — Стало»).</summary>
+    public async Task<(bool Success, string? Error, SnapshotComparisonResult? Result)> CompareSnapshotAsync(string snapshotId)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CompareSnapshot,
+            Payload = JsonSerializer.Serialize(new CompareSnapshotPayload(snapshotId), JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.Success && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<SnapshotComparisonResult>(response.Payload, JsonOptions);
+                return (true, null, result);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return (false, string.Format(LocalizationService.Instance["PipeCompareParseError"], ex.Message), null);
+            }
+        }
+
+        return (false, response?.Payload ?? LocalizationService.Instance["PipeCompareError"], null);
+    }
+
+    /// <summary>Запрашивает у службы отчёт анализатора времени загрузки Windows (Boot Time Tracer).</summary>
+    public async Task<StartupMonitor.Shared.Models.BootTime.BootTimeReport?> GetBootTimeReportAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetBootTimeReport,
+            Payload = "{}"
+        });
+
+        if (response?.Type == PipeMessageTypes.Success && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<StartupMonitor.Shared.Models.BootTime.BootTimeReport>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Приостанавливает глобальный мониторинг автозапуска в службе.</summary>
+    public async Task<bool> PauseMonitoringAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.PauseMonitoring,
+            Payload = "{}"
+        });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Возобновляет глобальный мониторинг автозапуска в службе.</summary>
+    public async Task<bool> ResumeMonitoringAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.ResumeMonitoring,
+            Payload = "{}"
+        });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает текущее состояние мониторинга (активен / приостановлен).</summary>
+    public async Task<MonitoringStatePayload?> GetMonitoringStateAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetMonitoringState,
+            Payload = "{}"
+        });
+
+        if (response?.Type == PipeMessageTypes.MonitoringStateResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<MonitoringStatePayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Запрашивает расширенную информацию о службе (PID, версия, аптайм).</summary>
+    public async Task<ServiceInfoPayload?> GetServiceInfoAsync()
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetServiceInfo,
+            Payload = "{}"
+        });
+
+        if (response?.Type == PipeMessageTypes.ServiceInfoResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ServiceInfoPayload>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Запрашивает список активных сетевых соединений (сокетов) для процесса (или всех процессов).</summary>
+    public async Task<List<ProcessNetworkSocket>> GetProcessNetworkConnectionsAsync(int pid = -1)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetProcessNetworkConnections,
+            Payload = pid > 0 ? pid.ToString() : "{}"
+        });
+
+        if (response?.Type == PipeMessageTypes.ProcessNetworkConnectionsResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<List<ProcessNetworkSocket>>(response.Payload, JsonOptions) ?? [];
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return [];
+            }
+        }
+        return [];
+    }
+
+    /// <summary>Запрашивает список загруженных модулей (DLL) и дескрипторов (Handles) для процесса.</summary>
+    public async Task<ProcessModulesResponse?> GetProcessModulesAsync(int pid, bool includeHandles = true)
+    {
+        var request = new GetProcessModulesRequest
+        {
+            ProcessId = pid,
+            IncludeHandles = includeHandles
+        };
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.GetProcessModules,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        });
+
+        if (response?.Type == PipeMessageTypes.ProcessModulesResponse && !string.IsNullOrEmpty(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<ProcessModulesResponse>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return new ProcessModulesResponse
+                {
+                    ProcessId = pid,
+                    Success = false,
+                    ErrorMessage = $"Ошибка десериализации ответа: {ex.Message}"
+                };
+            }
+        }
+
+        return new ProcessModulesResponse
+        {
+            ProcessId = pid,
+            Success = false,
+            ErrorMessage = response?.Payload ?? "Служба не вернула ответ на запрос модулей процесса."
+        };
+    }
+
+    /// <summary>Запрашивает проверку наличия обновлений на GitHub через службу.</summary>
+    public async Task<UpdateCheckResult?> CheckForUpdatesAsync()
+    {
+        var uiVersion = typeof(PipeClient).Assembly.GetName().Version?.ToString(3) ?? "1.4.0";
+        var clientBuildDate = GetLocalProcessDateUtc();
+        var req = new CheckForUpdatesRequest(uiVersion, clientBuildDate);
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CheckForUpdates,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        });
+        if (response?.Type == PipeMessageTypes.CheckForUpdatesResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<UpdateCheckResult>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Отправляет команду на скачивание пакета обновления.</summary>
+    public async Task<bool> DownloadUpdateAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.DownloadUpdate });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Отправляет команду на установку скачанного обновления.</summary>
+    public async Task<(bool Success, string Message)> InstallUpdateAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.InstallUpdate });
+        if (response?.Type == PipeMessageTypes.InstallUpdateResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(response.Payload);
+                var success = doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
+                var msg = doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
+                return (success, msg);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return (false, response?.Payload ?? "Ошибка при запуске обновления.");
+    }
+
+    /// <summary>Запрашивает статус процесса загрузки обновления.</summary>
+    public async Task<UpdateProgressInfo?> GetUpdateStatusAsync()
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetUpdateStatus });
+        if (response?.Type == PipeMessageTypes.UpdateStatusResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<UpdateProgressInfo>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Сохраняет настройки параметров автообновления.</summary>
+    public async Task<bool> SetUpdateSettingsAsync(UpdateSettingsPayload settings)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetUpdateSettings,
+            Payload = JsonSerializer.Serialize(settings, JsonOptions)
+        });
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает актуальный статус брандмауэра Windows и управляемых правил.</summary>
+    public async Task<FirewallStatusDto?> GetFirewallStatusAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallStatus }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<FirewallStatusDto>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Отправляет запрос на блокировку IP-адреса в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> BlockIpAsync(BlockIpRequest request, CancellationToken ct = default)
+    {
+        if (request == null)
+            return FirewallOperationResult.Fail("Запрос блокировки IP не может быть null.");
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.BlockIp,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось заблокировать IP-адрес.");
+    }
+
+    /// <summary>Отправляет запрос на разблокировку IP-адреса в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> UnblockIpAsync(string ip, FirewallDirection direction = FirewallDirection.Both, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(ip))
+            return FirewallOperationResult.Fail("IP-адрес не указан.");
+
+        var req = new UnblockIpRequest { Ip = ip.Trim(), Direction = direction };
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.UnblockIp,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось разблокировать IP-адрес.");
+    }
+
+    /// <summary>Отправляет запрос на блокировку порта в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> BlockPortAsync(BlockPortRequest request, CancellationToken ct = default)
+    {
+        if (request == null)
+            return FirewallOperationResult.Fail("Запрос блокировки порта не может быть null.");
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.BlockPort,
+            Payload = JsonSerializer.Serialize(request, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось заблокировать порт.");
+    }
+
+    /// <summary>Отправляет запрос на разблокировку порта в брандмауэре Windows.</summary>
+    public async Task<FirewallOperationResult> UnblockPortAsync(int port, FirewallProtocol protocol = FirewallProtocol.Tcp, FirewallDirection direction = FirewallDirection.Inbound, string? appPath = null, CancellationToken ct = default)
+    {
+        var req = new UnblockPortRequest
+        {
+            Port = port,
+            Protocol = protocol,
+            Direction = direction,
+            ApplicationPath = appPath
+        };
+
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.UnblockPort,
+            Payload = JsonSerializer.Serialize(req, JsonOptions)
+        }, ct);
+
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось разблокировать порт.");
+    }
+
+    /// <summary>Запрашивает актуальную конфигурацию правил защиты Port Defender.</summary>
+    public async Task<PortDefenderConfigDto?> GetPortDefenderConfigAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetPortDefenderConfig }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<PortDefenderConfigDto>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Отправляет новую конфигурацию правил защиты Port Defender.</summary>
+    public async Task<FirewallOperationResult> SetPortDefenderConfigAsync(PortDefenderConfigDto config, CancellationToken ct = default)
+    {
+        if (config == null) return FirewallOperationResult.Fail("Конфигурация не может быть null.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetPortDefenderConfig,
+            Payload = JsonSerializer.Serialize(config, JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        if (response?.Type == PipeMessageTypes.Success)
+            return FirewallOperationResult.Ok("Конфигурация Port Defender успешно сохранена.");
+
+        return FirewallOperationResult.Fail(response != null ? "Служба отклонила запрос конфигурации." : "Таймаут или обрыв IPC-связи со службой.");
+    }
+
+    /// <summary>Запрашивает список текущих активных блокировок службы Port Defender.</summary>
+    public async Task<List<ActiveBanDto>> GetActiveBansAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetActiveBans }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var bans = JsonSerializer.Deserialize<List<ActiveBanDto>>(response.Payload, JsonOptions);
+                if (bans != null) return bans;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return new List<ActiveBanDto>();
+    }
+
+    /// <summary>Отправляет команду на снятие всех активных блокировок Port Defender.</summary>
+    public async Task<bool> ClearAllBansAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.ClearAllBans }, ct);
+        return response?.Type == PipeMessageTypes.Success;
+    }
+
+    /// <summary>Запрашивает все правила брандмауэра Windows.</summary>
+    public async Task<List<FirewallRuleDto>?> GetAllFirewallRulesAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAllFirewallRules }, ct);
+        if (response?.Type == PipeMessageTypes.GetAllFirewallRulesResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var payload = JsonSerializer.Deserialize<FirewallRulesPayload>(response.Payload, JsonOptions);
+                if (payload?.Rules != null) return payload.Rules;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+            try
+            {
+                return JsonSerializer.Deserialize<List<FirewallRuleDto>>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Создаёт или обновляет правило брандмауэра Windows.</summary>
+    public async Task<FirewallOperationResult> CreateOrUpdateFirewallRuleAsync(FirewallRuleDto rule, CancellationToken ct = default)
+    {
+        if (rule == null)
+            return FirewallOperationResult.Fail("Правило брандмауэра не может быть null.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.CreateFirewallRule,
+            Payload = JsonSerializer.Serialize(new CreateRulePayload(rule), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось создать правило брандмауэра.");
+    }
+
+    /// <summary>Удаляет правило брандмауэра по имени.</summary>
+    public async Task<FirewallOperationResult> DeleteFirewallRuleAsync(string name, FirewallDirection direction = FirewallDirection.Both, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return FirewallOperationResult.Fail("Имя правила не указано.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.DeleteFirewallRule,
+            Payload = JsonSerializer.Serialize(new DeleteRulePayload(name.Trim(), direction), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось удалить правило брандмауэра.");
+    }
+
+    /// <summary>Включает или выключает правило брандмауэра.</summary>
+    public async Task<FirewallOperationResult> ToggleFirewallRuleAsync(string name, FirewallDirection direction, bool enable, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return FirewallOperationResult.Fail("Имя правила не указано.");
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.ToggleFirewallRule,
+            Payload = JsonSerializer.Serialize(new ToggleRulePayload(name.Trim(), direction, enable), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось переключить правило брандмауэра.");
+    }
+
+    /// <summary>Устанавливает режим фильтрации брандмауэра Windows.</summary>
+    public async Task<FirewallOperationResult> SetFirewallFilteringModeAsync(FirewallFilteringMode mode, CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetFirewallFilteringMode,
+            Payload = JsonSerializer.Serialize(new FilteringModePayload(mode), JsonOptions)
+        }, ct);
+        if (response != null && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions);
+                if (result != null) return result;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        if (response?.Type == PipeMessageTypes.Success)
+            return FirewallOperationResult.Ok(response.Payload ?? "Режим фильтрации обновлён.");
+        return FirewallOperationResult.Fail(response?.Payload ?? "Не удалось установить режим фильтрации.");
+    }
+
+    /// <summary>Запрашивает текущий режим фильтрации брандмауэра Windows.</summary>
+    public async Task<FirewallFilteringMode> GetFirewallFilteringModeAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallFilteringMode }, ct);
+        if (response?.Type == PipeMessageTypes.GetFirewallFilteringModeResponse && !string.IsNullOrWhiteSpace(response.Payload))
+        {
+            try
+            {
+                var payload = JsonSerializer.Deserialize<FilteringModePayload>(response.Payload, JsonOptions);
+                if (payload != null) return payload.Mode;
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+            try
+            {
+                return JsonSerializer.Deserialize<FirewallFilteringMode>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex) { LogResponseFailure(ex); }
+        }
+        return FirewallFilteringMode.Normal;
+    }
+
+    /// <summary>Запрашивает штатную остановку фоновой службы (мягкое завершение хоста).</summary>
+    /// <param name="timeoutMs">Таймаут ожидания ответа от службы в миллисекундах.</param>
+    /// <returns>True, если служба подтвердила остановку (Success).</returns>
+    public async Task<bool> RequestServiceShutdownAsync(int timeoutMs = 3000)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(timeoutMs);
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ShutdownService
+            }, cts.Token);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return false;
+        }
+    }
+
+    /// <summary>Отправляет решение пользователя по алерту о новом сетевом подключении.</summary>
+    /// <param name="request">Запрос резолва (AlertId + выбранное решение).</param>
+    /// <param name="ct">Токен отмены операции.</param>
+    /// <returns>True, если служба применила решение.</returns>
+    public async Task<bool> ResolveNetworkAlertAsync(ResolveNetworkAlertRequest request, CancellationToken ct = default)
+    {
+        if (request == null)
+            return false;
+
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ResolveNetworkAlert,
+                Payload = JsonSerializer.Serialize(request, JsonOptions)
+            }, ct);
+
+            if (response == null)
+                return false;
+
+            if (response.Type == PipeMessageTypes.ResolveNetworkAlertResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var result = JsonSerializer.Deserialize<ResolveNetworkAlertResultPayload>(response.Payload, JsonOptions);
+                    return result?.Success ?? false;
+                }
+                catch (Exception ex)
+                {
+                    LogResponseFailure(ex);
+                    return false;
+                }
+            }
+
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return false;
+        }
+    }
+
+    /// <summary>Запрашивает у службы список ожидающих сетевых алертов о новых подключениях.</summary>
+    /// <returns>Список <see cref="NetworkConnectionAlertDto"/> (пустой при недоступности службы).</returns>
+    public async Task<List<NetworkConnectionAlertDto>> GetPendingNetworkAlertsAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetPendingNetworkAlerts
+            }, ct);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Payload))
+                return new List<NetworkConnectionAlertDto>();
+
+            if (response.Type == PipeMessageTypes.GetPendingNetworkAlertsResponse)
+            {
+                try
+                {
+                    var payload = JsonSerializer.Deserialize<NetworkAlertsPayload>(response.Payload, JsonOptions);
+                    if (payload?.Alerts != null)
+                        return payload.Alerts;
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+                // Fallback: служба может вернуть голый список алертов.
+                try
+                {
+                    return JsonSerializer.Deserialize<List<NetworkConnectionAlertDto>>(response.Payload, JsonOptions)
+                        ?? new List<NetworkConnectionAlertDto>();
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+            }
+
+            return new List<NetworkConnectionAlertDto>();
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return new List<NetworkConnectionAlertDto>();
+        }
+    }
+
+    /// <summary>Запрашивает полный журнал истории сетевых подключений у службы.</summary>
+    public async Task<List<NetworkConnectionHistoryItem>> GetConnectionHistoryAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetConnectionHistory
+            }, ct);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Payload))
+                return new List<NetworkConnectionHistoryItem>();
+
+            if (response.Type == PipeMessageTypes.GetConnectionHistoryResponse)
+            {
+                return JsonSerializer.Deserialize<List<NetworkConnectionHistoryItem>>(response.Payload, JsonOptions)
+                    ?? new List<NetworkConnectionHistoryItem>();
+            }
+
+            return new List<NetworkConnectionHistoryItem>();
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return new List<NetworkConnectionHistoryItem>();
+        }
+    }
+
+    /// <summary>Запрашивает очистку журнала истории сетевых подключений у службы.</summary>
+    public async Task<bool> ClearConnectionHistoryAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ClearConnectionHistory
+            }, ct);
+
+            return response != null && response.Type == PipeMessageTypes.ClearConnectionHistoryResponse;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Запрашивает оценку сетевого подключения нейросетью у службы.
+    /// Оценка выполняется по отдельному именованному каналу, чтобы длительный AI-запрос
+    /// не удерживал <c>_sendLock</c> основного соединения и не блокировал действия пользователя
+    /// (например, кнопки «Разрешить»/«Заблокировать» в окне алерта).
+    /// </summary>
+    /// <param name="alertId">Идентификатор алерта.</param>
+    /// <param name="processName">Имя процесса.</param>
+    /// <param name="processPath">Полный путь к исполняемому файлу.</param>
+    /// <param name="remoteAddress">Удалённый IP-адрес.</param>
+    /// <param name="remotePort">Удалённый порт.</param>
+    /// <param name="ct">Токен отмены: при отмене отдельное соединение немедленно закрывается,
+    /// поэтому «хвостовой» ответ службы не может десинхронизировать основной канал.</param>
+    /// <returns>Результат оценки либо null при отмене, таймауте или недоступности службы.</returns>
+    public async Task<EvaluateNetworkAlertResponsePayload?> EvaluateNetworkAlertAsync(
+        string alertId, string processName, string processPath, string remoteAddress, int remotePort, CancellationToken ct = default)
+    {
+        NamedPipeClientStream? pipe = null;
+        try
+        {
+            // Отдельный экземпляр канала: служба поддерживает до 10 одновременных клиентов,
+            // а основной канал остаётся свободным для срочных команд (ResolveNetworkAlert).
+            pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await pipe.ConnectAsync(3000, ct).ConfigureAwait(false);
+
+            using var reader = new StreamReader(pipe);
+            using var writer = new StreamWriter(pipe) { AutoFlush = true };
+
+            var req = new EvaluateNetworkAlertRequest(alertId, processName, processPath, remoteAddress, remotePort);
+            var requestJson = JsonSerializer.Serialize(new PipeMessage
+            {
+                Type = PipeMessageTypes.EvaluateNetworkAlert,
+                Payload = JsonSerializer.Serialize(req, JsonOptions)
+            }, JsonOptions);
+
+            await writer.WriteLineAsync(requestJson.AsMemory(), ct).ConfigureAwait(false);
+            await writer.FlushAsync(ct).ConfigureAwait(false);
+
+            // Ограничиваем ожидание ответа, не смешивая таймаут с пользовательской отменой:
+            // отмена ct должна закрыть канал, а не оставить недочитанный ответ в буфере.
+            using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            responseCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+            var line = await reader.ReadLineAsync(responseCts.Token).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(line))
+                return null;
+
+            var response = JsonSerializer.Deserialize<PipeMessage>(line, JsonOptions);
+            if (response != null
+                && response.Type == PipeMessageTypes.EvaluateNetworkAlertResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<EvaluateNetworkAlertResponsePayload>(response.Payload, JsonOptions);
+            }
+
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            // Ожидаемая отмена: пользователь принял решение или окно закрыто.
+            return null;
+        }
+        catch (TimeoutException ex)
+        {
+            // Служба не успела открыть отдельный канал за 3 секунды; повторные отказы ограничены по частоте.
+            LogResponseFailure(ex);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return null;
+        }
+        finally
+        {
+            // Закрытие отдельного канала гарантирует, что поздний ответ службы
+            // уйдёт в уже закрытый pipe и не будет прочитан следующим запросом.
+            try { pipe?.Dispose(); } catch (ObjectDisposedException ex) { LogResponseFailure(ex); }
+        }
+    }
+
+    /// <summary>Отправляет службе настройки автономных решений ИИ для сетевых подключений.</summary>
+    public async Task SetAiAutonomousDecisionsAsync(bool enabled, string mode, CancellationToken ct = default)
+    {
+        try
+        {
+            var payload = new AiAutonomousDecisionsPayload(enabled, mode);
+            await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetAiAutonomousDecisions,
+                Payload = JsonSerializer.Serialize(payload, JsonOptions)
+            }, ct);
+        }
+        catch (Exception ex) { LogResponseFailure(ex); }
+    }
+
+    /// <summary>Включает/выключает детектор новых сетевых подключений на стороне службы.</summary>
+    /// <param name="enabled">True — интерактивные уведомления включены.</param>
+    /// <returns>True, если служба подтвердила изменение.</returns>
+    public async Task<bool> SetNetworkAlertsEnabledAsync(bool enabled, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetAlertsEnabled,
+                Payload = JsonSerializer.Serialize(new AlertsEnabledPayload(enabled), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return false;
+        }
+    }
+
+    /// <summary>Запрашивает текущее состояние детектора новых сетевых подключений.</summary>
+    /// <returns>True — интерактивные уведомления включены; false — выключены/нет данных.</returns>
+    public async Task<bool> GetNetworkAlertsEnabledAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetAlertsEnabled
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.GetAlertsEnabledResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var payload = JsonSerializer.Deserialize<AlertsEnabledPayload>(response.Payload, JsonOptions);
+                    if (payload != null)
+                        return payload.Enabled;
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+                // Fallback: служба может вернуть голый bool.
+                try
+                {
+                    return JsonSerializer.Deserialize<bool>(response.Payload, JsonOptions);
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return false;
+        }
+    }
+
+    /// <summary>Запрашивает у службы бэкап правил брандмауэра (экспорт).</summary>
+    /// <returns>Бэкап <see cref="FirewallBackupDto"/> или null при недоступности службы.</returns>
+    public async Task<FirewallBackupDto?> ExportFirewallRulesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ExportFirewallRules
+            }, ct);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.Payload))
+                return null;
+
+            try
+            {
+                return JsonSerializer.Deserialize<FirewallBackupDto>(response.Payload, JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                LogResponseFailure(ex);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return null;
+        }
+    }
+
+    /// <summary>Отправляет службе бэкап правил для импорта.</summary>
+    /// <param name="backup">Бэкап правил.</param>
+    /// <param name="overwrite">Перезаписывать существующие правила с тем же именем.</param>
+    /// <returns>Кортеж (Imported, Skipped). При ошибке — (0, 0).</returns>
+    public async Task<(int Imported, int Skipped)> ImportFirewallRulesAsync(FirewallBackupDto backup, bool overwrite = false, CancellationToken ct = default)
+    {
+        if (backup == null)
+            return (0, 0);
+
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ImportFirewallRules,
+                Payload = JsonSerializer.Serialize(new ImportFirewallRulesRequest(backup, overwrite), JsonOptions)
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.ImportFirewallRulesResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var result = JsonSerializer.Deserialize<FirewallImportResultPayload>(response.Payload, JsonOptions);
+                    if (result != null)
+                        return (result.Imported, result.Skipped);
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+            }
+
+            return (0, 0);
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return (0, 0);
+        }
+    }
+
+    /// <summary>Применяет готовый пресет безопасности брандмауэра.</summary>
+    /// <param name="presetType">Тип пресета.</param>
+    /// <returns>Количество применённых правил (0 при ошибке).</returns>
+    public async Task<int> ApplySecurityPresetAsync(SecurityPresetType presetType, CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.ApplySecurityPreset,
+                Payload = JsonSerializer.Serialize(new ApplySecurityPresetRequest(presetType), JsonOptions)
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.ApplySecurityPresetResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                try
+                {
+                    var result = JsonSerializer.Deserialize<SecurityPresetResultPayload>(response.Payload, JsonOptions);
+                    if (result != null)
+                        return result.AppliedCount;
+                }
+                catch (Exception ex) { LogResponseFailure(ex); }
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return 0;
+        }
+    }
+
+    /// <summary>Возвращает дату бинарника UI в UTC; диагностика чтения метаданных ограничивается частотой этого клиента.</summary>
+    /// <returns>Дата файла либо null при недоступных метаданных.</returns>
+    private DateTime? GetLocalProcessDateUtc()
+    {
+        try
+        {
+            var p = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(p) && File.Exists(p))
+            {
+                var w = File.GetLastWriteTimeUtc(p);
+                var c = File.GetCreationTimeUtc(p);
+                return w > c ? w : c;
+            }
+        }
+        catch (Exception ex) { LogResponseFailure(ex); }
+        return null;
+    }
+
+
+    /// <summary>Отменяет чтение и освобождает принадлежащие клиенту ресурсы; сбой одного ресурса не мешает остальной очистке.</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        try { _eventCts?.Cancel(); }
+        catch (Exception ex) { LogResponseFailure(ex, "Dispose.CancelEvents"); }
+        // Закрываем транспорт до обёрток, чтобы их освобождение не ожидало удалённого читателя.
+        ReleaseResource(_eventPipe, "событийный канал");
+        ReleaseResource(_pipe, "командный канал");
+        ReleaseResource(_eventReader, "читатель событий");
+        ReleaseResource(_reader, "читатель ответов");
+        ReleaseResource(_writer, "писатель запросов");
+        ReleaseResource(_eventCts, "источник отмены событий");
+        ReleaseResource(_sendLock, "семафор запросов");
+        _pipe = null;
+        _reader = null;
+        _writer = null;
+        _eventPipe = null;
+        _eventReader = null;
+    }
+
+    /// <summary>Освобождает ресурс транспорта с контекстной диагностикой ошибок завершения.</summary>
+    /// <param name="resource">Принадлежащий клиенту ресурс либо null при отсутствии подключения.</param>
+    /// <param name="name">Название ресурса для журнала.</param>
+    private void ReleaseResource(IDisposable? resource, string name)
+    {
+        try { resource?.Dispose(); }
+        catch (Exception ex) { LogResponseFailure(ex, "Dispose." + name); }
+    }
+
+    /// <summary>Диагностирует отказ операции не чаще раза в 30 секунд без записи полезной нагрузки, ключей или текста исключения.</summary>
+    /// <param name="exception">Причина перехода к существующему безопасному результату метода.</param>
+    /// <param name="operation">Имя вызывающего метода для локализации отказа.</param>
+    private void LogResponseFailure(Exception exception, [CallerMemberName] string operation = "")
+    {
+        // Пользовательская отмена и завершение уже освобождённого клиента являются штатными исходами.
+        if (exception is OperationCanceledException || (_disposed && exception is ObjectDisposedException)) return;
+        var now = Environment.TickCount64;
+        if (_lastResponseFailureLogs.TryGetValue(operation, out var previous))
+        {
+            if (now - previous < 30_000 || !_lastResponseFailureLogs.TryUpdate(operation, now, previous)) return;
+        }
+        else if (!_lastResponseFailureLogs.TryAdd(operation, now)) return;
+        App.Log($"PipeClient: {operation}: операция завершилась с ошибкой {exception.GetType().Name}; используется резервный результат.");
+    }
+
+    /// <summary>Получает текущий статус тихого режима для сокетов PID = 0.</summary>
+    public async Task<bool> GetFirewallSilentPid0Async(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallSilentPid0 }, ct);
+            if (response?.Type == PipeMessageTypes.GetFirewallSilentPid0Response && !string.IsNullOrEmpty(response.Payload))
+            {
+                var payload = JsonSerializer.Deserialize<FirewallSilentPid0Payload>(response.Payload, JsonOptions);
+                return payload?.Silent ?? true;
+            }
+        }
+        catch (Exception ex) { LogResponseFailure(ex); }
+        return true;
+    }
+
+    /// <summary>Устанавливает статус тихого режима для сокетов PID = 0.</summary>
+    public async Task<bool> SetFirewallSilentPid0Async(bool silent, CancellationToken ct = default)
+    {
+        try
+        {
+            var payload = JsonSerializer.Serialize(new FirewallSilentPid0Payload(silent), JsonOptions);
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetFirewallSilentPid0,
+                Payload = payload
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
+    }
+
+    // ===== Белый список сетевых приложений брандмауэра (AppSettings.FirewallWhitelistedApps) =====
+
+    /// <summary>Запрашивает белый список сетевых приложений брандмауэра со стороны службы.</summary>
+    public async Task<List<string>> GetFirewallWhitelistAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallWhitelist }, ct);
+            if (response?.Type == PipeMessageTypes.GetFirewallWhitelistResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<List<string>>(response.Payload, JsonOptions) ?? new List<string>();
+            }
+        }
+        catch (Exception ex) { LogResponseFailure(ex); }
+        return new List<string>();
+    }
+
+    /// <summary>Добавляет путь к приложению в белый список брандмауэра.</summary>
+    public async Task<bool> AddToFirewallWhitelistAsync(string path, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.AddToFirewallWhitelist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim()), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
+    }
+
+    /// <summary>Удаляет путь к приложению из белого списка брандмауэра.</summary>
+    public async Task<bool> RemoveFromFirewallWhitelistAsync(string path, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.RemoveFromFirewallWhitelist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim()), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
+    }
+
+    // ===== Чёрный список сетевых приложений брандмауэра (AppSettings.FirewallBlacklistedApps) =====
+
+    /// <summary>Запрашивает чёрный список сетевых приложений брандмауэра со стороны службы.</summary>
+    public async Task<List<string>> GetFirewallBlacklistAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetFirewallBlacklist }, ct);
+            if (response?.Type == PipeMessageTypes.GetFirewallBlacklistResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<List<string>>(response.Payload, JsonOptions) ?? new List<string>();
+            }
+        }
+        catch (Exception ex) { LogResponseFailure(ex); }
+        return new List<string>();
+    }
+
+    /// <summary>Добавляет путь к приложению в чёрный список брандмауэра.</summary>
+    public async Task<bool> AddToFirewallBlacklistAsync(string path, string? reason = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.AddToFirewallBlacklist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim(), reason), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
+    }
+
+    /// <summary>Удаляет путь к приложению из чёрного списка брандмауэра (снимает блокирующее правило).</summary>
+    public async Task<bool> RemoveFromFirewallBlacklistAsync(string path, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.RemoveFromFirewallBlacklist,
+                Payload = JsonSerializer.Serialize(new FirewallAppActionPayload(path.Trim()), JsonOptions)
+            }, ct);
+            return response?.Type == PipeMessageTypes.Success;
+        }
+        catch (Exception ex) { LogResponseFailure(ex); return false; }
+    }
+
+    /// <summary>Запрашивает консолидированный снимок Единой матрицы контроля доступа сетевых приложений.</summary>
+    public async Task<List<AppAccessMatrixItemDto>> GetAppAccessMatrixAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetAppAccessMatrix }, ct);
+            if (response?.Type == PipeMessageTypes.GetAppAccessMatrixResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<List<AppAccessMatrixItemDto>>(response.Payload, JsonOptions) ?? new List<AppAccessMatrixItemDto>();
+            }
+        }
+        catch (Exception ex) { LogResponseFailure(ex); }
+        return new List<AppAccessMatrixItemDto>();
+    }
+
+    /// <summary>Устанавливает состояние доступа программы в Матрице контроля доступа (Allowed / Prompt / Blocked).</summary>
+    public async Task<FirewallOperationResult> SetAppAccessControlStateAsync(SetAppAccessStateRequest request, CancellationToken ct = default)
+    {
+        if (request == null) return FirewallOperationResult.Fail("Запрос пуст.");
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.SetAppAccessControlState,
+                Payload = JsonSerializer.Serialize(request, JsonOptions)
+            }, ct);
+
+            if (response?.Type == PipeMessageTypes.SetAppAccessControlStateResponse && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                return JsonSerializer.Deserialize<FirewallOperationResult>(response.Payload, JsonOptions) ?? FirewallOperationResult.Fail("Пустой ответ службы.");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return FirewallOperationResult.Fail(ex.Message);
+        }
+        return FirewallOperationResult.Fail("Нет связи со службой контроля доступа.");
+    }
+}

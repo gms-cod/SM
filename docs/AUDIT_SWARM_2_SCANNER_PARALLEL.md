@@ -1,0 +1,13 @@
+# Subagent 2: Startup Scanners Core Parallelization (Registry, WMI, Tasks) (OpenCode muse-spark-1.3-contributor-free)
+
+- Время выполнения: 600.1 сек
+- Статус: Ошибка (Exit code: -1)
+
+---
+
+
+
+### Stderr / Warnings:
+```
+Task timed out after 600 seconds.
+```

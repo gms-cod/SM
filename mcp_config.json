@@ -1,0 +1,13 @@
+﻿{
+    "mcpServers":  {
+                       "opencode-subagent":  {
+                                                 "command":  "C:\\Users\\Gms\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                                                 "args":  [
+                                                              "C:\\Users\\Gms\\.gemini\\config\\plugins\\opencode-subagent-kit\\engine\\mcp_server.py"
+                                                          ],
+                                                 "env":  {
+                                                             "PYTHONIOENCODING":  "utf-8"
+                                                         }
+                                             }
+                   }
+}
