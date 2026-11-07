@@ -29,7 +29,7 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# OpenCode / AI cache (optional)
+# OpenCode / AI cache & Internal rules (Local Only)
 .opencode/
 .agents/
 AGENTS.md
@@ -38,6 +38,19 @@ SWARM_RULES.md
 Rulez/
 opencode.json
 mcp_config.json
+.stignore
+
+# Internal swarm scripts and private audits (Local Only)
+scripts/run_*.py
+scripts/benchmark_*.py
+scripts/test_*.py
+scripts/analyze_*.py
+scripts/opencode_*.py
+scripts/generate_*.py
+scripts/fetch_*.py
+scripts/find_*.py
+docs/SWARM_*.md
+docs/AUDIT_*.md
 
 # Python caches
 __pycache__/
