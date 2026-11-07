@@ -73,12 +73,12 @@ try
     var dataStore = new JsonDataStore(configPath, (message, exception) => Log.Warning(exception, "{Message}", message));
     var cfg = dataStore.Load();
 
-    // При старте завершаем процессы заблокированных записей и любые процессы,
-    // чьи пути совпадают с правилами ЧС (даже без записи в списке — проблема ms-teams)
+    // Автоматические действия при старте подчиняются сохранённой паузе и тому же matcher,
+    // что ETW/legacy: статус Blocked сам по себе не превращает NotifyOnly в команду Kill.
     try
     {
-        EntryOperations.TerminateAllBlocked(cfg.Entries);
-        EntryOperations.KillProcessesByRules(cfg.Blacklist);
+        if (!cfg.Settings.IsMonitoringPaused)
+            EntryOperations.KillProcessesByRules(cfg.Blacklist);
     }
     catch (Exception ex)
     {
@@ -121,16 +121,35 @@ try
                 var store = sp.GetRequiredService<JsonDataStore>();
                 var currentCfg = store.Load();
                 var modeStr = currentCfg.Settings?.ProcessLifecycleMode ?? "EtwPreferred";
-                if (!Enum.TryParse<ProcessLifecycleMode>(modeStr, true, out var mode))
+                if (!Enum.TryParse<ProcessLifecycleMode>(modeStr, true, out var mode) || !Enum.IsDefined(mode))
                 {
-                    mode = ProcessLifecycleMode.EtwPreferred;
+                    Log.Warning("Неизвестный режим ETW; сохранён безопасный Legacy fallback.");
+                    mode = ProcessLifecycleMode.Legacy;
                 }
                 var ingress = sp.GetRequiredService<LifecycleIngress>();
                 var registry = sp.GetRequiredService<ProcessLifecycleRegistry>();
                 var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ProcessLifecycleSupervisor>>();
-                return new ProcessLifecycleSupervisor(registry, ingress, logger, mode: mode);
+                // Сверка использует общий нативный снимок без запуска сетевых метрик и обогащения.
+                var metrics = sp.GetRequiredService<ProcessMetricsTracker>();
+                var supervisor = new ProcessLifecycleSupervisor(registry, ingress, logger, mode: mode,
+                    snapshotSource: metrics.CaptureLifecycleSnapshot);
+                // Подпись остаётся ленивой: готовые immutable-метаданные принимаются только
+                // для текущего экземпляра с точно подтверждённым FILETIME, без переноса на новый PID.
+                sp.GetRequiredService<ProcessMetadataEnricher>().MetadataReady += update => registry.TryUpdateVerifiedMetadata(update);
+                return supervisor;
             });
             services.AddHostedService(sp => sp.GetRequiredService<ProcessLifecycleSupervisor>());
+            // Executor применяет ЧС вне callback ETW; общий gate исключает параллельное действие legacy sweep.
+            services.AddSingleton(sp =>
+            {
+                var supervisor = sp.GetRequiredService<ProcessLifecycleSupervisor>();
+                var metrics = sp.GetRequiredService<ProcessMetricsTracker>();
+                return new ProcessBlacklistEnforcer(sp.GetRequiredService<JsonDataStore>(),
+                    sp.GetRequiredService<MonitoringStateCoordinator>(), supervisor.Registry, supervisor.Ingress,
+                    supervisor.Mode, () => supervisor.HealthState, metrics.CaptureLifecycleSnapshot,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ProcessBlacklistEnforcer>>());
+            });
+            services.AddHostedService(sp => sp.GetRequiredService<ProcessBlacklistEnforcer>());
             services.AddHostedService<RegistryWatcher>();
             services.AddHostedService<StartupFolderWatcher>();
             services.AddHostedService<ServiceWatcher>();

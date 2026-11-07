@@ -275,7 +275,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
                                      !string.IsNullOrEmpty(incoming.ProcessName) &&
                                      !string.Equals(existing.ProcessName, incoming.ProcessName, StringComparison.OrdinalIgnoreCase);
 
-                if (isStartTimeChanged || isNameChanged)
+                // Без авторитетного времени нельзя переносить состояние/selection по одному PID.
+                bool isIdentityUnknown = existing.StartTime == DateTime.MinValue || incoming.StartTime == DateTime.MinValue;
+                if (isStartTimeChanged || isNameChanged || isIdentityUnknown)
                 {
                     // Быстрый PID reuse: заменяем запись процесса на новый экземпляр
                     _processMap[incoming.Pid] = incoming;
@@ -836,6 +838,26 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Отказывает в действии при неизвестной identity или неподдерживающей службе.</summary>
+    /// <param name="expectedCreationFileTimeUtc">Токен, захваченный до асинхронных операций.</param>
+    /// <returns>Истина, если текущая служба обещает проверку точного экземпляра процесса.</returns>
+    private async Task<bool> CanAddressProcessInstanceAsync(long? expectedCreationFileTimeUtc)
+    {
+        var loc = LocalizationService.Instance;
+        if (!expectedCreationFileTimeUtc.HasValue || expectedCreationFileTimeUtc.Value <= 0)
+        {
+            MessageDialog(loc["TmProcessIdentityUnavailable"], loc["TmError"], MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        var serviceInfo = await _pipeClient.GetServiceInfoAsync();
+        if (serviceInfo?.SupportsProcessInstanceCommands != true)
+        {
+            MessageDialog(loc["TmProcessInstanceCommandsUnavailable"], loc["TmError"], MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        return true;
+    }
+
     /// <summary>
     /// Обрабатывает ошибку выполнения действия над процессом со стороны службы.
     /// При обнаружении ошибки смены экземпляра (ProcessInstanceChanged) выводит понятное предупреждение,
@@ -886,6 +908,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         if (result != MessageBoxResult.Yes) return;
 
         long? expectedCreationFileTimeUtc = GetExpectedCreationFileTimeUtc(target);
+        if (!await CanAddressProcessInstanceAsync(expectedCreationFileTimeUtc)) return;
         var res = await _pipeClient.KillProcessAsync(target.Pid, target.Name, expectedCreationFileTimeUtc);
         if (res?.Success == true)
         {
@@ -913,6 +936,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         if (result != MessageBoxResult.Yes) return;
 
         long? expectedCreationFileTimeUtc = GetExpectedCreationFileTimeUtc(target);
+        if (!await CanAddressProcessInstanceAsync(expectedCreationFileTimeUtc)) return;
         var res = await _pipeClient.BlockProcessAsync(target.Pid, path, target.Name, expectedCreationFileTimeUtc);
         if (res?.Success == true)
         {
@@ -935,6 +959,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
 
         var loc = LocalizationService.Instance;
         long? expectedCreationFileTimeUtc = GetExpectedCreationFileTimeUtc(target);
+        if (!await CanAddressProcessInstanceAsync(expectedCreationFileTimeUtc)) return;
         var res = await _pipeClient.SuspendProcessAsync(target.Pid, target.Name, expectedCreationFileTimeUtc);
         if (res?.Success == true)
         {
@@ -957,6 +982,7 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
 
         var loc = LocalizationService.Instance;
         long? expectedCreationFileTimeUtc = GetExpectedCreationFileTimeUtc(target);
+        if (!await CanAddressProcessInstanceAsync(expectedCreationFileTimeUtc)) return;
         var res = await _pipeClient.ResumeProcessAsync(target.Pid, target.Name, expectedCreationFileTimeUtc);
         if (res?.Success == true)
         {

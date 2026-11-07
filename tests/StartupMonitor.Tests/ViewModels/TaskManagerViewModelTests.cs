@@ -589,6 +589,14 @@ public class TaskManagerViewModelTests
 /// </summary>
 public class FakeProcessPipeClient : PipeClient
 {
+    /// <summary>Явное подтверждение capability новой службы; может быть заменено отказом или отсутствием ответа.</summary>
+    public ServiceInfoPayload? ServiceInfoToReturn { get; set; } = new(1, "2.1.0", "Running", DateTime.UtcNow, TimeSpan.Zero, false,
+        SupportsProcessInstanceCommands: true);
+
+    /// <summary>Возвращает управляемую информацию службы без подключения к настоящему именованному каналу.</summary>
+    /// <returns>Ответ службы, выбранный текущим сценарием.</returns>
+    public override Task<ServiceInfoPayload?> GetServiceInfoAsync() => Task.FromResult(ServiceInfoToReturn);
+
     public ProcessActionResultPayload ResultToReturn { get; set; } = new(true, "OK");
 
     public int? LastKillPid { get; private set; }

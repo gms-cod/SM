@@ -244,6 +244,9 @@
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                           CanContentScroll="False" Focusable="False">
             <StackPanel x:Name="FooterPanel">
+                <!-- Ограничение режима показывается постоянно, в том числе для отключённых действий. -->
+                <TextBlock x:Name="TxtSessionRestriction" Visibility="Collapsed"
+                           FontSize="11" Foreground="#D97706" TextWrapping="Wrap" Margin="0,0,0,6" />
                 <TextBlock x:Name="TxtCountdown"
                            FontSize="11"
                            Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"

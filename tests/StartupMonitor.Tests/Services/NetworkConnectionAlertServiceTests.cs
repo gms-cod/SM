@@ -44,7 +44,8 @@ public sealed class NetworkConnectionAlertServiceTests
         var svc = new NetworkConnectionAlertService(
             new ProcessNetworkTracker(),
             new WindowsFirewallService(),
-            store)
+            store,
+            sessionFirewall: new TestSessionFirewallPolicy())
         {
             SocketsProvider = () => sockets ?? new List<ProcessNetworkSocket>(),
             ProcessPathResolver = pid =>

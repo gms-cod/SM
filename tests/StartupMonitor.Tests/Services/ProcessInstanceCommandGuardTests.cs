@@ -18,7 +18,7 @@ public class ProcessInstanceCommandGuardTests
     };
 
     /// <summary>
-    /// Проверяет, что при передаче точного (или совпадающего с погрешностью до 20 мс) времени создания
+    /// Проверяет, что при передаче точного времени создания
     /// текущего процесса верификация возвращает true и не заполняет failureReason.
     /// </summary>
     [Fact]
@@ -106,25 +106,45 @@ public class ProcessInstanceCommandGuardTests
     }
 
     /// <summary>
-    /// Проверяет квантование времени: разница до 20 мс укладывается в допустимую погрешность Win32 FILETIME,
-    /// а разница свыше 20 мс (например 50 мс) приводит к отклонению команды.
+    /// Проверяет строгое совпадение FILETIME: даже один такт и смещение в 10 мс
+    /// обозначают другой экземпляр процесса и приводят к отклонению команды.
     /// </summary>
     [Fact]
-    public void VerifyProcessIdentity_ToleranceBoundary_CheckedCorrectly()
+    public void VerifyProcessIdentity_AnyCreationTimeDifference_RejectsCommand()
     {
         using var currentProc = Process.GetCurrentProcess();
         int pid = currentProc.Id;
         long actualCreationTimeUtc = currentProc.StartTime.ToFileTimeUtc();
 
-        // 10 мс погрешности (100 000 тактов FILETIME) — должно быть разрешено
-        long timeWithinTolerance = actualCreationTimeUtc + (10L * 10_000L);
-        Assert.True(EntryOperations.VerifyProcessIdentity(pid, timeWithinTolerance));
+        foreach (long delta in new[] { -1L, 1L, -100_000L, 100_000L })
+        {
+            bool accepted = EntryOperations.VerifyProcessIdentity(pid, actualCreationTimeUtc + delta, out string? reason);
+            Assert.False(accepted);
+            Assert.Equal(EntryOperations.ProcessInstanceChangedReason, reason);
+        }
+    }
 
-        // 50 мс погрешности (500 000 тактов FILETIME) — должно быть отклонено
-        long timeOutsideTolerance = actualCreationTimeUtc + (50L * 10_000L);
-        bool isValidOutside = EntryOperations.VerifyProcessIdentity(pid, timeOutsideTolerance, out string? reasonOutside);
-        Assert.False(isValidOutside);
-        Assert.Equal(EntryOperations.ProcessInstanceChangedReason, reasonOutside);
+    /// <summary>Проверяет точный FILETIME на уже открытом дескрипторе, который затем использует действие над процессом.</summary>
+    [Fact]
+    public void VerifyProcessHandleIdentity_UsesRetainedHandleAndExactCreationTime()
+    {
+        using var current = Process.GetCurrentProcess();
+        long creation = current.StartTime.ToFileTimeUtc();
+
+        Assert.True(EntryOperations.VerifyProcessHandleIdentity(current.Handle, creation, out var exactReason));
+        Assert.Null(exactReason);
+        Assert.False(EntryOperations.VerifyProcessHandleIdentity(current.Handle, creation + 1, out var changedReason));
+        Assert.Equal(EntryOperations.ProcessInstanceChangedReason, changedReason);
+        Assert.True(EntryOperations.VerifyProcessIdentity(current, creation, out var retainedReason));
+        Assert.Null(retainedReason);
+    }
+
+    /// <summary>Проверяет отказ для пустого дескриптора при наличии обязательного токена экземпляра.</summary>
+    [Fact]
+    public void VerifyProcessHandleIdentity_InvalidHandle_RejectsInsteadOfUsingPidLookup()
+    {
+        Assert.False(EntryOperations.VerifyProcessHandleIdentity(IntPtr.Zero, DateTime.UtcNow.ToFileTimeUtc(), out var reason));
+        Assert.Equal(EntryOperations.ProcessInstanceChangedReason, reason);
     }
 
     /// <summary>

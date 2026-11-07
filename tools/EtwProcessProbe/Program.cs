@@ -3,7 +3,6 @@
 // </copyright>
 
 using System;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
@@ -56,23 +55,33 @@ public static class Program
             return RunHelperProcess(args);
         }
 
-        return await RunEtwProbeAsync(args);
+        try
+        {
+            return await RunEtwProbeAsync(args);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ОШИБКА] Проверка ETW не завершена: {ex}");
+            return 1;
+        }
     }
 
     /// <summary>
     /// Режим вспомогательного дочернего процесса (Helper).
     /// Печатает свой PID, время старта и штатно завершается через заданный таймаут.
     /// </summary>
+    /// <param name="args">Параметры helper; длительность ограничивается для детерминированного завершения.</param>
+    /// <returns>Ноль при штатном завершении.</returns>
     private static int RunHelperProcess(string[] args)
     {
-        var current = Process.GetCurrentProcess();
+        using var current = Process.GetCurrentProcess();
         var durationMs = 300;
         for (int i = 0; i < args.Length - 1; i++)
         {
             if (args[i].Equals("--duration", StringComparison.OrdinalIgnoreCase) &&
                 int.TryParse(args[i + 1], out var d))
             {
-                durationMs = d;
+                durationMs = Math.Clamp(d, 1, 5000);
             }
         }
 
@@ -85,6 +94,8 @@ public static class Program
     /// <summary>
     /// Главный сценарий зонда: инициализирует native-сессию ETW, читатель событий и проверяет захват helper-процессов.
     /// </summary>
+    /// <param name="args">Количество процессов от 1 до 128; неизвестные параметры считаются ошибкой.</param>
+    /// <returns>Ноль только после подтверждения реальных событий, отсутствия потерь и успешной остановки consumer.</returns>
     private static async Task<int> RunEtwProbeAsync(string[] args)
     {
         Console.WriteLine("===============================================================================");
@@ -104,17 +115,14 @@ public static class Program
         }
 
         int targetProcessCount = 5;
-        for (int i = 0; i < args.Length - 1; i++)
-        {
-            if (args[i].Equals("--count", StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(args[i + 1], out var c) && c > 0)
-            {
-                targetProcessCount = c;
-            }
-        }
+        if (args.Length != 0 && (args.Length != 2 || args[0] != "--count" ||
+            !int.TryParse(args[1], out targetProcessCount) || targetProcessCount is < 1 or > 128))
+            throw new ArgumentException("Ожидается --count от 1 до 128.", nameof(args));
 
         var logger = new ConsoleSimpleLogger<ProcessLifecycleSupervisor>();
-        var sessionName = "StartupMonitor.Probe." + Guid.NewGuid().ToString("N")[..8];
+        // Production-контроллер имеет единственный lease. Зонд запускается только при штатно
+        // остановленной службе и использует то же имя; живой владелец блокирует запуск зонда.
+        var sessionName = NativeProcessTraceSession.DefaultSessionName;
 
         Console.WriteLine($"1. Инициализация сессии ETW '{sessionName}'...");
         if (!NativeProcessTraceSession.TryStart(
@@ -136,148 +144,149 @@ public static class Program
             Console.WriteLine($"Сессия ETW успешно создана (Handle: 0x{session.SessionHandle:X16}).");
             Console.ResetColor();
 
-            var ingress = new LifecycleIngress(capacity: 1024, byteBudget: 4 * 1024 * 1024);
+            var ingress = new LifecycleIngress(capacity: 4096, byteBudget: 8 * 1024 * 1024);
             var epoch = Guid.NewGuid();
             using var cts = new CancellationTokenSource();
-
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             var readerTask = Task.Factory.StartNew(
-                () =>
-                {
-                    try
-                    {
-                        EtwProcessReader.Run(session, ingress, epoch, logger, cts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        // Штатная отмена читателя при завершении теста
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Читатель ETW завершился с исключением: {ex.Message}");
-                    }
-                },
-                cts.Token,
+                () => EtwProcessReader.Run(session, ingress, epoch, logger, cts.Token),
+                CancellationToken.None,
                 TaskCreationOptions.LongRunning,
                 TaskScheduler.Default);
+            var observed = new List<ProcessLifecycleEvent>();
+            var expected = new List<(int Pid, string Token)>();
+            var currentExe = Environment.ProcessPath ?? throw new IOException("Не найден путь EXE зонда.");
+            var probePid = Environment.ProcessId;
 
-            Console.WriteLine("2. Ожидание готовности потребителя ETW (Ready Handshake)...");
-            await Task.Delay(500);
-
-            var launchedPids = new ConcurrentDictionary<int, DateTime>();
-            var caughtStarts = new ConcurrentDictionary<int, ProcessLifecycleEvent>();
-            var caughtStops = new ConcurrentDictionary<int, ProcessLifecycleEvent>();
-
-            var collectorCts = new CancellationTokenSource();
-            var collectorTask = Task.Run(async () =>
+            /// <summary>
+            /// Единственный reader сохраняет ранние события до регистрации PID в Process.Start.
+            /// История ограничена; переполнение завершает проверку ошибкой вместо сокрытия потери.
+            /// </summary>
+            void Drain()
             {
-                while (!collectorCts.Token.IsCancellationRequested)
+                while (ingress.TryRead(out var evt))
                 {
-                    if (ingress.TryRead(out var evt))
-                    {
-                        if (evt != null && evt.Kind == LifecycleEventKind.Started && launchedPids.ContainsKey(evt.ProcessId))
-                        {
-                            caughtStarts[evt.ProcessId] = evt;
-                            Console.WriteLine($"[ETW EVENT] Пойман старт процесса PID {evt.ProcessId} ({evt.ImageName})");
-                        }
-                        else if (evt != null && evt.Kind == LifecycleEventKind.Stopped && launchedPids.ContainsKey(evt.ProcessId))
-                        {
-                            caughtStops[evt.ProcessId] = evt;
-                            Console.WriteLine($"[ETW EVENT] Поймана остановка процесса PID {evt.ProcessId}");
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            await Task.Delay(20, collectorCts.Token);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            break;
-                        }
-                    }
+                    if (evt is null) continue;
+                    if (observed.Count >= 16384)
+                        throw new IOException("Превышен ограниченный бюджет истории зонда (16384 события).");
+                    observed.Add(evt);
                 }
-            });
+            }
 
-            Console.WriteLine($"3. Запуск {targetProcessCount} тестовых helper-процессов...");
-            var currentExe = Process.GetCurrentProcess().MainModule?.FileName ?? "EtwProcessProbe.exe";
-
-            for (int i = 0; i < targetProcessCount; i++)
+            /// <summary>Связывает Start по nonce/PPID, а Stop — по экземпляру ядра и порядку QPC.</summary>
+            /// <param name="child">PID и уникальный nonce собственного helper.</param>
+            /// <returns>Истина после получения согласованной пары событий данного запуска.</returns>
+            bool HasPair((int Pid, string Token) child)
             {
-                var psi = new ProcessStartInfo(currentExe, "--helper --duration 200")
+                var start = observed.FirstOrDefault(e => e.SourceEpoch == epoch &&
+                    e.Kind == LifecycleEventKind.Started && e.ProcessId == child.Pid &&
+                    e.ParentProcessId == probePid && e.CommandLine.Contains(child.Token, StringComparison.Ordinal));
+                return start is not null && observed.Any(e => e.SourceEpoch == epoch &&
+                    e.Kind == LifecycleEventKind.Stopped && e.ProcessId == child.Pid &&
+                    e.OccurredQpc >= start.OccurredQpc &&
+                    (start.KernelKey == 0 || e.KernelKey == 0 || e.KernelKey == start.KernelKey));
+            }
+
+            /// <summary>Создаёт собственный helper и параллельно выгружает bounded ingress до его завершения.</summary>
+            /// <returns>PID и nonce завершившегося собственного helper.</returns>
+            async Task<(int Pid, string Token)> LaunchAsync()
+            {
+                var nonce = Guid.NewGuid().ToString("N");
+                var psi = new ProcessStartInfo(currentExe)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true
                 };
-
-                var proc = Process.Start(psi);
-                if (proc != null)
+                foreach (var arg in new[] { "--helper", "--duration", "200", "--probe-token", nonce })
+                    psi.ArgumentList.Add(arg);
+                using var proc = Process.Start(psi) ?? throw new IOException("Helper не был запущен.");
+                var identity = (Pid: proc.Id, Token: nonce);
+                var output = proc.StandardOutput.ReadToEndAsync(deadline.Token);
+                var exit = proc.WaitForExitAsync(deadline.Token);
+                try
                 {
-                    launchedPids[proc.Id] = DateTime.UtcNow;
-                    Console.WriteLine($"   -> Запущен helper #{i + 1}: PID {proc.Id}");
-                    proc.WaitForExit();
+                    while (!exit.IsCompleted)
+                    {
+                        Drain();
+                        if (readerTask.IsCompleted)
+                            throw new IOException("ETW consumer завершился до окончания проверки.", readerTask.Exception);
+                        await Task.Delay(20, deadline.Token);
+                    }
+                    await exit;
+                    if (proc.ExitCode != 0 || !(await output).Contains($"PID={proc.Id},", StringComparison.Ordinal))
+                        throw new IOException($"Helper PID {proc.Id} не подтвердил штатное завершение (код {proc.ExitCode}).");
+                    Drain();
+                    return identity;
+                }
+                finally
+                {
+                    if (!proc.HasExited) proc.Kill();
                 }
             }
 
-            Console.WriteLine("4. Ожидание выгрузки буферов ядра ETW (drain buffers)...");
-            var timeout = Stopwatch.StartNew();
-            while (timeout.ElapsedMilliseconds < 5000)
+            try
             {
-                if (caughtStarts.Count >= targetProcessCount && caughtStops.Count >= targetProcessCount)
+                Console.WriteLine("2. Подтверждение готовности реальной парой Start/Stop отдельного sentinel-helper...");
+                var sentinels = new List<(int Pid, string Token)>();
+                var readyTimeout = Stopwatch.StartNew();
+                while (!sentinels.Any(HasPair))
                 {
-                    break;
+                    sentinels.Add(await LaunchAsync());
+                    Drain();
+                    if (readerTask.IsCompleted || readyTimeout.Elapsed > TimeSpan.FromSeconds(10))
+                        throw new IOException("Consumer не подтвердил готовность событиями sentinel-helper.", readerTask.Exception);
+                    await Task.Delay(250, deadline.Token);
                 }
-                await Task.Delay(100);
+                var initialStats = session.QueryStatistics() ?? throw new IOException("Не получена начальная статистика ядра ETW.");
+                Console.WriteLine($"3. Запуск {targetProcessCount} проверяемых helper-процессов...");
+                for (var i = 0; i < targetProcessCount; i++) expected.Add(await LaunchAsync());
+
+                var drainTimeout = Stopwatch.StartNew();
+                while (!expected.All(HasPair) && drainTimeout.Elapsed < TimeSpan.FromSeconds(10))
+                {
+                    Drain();
+                    if (readerTask.IsCompleted)
+                        throw new IOException("ETW consumer завершился при ожидании событий.", readerTask.Exception);
+                    await Task.Delay(25, deadline.Token);
+                }
+                Drain();
+                var stats = session.QueryStatistics() ?? throw new IOException("Не получена финальная статистика ядра ETW.");
+                var matched = expected.Count(HasPair);
+                Console.WriteLine($"Подтверждённые экземпляры Start+Stop: {matched}/{targetProcessCount}; " +
+                    $"IngressDropped={ingress.Dropped}, ParseFailures={ingress.ParseFailures}, " +
+                    $"EventsLost={stats.EventsLost}, RealTimeBuffersLost={stats.RealTimeBuffersLost}, " +
+                    $"InitialEventsLost={initialStats.EventsLost}.");
+                if (matched != targetProcessCount || ingress.Dropped != 0 || ingress.ParseFailures != 0 ||
+                    stats.EventsLost != 0 || stats.RealTimeBuffersLost != 0 || stats.LogBuffersLost != 0)
+                    throw new IOException("Не выполнены критерии полного приёма событий без потерь.");
             }
-
-            collectorCts.Cancel();
-            try { await collectorTask; } catch { }
-
-            cts.Cancel();
-            session.Dispose();
-            try { await readerTask; } catch { }
-
-            Console.WriteLine("-------------------------------------------------------------------------------");
-            Console.WriteLine("Результаты верификации:");
-            Console.WriteLine($"   Запущено тестовых helper-ов:      {targetProcessCount}");
-            Console.WriteLine($"   Поймано событий ProcessStart:     {caughtStarts.Count} из {targetProcessCount}");
-            Console.WriteLine($"   Поймано событий ProcessStop:      {caughtStops.Count} из {targetProcessCount}");
-            Console.WriteLine($"   Потери очереди Ingress (Dropped): {ingress.Dropped}");
-            Console.WriteLine($"   Ошибки парсинга (ParseFailures):  {ingress.ParseFailures}");
-            Console.WriteLine("-------------------------------------------------------------------------------");
-
-            if (caughtStarts.Count == targetProcessCount && caughtStops.Count == targetProcessCount)
+            finally
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("[УСПЕХ] Все 100% событий Start и Stop короткоживущих процессов успешно пойманы!");
-                Console.ResetColor();
-                return 0;
+                cts.Cancel();
+                session.Stop();
+                try
+                {
+                    await readerTask.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+                catch (OperationCanceledException ex) when (cts.IsCancellationRequested && ex.CancellationToken == cts.Token)
+                {
+                    Console.WriteLine("Consumer подтвердил штатную остановку по отмене.");
+                }
             }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("[ВНИМАНИЕ] Часть событий буферизована ядром или не успела дойти до истечения таймаута.");
-                Console.ResetColor();
-                return 1;
-            }
+            Console.WriteLine("[УСПЕХ] Реальные события подтверждены; consumer и собственная сессия остановлены.");
+            return 0;
         }
     }
 
     /// <summary>
     /// Проверяет, запущен ли текущий процесс с повышенными привилегиями Администратора.
     /// </summary>
+    /// <returns>Признак наличия прав администратора; ошибки проверки не скрываются.</returns>
     private static bool IsAdministrator()
     {
-        try
-        {
-            using var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
-        catch
-        {
-            return false;
-        }
+        using var identity = WindowsIdentity.GetCurrent();
+        var principal = new WindowsPrincipal(identity);
+        return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
 }

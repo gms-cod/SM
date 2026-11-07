@@ -130,11 +130,10 @@ public class WatcherHelperTests
     // ───── GetLocationFromKeyPath ─────
 
     /// <summary>
-    /// Проверяет, что запись из списка удалённых (списка восстановления) не возвращается
-    /// в общий список при повторном обнаружении в системе.
+    /// Проверяет видимый отказ отключения отсутствующего источника без потери ручной резервной копии.
     /// </summary>
     [Fact]
-    public void AddOrUpdate_RemovedEntry_DoesNotReaddToGeneralList()
+    public void AddOrUpdate_RemovedEntry_MissingSourceRemainsVisibleWithOriginalBackup()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), $"smon-{Guid.NewGuid():N}");
         var store = new JsonDataStore(tmpDir);
@@ -142,8 +141,8 @@ public class WatcherHelperTests
         var entry = new StartupEntry
         {
             Name = "App",
-            FilePath = @"C:\app.exe",
-            CommandLine = @"C:\app.exe",
+            FilePath = Path.Combine(tmpDir, "not-existing.exe"),
+            CommandLine = Path.Combine(tmpDir, "not-existing.exe"),
             Location = EntryLocation.StartupFolder,
             LocationDetail = @"C:\Users\Test\Startup",
         };
@@ -151,23 +150,27 @@ public class WatcherHelperTests
 
         // Запись добавлена, затем удалена пользователем из системы (→ список восстановления)
         store.AddEntry(entry);
-        store.AddRemovedEntry(new RemovedEntry { OriginalEntryId = entry.Id });
+        store.AddRemovedEntry(new RemovedEntry { OriginalEntryId = entry.Id, RestorePayload = "original user backup" });
         store.RemoveEntry(entry.Id);
 
         // Запись снова обнаружена watcher'ом — не должна вернуться в общий список
-        var notif = new NotificationService(new InitialScanTracker());
+        using var notif = new NotificationService(new InitialScanTracker());
         var added = WatcherHelper.AddOrUpdate(store, notif, entry);
 
         Assert.False(added);
-        Assert.Null(store.FindEntry(e => e.Id == entry.Id));
+        var visible = store.FindEntry(e => e.Id == entry.Id);
+        Assert.NotNull(visible);
+        Assert.Equal(EntryStatus.Enabled, visible.Status);
+        Assert.Empty(visible.DisablePayload);
+        Assert.Equal("original user backup", Assert.Single(store.GetRemovedEntries()).RestorePayload);
+        Assert.Contains(store.ReadHistory(), history => history.ChangeType == "AutomaticDisableFailed");
     }
 
     /// <summary>
-    /// Проверяет, что при включенном StrictMode новая запись не добавляется в активный список,
-    /// а стирается и отправляется уведомление lockdownBlocked.
+    /// Проверяет обратимое отключение собственной безвредной записи строгим режимом без переноса в удалённые.
     /// </summary>
     [Fact]
-    public void AddOrUpdate_StrictModeEnabled_BlocksAndRemovesNewEntry()
+    public void AddOrUpdate_StrictModeEnabled_DisablesAndKeepsVisibleEntry()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), $"smon-strict-{Guid.NewGuid():N}");
         var store = new JsonDataStore(tmpDir);
@@ -175,24 +178,33 @@ public class WatcherHelperTests
         cfg.Settings.StrictMode = true;
         store.Save(cfg);
 
-        var notif = new NotificationService(new InitialScanTracker());
+        using var notif = new NotificationService(new InitialScanTracker());
+
+        var startupFile = Path.Combine(tmpDir, "harmless-startup.txt");
+        File.WriteAllText(startupFile, "harmless test source");
 
         var entry = new StartupEntry
         {
             Name = "NewUntrustedApp",
-            FilePath = @"C:\Test\untrusted.exe",
-            CommandLine = @"C:\Test\untrusted.exe",
-            Location = EntryLocation.RegistryRun,
-            LocationDetail = @"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            FilePath = startupFile,
+            CommandLine = startupFile,
+            Location = EntryLocation.StartupFolder,
+            LocationDetail = tmpDir,
         };
         entry.Id = WatcherHelper.ComputeStableId(entry);
 
         var added = WatcherHelper.AddOrUpdate(store, notif, entry);
 
         Assert.False(added);
-        Assert.Null(store.FindEntry(e => e.Id == entry.Id));
-        // Должна появиться в RemovedEntries
-        Assert.Contains(store.GetRemovedEntries(), r => r.OriginalEntryId == entry.Id);
+        var disabled = store.FindEntry(e => e.Id == entry.Id);
+        Assert.NotNull(disabled);
+        Assert.Equal(EntryStatus.Disabled, disabled.Status);
+        Assert.NotEmpty(disabled.DisablePayload);
+        Assert.Empty(store.GetRemovedEntries());
+        Assert.False(File.Exists(startupFile));
+        Assert.Equal("harmless test source", File.ReadAllText(startupFile + ".disabled"));
+        Assert.True(EntryOperations.EnableFromSystem(disabled).success);
+        Assert.True(File.Exists(startupFile));
     }
 
     /// <summary>

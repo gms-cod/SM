@@ -49,6 +49,8 @@ public partial class MainWindow
 
         // Нативный ShowWindow должен восстановить и скрытое через Hide визуальное дерево WPF.
         WindowVisibilitySynchronizer.Attach(this, RestoreFromTray);
+        // Крестик и Alt+F4 скрывают окно, сохраняя его Dispatcher, подписки и значок трея.
+        WindowCloseToTrayBehavior.Attach(this);
 
         _pipeClient = new PipeClient();
         _viewModel = new MainViewModel(_pipeClient);
@@ -655,8 +657,10 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Обрабатывает клик по кнопке выхода из приложения.</summary>
-    private void OnExitClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    /// <summary>Явный выход по мыши, клавиатуре или UI Automation завершает UI штатным Application.Shutdown.</summary>
+    /// <param name="sender">Кнопка выхода в нижней части боковой панели.</param>
+    /// <param name="e">Аргументы стандартного действия Click.</param>
+    private void OnExitClick(object sender, RoutedEventArgs e)
     {
         Application.Current.Shutdown();
     }

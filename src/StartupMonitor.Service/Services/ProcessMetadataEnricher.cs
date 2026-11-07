@@ -11,6 +11,7 @@ using System.Threading.Channels;
 using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Helpers;
 using StartupMonitor.Shared.Diagnostics;
+using StartupMonitor.Service.Services.ProcessLifecycle;
 
 namespace StartupMonitor.Service.Services;
 
@@ -26,8 +27,18 @@ public record CachedProcessMetadata(
     bool IsSigned = false,
     DigitalSignatureStatus SignatureStatus = DigitalSignatureStatus.Unknown,
     string? SignerName = null,
-    string? SignatureIssuer = null
+    string? SignatureIssuer = null,
+    bool SignatureChecked = false
 );
+
+/// <summary>Передаёт подтверждённые метаданные без изменяемого DTO и без ссылки на кэш worker.</summary>
+/// <param name="ProcessId">PID экземпляра, для которого выполнена проверка.</param>
+/// <param name="CreationTimeUtc">Точный FILETIME этого экземпляра, преобразованный в UTC.</param>
+/// <param name="ExecutablePath">Разрешённый путь образа.</param>
+/// <param name="Signer">Проверенный подписант либо null.</param>
+/// <param name="Status">Полнота успешно полученных метаданных.</param>
+public readonly record struct ProcessMetadataUpdate(int ProcessId, DateTime CreationTimeUtc,
+    string ExecutablePath, string? Signer, ProcessMetadataStatus Status);
 
 /// <summary>Сервис обогащения метаданных процессов с кэшированием и Time-Sliced квантованием (защита от скачков CPU).</summary>
 public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
@@ -36,15 +47,22 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
     private readonly ConcurrentDictionary<(int Pid, long StartTimeTicks), CachedProcessMetadata> _cache = new();
     // Очередь процессов, требующих обогащения метаданными
     /// <summary>Ограниченная очередь будит единственный worker только при поступлении работы.</summary>
-    private readonly Channel<ProcessInfo> _enrichQueue = Channel.CreateBounded<ProcessInfo>(new BoundedChannelOptions(1024)
+    private readonly Channel<MetadataRequest> _enrichQueue = Channel.CreateBounded<MetadataRequest>(new BoundedChannelOptions(1024)
     {
         SingleReader = true,
         FullMode = BoundedChannelFullMode.Wait
     });
+    /// <summary>Неизменяемый запрос не удерживает DTO опубликованного снимка.</summary>
+    private sealed record MetadataRequest(int ProcessId, long CreationTicks, string ProcessName, CachedProcessMetadata BasicMetadata);
+    /// <summary>Один запрос на подтверждённый экземпляр; при отказе очереди возможна следующая попытка.</summary>
+    private readonly ConcurrentDictionary<(int Pid, long StartTimeTicks), byte> _inFlight = new();
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _workerTask;
     /// <summary>Защищает отмену и освобождение CTS от повторного Dispose через владельцев DI.</summary>
     private int _disposed;
+
+    /// <summary>Публикует полную подпись для identity-aware lifecycle-проекции; сбой подписчика изолирован.</summary>
+    public event Action<ProcessMetadataUpdate>? MetadataReady;
 
     /// <summary>ProcessMetadataEnricher: Выполняет операцию ProcessMetadataEnricher.</summary>
     public ProcessMetadataEnricher()
@@ -60,6 +78,8 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         if (Volatile.Read(ref _disposed) != 0) return;
         using var _prof = ExecutionProfiler.Measure("Service.ProcessEnrich.EnrichOrQueue");
         var key = (proc.ProcessId, proc.StartTime.Ticks);
+        // Неизвестное время создания нельзя превращать в устойчивую identity PID/0.
+        if (proc.StartTime == DateTime.MinValue) return;
         if (_cache.TryGetValue(key, out var cached))
         {
             proc.FilePath = cached.FilePath;
@@ -79,6 +99,8 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
             {
                 proc.ThreatInfo = cached.ThreatInfo;
             }
+            if (!cached.SignatureChecked) QueueEnrichment(proc, key);
+            else PublishMetadata(key, cached);
             return;
         }
 
@@ -89,7 +111,8 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         }
 
         // Пытаемся быстро считать путь и аргументы через открытый дескриптор или по PID
-        if (processHandle != IntPtr.Zero)
+        if (processHandle != IntPtr.Zero &&
+            EntryOperations.VerifyProcessHandleIdentity(processHandle, proc.StartTime.ToFileTimeUtc(), out _))
         {
             if (string.IsNullOrEmpty(proc.FilePath))
             {
@@ -106,7 +129,7 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         }
         else if (string.IsNullOrEmpty(proc.FilePath) && proc.ProcessId > 4)
         {
-            proc.FilePath = TryGetProcessPath(proc.ProcessId);
+            proc.FilePath = TryGetVerifiedProcessPath(proc.ProcessId, proc.StartTime);
         }
 
         if (proc.ThreatInfo == null || !proc.ThreatInfo.HasThreat)
@@ -132,8 +155,22 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         }
 
         // Ставим в очередь на глубокое обогащение (цифровая подпись Authenticode)
-        if (!_enrichQueue.Writer.TryWrite(proc))
-            Serilog.Log.Debug("Очередь метаданных заполнена или остановлена; процесс {Pid} будет проверен при следующем снимке", proc.ProcessId);
+        QueueEnrichment(proc, key);
+    }
+
+    /// <summary>Дедуплицирует работу и копирует поля до передачи между потоками.</summary>
+    /// <param name="proc">DTO текущего снимка, который worker не изменяет.</param>
+    /// <param name="key">Подтверждённый PID и время создания.</param>
+    private void QueueEnrichment(ProcessInfo proc, (int Pid, long StartTimeTicks) key)
+    {
+        if (!_inFlight.TryAdd(key, 0)) return;
+        var basic = new CachedProcessMetadata(proc.FilePath, proc.CommandLine, proc.Publisher,
+            proc.ParentProcessId, proc.IsSystemProcess, proc.Description, proc.ThreatInfo);
+        if (!_enrichQueue.Writer.TryWrite(new MetadataRequest(key.Pid, key.StartTimeTicks, proc.ProcessName, basic)))
+        {
+            _inFlight.TryRemove(key, out _);
+            Serilog.Log.Debug("Очередь метаданных заполнена или остановлена; PID {Pid} будет повторён при следующем снимке", proc.ProcessId);
+        }
     }
 
     /// <summary>Обрабатывает очередь порциями; пустой канал не создаёт периодических пробуждений CPU.</summary>
@@ -147,27 +184,36 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
             {
                 if (!await _enrichQueue.Reader.WaitToReadAsync(ct).ConfigureAwait(false)) break;
                 int processedInBatch = 0;
-                while (processedInBatch < 5 && _enrichQueue.Reader.TryRead(out var proc))
+                while (processedInBatch < 5 && _enrichQueue.Reader.TryRead(out var request))
                 {
-                    var key = (proc.ProcessId, proc.StartTime.Ticks);
-                    if (_cache.TryGetValue(key, out var cached))
+                    var key = (request.ProcessId, request.CreationTicks);
+                    try
                     {
-                        proc.FilePath = cached.FilePath;
-                        proc.CommandLine = cached.CommandLine;
-                        proc.Publisher = cached.Publisher;
-                        proc.ParentProcessId = cached.ParentProcessId;
-                        proc.IsSystemProcess = cached.IsSystemProcess;
-                        if (string.IsNullOrEmpty(proc.Description) && !string.IsNullOrEmpty(cached.Description))
+                        if (_cache.TryGetValue(key, out var cached) && cached.SignatureChecked)
                         {
-                            proc.Description = cached.Description;
+                            continue;
                         }
-                        continue;
-                    }
+                        var basic = cached ?? request.BasicMetadata;
+                        // Локальный DTO принадлежит только worker. Публичный снимок не меняется
+                        // после отправки UI, а late result адресуется точному ключу экземпляра.
+                        var proc = new ProcessInfo
+                        {
+                            ProcessId = request.ProcessId,
+                            StartTime = new DateTime(request.CreationTicks, DateTimeKind.Utc),
+                            ProcessName = request.ProcessName,
+                            FilePath = basic.FilePath,
+                            CommandLine = basic.CommandLine,
+                            Publisher = basic.Publisher,
+                            ParentProcessId = basic.ParentProcessId,
+                            IsSystemProcess = basic.IsSystemProcess,
+                            Description = basic.Description,
+                            ThreatInfo = basic.ThreatInfo
+                        };
 
                     // Если путь ещё не определён, пытаемся открыть процесс
                     if (string.IsNullOrEmpty(proc.FilePath))
                     {
-                        proc.FilePath = TryGetProcessPath(proc.ProcessId);
+                        proc.FilePath = TryGetVerifiedProcessPath(proc.ProcessId, proc.StartTime);
                     }
 
                     // Проверяем цифровую подпись Authenticode через WinVerifyTrust
@@ -226,10 +272,17 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
                         proc.IsSigned,
                         proc.SignatureStatus,
                         proc.SignerName,
-                        proc.SignatureIssuer
+                        proc.SignatureIssuer,
+                        SignatureChecked: !string.IsNullOrEmpty(proc.FilePath)
                     );
                     _cache[key] = metadata;
+                    if (metadata.SignatureChecked) PublishMetadata(key, metadata);
                     processedInBatch++;
+                    }
+                    finally
+                    {
+                        _inFlight.TryRemove(key, out _);
+                    }
                 }
 
                 // Микропауза между квантами для сглаживания нагрузки на CPU
@@ -249,14 +302,46 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
     }
 
     /// <summary>Очищает устаревшие записи из кэша для завершившихся процессов.</summary>
+    /// <param name="activePids">Совместимый список PID; основной collector использует точные ключи экземпляров.</param>
     public void PruneDeadProcesses(HashSet<int> activePids)
     {
+        ArgumentNullException.ThrowIfNull(activePids);
         foreach (var key in _cache.Keys)
         {
             if (!activePids.Contains(key.Pid))
             {
                 _cache.TryRemove(key, out _);
             }
+        }
+    }
+
+    /// <summary>Удаляет старые поколения даже при непрерывном повторном использовании того же PID.</summary>
+    /// <param name="activeInstances">Подтверждённые ключи текущего системного снимка.</param>
+    public void PruneDeadProcesses(HashSet<(int Pid, long StartTimeTicks)> activeInstances)
+    {
+        ArgumentNullException.ThrowIfNull(activeInstances);
+        foreach (var key in _cache.Keys)
+        {
+            if (!activeInstances.Contains(key)) _cache.TryRemove(key, out _);
+        }
+    }
+
+    /// <summary>
+    /// Доставляет собственные неизменяемые поля. Cache-hit повторяет доставку после авторитетной
+    /// baseline-сверки, если первая подпись была готова раньше неё; registry отбрасывает одинаковые результаты.
+    /// </summary>
+    /// <param name="key">PID и точное время создания проверенного экземпляра.</param>
+    /// <param name="metadata">Завершённые метаданные кэша.</param>
+    private void PublishMetadata((int Pid, long StartTimeTicks) key, CachedProcessMetadata metadata)
+    {
+        var handlers = MetadataReady;
+        if (handlers == null) return;
+        var update = new ProcessMetadataUpdate(key.Pid, new DateTime(key.StartTimeTicks, DateTimeKind.Utc),
+            metadata.FilePath, metadata.SignerName, ProcessMetadataStatus.SignatureChecked);
+        foreach (Action<ProcessMetadataUpdate> handler in handlers.GetInvocationList())
+        {
+            try { handler(update); }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "Не удалось доставить метаданные экземпляра процесса PID {Pid}", key.Pid); }
         }
     }
 
@@ -293,6 +378,22 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
         {
             CloseHandle(hProcess);
         }
+    }
+
+    /// <summary>Читает путь только на handle с точным временем создания запрошенного экземпляра.</summary>
+    /// <param name="pid">PID процесса.</param>
+    /// <param name="creationUtc">Авторитетное время создания из системного снимка.</param>
+    /// <returns>Полный путь либо пустая строка при смене экземпляра или отказе доступа.</returns>
+    private static string TryGetVerifiedProcessPath(int pid, DateTime creationUtc)
+    {
+        var handle = OpenProcess(0x1000, false, pid);
+        if (handle == IntPtr.Zero) return string.Empty;
+        try
+        {
+            return EntryOperations.VerifyProcessHandleIdentity(handle, creationUtc.ToFileTimeUtc(), out _)
+                ? GetProcessPathFromHandle(handle) : string.Empty;
+        }
+        finally { CloseHandle(handle); }
     }
 
     /// <summary>GetProcessPathFromHandle: Возвращает ProcessPathFromHandle.</summary>

@@ -10,6 +10,7 @@
     Если указан и скрипт запущен без прав администратора, запустить зонд в повышенном процессе.
 #>
 param (
+    [ValidateRange(1, 128)]
     [int]$Count = 5,
     [switch]$Elevate
 )
@@ -53,12 +54,14 @@ if (-not $isAdmin) {
 
     if ($Elevate) {
         Write-Host "Запуск EtwProcessProbe с повышением прав через UAC..." -ForegroundColor Cyan
-        Start-Process -FilePath $probeExe -ArgumentList "--count $Count" -Verb RunAs -Wait
-        exit 0
+        # Код повышенного зонда передаётся вызывающему процессу: отказ или ошибка не становятся ложным успехом.
+        $probeProcess = Start-Process -FilePath $probeExe -ArgumentList "--count $Count" -Verb RunAs -Wait -PassThru
+        exit $probeProcess.ExitCode
     } else {
         Write-Host "Для полного интеграционного теста перезапустите терминал от Администратора или вызовите:" -ForegroundColor Gray
         Write-Host "  .\scripts\test-etw-integration.ps1 -Elevate" -ForegroundColor Gray
-        exit 0
+        # Отсутствие привилегий означает невыполненную интеграционную проверку.
+        exit 2
     }
 }
 

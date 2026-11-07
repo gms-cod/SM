@@ -90,6 +90,9 @@ public class PipeServer : BackgroundService
 
     private readonly BlacklistManager _blacklist;
 
+    /// <summary>Событийный исполнитель ЧС; при отсутствии DI-регистрации сохраняется прежний legacy путь.</summary>
+    private readonly StartupMonitor.Service.Services.ProcessLifecycle.ProcessBlacklistEnforcer? _processBlacklistEnforcer;
+
     // Сервис уведомлений (toast-уведомления UI)
 
     private readonly NotificationService _notifications;
@@ -292,6 +295,8 @@ public class PipeServer : BackgroundService
         _scanner = scanner;
 
         _blacklist = blacklist;
+
+        _processBlacklistEnforcer = serviceProvider.GetService<StartupMonitor.Service.Services.ProcessLifecycle.ProcessBlacklistEnforcer>();
 
         _notifications = notifications;
 
@@ -537,6 +542,7 @@ public class PipeServer : BackgroundService
         PipeMessageTypes.GetPendingNetworkAlerts or PipeMessageTypes.GetConnectionHistory or PipeMessageTypes.GetAlertsEnabled or
         PipeMessageTypes.GetFirewallSilentPid0 or PipeMessageTypes.GetFirewallWhitelist or PipeMessageTypes.GetFirewallBlacklist or
         PipeMessageTypes.GetAppAccessMatrix or PipeMessageTypes.GetNetworkTrafficHistory or
+        PipeMessageTypes.ResolveNetworkAlert or PipeMessageTypes.EvaluateNetworkAlert or
         PipeMessageTypes.SubscribeProcessMetrics or PipeMessageTypes.UnsubscribeProcessMetrics;
 
     /// <summary>
@@ -858,15 +864,28 @@ public class PipeServer : BackgroundService
 
                             // Системный вызов нужен только для физически отключённых записей
 
-                            if (entry.Status == EntryStatus.Disabled)
+                            // Явное включение не отменяет правило ЧС молча: пользователь сначала снимает его.
+                            if (_store.FindBlacklistRule(rule => rule.Action == BlacklistAction.NotifyAndRemove && BlacklistManager.IsMatchStatic(rule, entry)) != null)
+                            {
+                                response.Type = PipeMessageTypes.Error;
+                                response.Payload = "Сначала удалите действующее правило чёрного списка для этой записи.";
+                                break;
+                            }
+
+                            if (entry.Status == EntryStatus.Disabled ||
+                                (entry.Status == EntryStatus.Blocked && !string.IsNullOrEmpty(entry.DisablePayload)))
 
                             {
 
                                 var (sysOk, sysErr) = EntryOperations.EnableFromSystem(entry);
 
-                                if (!sysOk && sysErr != null)
-
+                                if (!sysOk)
+                                {
                                     _logger.LogWarning("EnableFromSystem для {Type} ({Name}): {Error}", entry.Location, entry.Name, sysErr);
+                                    response.Type = PipeMessageTypes.Error;
+                                    response.Payload = sysErr ?? "Не удалось включить запись в системе.";
+                                    break;
+                                }
 
                             }
 
@@ -882,7 +901,7 @@ public class PipeServer : BackgroundService
 
                                 {
 
-                                    var (rok, rerr) = EntryOperations.RestoreToSystem(removed);
+                                    var (rok, rerr) = EntryOperations.RestoreRemovedEntry(_store, removed);
 
                                     if (!rok)
 
@@ -1198,15 +1217,12 @@ public class PipeServer : BackgroundService
 
                         {
 
-                            var (ok, err) = EntryOperations.RestoreToSystem(removed);
+                            // Известная identity и runtime-intent защищают ручной Restore от повторной AutoGuard-блокировки.
+                            var (ok, err) = EntryOperations.RestoreRemovedEntry(_store, removed);
 
                             if (ok)
 
                             {
-
-                                cfg.RemovedEntries.Remove(removed);
-
-                                _store.Save(cfg);
 
                                 NotifyExternalEntriesChanged();
 
@@ -1886,21 +1902,21 @@ public class PipeServer : BackgroundService
 
                         }
 
-                        if (!EntryOperations.VerifyProcessIdentity(killPayload.ProcessId, killPayload.ExpectedCreationFileTimeUtc, out var killVerifyReason))
-                        {
-                            _logger.LogWarning("Отклонено завершение процесса PID {Pid}: несовпадение экземпляра процесса ({Reason})", killPayload.ProcessId, killVerifyReason);
-                            response.Type = PipeMessageTypes.Error;
-                            response.Payload = JsonSerializer.Serialize(
-                                new ProcessActionResultPayload(false, killVerifyReason ?? EntryOperations.ProcessInstanceChangedReason, killPayload.ProcessId),
-                                JsonOptions);
-                            break;
-                        }
-
                         try
 
                         {
 
                             using var proc = System.Diagnostics.Process.GetProcessById(killPayload.ProcessId);
+
+                            // Проверенный Process удерживает тот же handle до Kill; повторного открытия PID нет.
+                            if (!EntryOperations.VerifyProcessIdentity(proc, killPayload.ExpectedCreationFileTimeUtc, out var killVerifyReason))
+                            {
+                                _logger.LogWarning("Отклонено завершение PID {Pid}: {Reason}", killPayload.ProcessId, killVerifyReason);
+                                response.Type = PipeMessageTypes.Error;
+                                response.Payload = JsonSerializer.Serialize(new ProcessActionResultPayload(false,
+                                    killVerifyReason ?? EntryOperations.ProcessInstanceChangedReason, killPayload.ProcessId), JsonOptions);
+                                break;
+                            }
 
                             if (EntryOperations.IsProtectedProcessName(proc.ProcessName))
 
@@ -2144,12 +2160,17 @@ public class PipeServer : BackgroundService
 
                         }
 
-                        if (!EntryOperations.VerifyProcessIdentity(blockPayload.ProcessId, blockPayload.ExpectedCreationFileTimeUtc, out var blockVerifyReason))
+                        // Удерживаем выбранный экземпляр до создания правила и действия. Токен
+                        // проверяется на этом handle до любых изменений ЧС или автозапуска.
+                        using var blockTarget = blockPayload.ProcessId > 0
+                            ? System.Diagnostics.Process.GetProcessById(blockPayload.ProcessId) : null;
+                        if (blockPayload.ExpectedCreationFileTimeUtc.HasValue &&
+                            (blockTarget == null || !EntryOperations.VerifyProcessIdentity(blockTarget, blockPayload.ExpectedCreationFileTimeUtc, out _)))
                         {
-                            _logger.LogWarning("Отклонена блокировка процесса PID {Pid}: несовпадение экземпляра процесса ({Reason})", blockPayload.ProcessId, blockVerifyReason);
+                            _logger.LogWarning("Отклонена блокировка PID {Pid}: экземпляр изменился", blockPayload.ProcessId);
                             response.Type = PipeMessageTypes.Error;
                             response.Payload = JsonSerializer.Serialize(
-                                new ProcessActionResultPayload(false, blockVerifyReason ?? EntryOperations.ProcessInstanceChangedReason, blockPayload.ProcessId),
+                                new ProcessActionResultPayload(false, EntryOperations.ProcessInstanceChangedReason, blockPayload.ProcessId),
                                 JsonOptions);
                             break;
                         }
@@ -2210,19 +2231,17 @@ public class PipeServer : BackgroundService
 
                         {
 
-                            if (blockPayload.ProcessId > 0)
+                            if (blockTarget != null && !blockTarget.HasExited)
 
                             {
 
-                                using var proc = System.Diagnostics.Process.GetProcessById(blockPayload.ProcessId);
-
-                                proc.Kill(entireProcessTree: true);
+                                blockTarget.Kill(entireProcessTree: true);
 
                             }
 
                         }
 
-                        catch { }
+                        catch (Exception ex) { _logger.LogWarning(ex, "Не удалось дополнительно завершить выбранный экземпляр PID {Pid} после применения ЧС", blockPayload.ProcessId); }
 
 
 
@@ -2464,7 +2483,9 @@ public class PipeServer : BackgroundService
 
                         Uptime: uptime,
 
-                        IsPaused: _coordinator.IsPaused
+                        IsPaused: _coordinator.IsPaused,
+
+                        SupportsProcessInstanceCommands: true
 
                     );
 
@@ -3896,7 +3917,7 @@ public class PipeServer : BackgroundService
 
                         response.Payload = JsonSerializer.Serialize(
 
-                            new ResolveNetworkAlertResultPayload(resolved, resolved ? "Решение применено." : "Алерт не найден."),
+                            new ResolveNetworkAlertResultPayload(resolved, resolved ? "Решение применено." : "Решение не подтверждено: алерт отсутствует, правило недоступно либо действие не поддерживается. Проверьте журнал службы и повторите выбор."),
 
                             JsonOptions);
 
@@ -4886,13 +4907,20 @@ public class PipeServer : BackgroundService
 
                 {
 
-                    cfg = _store.Load();
+                    // Копируем только правила: обновления рейтингов и истории не требуют нового полного AppConfig.
+                    var rules = _store.GetBlacklistSnapshot().Rules;
 
-                    needsKillSweep = EntryOperations.HasActiveKillRules(cfg.Blacklist);
+                    needsKillSweep = EntryOperations.HasActiveKillRules(rules);
 
                     if (needsKillSweep)
-
-                        EntryOperations.KillProcessesByRules(cfg.Blacklist, _logger);
+                    {
+                        // Проверка здоровья повторяется внутри общего execution gate: восстановившийся
+                        // ETW executor и legacy не выполняют автоматические действия одновременно.
+                        if (_processBlacklistEnforcer != null)
+                            _processBlacklistEnforcer.RunFallbackSweep(() => EntryOperations.KillProcessesByRules(_store.GetBlacklistSnapshot().Rules, _logger));
+                        else
+                            EntryOperations.KillProcessesByRules(rules, _logger);
+                    }
 
                 }
 

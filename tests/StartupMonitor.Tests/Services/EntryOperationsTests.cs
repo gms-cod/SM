@@ -73,18 +73,20 @@ public class EntryOperationsTests
     public void RemoveStartupFile_ExistingFile_RemovesAndReturnsPayload()
     {
         var tempFile = Path.GetTempFileName() + ".lnk";
+        string? createdBackup = null;
         try
         {
             File.WriteAllText(tempFile, "dummy shortcut content");
             var entry = MakeEntry(EntryLocation.StartupFolder, filePath: tempFile);
 
             var (success, error) = EntryOperations.RemoveStartupFile(entry, out var payload);
+            var fp = string.IsNullOrEmpty(payload) ? null : JsonSerializer.Deserialize<EntryOperations.FilePayload>(payload, JsonOptions);
+            createdBackup = fp?.BackupPath;
             Assert.True(success, error);
             Assert.Null(error);
 
             Assert.False(File.Exists(tempFile), "Original file should be deleted");
 
-            var fp = JsonSerializer.Deserialize<EntryOperations.FilePayload>(payload, JsonOptions);
             Assert.NotNull(fp);
             Assert.Equal(tempFile, fp.OriginalPath);
             Assert.True(File.Exists(fp.BackupPath), "Backup file should exist");
@@ -92,12 +94,8 @@ public class EntryOperationsTests
         finally
         {
             if (File.Exists(tempFile)) File.Delete(tempFile);
-            var backupDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "StartupMonitor", "backups");
-            if (Directory.Exists(backupDir))
-                foreach (var f in Directory.GetFiles(backupDir))
-                    try { File.Delete(f); } catch { }
+            // Общая папка содержит пользовательские бэкапы: удаляется только путь из payload этого теста.
+            if (createdBackup != null && File.Exists(createdBackup)) File.Delete(createdBackup);
         }
     }
 
@@ -127,6 +125,8 @@ public class EntryOperationsTests
         try
         {
             File.WriteAllText(tempBackup, "backup content");
+            // Восстанавливаем удалённый путь, а не перезаписываем созданный GetTempFileName пустой файл.
+            File.Delete(tempOriginal);
 
             var payload = JsonSerializer.Serialize(
                 new EntryOperations.FilePayload(tempBackup, tempOriginal),

@@ -59,15 +59,23 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
     private readonly ProcessLifecycleRegistry _registry;
     private readonly LifecycleIngress _ingress;
     private readonly ILogger<ProcessLifecycleSupervisor> _logger;
-    private readonly Guid _sourceEpoch = Guid.NewGuid();
+    private Guid _sourceEpoch = Guid.NewGuid();
     private readonly CancellationTokenSource _cts = new();
+    /// <summary>Сериализует применение событий и полного снимка одним логическим writer.</summary>
+    private readonly object _registryWriteGate = new();
+    private readonly Func<CancellationToken, IReadOnlyList<(int Pid, int ParentPid, DateTime CreationTimeUtc, string ImageName)>>? _snapshotSource;
+    private readonly Func<IOwnedProcessTraceSession>? _sessionFactory;
 
     private IOwnedProcessTraceSession? _session;
     private Task? _readerTask;
     private Task? _reducerTask;
     private Task? _healthCheckTask;
-    private ProcessLifecycleHealthState _healthState = ProcessLifecycleHealthState.Starting;
+    private volatile ProcessLifecycleHealthState _healthState = ProcessLifecycleHealthState.Starting;
     private int _disposed;
+    private int _stopped;
+    private int _readerFailed;
+    private long _historicalGapCount;
+    private long _lastDropped;
     private uint _lastEventsLost;
     private uint _lastRealTimeBuffersLost;
 
@@ -82,18 +90,28 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
         ProcessLifecycleRegistry registry,
         LifecycleIngress ingress,
         ILogger<ProcessLifecycleSupervisor> logger,
-        ProcessLifecycleMode mode = ProcessLifecycleMode.EtwPreferred)
+        ProcessLifecycleMode mode = ProcessLifecycleMode.EtwPreferred,
+        Func<CancellationToken, IReadOnlyList<(int Pid, int ParentPid, DateTime CreationTimeUtc, string ImageName)>>? snapshotSource = null,
+        Func<IOwnedProcessTraceSession>? sessionFactory = null)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _ingress = ingress ?? throw new ArgumentNullException(nameof(ingress));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mode = mode;
+        _snapshotSource = snapshotSource;
+        _sessionFactory = sessionFactory;
     }
 
     /// <summary>
     /// Текущее состояние здоровья подсистемы ETW.
     /// </summary>
     public ProcessLifecycleHealthState HealthState => _healthState;
+
+    /// <summary>Режим, выбранный при запуске; Legacy sweep сохраняет защиту независимо от reader.</summary>
+    public ProcessLifecycleMode Mode => _mode;
+
+    /// <summary>Число обнаруженных пробелов истории; успешная сверка live-набора их не удаляет.</summary>
+    public long HistoricalGapCount => Interlocked.Read(ref _historicalGapCount);
 
     /// <summary>
     /// Реестр активных и исторических процессов.
@@ -111,6 +129,7 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
     /// </summary>
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_mode == ProcessLifecycleMode.Legacy)
         {
             _logger.LogInformation("Процессный мониторинг запущен в режиме Legacy (ETW отключен конфигурацией).");
@@ -120,55 +139,11 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
 
         _logger.LogInformation("Инициализация ETW Process Lifecycle в режиме {Mode} (Эпоха источника: {Epoch})...", _mode, _sourceEpoch);
 
-        try
-        {
-            // 1. Попытка создания изолированной сессии SystemTraceProvider
-            if (!NativeProcessTraceSession.TryStart(
-                session: out var ownedSession,
-                errorMessage: out var errorMsg,
-                errorCode: out var errorCode,
-                sessionName: "StartupMonitor.ProcessLifecycle",
-                logger: _logger))
-            {
-                _logger.LogWarning(
-                    "Не удалось активировать native-сессию ETW (Код Win32: {ErrorCode}, Причина: {Error}). Активирован автоматический fallback.",
-                    errorCode,
-                    errorMsg);
-
-                _healthState = ProcessLifecycleHealthState.Degraded;
-                return Task.CompletedTask;
-            }
-
-            _session = ownedSession;
-            _healthState = ProcessLifecycleHealthState.Synchronizing;
-
-            var ct = _cts.Token;
-
-            // 2. Запуск фонового читателя событий ядра
-            _readerTask = Task.Factory.StartNew(
-                () => RunReaderLoop(ownedSession!, _ingress, _sourceEpoch, _logger, ct),
-                ct,
-                TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
-
-            // 3. Запуск однопоточного редуктора состояния (Single Writer)
-            _reducerTask = Task.Factory.StartNew(
-                () => RunReducerLoopAsync(_ingress, _registry, ct),
-                ct,
-                TaskCreationOptions.LongRunning,
-                TaskScheduler.Default).Unwrap();
-
-            // 4. Запуск фонового цикла контроля здоровья и авто-сверки
-            _healthCheckTask = Task.Run(() => RunHealthMonitoringLoopAsync(ct), ct);
-
-            _healthState = ProcessLifecycleHealthState.Healthy;
-            _logger.LogInformation("ETW Process Lifecycle успешно запущен и переведен в состояние Healthy.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Непредвиденное исключение при инициализации ETW Supervisor. Переход в режим Degraded.");
-            _healthState = ProcessLifecycleHealthState.Degraded;
-        }
+        // Host.StartAsync не ждёт native mutex/consumer. Здоровье подтверждается только после
+        // готовности reader, успешного native QUERY и baseline; защитный sweep остаётся доступным.
+        var ct = _cts.Token;
+        _reducerTask = Task.Run(() => RunReducerLoopAsync(_ingress, _registry, ct), ct);
+        _healthCheckTask = Task.Run(() => RunHealthMonitoringLoopAsync(ct), ct);
 
         return Task.CompletedTask;
     }
@@ -178,7 +153,7 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
     /// </summary>
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (Interlocked.Exchange(ref _stopped, 1) != 0) return;
 
         _healthState = ProcessLifecycleHealthState.Stopping;
         _logger.LogInformation("Остановка ETW Process Lifecycle Supervisor...");
@@ -219,6 +194,10 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
                 {
                     _logger.LogWarning("Таймаут ожидания завершения фоновых потоков ETW Supervisor.");
                 }
+                else
+                {
+                    await combined.ConfigureAwait(false);
+                }
             }
         }
         catch (Exception ex)
@@ -235,24 +214,28 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
     /// <summary>
     /// Цикл фонового чтения ETW на выделенном рабочем потоке.
     /// </summary>
-    private static void RunReaderLoop(
+    private void RunReaderLoop(
         IOwnedProcessTraceSession session,
         LifecycleIngress ingress,
         Guid sourceEpoch,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action onReady)
     {
         try
         {
-            EtwProcessReader.Run(session, ingress, sourceEpoch, logger, ct);
+            EtwProcessReader.Run(session, ingress, sourceEpoch, logger, ct, onReady);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // Ожидаемая штатная отмена
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Фатальный сбой потока-читателя ETW сессии {SessionName}. Потребуется сверка.", session.Name);
+            Volatile.Write(ref _readerFailed, 1);
+            _healthState = ProcessLifecycleHealthState.Degraded;
+            Interlocked.Increment(ref _historicalGapCount);
             ingress.RequestReconciliation();
         }
     }
@@ -276,7 +259,10 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
                 {
                     if (ev != null)
                     {
-                        registry.ApplyEvent(ev);
+                        lock (_registryWriteGate)
+                        {
+                            if (ev.SourceEpoch == _sourceEpoch) registry.ApplyEvent(ev);
+                        }
                     }
                 }
             }
@@ -288,6 +274,9 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Критическая ошибка в цикле обработки событий реестра процессов.");
+            _healthState = ProcessLifecycleHealthState.Degraded;
+            Interlocked.Increment(ref _historicalGapCount);
+            ingress.RequestReconciliation();
         }
     }
 
@@ -296,94 +285,161 @@ public sealed class ProcessLifecycleSupervisor : IHostedService, IDisposable
     /// </summary>
     private async Task RunHealthMonitoringLoopAsync(CancellationToken ct)
     {
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-
+        var lastReconciliation = 0L;
+        var failures = 0;
         try
         {
-            while (!ct.IsCancellationRequested && await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
+            while (!ct.IsCancellationRequested)
             {
-                // 1. Опрос ошибок парсинга из ingress с троттлингом
-                var diagnostic = _ingress.TakeParseFailureDiagnostic();
-                if (diagnostic != null)
+                try
                 {
-                    _logger.LogWarning(
-                        "Зафиксированы ошибки декодирования событий ETW (Вид: {Kind}, Тип: {Type}, Код: {Code}, Всего сбоев: {Total}).",
-                        diagnostic.Kind,
-                        diagnostic.ExceptionType,
-                        diagnostic.ErrorCode,
-                        _ingress.ParseFailures);
-                }
+                    if (_reducerTask?.IsCompleted == true)
+                        throw new IOException("Reducer ETW остановлен; реестр не может считаться согласованным.");
 
-                // 2. Опрос нативной статистики ядра
-                if (_session is NativeProcessTraceSession nativeSession)
-                {
-                    try
+                    if (_session == null || Volatile.Read(ref _readerFailed) != 0 || _readerTask?.IsCompleted == true)
                     {
-                        var stats = nativeSession.QueryStatistics();
-                        if (stats != null && (stats.EventsLost > _lastEventsLost || stats.RealTimeBuffersLost > _lastRealTimeBuffersLost))
+                        // Старый reader прекращается только после подтверждённого STOP. При отказе
+                        // handle/lease сохраняются, следующий проход повторяет безопасную остановку.
+                        if (_session != null)
                         {
-                            var lostDelta = (stats.EventsLost - _lastEventsLost) + (stats.RealTimeBuffersLost - _lastRealTimeBuffersLost);
-                            _lastEventsLost = stats.EventsLost;
-                            _lastRealTimeBuffersLost = stats.RealTimeBuffersLost;
+                            _session.Stop();
+                            if (_readerTask != null)
+                                await _readerTask.WaitAsync(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+                            _session.Dispose();
+                            _session = null;
+                        }
 
-                            _logger.LogWarning(
-                                "Обнаружена потеря {Delta} событий/буферов ядра ETW (Всего потеряно: {TotalLost}). Запрос сверки реестра.",
-                                lostDelta,
-                                stats.EventsLost + stats.RealTimeBuffersLost);
+                        _healthState = ProcessLifecycleHealthState.Starting;
+                        var session = _sessionFactory?.Invoke() ?? NativeProcessTraceSession.Start(logger: _logger);
+                        _session = session;
+                        lock (_registryWriteGate) _sourceEpoch = Guid.NewGuid();
+                        var sourceEpoch = _sourceEpoch;
+                        _lastEventsLost = 0;
+                        _lastRealTimeBuffersLost = 0;
+                        Volatile.Write(ref _readerFailed, 0);
+                        var ready = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _readerTask = Task.Factory.StartNew(
+                            () => RunReaderLoop(session, _ingress, sourceEpoch, _logger, ct, () => ready.TrySetResult(true)),
+                            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                        _healthState = ProcessLifecycleHealthState.Synchronizing;
+                        await ready.Task.WaitAsync(TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
+                        _ingress.RequestReconciliation();
+                    }
 
+                    if (_readerTask?.IsCompleted != false || Volatile.Read(ref _readerFailed) != 0)
+                        throw new IOException("Reader ETW недоступен; требуется перезапуск источника.");
+
+                    var diagnostic = _ingress.TakeParseFailureDiagnostic();
+                    if (diagnostic != null)
+                        _logger.LogWarning("Ошибки ETW payload: {Kind}, {Type}, {Code}; всего {Count}",
+                            diagnostic.Kind, diagnostic.ExceptionType, diagnostic.ErrorCode, _ingress.ParseFailures);
+
+                    if (_session is NativeProcessTraceSession nativeSession)
+                    {
+                        var stats = nativeSession.QueryStatistics()
+                            ?? throw new IOException("Native QUERY не подтвердил активность ETW-сессии.");
+                        // Вычитание накопительных unsigned счётчиков учитывает один оборот.
+                        var eventsDelta = unchecked(stats.EventsLost - _lastEventsLost);
+                        var buffersDelta = unchecked(stats.RealTimeBuffersLost - _lastRealTimeBuffersLost);
+                        _lastEventsLost = stats.EventsLost;
+                        _lastRealTimeBuffersLost = stats.RealTimeBuffersLost;
+                        if (eventsDelta != 0 || buffersDelta != 0)
+                        {
+                            Interlocked.Increment(ref _historicalGapCount);
                             _healthState = ProcessLifecycleHealthState.Degraded;
                             _ingress.RequestReconciliation();
+                            _logger.LogWarning("ETW потерял {Events} событий и {Buffers} real-time буферов; история содержит пробел.",
+                                eventsDelta, buffersDelta);
                         }
                     }
-                    catch (Exception ex)
+
+                    var dropped = _ingress.Dropped;
+                    if (dropped != _lastDropped || diagnostic != null)
                     {
-                        _logger.LogDebug(ex, "Не удалось опросить нативную статистику сессии ETW.");
+                        _lastDropped = dropped;
+                        Interlocked.Increment(ref _historicalGapCount);
+                        _healthState = ProcessLifecycleHealthState.Degraded;
                     }
-                }
 
-                // 3. Проверка необходимости сверки (Reconciliation)
-                if (_ingress.NeedsReconciliation)
-                {
-                    var requestedGen = _ingress.RequestedReconciliation;
-                    _logger.LogInformation("Выполняется сверка состояния процессов (Reconciliation Generation: {Gen})...", requestedGen);
+                    if (lastReconciliation == 0 || Stopwatch.GetElapsedTime(lastReconciliation) >= TimeSpan.FromSeconds(60))
+                        _ingress.RequestReconciliation();
 
-                    try
+                    if (_registry.IsCapacityExceeded)
                     {
-                        // Захватываем текущие запущенные процессы через Toolhelp32/Process API для восстановления live-набора
-                        var currentProcesses = Process.GetProcesses();
-                        var baselineList = new List<(int Pid, int ParentPid, DateTime CreationTimeUtc, string ImageName)>(currentProcesses.Length);
+                        _healthState = ProcessLifecycleHealthState.Degraded;
+                        _ingress.RequestReconciliation();
+                    }
 
-                        var nowUtc = DateTime.UtcNow;
-                        foreach (var p in currentProcesses)
+                    if (_ingress.NeedsReconciliation)
+                    {
+                        _healthState = ProcessLifecycleHealthState.Synchronizing;
+                        var generation = _ingress.RequestedReconciliation;
+                        var snapshotSource = _snapshotSource
+                            ?? throw new InvalidOperationException("Не зарегистрирован авторитетный native snapshot source.");
+                        lock (_registryWriteGate)
                         {
-                            DateTime startTime = nowUtc;
-                            try { startTime = p.StartTime.ToUniversalTime(); } catch { }
-                            baselineList.Add((p.Id, 0, startTime, p.ProcessName));
-                            p.Dispose();
+                            // Снимок и слияние сериализованы с событиями; callback ETW продолжает
+                            // писать в bounded ingress без ожидания метаданных, сети или IPC.
+                            var startedUtc = DateTime.UtcNow;
+                            var processes = snapshotSource(ct);
+                            _registry.ApplyBaseline(processes, startedUtc, DateTime.UtcNow);
+                            _ingress.AcknowledgeReconciliation(generation);
                         }
-
-                        _registry.ApplyBaseline(baselineList, nowUtc);
-                        _ingress.AcknowledgeReconciliation(requestedGen);
-
-                        _healthState = ProcessLifecycleHealthState.Healthy;
-                        _logger.LogInformation("Сверка состояния процессов успешно завершена (Подтверждена Generation: {Gen}).", requestedGen);
+                        lastReconciliation = Stopwatch.GetTimestamp();
                     }
-                    catch (Exception ex)
+
+                    // Сверка live-набора не восстанавливает историю потерянных коротких процессов.
+                    if (_readerTask?.IsCompleted != false || Volatile.Read(ref _readerFailed) != 0 ||
+                        _reducerTask?.IsCompleted != false)
+                        throw new IOException("ETW worker остановлен во время синхронизации.");
+                    if (_registry.IsCapacityExceeded)
                     {
-                        _logger.LogError(ex, "Ошибка при выполнении сверки процессов (Reconciliation).");
+                        _healthState = ProcessLifecycleHealthState.Degraded;
+                        _logger.LogWarning("Live-реестр ETW превышает ёмкость {Capacity}; legacy-защита сохранена до полной сверки.",
+                            ProcessLifecycleRegistry.MaxLiveCapacity);
                     }
+                    else if (!_ingress.NeedsReconciliation)
+                    {
+                        if (_healthState != ProcessLifecycleHealthState.Healthy)
+                            _logger.LogInformation("ETW Healthy: reader и native QUERY подтверждены, baseline применён; historical gaps {Gaps}.",
+                                HistoricalGapCount);
+                        _healthState = ProcessLifecycleHealthState.Healthy;
+                    }
+                    failures = 0;
+                    await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _healthState = ProcessLifecycleHealthState.Degraded;
+                    _logger.LogWarning(ex, "ETW Degraded; защитный legacy sweep сохранён, выполняется повторная попытка.");
+                    if (_reducerTask?.IsCompleted == true)
+                    {
+                        _reducerTask = Task.Run(() => RunReducerLoopAsync(_ingress, _registry, ct), ct);
+                        _ingress.RequestReconciliation();
+                    }
+                    if (_session is NativeProcessTraceSession)
+                        Volatile.Write(ref _readerFailed, 1);
+                    failures = Math.Min(failures + 1, 6);
+                    var delay = failures switch { 1 => 1, 2 => 2, 3 => 5, 4 => 10, _ => 30 };
+                    await Task.Delay(TimeSpan.FromSeconds(delay), ct).ConfigureAwait(false);
                 }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            // Штатная отмена
+            _logger.LogDebug("Контроль здоровья ETW остановлен по запросу.");
         }
         finally
         {
-            timer.Dispose();
+            try { _session?.Stop(); }
+            catch (Exception ex) { _logger.LogError(ex, "Остановка ETW при завершении supervisor не подтверждена; lease сохранён."); }
         }
     }
+
 
     /// <summary>
     /// Освобождает ресурсы супервизора.

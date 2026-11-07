@@ -28,7 +28,42 @@ public static class EntryOperations
     // ───────────────────────────── Registry ─────────────────────────────
 
     /// <summary>DTO для сохранения/восстановления значения реестра (ключ, имя значения, данные).</summary>
-    public record RegistryPayload(string Key, string ValueName, string ValueData);
+    public record RegistryPayload(string Key, string ValueName, string ValueData,
+        RegistryValueKind? ValueKind = null, string? TypedValueJson = null);
+
+    /// <summary>Сохраняет тип и исходные данные значения, включая нераскрытые переменные окружения.</summary>
+    /// <param name="key">Открытый исходный ключ.</param>
+    /// <param name="path">Полный путь ключа для восстановления.</param>
+    /// <param name="name">Имя значения.</param>
+    /// <returns>Совместимый с прежним форматом снимок значения.</returns>
+    private static RegistryPayload CaptureRegistryValue(RegistryKey key, string path, string name)
+    {
+        var value = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames)
+            ?? throw new InvalidOperationException($"Значение реестра '{name}' отсутствует.");
+        return new RegistryPayload(path, name, value.ToString() ?? string.Empty,
+            key.GetValueKind(name), JsonSerializer.Serialize(value, value.GetType()));
+    }
+
+    /// <summary>Восстанавливает исходный тип значения; старые payload без типа остаются строковыми.</summary>
+    /// <param name="key">Целевой ключ.</param>
+    /// <param name="payload">Сохранённое значение.</param>
+    private static void WriteRegistryValue(RegistryKey key, RegistryPayload payload)
+    {
+        var kind = payload.ValueKind ?? RegistryValueKind.String;
+        object value = payload.ValueData;
+        if (payload.TypedValueJson is { } json)
+            value = kind switch
+            {
+                RegistryValueKind.DWord => JsonSerializer.Deserialize<int>(json),
+                RegistryValueKind.QWord => JsonSerializer.Deserialize<long>(json),
+                RegistryValueKind.Binary or RegistryValueKind.None => JsonSerializer.Deserialize<byte[]>(json) ?? [],
+                RegistryValueKind.MultiString => JsonSerializer.Deserialize<string[]>(json) ?? [],
+                RegistryValueKind.String or RegistryValueKind.ExpandString => JsonSerializer.Deserialize<string>(json) ?? string.Empty,
+                _ => throw new InvalidOperationException("Неподдерживаемый тип значения реестра в резервной копии.")
+            };
+        key.SetValue(payload.ValueName, value, kind);
+        key.Flush();
+    }
 
     /// <summary>Возвращает путь в реестре для указанного типа расположения.</summary>
     private static string GetRegistryKeyPath(EntryLocation loc)
@@ -177,27 +212,49 @@ public static class EntryOperations
         return idx > 0 ? (name[..idx], name[(idx + 1)..]) : (null, name);
     }
 
-    /// <summary>Отключает запись в реестре: удаляет значение, сохраняет бэкап в entry.DisablePayload</summary>
+    /// <summary>Переносит значение автозапуска в неактивный подключ StartupMonitorDisabled, сохраняя первый типизированный снимок.</summary>
+    /// <param name="entry">Запись с точным именем значения и данными отключения.</param>
+    /// <returns>Подтверждение отключения либо причина отказа без потери предыдущего снимка.</returns>
     public static (bool success, string? error) DisableRegistry(StartupEntry entry)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+        try
+        {
         var (subKey, valueName) = SplitSubKeyName(entry.Name);
         var (ok, err) = OpenRegistry(entry, writable: true, out var key, subKey);
         if (!ok || key == null) return (false, err ?? "Failed to open registry key");
         using (key)
         {
-            // Сохраняем текущее значение перед удалением
-            var existing = key.GetValue(valueName)?.ToString() ?? "";
+            if (!key.GetValueNames().Contains(valueName, StringComparer.OrdinalIgnoreCase))
+            {
+                using var previousDisabled = key.OpenSubKey("StartupMonitorDisabled");
+                if (string.IsNullOrEmpty(entry.DisablePayload))
+                    entry.DisablePayload = previousDisabled?.GetValue(valueName) as string ?? string.Empty;
+                return !string.IsNullOrEmpty(entry.DisablePayload)
+                    ? (true, null) : (false, $"Значение реестра '{valueName}' и его резервная копия отсутствуют.");
+            }
+            using var disabled = key.CreateSubKey("StartupMonitorDisabled", writable: true)
+                ?? throw new InvalidOperationException("Не удалось сохранить отключённое значение реестра.");
+            // Повторная автоматическая блокировка не затирает первый сохранённый снимок.
+            if (string.IsNullOrEmpty(entry.DisablePayload))
+                entry.DisablePayload = JsonSerializer.Serialize(CaptureRegistryValue(key, BuildPayloadPath(entry, subKey), valueName), JsonOptions);
+            disabled.SetValue(valueName, entry.DisablePayload, RegistryValueKind.String);
+            disabled.Flush();
             key.DeleteValue(valueName, throwOnMissingValue: false);
-            var fullPath = BuildPayloadPath(entry, subKey);
-            // Сериализуем бэкап в DisablePayload для последующего восстановления
-            entry.DisablePayload = JsonSerializer.Serialize(
-                new RegistryPayload(fullPath, valueName, existing),
-                JsonOptions);
+            key.Flush();
         }
         return (true, null);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Не удалось отключить значение реестра {EntryName}", entry.Name);
+            return (false, ex.Message);
+        }
     }
 
     /// <summary>Включает запись в реестре: восстанавливает значение из DisablePayload</summary>
+    /// <param name="entry">Отключённая запись с прежним или типизированным payload.</param>
+    /// <returns>Подтверждение записи исходного значения и его типа.</returns>
     public static (bool success, string? error) EnableRegistry(StartupEntry entry)
     {
         if (string.IsNullOrEmpty(entry.DisablePayload))
@@ -211,7 +268,9 @@ public static class EntryOperations
             if (!ok || key == null) return (false, err ?? "Failed to open registry key");
             using (key)
             {
-                key.SetValue(rp.ValueName, rp.ValueData);
+                WriteRegistryValue(key, rp);
+                using var disabled = key.OpenSubKey("StartupMonitorDisabled", writable: true);
+                disabled?.DeleteValue(rp.ValueName, throwOnMissingValue: false);
                 // После восстановления очищаем payload
                 entry.DisablePayload = "";
             }
@@ -235,12 +294,15 @@ public static class EntryOperations
             using (key)
             {
                 // Сохраняем значение перед удалением
-                var existing = key.GetValue(valueName)?.ToString() ?? "";
-                key.DeleteValue(valueName, throwOnMissingValue: false);
-
                 var fullPath = BuildPayloadPath(entry, subKey);
-                var regPayload = new RegistryPayload(fullPath, valueName, existing);
-                payload = JsonSerializer.Serialize(regPayload, JsonOptions);
+                payload = key.GetValueNames().Contains(valueName, StringComparer.OrdinalIgnoreCase)
+                    ? JsonSerializer.Serialize(CaptureRegistryValue(key, fullPath, valueName), JsonOptions)
+                    : entry.DisablePayload;
+                if (string.IsNullOrEmpty(payload))
+                    return (false, "Значение реестра и данные отключения отсутствуют.");
+                key.DeleteValue(valueName, throwOnMissingValue: false);
+                using var disabled = key.OpenSubKey("StartupMonitorDisabled", writable: true);
+                disabled?.DeleteValue(valueName, throwOnMissingValue: false);
                 return (true, null);
             }
         }
@@ -263,7 +325,15 @@ public static class EntryOperations
             if (!ok || key == null) return (false, err ?? "Failed to open registry key");
             using (key)
             {
-                key.SetValue(rp.ValueName, rp.ValueData);
+                if (key.GetValueNames().Contains(rp.ValueName, StringComparer.OrdinalIgnoreCase))
+                {
+                    var current = CaptureRegistryValue(key, rp.Key, rp.ValueName);
+                    var expectedKind = rp.ValueKind ?? RegistryValueKind.String;
+                    var expectedJson = rp.TypedValueJson ?? JsonSerializer.Serialize(rp.ValueData);
+                    return current.ValueKind == expectedKind && current.TypedValueJson == expectedJson
+                        ? (true, null) : (false, "Значение реестра уже занято другими данными; восстановление ничего не перезаписало.");
+                }
+                WriteRegistryValue(key, rp);
             }
             return (true, null);
         }
@@ -279,6 +349,8 @@ public static class EntryOperations
     public record FilePayload(string BackupPath, string OriginalPath);
 
     /// <summary>Отключает файл в папке автозапуска: переименовывает в .disabled</summary>
+    /// <param name="entry">Запись файла, резервная копия которого не перезаписывается при повторе.</param>
+    /// <returns>Подтверждение отключения либо причина безопасного отказа.</returns>
     public static (bool success, string? error) DisableStartupFile(StartupEntry entry)
     {
         try
@@ -286,14 +358,15 @@ public static class EntryOperations
             if (string.IsNullOrWhiteSpace(entry.FilePath) || SystemProtectionHelper.IsProtectedProcessName(entry.FilePath))
                 return (false, "Недопустимый или защищённый путь к файлу");
 
-            if (!File.Exists(entry.FilePath))
-                return (false, $"File not found: {entry.FilePath}");
-
             // Переименовываем .exe/.lnk → .exe.disabled/.lnk.disabled
             var disabledPath = entry.FilePath + ".disabled";
             if (File.Exists(disabledPath))
-                File.Delete(disabledPath);
+                return !File.Exists(entry.FilePath) ? (true, null) : (false, "Файл .disabled уже существует; исходная резервная копия сохранена.");
+            if (!File.Exists(entry.FilePath))
+                return (false, $"File not found: {entry.FilePath}");
             File.Move(entry.FilePath, disabledPath);
+            if (string.IsNullOrEmpty(entry.DisablePayload))
+                entry.DisablePayload = JsonSerializer.Serialize(new FilePayload(disabledPath, entry.FilePath), JsonOptions);
             return (true, null);
         }
         catch (Exception ex)
@@ -303,6 +376,8 @@ public static class EntryOperations
     }
 
     /// <summary>Включает файл в папке автозапуска: переименовывает обратно из .disabled</summary>
+    /// <param name="entry">Запись отключённого файла.</param>
+    /// <returns>Подтверждение переименования; конфликтующий файл сохраняется неизменным.</returns>
     public static (bool success, string? error) EnableStartupFile(StartupEntry entry)
     {
         try
@@ -314,10 +389,11 @@ public static class EntryOperations
             if (!File.Exists(disabledPath))
                 return (false, $"Disabled file not found: {disabledPath}");
 
-            // Удаляем существующий файл, если есть, и переименовываем .disabled обратно
+            // Совпавшее имя нового файла не даёт права уничтожать его при включении старой записи.
             if (File.Exists(entry.FilePath))
-                File.Delete(entry.FilePath);
+                return (false, "Исходный путь уже занят; файлы не изменены.");
             File.Move(disabledPath, entry.FilePath);
+            entry.DisablePayload = string.Empty;
             return (true, null);
         }
         catch (Exception ex)
@@ -337,7 +413,8 @@ public static class EntryOperations
                 return (false, "Недопустимый или защищённый путь к файлу");
             }
 
-            if (!File.Exists(entry.FilePath))
+            var sourcePath = File.Exists(entry.FilePath) ? entry.FilePath : entry.FilePath + ".disabled";
+            if (!File.Exists(sourcePath))
             {
                 payload = "";
                 return (false, $"File not found: {entry.FilePath}");
@@ -346,8 +423,8 @@ public static class EntryOperations
             // Копируем в бэкап перед удалением
             Directory.CreateDirectory(BackupDir);
             var backupPath = Path.Combine(BackupDir, $"startup_{Guid.NewGuid():N}{Path.GetExtension(entry.FilePath)}");
-            File.Copy(entry.FilePath, backupPath);
-            File.Delete(entry.FilePath);
+            File.Copy(sourcePath, backupPath);
+            File.Delete(sourcePath);
 
             var filePayload = new FilePayload(backupPath, entry.FilePath);
             payload = JsonSerializer.Serialize(filePayload, JsonOptions);
@@ -370,11 +447,20 @@ public static class EntryOperations
             if (string.IsNullOrWhiteSpace(fp.OriginalPath) || SystemProtectionHelper.IsProtectedProcessName(fp.OriginalPath))
                 return (false, "Недопустимый или защищённый путь для восстановления файла");
             if (!File.Exists(fp.BackupPath)) return (false, $"Backup not found: {fp.BackupPath}");
+            if (File.Exists(fp.OriginalPath))
+            {
+                // Потерянный ACK допускает повтор уже выполненного Restore; иной файл не перезаписывается.
+                using var backup = File.OpenRead(fp.BackupPath);
+                using var original = File.OpenRead(fp.OriginalPath);
+                return System.Security.Cryptography.SHA256.HashData(backup).AsSpan()
+                    .SequenceEqual(System.Security.Cryptography.SHA256.HashData(original))
+                    ? (true, null) : (false, "Путь восстановления занят другим файлом; исходные данные не изменены.");
+            }
 
             // Создаём целевую директорию при необходимости и копируем файл обратно
             var dir = Path.GetDirectoryName(fp.OriginalPath);
             if (dir != null) Directory.CreateDirectory(dir);
-            File.Copy(fp.BackupPath, fp.OriginalPath, overwrite: true);
+            File.Copy(fp.BackupPath, fp.OriginalPath, overwrite: false);
             return (true, null);
         }
         catch (Exception ex)
@@ -427,6 +513,8 @@ public static class EntryOperations
     }
 
     /// <summary>Отключает службу: sc stop + sc config start=disabled</summary>
+    /// <param name="entry">Запись службы; первый тип запуска сохраняется для включения.</param>
+    /// <returns>Подтверждение изменения SCM либо причина отказа.</returns>
     public static (bool success, string? error) DisableService(StartupEntry entry)
     {
         try
@@ -438,6 +526,8 @@ public static class EntryOperations
                 return (false, "Самозащита StartupMonitor: отключение собственной службы программы запрещено");
             if (SystemProtectionHelper.IsCoreWindowsService(svcName))
                 return (false, "Отключение критически важных системных служб Windows запрещено в целях безопасности ОС");
+            if (string.IsNullOrEmpty(entry.DisablePayload))
+                entry.DisablePayload = JsonSerializer.Serialize(new ServicePayload(svcName, entry.FilePath, GetServiceStartType(svcName), null), JsonOptions);
             RunSc($"stop \"{svcName}\"", 5000);
             var (exitCode, _) = RunSc($"config \"{svcName}\" start=disabled", 10000);
             if (exitCode != 0)
@@ -450,7 +540,9 @@ public static class EntryOperations
         }
     }
 
-    /// <summary>Включает службу: sc config start=auto + sc start</summary>
+    /// <summary>Восстанавливает сохранённый тип запуска службы без её принудительного немедленного старта.</summary>
+    /// <param name="entry">Запись службы и прежний тип запуска.</param>
+    /// <returns>Подтверждение изменения SCM либо причина отказа.</returns>
     public static (bool success, string? error) EnableService(StartupEntry entry)
     {
         try
@@ -458,10 +550,13 @@ public static class EntryOperations
             var svcName = entry.LocationDetail;
             if (!IsValidServiceName(svcName))
                 return (false, $"Invalid service name: {svcName}");
-            var (exitCode, _) = RunSc($"config \"{svcName}\" start=auto", 10000);
+            var saved = string.IsNullOrEmpty(entry.DisablePayload) ? null : JsonSerializer.Deserialize<ServicePayload>(entry.DisablePayload, JsonOptions);
+            var startType = saved?.StartType is "boot" or "system" or "auto" or "demand" ? saved.StartType : "auto";
+            var (exitCode, _) = RunSc($"config \"{svcName}\" start={startType}", 10000);
             if (exitCode != 0)
                 return (false, $"sc config failed with exit code {exitCode}");
-            RunSc($"start \"{svcName}\"", 5000);
+            // Включение восстанавливает режим запуска; оно не запускает произвольную службу немедленно.
+            entry.DisablePayload = string.Empty;
             return (true, null);
         }
         catch (Exception ex)
@@ -537,7 +632,23 @@ public static class EntryOperations
     /// <summary>DTO для сохранения/восстановления задачи планировщика: XML и путь.</summary>
     public record TaskPayload(string TaskXml, string TaskPath);
 
+    /// <summary>Сравнивает определения одной задачи, допуская только изменение флага Enabled нашим отключением.</summary>
+    /// <param name="originalXml">Сохранённое исходное определение.</param>
+    /// <param name="disabledXml">Определение перед повторным отключением.</param>
+    /// <returns>True при совпадении principal, действий, триггеров и прочих настроек.</returns>
+    internal static bool AreEquivalentTaskDefinitions(string originalXml, string disabledXml)
+    {
+        var original = System.Xml.Linq.XDocument.Parse(originalXml);
+        var disabled = System.Xml.Linq.XDocument.Parse(disabledXml);
+        foreach (var document in new[] { original, disabled })
+            foreach (var flag in document.Descendants().Where(element => element.Name.LocalName == "Enabled" && element.Parent?.Name.LocalName == "Settings").ToArray())
+                flag.Remove();
+        return System.Xml.Linq.XNode.DeepEquals(original, disabled);
+    }
+
     /// <summary>Отключает задачу в планировщике: task.Enabled = false</summary>
+    /// <param name="entry">Запись задачи, полный XML которой сохраняется только при первом отключении.</param>
+    /// <returns>Подтверждение отключения существующей задачи.</returns>
     public static (bool success, string? error) DisableTask(StartupEntry entry)
     {
         try
@@ -546,6 +657,8 @@ public static class EntryOperations
             using var ts = new Microsoft.Win32.TaskScheduler.TaskService();
             var task = ts.GetTask(taskPath);
             if (task == null) return (false, $"Task not found: {taskPath}");
+            if (string.IsNullOrEmpty(entry.DisablePayload))
+                entry.DisablePayload = JsonSerializer.Serialize(new TaskPayload(task.Xml, task.Path), JsonOptions);
             task.Enabled = false;
             return (true, null);
         }
@@ -556,6 +669,8 @@ public static class EntryOperations
     }
 
     /// <summary>Включает задачу в планировщике: task.Enabled = true</summary>
+    /// <param name="entry">Существующая отключённая задача.</param>
+    /// <returns>Подтверждение включения либо причина отказа.</returns>
     public static (bool success, string? error) EnableTask(StartupEntry entry)
     {
         try
@@ -565,6 +680,7 @@ public static class EntryOperations
             var task = ts.GetTask(taskPath);
             if (task == null) return (false, $"Task not found: {taskPath}");
             task.Enabled = true;
+            entry.DisablePayload = string.Empty;
             return (true, null);
         }
         catch (Exception ex)
@@ -604,6 +720,8 @@ public static class EntryOperations
     }
 
     /// <summary>Восстанавливает задачу в планировщике из сохранённого XML.</summary>
+    /// <param name="payloadJson">Сохранённые XML и полный путь задачи.</param>
+    /// <returns>Подтверждение регистрации с исходным principal и типом входа либо причина отказа.</returns>
     public static (bool success, string? error) RestoreTask(string payloadJson)
     {
         try
@@ -611,9 +729,24 @@ public static class EntryOperations
             var tp = JsonSerializer.Deserialize<TaskPayload>(payloadJson, JsonOptions);
             if (tp == null) return (false, "Invalid task payload");
 
+            if (string.IsNullOrWhiteSpace(tp.TaskPath) || string.IsNullOrWhiteSpace(tp.TaskXml))
+                return (false, "В резервной копии отсутствует путь или XML задачи.");
             using var ts = new Microsoft.Win32.TaskScheduler.TaskService();
-            // RegisterTask принимает путь задачи целиком (\Folder\Name)
-            ts.RootFolder.RegisterTask(tp.TaskPath, tp.TaskXml);
+            using var existing = ts.GetTask(tp.TaskPath);
+            if (existing != null)
+                return System.Xml.Linq.XNode.DeepEquals(System.Xml.Linq.XDocument.Parse(existing.Xml), System.Xml.Linq.XDocument.Parse(tp.TaskXml))
+                    ? (true, null) : (false, "Задача с таким путём уже существует; восстановление не перезаписывает чужую задачу.");
+            using var definition = ts.NewTask();
+            definition.XmlText = tp.TaskXml;
+            var principal = definition.Principal;
+            if (principal.LogonType is Microsoft.Win32.TaskScheduler.TaskLogonType.Password or Microsoft.Win32.TaskScheduler.TaskLogonType.InteractiveTokenOrPassword)
+                return (false, "Восстановление задачи требует пароля её учётной записи; пароль не хранится в резервной копии.");
+            // Сохраняем principal из XML: RegisterTask с параметрами по умолчанию менял
+            // тип входа на S4U, несовместимый с InteractiveToken задачи AntigravityAutoPatch.
+            using var restored = ts.RootFolder.RegisterTaskDefinition(tp.TaskPath, definition,
+                Microsoft.Win32.TaskScheduler.TaskCreation.Create, string.IsNullOrWhiteSpace(principal.UserId) ? principal.GroupId : principal.UserId,
+                null, principal.LogonType);
+            if (restored == null) return (false, "Планировщик не подтвердил регистрацию восстановленной задачи.");
             return (true, null);
         }
         catch (Exception ex)
@@ -1184,7 +1317,7 @@ public static class EntryOperations
         {
             // Запись удалена пользователем из системы (в списке восстановления) —
             // в общем списке ей не место, даже если статус Blocked
-            if (store.IsRemoved(entry.Id))
+            if (store.IsRemoved(entry.Id) && string.IsNullOrEmpty(entry.DisablePayload))
             {
                 store.RemoveEntry(entry.Id);
                 logger?.LogInformation("CleanupStaleEntries: удалена из общего списка {Name} ({Loc}) — в списке восстановления",
@@ -1414,6 +1547,107 @@ public static class EntryOperations
 
             _ => (false, $"RestoreToSystem not supported for {entry.Location}")
         };
+    }
+
+    /// <summary>Краткоживущие намерения ручного восстановления; не переживают аварийный перезапуск службы.</summary>
+    private static readonly ConcurrentDictionary<string, byte> _restoreIntents = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Различает явное ручное восстановление и самопроизвольное повторное появление удалённой записи.</summary>
+    /// <param name="store">Конкретное хранилище службы.</param>
+    /// <param name="entryId">Исходный идентификатор записи.</param>
+    /// <returns>True только во время незавершённой авторизованной операции восстановления.</returns>
+    internal static bool IsRestoreInProgress(JsonDataStore store, string entryId) =>
+        _restoreIntents.ContainsKey(Path.GetFullPath(store.BaseDirectory) + "\0" + entryId);
+
+    /// <summary>
+    /// Восстанавливает удалённую запись без гонки с AutoGuard. Известная identity сохраняется
+    /// до события ОС, а RemovedEntry удаляется только после подтверждения восстановления.
+    /// Отказ оставляет резервную копию и возвращает прежнее состояние основной записи.
+    /// </summary>
+    /// <param name="store">Хранилище записей и резервных копий.</param>
+    /// <param name="removed">Авторитетная резервная копия, выбранная пользователем.</param>
+    /// <param name="restore">Тестируемая операция ОС; по умолчанию настоящее восстановление.</param>
+    /// <returns>Подтверждённый результат либо содержательная причина отказа.</returns>
+    internal static (bool success, string? error) RestoreRemovedEntry(JsonDataStore store, RemovedEntry removed,
+        Func<RemovedEntry, (bool success, string? error)>? restore = null)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(removed);
+        if (string.IsNullOrWhiteSpace(removed.OriginalEntryId))
+            return (false, "В резервной копии отсутствует идентификатор исходной записи.");
+        var entry = new StartupEntry
+        {
+            Id = removed.OriginalEntryId, Name = removed.Name, FilePath = removed.FilePath,
+            Publisher = removed.Publisher, Location = removed.Location, LocationDetail = removed.LocationDetail,
+            DetectedAt = removed.DetectedAt, Status = EntryStatus.Enabled
+        };
+        if (store.FindBlacklistRule(rule => rule.Action == BlacklistAction.NotifyAndRemove && BlacklistManager.IsMatchStatic(rule, entry)) != null)
+            return (false, "Запись соответствует действующему правилу чёрного списка. Сначала удалите это правило.");
+        var intent = Path.GetFullPath(store.BaseDirectory) + "\0" + entry.Id;
+        if (!_restoreIntents.TryAdd(intent, 0)) return (false, "Восстановление этой записи уже выполняется.");
+        var previous = store.FindEntry(candidate => candidate.Id == entry.Id);
+        var systemRestored = false;
+        var published = false;
+        try
+        {
+            if (previous == null)
+            {
+                if (!store.AddEntry(entry)) return (false, "Совпадающая запись уже существует в хранилище.");
+                published = true;
+            }
+            else
+            {
+                entry.CommandLine = previous.CommandLine;
+                store.UpdateEntry(entry);
+                published = true;
+            }
+            // Если программа создала ту же точку заново и мы её отключили, восстанавливаем
+            // существующий объект вместо повторного Create (который обязан отклонять конфликт).
+            var canEnableExisting = previous != null && !string.IsNullOrEmpty(previous.DisablePayload) &&
+                previous.Status is EntryStatus.Disabled or EntryStatus.Blocked && previous.Location == removed.Location &&
+                string.Equals(previous.LocationDetail, removed.LocationDetail, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(previous.FilePath, removed.FilePath, StringComparison.OrdinalIgnoreCase);
+            if (canEnableExisting && previous?.Location == EntryLocation.TaskScheduler)
+            {
+                var original = JsonSerializer.Deserialize<TaskPayload>(removed.RestorePayload, JsonOptions);
+                var disabled = JsonSerializer.Deserialize<TaskPayload>(previous.DisablePayload, JsonOptions);
+                canEnableExisting = original != null && disabled != null &&
+                    AreEquivalentTaskDefinitions(original.TaskXml, disabled.TaskXml);
+            }
+            var result = restore != null ? restore(removed) : canEnableExisting && previous != null
+                ? EnableFromSystem(previous) : RestoreToSystem(removed);
+            if (!result.success) return result;
+            systemRestored = true;
+            // Повторное чтение не откатывает конкурентные изменения watcher и других записей.
+            var config = store.Load();
+            config.RemovedEntries.RemoveAll(candidate => candidate.Id == removed.Id);
+            store.Save(config);
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Не удалось завершить ручное восстановление записи {EntryId}", entry.Id);
+            return (false, $"Восстановление '{removed.Name}' не завершено: {ex.Message}");
+        }
+        finally
+        {
+            try
+            {
+                if (!systemRestored && published)
+                {
+                    if (previous == null) store.RemoveEntry(entry.Id);
+                    else store.UpdateEntry(previous);
+                }
+            }
+            catch (Exception rollbackError)
+            {
+                Serilog.Log.Error(rollbackError, "Не удалось вернуть прежнее состояние записи после отказа Restore {EntryId}", entry.Id);
+            }
+            finally
+            {
+                _restoreIntents.TryRemove(intent, out _);
+            }
+        }
     }
 
     /// <summary>Отключает запись в системе (без удаления, с возможностью включить обратно).</summary>
@@ -1651,13 +1885,9 @@ public static class EntryOperations
                 return false;
             }
 
-            // Допускаем минимальную погрешность до 20 мс на квантование Win32 FILETIME
-            // (1 мс = 10 000 тактов FILETIME по 100 нс, 20 мс = 200 000 тактов)
-            const long maxToleranceTicks = 20L * 10_000L;
-            long diff = actualCreationTimeUtc - expectedCreationFileTimeUtc.Value;
-            long absDelta = diff < 0 ? (diff == long.MinValue ? long.MaxValue : -diff) : diff;
-
-            if (absDelta <= maxToleranceTicks)
+            // FILETIME из снимка и GetProcessTimes описывает одно значение; допуск может
+            // ошибочно принять другой экземпляр при быстром повторном использовании PID.
+            if (actualCreationTimeUtc == expectedCreationFileTimeUtc.Value)
             {
                 return true;
             }
@@ -1701,6 +1931,41 @@ public static class EntryOperations
         return VerifyProcessIdentity(processId, expectedCreationFileTimeUtc, out _);
     }
 
+    /// <summary>Проверяет FILETIME на дескрипторе, который будет использован для действия.</summary>
+    /// <param name="processHandle">Открытый дескриптор с правом PROCESS_QUERY_LIMITED_INFORMATION.</param>
+    /// <param name="expectedCreationFileTimeUtc">Точное ожидаемое время либо null для legacy-клиента.</param>
+    /// <param name="failureReason">Причина отказа без выполнения действия.</param>
+    /// <returns>Истина только для совпавшего экземпляра либо legacy-запроса без токена.</returns>
+    public static bool VerifyProcessHandleIdentity(IntPtr processHandle, long? expectedCreationFileTimeUtc, out string? failureReason)
+    {
+        failureReason = null;
+        if (!expectedCreationFileTimeUtc.HasValue) return true;
+        if (expectedCreationFileTimeUtc.Value <= 0 || processHandle == IntPtr.Zero ||
+            !GetProcessTimes(processHandle, out var creationTime, out _, out _, out _) ||
+            creationTime != expectedCreationFileTimeUtc.Value)
+        {
+            failureReason = ProcessInstanceChangedReason;
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>Удерживает проверенный handle в объекте Process до завершения действия.</summary>
+    /// <param name="process">Открытый процесс, используемый далее для Kill без повторного поиска PID.</param>
+    /// <param name="expectedCreationFileTimeUtc">Ожидаемое время создания экземпляра.</param>
+    /// <param name="failureReason">Причина отказа.</param>
+    /// <returns>Истина при точном совпадении или отсутствии legacy-токена.</returns>
+    public static bool VerifyProcessIdentity(Process process, long? expectedCreationFileTimeUtc, out string? failureReason)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        if (!expectedCreationFileTimeUtc.HasValue)
+        {
+            failureReason = null;
+            return true;
+        }
+        return VerifyProcessHandleIdentity(process.Handle, expectedCreationFileTimeUtc, out failureReason);
+    }
+
     private static readonly ConcurrentDictionary<int, bool> _suspendedPids = new();
 
     /// <summary>Проверяет, был ли процесс приостановлен службой.</summary>
@@ -1721,9 +1986,6 @@ public static class EntryOperations
     /// <summary>Приостанавливает выполнение процесса по PID через NtSuspendProcess.</summary>
     public static (bool success, string message) SuspendProcess(int processId, string? processName = null, long? expectedCreationFileTimeUtc = null)
     {
-        if (!VerifyProcessIdentity(processId, expectedCreationFileTimeUtc, out var failureReason))
-            return (false, failureReason ?? ProcessInstanceChangedReason);
-
         if (!string.IsNullOrEmpty(processName) && IsProtectedProcessName(processName))
             return (false, $"Процесс {processName} является системным и защищён от приостановки.");
 
@@ -1733,7 +1995,7 @@ public static class EntryOperations
             if (IsProtectedProcessName(proc.ProcessName))
                 return (false, $"Процесс {proc.ProcessName} является системным и защищён от приостановки.");
 
-            var hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, false, processId);
+            var hProcess = OpenProcess(PROCESS_SUSPEND_RESUME | PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
             if (hProcess == IntPtr.Zero)
             {
                 var err = Marshal.GetLastWin32Error();
@@ -1742,6 +2004,9 @@ public static class EntryOperations
 
             try
             {
+                // Проверка и NtSuspendProcess используют один handle, исключая повторное открытие PID.
+                if (!VerifyProcessHandleIdentity(hProcess, expectedCreationFileTimeUtc, out var failureReason))
+                    return (false, failureReason ?? ProcessInstanceChangedReason);
                 var status = NtSuspendProcess(hProcess);
                 if (status == 0)
                 {
@@ -1769,13 +2034,10 @@ public static class EntryOperations
     /// <summary>Возобновляет выполнение процесса по PID через NtResumeProcess.</summary>
     public static (bool success, string message) ResumeProcess(int processId, string? processName = null, long? expectedCreationFileTimeUtc = null)
     {
-        if (!VerifyProcessIdentity(processId, expectedCreationFileTimeUtc, out var failureReason))
-            return (false, failureReason ?? ProcessInstanceChangedReason);
-
         try
         {
             using var proc = Process.GetProcessById(processId);
-            var hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, false, processId);
+            var hProcess = OpenProcess(PROCESS_SUSPEND_RESUME | PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
             if (hProcess == IntPtr.Zero)
             {
                 var err = Marshal.GetLastWin32Error();
@@ -1784,6 +2046,9 @@ public static class EntryOperations
 
             try
             {
+                // Сверка экземпляра выполняется на том же дескрипторе, что и NtResumeProcess.
+                if (!VerifyProcessHandleIdentity(hProcess, expectedCreationFileTimeUtc, out var failureReason))
+                    return (false, failureReason ?? ProcessInstanceChangedReason);
                 var status = NtResumeProcess(hProcess);
                 if (status == 0)
                 {

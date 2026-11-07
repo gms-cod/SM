@@ -129,7 +129,7 @@
     <value>Ошибка PipeServer при подключении клиента</value>
   </data>
   <data name="StrictModeDescription" xml:space="preserve">
-    <value>При обнаружении новой записи немедленно стирает её из системы, завершает процесс, сохраняет резервную копию и отображает уведомление.</value>
+    <value>При обнаружении новой записи отключает её, сохраняет данные для включения и отображает уведомление.</value>
   </data>
   <data name="NavLogs" xml:space="preserve">
     <value>Журнал</value>
@@ -279,7 +279,7 @@
     <value>{0} удалена из автозапуска (чёрный список)</value>
   </data>
   <data name="ActionNotifyRemove" xml:space="preserve">
-    <value>Уведомить и удалить</value>
+    <value>Уведомить и отключить</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>Мониторинг автозапуска в реальном времени</value>
@@ -1019,6 +1019,12 @@
   <data name="TmProcessInstanceChanged" xml:space="preserve">
     <value>Процесс перезапустился под новым ID, действие отменено в целях безопасности.</value>
   </data>
+  <data name="TmProcessIdentityUnavailable" xml:space="preserve">
+    <value>Время создания процесса недоступно. Обновите список процессов перед повторной попыткой.</value>
+  </data>
+  <data name="TmProcessInstanceCommandsUnavailable" xml:space="preserve">
+    <value>Служба не поддерживает проверку экземпляра процесса. Подключитесь к обновлённой службе перед повторной попыткой.</value>
+  </data>
   <data name="TmError" xml:space="preserve">
     <value>Ошибка</value>
   </data>
@@ -1408,7 +1414,7 @@
     <value>Только аудит (запись в историю и предупреждение)</value>
   </data>
   <data name="AutoGuardsModeEnforce" xml:space="preserve">
-    <value>Активная блокировка (завершение процесса и изоляция в бэкап)</value>
+    <value>Активная блокировка (отключение с возможностью включить обратно)</value>
   </data>
   <data name="AutoGuardsRulesLabel" xml:space="preserve">
     <value>Политики автоматической защиты:</value>
@@ -2027,7 +2033,7 @@
 <data name="FwRuleBtnCancel" xml:space="preserve"><value>Отмена</value></data>
 <data name="NetAlertCloseTip" xml:space="preserve"><value>Закрыть (разрешить на этот сеанс)</value></data>
 <data name="NetAlertAllowAlwaysTip" xml:space="preserve"><value>Создать разрешающее правило в Windows Firewall</value></data>
-<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Разрешить без создания правила (до перезапуска)</value></data>
+<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Временное исходящее правило до перезапуска службы, максимум на 8 часов. Блокировки Windows и других средств защиты сохраняют приоритет.</value></data>
 <data name="NetAlertBlockTip" xml:space="preserve"><value>Создать блокирующее правило в Windows Firewall</value></data>
 <data name="NetAlertCountdownHint" xml:space="preserve"><value>Автоматическое решение через 15 сек...</value></data>
 <data name="NetBansCountFormat" xml:space="preserve"><value>Активных банов: {0}</value></data>
@@ -2119,7 +2125,7 @@
   <data name="NetAlertAiActionBlockAlways" xml:space="preserve"><value>Всегда блокировать</value></data>
   <data name="NetAlertAiActionBlockSession" xml:space="preserve"><value>Заблокировать на сессию</value></data>
   <data name="NetAlertAiRecommendedActionFormat" xml:space="preserve"><value>Рекомендация: {0}</value></data>
-  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>Анализ нейросетью недоступен (проверьте настройки AI в параметрах).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Стандартное сетевое подключение приложения.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Применяйте стандартные правила брандмауэра.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Блок на сеанс</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Временно блокировать исходящие запросы процесса до перезапуска</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Рекомендация: Разрешить всегда</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Рекомендация: Разрешить на сеанс</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Рекомендация: Заблокировать всегда</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Рекомендация: Заблокировать на сеанс</value></data>  <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
+  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>Анализ нейросетью недоступен (проверьте настройки AI в параметрах).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Стандартное сетевое подключение приложения.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Применяйте стандартные правила брандмауэра.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Блок на сеанс</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Блокировать исходящие подключения программы до перезапуска службы, максимум на 8 часов. Постоянное правило не создаётся.</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Рекомендация: Разрешить всегда</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Рекомендация: Разрешить на сеанс</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Рекомендация: Заблокировать всегда</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Рекомендация: Заблокировать на сеанс</value></data>  <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
   <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Автономные решения ИИ:</value></data>
   <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Автономные решения ИИ для сетевых подключений</value></data>
   <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>Автоматически анализировать новые исходящие подключения нейросетью и применять решение без показа всплывающего окна</value></data>
@@ -2372,4 +2378,8 @@
   <data name="DefenderOpenErrorFormat" xml:space="preserve"><value>Не удалось открыть настройку Port Defender: {0}</value></data>
   <data name="DefenderSummaryRefreshed" xml:space="preserve"><value>Сводка Port Defender обновлена.</value></data>
   <data name="DefenderRefreshErrorFormat" xml:space="preserve"><value>Ошибка обновления Port Defender: {0}</value></data>
+  <data name="NetAlertApplying" xml:space="preserve"><value>Применяется выбранное решение…</value></data>
+  <data name="NetAlertApplyFailed" xml:space="preserve"><value>Служба не подтвердила применение решения. Проверьте службу и повторите выбор.</value></data>
+  <data name="NetAlertSessionAllowUnavailable" xml:space="preserve"><value>Для временного разрешения нужен путь программы и обычный режим фильтрации. В режиме белого списка или полного запрета используйте постоянное правило либо измените режим.</value></data>
+  <data name="NetAlertPathRequired" xml:space="preserve"><value>Путь программы недоступен. Безопасно применить правило к приложению нельзя; можно разрешить показанный удалённый порт.</value></data>
 </root>

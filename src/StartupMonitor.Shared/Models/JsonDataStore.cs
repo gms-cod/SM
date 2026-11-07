@@ -28,6 +28,12 @@ public class JsonDataStore
     private AppConfig? _cache;
     /// <summary>Монотонно возрастающая ревизия данных для оптимизации передачи по IPC (P1-04).</summary>
     private long _revision;
+    /// <summary>Отдельная версия только правил ЧС; изменения рейтингов и истории её не меняют.</summary>
+    private long _blacklistRevision;
+    /// <summary>Номер последнего успешно сохранённого поколения правил ЧС.</summary>
+    public long BlacklistRevision => Interlocked.Read(ref _blacklistRevision);
+    /// <summary>Сигнал обновления правил после фиксации файлов и выхода из блокировки хранилища.</summary>
+    public event Action? BlacklistChanged;
     /// <summary>Текущая ревизия данных хранилища.</summary>
     public long Revision => Interlocked.Read(ref _revision);
     /// <summary>Принудительное увеличение номера ревизии.</summary>
@@ -130,6 +136,19 @@ public class JsonDataStore
         }
 
         TrimHistoryFile();
+        Interlocked.Increment(ref _blacklistRevision);
+    }
+
+    /// <summary>Копирует только правила ЧС вместе с их согласованной версией, не клонируя весь AppConfig.</summary>
+    /// <returns>Собственные копии правил и поколение, полученные под одной блокировкой.</returns>
+    public (long Version, IReadOnlyList<BlacklistRule> Rules) GetBlacklistSnapshot()
+    {
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            var config = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
+            return (_blacklistRevision, config.Blacklist.Select(rule => rule.Clone()).ToArray());
+        }
     }
 
     /// <summary>Загружает и возвращает изолированный глубокий снимок конфигурации (P0-02).</summary>
@@ -503,18 +522,49 @@ public class JsonDataStore
         ValidateSection(config);
         using var _profSave = ExecutionProfiler.Profile("Service.JsonDataStoreSave");
         using var _prof = ExecutionProfiler.Measure("Shared.Store.Save");
+        var blacklistChanged = false;
         lock (_lock)
         {
             EnsureLoadedLocked();
             // Базовые состояния неизменяемы: независимые изменения объединяются только при устаревшем снимке.
             var current = _cache ?? throw new InvalidOperationException("Конфигурация не загружена.");
-            _cache = _snapshotOrigins.TryGetValue(config, out var original) && !ReferenceEquals(original, current)
+            var next = _snapshotOrigins.TryGetValue(config, out var original) && !ReferenceEquals(original, current)
                 ? ConfigurationMerge.Merge(GetSnapshotMergeBaseline(original, config), config, current, _options)
                 : CloneSnapshot(config);
-            SaveEntries();
-            SaveBlacklist();
-            SaveRemoved();
-            SaveSettings();
+            var oldBlacklist = JsonSerializer.Serialize(current.Blacklist, _options);
+            var newBlacklist = JsonSerializer.Serialize(next.Blacklist, _options);
+            // Все payload готовятся до первой записи. Кэш публикуется только после успеха;
+            // при отказе диска ранее записанные секции возвращаются к предыдущему состоянию.
+            var sections = new[]
+            {
+                (Path: EntriesPath, Old: JsonSerializer.Serialize(current.Entries, _options), New: JsonSerializer.Serialize(next.Entries, _options)),
+                (Path: BlacklistPath, Old: oldBlacklist, New: newBlacklist),
+                (Path: RemovedPath, Old: JsonSerializer.Serialize(current.RemovedEntries, _options), New: JsonSerializer.Serialize(next.RemovedEntries, _options)),
+                (Path: SettingsPath,
+                    Old: JsonSerializer.Serialize(new SettingsSection { Language = current.Language, Theme = current.Theme, Settings = current.Settings }, _options),
+                    New: JsonSerializer.Serialize(new SettingsSection { Language = next.Language, Theme = next.Theme, Settings = next.Settings }, _options))
+            };
+            var committed = new List<(string Path, string Old)>();
+            try
+            {
+                foreach (var section in sections)
+                {
+                    WriteSectionAtomic(section.Path, section.New);
+                    committed.Add((section.Path, section.Old));
+                }
+            }
+            catch
+            {
+                foreach (var section in committed.AsEnumerable().Reverse())
+                {
+                    try { WriteSectionAtomic(section.Path, section.Old); }
+                    catch (Exception rollbackError) { _logWarning($"Не удалось откатить секцию {Path.GetFileName(section.Path)} после ошибки сохранения.", rollbackError); }
+                }
+                throw;
+            }
+            _cache = next;
+            blacklistChanged = !string.Equals(oldBlacklist, newBlacklist, StringComparison.Ordinal);
+            if (blacklistChanged) Interlocked.Increment(ref _blacklistRevision);
             // База повторного сохранения содержит только известные writer данные, а не весь результат merge:
             // это допускает возврат поля к прежнему значению и не превращает неизвестные добавления в удаление.
             var writerBaseline = CloneSnapshot(config);
@@ -524,6 +574,14 @@ public class JsonDataStore
             {
                 _entryOrigins.Remove(config.Entries[index]);
                 _entryOrigins.Add(config.Entries[index], writerBaseline.Entries[index]);
+            }
+        }
+        if (blacklistChanged && BlacklistChanged is { } handlers)
+        {
+            foreach (Action handler in handlers.GetInvocationList())
+            {
+                try { handler(); }
+                catch (Exception ex) { _logWarning("Ошибка подписчика изменения правил ЧС.", ex); }
             }
         }
     }

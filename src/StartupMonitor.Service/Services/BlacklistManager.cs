@@ -24,38 +24,24 @@ public class BlacklistManager
         return _store.FindBlacklistRule(rule => IsMatchStatic(rule, entry));
     }
 
-    /// <summary>Применяет действие правила ЧС к записи: блокировка + удаление или только уведомление.</summary>
+    /// <summary>Применяет правило ЧС: отключает точку автозапуска без удаления либо отправляет уведомление.</summary>
+    /// <param name="entry">Исходная запись, сохраняющая данные для последующего включения.</param>
+    /// <param name="rule">Совпавшее правило; прежнее имя NotifyAndRemove сохранено для совместимости конфигурации.</param>
+    /// <param name="store">Хранилище записей.</param>
+    /// <param name="notifications">Очередь уведомлений.</param>
     public void ApplyBlacklistAction(StartupEntry entry, BlacklistRule? rule, JsonDataStore store, NotificationService notifications)
     {
         if (rule == null) return;
         // Защита ядра Windows: системные службы и компоненты ОС запрещено удалять или глушить через ЧС
         if (SystemProtectionHelper.IsProtectedSystemEntry(entry)) return;
 
-        entry.Status = EntryStatus.Blocked;
-        entry.FromBlacklist = true;
-
-        // NotifyAndRemove: убить процесс + удалить из системы + сохранить бэкап для восстановления
+        // Сериализованное имя действия сохранено; автоматическое удаление заменено обратимым отключением.
         if (rule.Action == BlacklistAction.NotifyAndRemove)
         {
             EntryOperations.KillProcess(entry);
-            var (success, _, payload) = EntryOperations.RemoveFromSystem(entry);
+            var (success, error) = DisableAutomatically(entry, store, "BlacklistDisabled", fromBlacklist: true);
             if (success)
             {
-                // Сохраняем в RemovedEntry для возможности восстановления
-                store.AddRemovedEntry(new RemovedEntry
-                {
-                    OriginalEntryId = entry.Id,
-                    Name = entry.Name,
-                    FilePath = entry.FilePath,
-                    Publisher = entry.Publisher,
-                    Location = entry.Location,
-                    LocationDetail = entry.LocationDetail,
-                    DetectedAt = entry.DetectedAt,
-                    RestorePayload = payload ?? "",
-                });
-                // Запись ОСТАЁТСЯ в списке как Blocked: из системы удалена,
-                // но пользователь видит блокировку и может разблокировать (= восстановить)
-                store.UpdateEntry(entry);
                 // Уведомляем UI об авто-блокировке (покажет предупреждение)
                 notifications.Enqueue(new PipeMessage
                 {
@@ -63,9 +49,12 @@ public class BlacklistManager
                     Payload = System.Text.Json.JsonSerializer.Serialize(entry)
                 });
             }
+            else Serilog.Log.Warning("Не удалось автоматически отключить {EntryName}: {Error}", entry.Name, error);
         }
         else
         {
+            entry.Status = EntryStatus.Blocked;
+            entry.FromBlacklist = true;
             // NotifyOnly: только блокировка и уведомление, без удаления из системы
             notifications.Enqueue(new PipeMessage
             {
@@ -76,6 +65,45 @@ public class BlacklistManager
         // Статус/флаг записи изменён (Blocked/FromBlacklist) — двигаем ревизию Entries,
         // чтобы дельта-опрос UI (GetEntriesDelta) забрал актуальный снимок.
         Pipe.PipeServer.NotifyExternalEntriesChanged();
+    }
+
+    /// <summary>Единая обратимая автоматическая блокировка без создания RemovedEntry или удаления точки запуска.</summary>
+    /// <param name="entry">Отключаемая запись.</param>
+    /// <param name="store">Хранилище для сохранения первого DisablePayload.</param>
+    /// <param name="reason">Диагностируемая причина автоматического отключения.</param>
+    /// <param name="fromBlacklist">Требуется ли отметка действующего правила ЧС.</param>
+    /// <returns>Подтверждение отключения либо причина отказа.</returns>
+    internal static (bool success, string? error) DisableAutomatically(StartupEntry entry, JsonDataStore store,
+        string reason, bool fromBlacklist = false)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(store);
+        try
+        {
+            var existing = store.FindEntry(candidate => candidate.Id == entry.Id);
+            if (existing != null && !string.IsNullOrEmpty(existing.DisablePayload))
+                entry.DisablePayload = existing.DisablePayload;
+            var result = EntryOperations.DisableFromSystem(entry);
+            if (result.success)
+            {
+                entry.Status = fromBlacklist ? EntryStatus.Blocked : EntryStatus.Disabled;
+                entry.FromBlacklist = fromBlacklist;
+            }
+            // Даже отказ остаётся видимой записью, а не потерянной точкой автозапуска.
+            if (!store.AddEntry(entry)) store.UpdateEntry(entry);
+            store.AddHistory(new HistoryEntry
+            {
+                ChangeType = result.success ? "AutomaticallyDisabled" : "AutomaticDisableFailed",
+                EntryName = entry.Name, EntryPath = entry.FilePath, Location = entry.Location.ToString(),
+                Action = result.success ? reason : $"{reason}: {result.error}"
+            });
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Ошибка автоматического отключения {EntryName}", entry.Name);
+            return (false, ex.Message);
+        }
     }
 
     /// <summary>Проверяет, подходит ли запись под правило ЧС по типу совпадения (путь/маска/издатель/SHA256).</summary>

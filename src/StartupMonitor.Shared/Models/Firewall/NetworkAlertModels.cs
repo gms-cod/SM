@@ -23,6 +23,14 @@ public class NetworkConnectionAlertDto
     [JsonPropertyName("processPath")]
     public string ProcessPath { get; set; } = string.Empty;
 
+    /// <summary>Временное разрешение поддерживается текущим режимом фильтрации и доступной идентичностью.</summary>
+    [JsonPropertyName("canAllowSession")]
+    public bool CanAllowSession { get; set; } = true;
+
+    /// <summary>Временная блокировка доступна для достоверного полного пути приложения.</summary>
+    [JsonPropertyName("canBlockSession")]
+    public bool CanBlockSession { get; set; } = true;
+
     /// <summary>Протокол соединения ("TCP", "TCPv6", "UDP", "UDPv6").</summary>
     [JsonPropertyName("protocol")]
     public string Protocol { get; set; } = "TCP";

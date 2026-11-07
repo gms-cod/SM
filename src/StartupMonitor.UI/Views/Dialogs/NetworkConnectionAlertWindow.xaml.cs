@@ -22,19 +22,32 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <summary>Отступ от краёв рабочей области монитора (в DIP).</summary>
     private const double ScreenMargin = 10.0;
 
-    /// <summary>Ширина окна по умолчанию для обычных высоких мониторов (в DIP).</summary>
-    private const double DefaultWindowWidth = 490.0;
-
-    /// <summary>Максимальная адаптивная ширина окна на компактных мониторах (в DIP).</summary>
-    private const double AdaptiveMaxWindowWidth = 560.0;
-
-    /// <summary>Минимально допустимая ширина окна на узких экранах (в DIP).</summary>
-    private const double MinimumWindowWidth = 320.0;
-
-    /// <summary>Минимальная высота окна (в DIP).</summary>
-    private const double MinimumWindowHeight = 220.0;
-
-    /// <summary>Резервная высота, если размеры ещё не рассчитаны layout-движком (в DIP).</summary>
+    /// <summary>Ширина окна по умолчанию для обычных высоких мониторов (в DIP).</summary>
+
+    private const double DefaultWindowWidth = 490.0;
+
+
+
+    /// <summary>Максимальная адаптивная ширина окна на компактных мониторах (в DIP).</summary>
+
+    private const double AdaptiveMaxWindowWidth = 560.0;
+
+
+
+    /// <summary>Минимально допустимая ширина окна на узких экранах (в DIP).</summary>
+
+    private const double MinimumWindowWidth = 320.0;
+
+
+
+    /// <summary>Минимальная высота окна (в DIP).</summary>
+
+    private const double MinimumWindowHeight = 220.0;
+
+
+
+    /// <summary>Резервная высота, если размеры ещё не рассчитаны layout-движком (в DIP).</summary>
+
     private const double FallbackWindowHeight = 440.0;
 
     /// <summary>Данные алерта, отображаемые в карточке.</summary>
@@ -42,6 +55,9 @@ public partial class NetworkConnectionAlertWindow : Window
 
     /// <summary>Клиент IPC для отправки решения и запроса AI-оценки.</summary>
     private readonly PipeClient _pipeClient;
+
+    /// <summary>Отправитель решения; внедрение позволяет проверить настоящий жизненный цикл окна без IPC.</summary>
+    private readonly Func<ResolveNetworkAlertRequest, CancellationToken, Task<bool>> _resolutionSender;
 
     /// <summary>Таймер обратного отсчёта с шагом в одну секунду.</summary>
     private readonly DispatcherTimer _countdownTimer;
@@ -60,6 +76,14 @@ public partial class NetworkConnectionAlertWindow : Window
 
     /// <summary>Флаг «окно закрыто» (0 — нет, 1 — да). Доступ через Interlocked/Volatile.</summary>
     private int _isClosed;
+
+    /// <summary>Подтверждение службы, разрешающее окончательное закрытие карточки.</summary>
+    private bool _resolutionConfirmed;
+
+    /// <summary>После ошибки автоматический повтор запрещён до нового явного выбора пользователя.</summary>
+    private bool _resolutionFailed;
+    /// <summary>Флаг принудительного закрытия карточки в обход ожидания подтверждения службы.</summary>
+    private bool _forceClosing;
 
     /// <summary>Признак паузы таймера из-за наведения курсора (изменяется только в UI-потоке).</summary>
     /// <summary>Выполнено ли первоначальное размещение на мониторе владельца или курсора.</summary>
@@ -82,13 +106,16 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="alert">Данные алерта (не может быть null).</param>
     /// <param name="pipeClient">Клиент IPC (не может быть null).</param>
     /// <param name="countdownSeconds">Длительность обратного отсчёта; значения ≤ 0 заменяются на 30 секунд.</param>
+    /// <param name="resolutionSender">Необязательный адаптер подтверждения решения для изолированной проверки.</param>
     public NetworkConnectionAlertWindow(
         NetworkConnectionAlertDto alert,
         PipeClient pipeClient,
-        int countdownSeconds = 30)
+        int countdownSeconds = 30,
+        Func<ResolveNetworkAlertRequest, CancellationToken, Task<bool>>? resolutionSender = null)
     {
         _alert = alert ?? throw new ArgumentNullException(nameof(alert));
         _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
+        _resolutionSender = resolutionSender ?? _pipeClient.ResolveNetworkAlertAsync;
         _totalSeconds = countdownSeconds > 0 ? countdownSeconds : 30;
         _remainingSeconds = _totalSeconds;
 
@@ -105,6 +132,7 @@ public partial class NetworkConnectionAlertWindow : Window
 
         Loaded += OnWindowLoaded;
         Closed += OnWindowClosed;
+        Closing += OnWindowClosing;
         MouseLeftButtonDown += OnDragMove;
         SizeChanged += OnWindowSizeChanged;
 
@@ -131,6 +159,7 @@ public partial class NetworkConnectionAlertWindow : Window
             return;
 
         FillAlertFields();
+        SetButtonsEnabled(true);
         RepositionWindow(animate: false);
         FadeIn();
 
@@ -167,6 +196,24 @@ public partial class NetworkConnectionAlertWindow : Window
         CancelAiEvaluation();
     }
 
+    /// <summary>Преобразует системное закрытие в подтверждаемую блокировку на сеанс.</summary>
+    /// <param name="sender">Закрываемое окно.</param>
+    /// <param name="e">Аргументы, позволяющие дождаться ответа службы без блокировки диспетчера.</param>
+    private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (_resolutionConfirmed || !IsLoaded || _forceClosing)
+            return;
+
+        if (_resolutionFailed)
+        {
+            _forceClosing = true;
+            return;
+        }
+
+        e.Cancel = true;
+        ResolveAndClose(NetworkAlertResolution.BlockSession);
+    }
+
     /// <summary>
     /// Приостанавливает обратный отсчёт при наведении курсора на окно.
     /// </summary>
@@ -174,7 +221,7 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="e">Аргументы события мыши.</param>
     private void OnWindowMouseEnter(object sender, MouseEventArgs e)
     {
-        if (Volatile.Read(ref _isResolved) != 0)
+        if (Volatile.Read(ref _isResolved) != 0 || _resolutionFailed)
             return;
 
         _isPausedByHover = true;
@@ -189,7 +236,7 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="e">Аргументы события мыши.</param>
     private void OnWindowMouseLeave(object sender, MouseEventArgs e)
     {
-        if (Volatile.Read(ref _isResolved) != 0)
+        if (Volatile.Read(ref _isResolved) != 0 || _resolutionFailed)
             return;
 
         _isPausedByHover = false;
@@ -319,8 +366,10 @@ public partial class NetworkConnectionAlertWindow : Window
             + RootBorder.Padding.Bottom + RootBorder.BorderThickness.Top + RootBorder.BorderThickness.Bottom;
         FooterPanel.Measure(new Size(Math.Max(1.0, Width - chromeWidth), double.PositiveInfinity));
         return FooterPanel.DesiredSize.Height + chromeHeight;
-    }
-
+    }
+
+
+
     /// <summary>Ограничивает общую прокрутку сведений, оставляя доступное место панели действий.</summary>
     /// <param name="workArea">Рабочая область выбранного монитора в DIP.</param>
     private void UpdateContentViewport(Rect workArea)
@@ -332,8 +381,10 @@ public partial class NetworkConnectionAlertWindow : Window
         ContentScrollViewer.MaxHeight = Math.Max(0.0, availableHeight - fixedHeight);
         FooterScrollViewer.MaxHeight = Math.Max(1.0, availableHeight - chromeHeight);
         AiScrollViewer.MaxHeight = double.PositiveInfinity;
-    }
-
+    }
+
+
+
     /// <summary>Подбирает размеры окна и области прокрутки в пределах фактической рабочей области.</summary>
     /// <param name="workArea">Рабочая область монитора в DIP с положительными конечными размерами.</param>
     internal void ApplyAdaptiveGeometry(Rect workArea)
@@ -351,8 +402,10 @@ public partial class NetworkConnectionAlertWindow : Window
         if (double.IsNaN(Width) || Math.Abs(Width - targetWidth) > 1.0)
             Width = targetWidth;
         UpdateContentViewport(workArea);
-    }
-
+    }
+
+
+
     /// <summary>Выбирает удобную ширину, не превышающую фактически доступное место.</summary>
     /// <param name="workArea">Рабочая область текущего монитора в DIP.</param>
     /// <returns>Предпочтительная ширина окна в DIP.</returns>
@@ -362,82 +415,156 @@ public partial class NetworkConnectionAlertWindow : Window
         var targetWidth = workArea.Height <= 750.0 ? AdaptiveMaxWindowWidth
             : workArea.Height <= 850.0 ? 520.0 : DefaultWindowWidth;
         return Math.Min(targetWidth, availableWidth);
-    }
-
-    /// <summary>
-    /// Выполняет динамическое позиционирование окна в правом нижнем углу рабочей области текущего монитора.
-    /// Реализует привязку к нижнему краю экрана («Bottom-Anchored»): при росте высоты окна
-    /// (например, при подгрузке вердикта ИИ) окно динамически поднимается вверх,
-    /// гарантируя, что все кнопки действий всегда остаются строго на своих координатах над панелью задач.
-    /// </summary>
-    /// <param name="animate">Флаг плавного анимирования координаты Top.</param>
-    private void RepositionWindow(bool animate = false)
-    {
-        try
-        {
-            if (Volatile.Read(ref _isClosed) != 0)
-                return;
-
+    }
+
+
+
+    /// <summary>
+
+    /// Выполняет динамическое позиционирование окна в правом нижнем углу рабочей области текущего монитора.
+
+    /// Реализует привязку к нижнему краю экрана («Bottom-Anchored»): при росте высоты окна
+
+    /// (например, при подгрузке вердикта ИИ) окно динамически поднимается вверх,
+
+    /// гарантируя, что все кнопки действий всегда остаются строго на своих координатах над панелью задач.
+
+    /// </summary>
+
+    /// <param name="animate">Флаг плавного анимирования координаты Top.</param>
+
+    private void RepositionWindow(bool animate = false)
+
+    {
+
+        try
+
+        {
+
+            if (Volatile.Read(ref _isClosed) != 0)
+
+                return;
+
+
+
             var workArea = WindowHelper.GetCurrentMonitorWorkArea(this, initialPlacement: !_initialPlacementComplete);
             _initialPlacementComplete = true;
-            if (workArea.Width <= 0 || workArea.Height <= 0)
-                return;
-
-            ApplyAdaptiveGeometry(workArea);
-
-            var width = ActualWidth > 0 ? ActualWidth : GetPreferredWidth(workArea);
-            var height = ActualHeight > 0
-                ? ActualHeight
-                : (DesiredSize.Height > 0 ? DesiredSize.Height : FallbackWindowHeight);
-
-            // Гарантируем, что окно не выйдет за рабочую область даже на очень малых экранах.
-            var maxHeight = Math.Max(MinimumWindowHeight, workArea.Height - (ScreenMargin * 2));
-            height = Math.Min(height, maxHeight);
-
-            var targetLeft = Math.Max(workArea.Left + ScreenMargin, workArea.Right - width - ScreenMargin);
-
-            // Строгая нижняя привязка: нижний край окна всегда зафиксирован на (workArea.Bottom - ScreenMargin).
-            // При росте height значение targetTop уменьшается на ту же дельту, окно растет вверх,
-            // а экранные координаты кнопок футера остаются неизменными.
-            var targetTop = workArea.Bottom - height - ScreenMargin;
-
-            if (_isManuallyMoved)
-            {
-                ClampInsideCurrentMonitor();
-                return;
-            }
-
-            Left = targetLeft;
-
-            if (animate && !double.IsNaN(Top) && Math.Abs(Top - targetTop) > 1.0)
-            {
-                BeginAnimation(TopProperty, null);
-                var anim = new DoubleAnimation
-                {
-                    From = Top,
-                    To = targetTop,
-                    Duration = TimeSpan.FromMilliseconds(200),
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
-                    FillBehavior = FillBehavior.Stop
-                };
-                anim.Completed += (_, _) =>
-                {
-                    if (Volatile.Read(ref _isClosed) == 0)
-                        Top = targetTop;
-                };
-                BeginAnimation(TopProperty, anim);
-            }
-            else
-            {
-                BeginAnimation(TopProperty, null);
-                Top = targetTop;
-            }
-        }
-        catch (Exception ex)
-        {
-            // Zero-Crash: защита от непредвиденных исключений layout.
-            App.Log($"NetworkConnectionAlertWindow.Reposition: {ex.Message}");
-        }
+            if (workArea.Width <= 0 || workArea.Height <= 0)
+
+                return;
+
+
+
+            ApplyAdaptiveGeometry(workArea);
+
+
+
+            var width = ActualWidth > 0 ? ActualWidth : GetPreferredWidth(workArea);
+
+            var height = ActualHeight > 0
+
+                ? ActualHeight
+
+                : (DesiredSize.Height > 0 ? DesiredSize.Height : FallbackWindowHeight);
+
+
+
+            // Гарантируем, что окно не выйдет за рабочую область даже на очень малых экранах.
+
+            var maxHeight = Math.Max(MinimumWindowHeight, workArea.Height - (ScreenMargin * 2));
+
+            height = Math.Min(height, maxHeight);
+
+
+
+            var targetLeft = Math.Max(workArea.Left + ScreenMargin, workArea.Right - width - ScreenMargin);
+
+
+
+            // Строгая нижняя привязка: нижний край окна всегда зафиксирован на (workArea.Bottom - ScreenMargin).
+
+            // При росте height значение targetTop уменьшается на ту же дельту, окно растет вверх,
+
+            // а экранные координаты кнопок футера остаются неизменными.
+
+            var targetTop = workArea.Bottom - height - ScreenMargin;
+
+
+
+            if (_isManuallyMoved)
+
+            {
+
+                ClampInsideCurrentMonitor();
+
+                return;
+
+            }
+
+
+
+            Left = targetLeft;
+
+
+
+            if (animate && !double.IsNaN(Top) && Math.Abs(Top - targetTop) > 1.0)
+
+            {
+
+                BeginAnimation(TopProperty, null);
+
+                var anim = new DoubleAnimation
+
+                {
+
+                    From = Top,
+
+                    To = targetTop,
+
+                    Duration = TimeSpan.FromMilliseconds(200),
+
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+
+                    FillBehavior = FillBehavior.Stop
+
+                };
+
+                anim.Completed += (_, _) =>
+
+                {
+
+                    if (Volatile.Read(ref _isClosed) == 0)
+
+                        Top = targetTop;
+
+                };
+
+                BeginAnimation(TopProperty, anim);
+
+            }
+
+            else
+
+            {
+
+                BeginAnimation(TopProperty, null);
+
+                Top = targetTop;
+
+            }
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            // Zero-Crash: защита от непредвиденных исключений layout.
+
+            App.Log($"NetworkConnectionAlertWindow.Reposition: {ex.Message}");
+
+        }
+
     }
 
     /// <summary>
@@ -514,8 +641,15 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="e">Аргументы события.</param>
     private void OnCountdownTick(object? sender, EventArgs e)
     {
-        if (Volatile.Read(ref _isResolved) != 0 || _isPausedByHover)
+        if (Volatile.Read(ref _isResolved) != 0 || _isPausedByHover || _resolutionFailed)
             return;
+
+        if (!_alert.CanBlockSession)
+        {
+            _countdownTimer.Stop();
+            TxtCountdown.Text = LocalizationService.Instance["NetAlertPathRequired"];
+            return;
+        }
 
         _remainingSeconds--;
         if (_remainingSeconds <= 0)
@@ -548,13 +682,21 @@ public partial class NetworkConnectionAlertWindow : Window
         ResolveAndClose(NetworkAlertResolution.AllowPort);
 
     /// <summary>Пользователь закрыл окно крестиком (трактуется как блокировка на сессию).</summary>
-    private void OnCloseClick(object sender, RoutedEventArgs e) =>
+    private void OnCloseClick(object sender, RoutedEventArgs e)
+    {
+        if (_resolutionFailed)
+        {
+            _forceClosing = true;
+            FadeOutAndClose();
+            return;
+        }
+
         ResolveAndClose(NetworkAlertResolution.BlockSession);
+    }
 
     /// <summary>
-    /// Атомарно фиксирует решение, немедленно отменяет AI-запрос и запускает закрытие окна.
-    /// Отправка решения службе выполняется в фоне, поэтому UI никогда не ждёт IPC-ответ
-    /// и не зависает даже при недоступной службе.
+    /// Атомарно начинает применение решения, отменяет AI-запрос и асинхронно ожидает
+    /// подтверждение службы. Карточка удерживает глобальный запрет повторного окна до ACK.
     /// </summary>
     /// <param name="resolution">Выбранное пользователем решение.</param>
     private void ResolveAndClose(NetworkAlertResolution resolution)
@@ -565,12 +707,12 @@ public partial class NetworkConnectionAlertWindow : Window
         if (Interlocked.Exchange(ref _isResolved, 1) != 0)
             return;
 
-        Resolution = resolution;
-
         // Мгновенная отмена AI-запроса: пользовательское действие имеет приоритет.
         CancelAiEvaluation();
         _countdownTimer.Stop();
         SetButtonsEnabled(false);
+        _resolutionFailed = false;
+        TxtCountdown.Text = LocalizationService.Instance["NetAlertApplying"];
 
         var request = new ResolveNetworkAlertRequest
         {
@@ -582,33 +724,47 @@ public partial class NetworkConnectionAlertWindow : Window
             Resolution = resolution
         };
 
-        // Решение досылается асинхронно: окно исчезает сразу, а служба получает команду
-        // по основному каналу, который больше не занят длительной AI-оценкой.
         _ = SendResolutionInBackgroundAsync(request);
-
-        FadeOutAndClose();
     }
 
     /// <summary>
-    /// Отправляет решение службе в фоне с ограниченным таймаутом.
-    /// Исключения не пробрасываются в UI-поток и журналируются.
+    /// Отправляет решение без блокировки UI и закрывает карточку только после успешного ACK.
+    /// Ошибка сохраняет ту же карточку и позволяет явно повторить выбор.
     /// </summary>
     /// <param name="request">Запрос резолва алерта.</param>
     private async Task SendResolutionInBackgroundAsync(ResolveNetworkAlertRequest request)
     {
+        var applied = false;
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await _pipeClient.ResolveNetworkAlertAsync(request, cts.Token).ConfigureAwait(false);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            applied = await _resolutionSender(request, cts.Token).WaitAsync(cts.Token).ConfigureAwait(true);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
-            // Служба не ответила за 5 секунд — окно уже закрыто, повтор не требуется.
+            App.Log($"NetworkConnectionAlertWindow.Resolve timeout: {ex.Message}");
         }
         catch (Exception ex)
         {
             App.Log($"NetworkConnectionAlertWindow.Resolve: {ex.Message}");
         }
+
+        if (Volatile.Read(ref _isClosed) != 0)
+            return;
+
+        if (applied)
+        {
+            Resolution = request.Resolution;
+            _resolutionConfirmed = true;
+            FadeOutAndClose();
+            return;
+        }
+
+        App.Log($"NetworkConnectionAlertWindow.Resolve rejected: alert={request.AlertId}, decision={request.Resolution}");
+        _resolutionFailed = true;
+        Interlocked.Exchange(ref _isResolved, 0);
+        SetButtonsEnabled(true);
+        TxtCountdown.Text = LocalizationService.Instance["NetAlertApplyFailed"];
     }
 
     /// <summary>
@@ -632,12 +788,22 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="enabled">True — включить кнопки, false — заблокировать.</param>
     private void SetButtonsEnabled(bool enabled)
     {
-        BtnWhitelist.IsEnabled = enabled;
-        BtnAllowSession.IsEnabled = enabled;
-        BtnBlockSession.IsEnabled = enabled;
-        BtnBlockAlways.IsEnabled = enabled;
+        BtnWhitelist.IsEnabled = enabled && _alert.CanBlockSession;
+        BtnAllowSession.IsEnabled = enabled && _alert.CanAllowSession;
+        BtnBlockSession.IsEnabled = enabled && _alert.CanBlockSession;
+        BtnBlockAlways.IsEnabled = enabled && _alert.CanBlockSession;
         BtnAllowPort.IsEnabled = enabled;
-        BtnClose.IsEnabled = enabled;
+        BtnClose.IsEnabled = enabled && _alert.CanBlockSession;
+        BtnAllowSession.ToolTip = _alert.CanAllowSession
+            ? LocalizationService.Instance.NetAlertAllowSessionTip
+            : LocalizationService.Instance["NetAlertSessionAllowUnavailable"];
+        BtnBlockSession.ToolTip = _alert.CanBlockSession
+            ? LocalizationService.Instance.NetAlertBlockSessionTip
+            : LocalizationService.Instance["NetAlertPathRequired"];
+        System.Windows.Controls.ToolTipService.SetShowOnDisabled(BtnAllowSession, true);
+        System.Windows.Controls.ToolTipService.SetShowOnDisabled(BtnBlockSession, true);
+        TxtSessionRestriction.Visibility = _alert.CanAllowSession && _alert.CanBlockSession ? Visibility.Collapsed : Visibility.Visible;
+        TxtSessionRestriction.Text = LocalizationService.Instance[_alert.CanBlockSession ? "NetAlertSessionAllowUnavailable" : "NetAlertPathRequired"];
     }
 
     /// <summary>

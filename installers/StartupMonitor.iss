@@ -4,7 +4,7 @@
 
 #ifndef MyAppVersion
   ; Версия по умолчанию совпадает с проверяемой сборкой и новым релизным тегом.
-  #define MyAppVersion "2.0.14"
+  #define MyAppVersion "2.1.1"
 #endif
 
 #define MyAppName "Startup Monitor"

@@ -303,7 +303,7 @@ public class LocalizationService : INotifyPropertyChanged
     public string MatchTypePublisher => this["MatchTypePublisher"];
     /// <summary>Тип совпадения «SHA256».</summary>
     public string MatchTypeSHA256 => this["MatchTypeSHA256"];
-    /// <summary>Действие «Уведомить и удалить».</summary>
+    /// <summary>Действие «Уведомить и отключить»; ключ ресурса сохранён для совместимости.</summary>
     public string ActionNotifyRemove => this["ActionNotifyRemove"];
     /// <summary>Действие «Только уведомить».</summary>
     public string ActionNotifyOnly => this["ActionNotifyOnly"];

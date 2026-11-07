@@ -176,6 +176,8 @@ public sealed class IpcTransportRegressionTests
     [Theory]
     [InlineData(PipeMessageTypes.GetStatus, true)]
     [InlineData(PipeMessageTypes.GetNetworkTrafficHistory, true)]
+    [InlineData(PipeMessageTypes.ResolveNetworkAlert, true)]
+    [InlineData(PipeMessageTypes.EvaluateNetworkAlert, true)]
     [InlineData(PipeMessageTypes.GetAiConfig, false)]
     [InlineData(PipeMessageTypes.KillProcessById, false)]
     [InlineData(PipeMessageTypes.BlockIp, false)]

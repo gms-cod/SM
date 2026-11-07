@@ -3196,7 +3196,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _networkAlertPollerTimer?.Dispose();
         _networkAlertPollerTimer = null;
         Interlocked.Exchange(ref _isPollingNetworkAlerts, 0);
-        Interlocked.Exchange(ref _isAlertWindowOpen, 0);
+
+        var hasActiveAlertWindow = false;
+        try
+        {
+            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                hasActiveAlertWindow = System.Windows.Application.Current.Windows
+                    .OfType<Views.Dialogs.NetworkConnectionAlertWindow>()
+                    .Any(w => w.IsLoaded);
+            });
+        }
+        catch { }
+
+        if (!hasActiveAlertWindow)
+        {
+            Interlocked.Exchange(ref _isAlertWindowOpen, 0);
+        }
     }
 
     /// <summary>

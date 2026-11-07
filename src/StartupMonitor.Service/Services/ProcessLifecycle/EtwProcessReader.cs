@@ -27,7 +27,8 @@ public static class EtwProcessReader
         LifecycleIngress ingress,
         Guid sourceEpoch,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action? onReady = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(ingress);
@@ -114,6 +115,8 @@ public static class EtwProcessReader
 
         try
         {
+            // Готовность означает открытый consumer с подписанными обработчиками, а не sleep.
+            onReady?.Invoke();
             source.Process();
             ct.ThrowIfCancellationRequested();
             throw new IOException("ETW consumer завершил обработку событий без явного запроса остановки. Требуется восстановление.");

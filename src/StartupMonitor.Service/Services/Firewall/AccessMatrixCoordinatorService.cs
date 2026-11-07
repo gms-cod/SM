@@ -189,6 +189,8 @@ public sealed class AccessMatrixCoordinatorService
     /// <summary>
     /// Атомарно применяет изменение состояния доступа программы.
     /// </summary>
+    /// <param name="request">Проверяемый выбор состояния, области действия и срока временного правила.</param>
+    /// <returns>Подтверждение только после успешного применения требуемой политики и сохранения настроек.</returns>
     public FirewallOperationResult ApplyAccessState(SetAppAccessStateRequest request)
     {
         if (request == null)
@@ -200,6 +202,10 @@ public sealed class AccessMatrixCoordinatorService
             return FirewallOperationResult.Fail("Не указан путь или имя приложения.");
 
         var targetKey = !string.IsNullOrWhiteSpace(path) ? path : name;
+        // Проверка enum и TTL выполняется до любых записей постоянной политики.
+        if (!Enum.IsDefined(request.TargetState) || !Enum.IsDefined(request.Scope) ||
+            request.Scope == AccessRuleScope.TimedTtl && request.TtlMinutes is < 1 or > 480)
+            return FirewallOperationResult.Fail("Некорректное состояние, область или срок временного правила.");
         var protection = EvaluateProtectionLevel(name, path);
 
         // ЖЕСТКИЙ БАРЬЕР: Блокировка критического ядра Windows категорически запрещена
@@ -213,107 +219,63 @@ public sealed class AccessMatrixCoordinatorService
         {
             try
             {
+                // Сессионный выбор проходит тем же подтверждаемым путём, что и всплывающая карточка.
+                // Он не сохраняет разрешения в реестре и не переживает аварийный выход службы.
+                if (request.Scope != AccessRuleScope.Permanent && request.TargetState != AccessControlState.Prompt)
+                    return _alertService.ApplySessionAccess(path, name,
+                        request.TargetState == AccessControlState.Allowed ? NetworkAlertResolution.AllowSession : NetworkAlertResolution.BlockSession,
+                        request.Scope == AccessRuleScope.TimedTtl ? TimeSpan.FromMinutes(request.TtlMinutes) : null);
+
                 var cfg = _store.Load();
 
-                // Имя правила брандмауэра для полной синхронизации
+                // Полное приложение определяет имя правила: одинаковые exe из разных каталогов независимы.
+                if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+                    return FirewallOperationResult.Fail("Для изменения сетевого доступа необходим полный путь приложения.");
                 var safeBaseName = SanitizeRuleName(!string.IsNullOrWhiteSpace(name) ? Path.GetFileNameWithoutExtension(name) : "App");
-                var allowRuleName = $"StartupMonitor_Allow_{safeBaseName}_Managed";
-                var blockRuleName = $"StartupMonitor_Block_{safeBaseName}_Managed";
+                var pathHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(path.ToLowerInvariant())))[..16];
+                var ruleName = $"StartupMonitor_Access_{safeBaseName}_{pathHash}_Managed";
 
-                switch (request.TargetState)
+                if (request.TargetState != AccessControlState.Prompt)
                 {
-                    case AccessControlState.Allowed:
-                        // 1. Обновляем списки хранилища
-                        cfg.Settings.FirewallBlacklistedApps.RemoveAll(p => string.Equals(p, targetKey, StringComparison.OrdinalIgnoreCase));
-                        if (request.Scope == AccessRuleScope.Permanent)
-                        {
-                            if (!cfg.Settings.FirewallWhitelistedApps.Contains(targetKey, StringComparer.OrdinalIgnoreCase))
-                                cfg.Settings.FirewallWhitelistedApps.Add(targetKey);
-                        }
-                        _store.Save(cfg);
+                    var action = request.TargetState == AccessControlState.Allowed ? FirewallAction.Allow : FirewallAction.Block;
+                    var applied = _firewall.CreateOrUpdateRule(new FirewallRuleDto
+                    {
+                        Name = ruleName,
+                        Description = $"Матрица доступа StartupMonitor: {name} ({path})",
+                        Direction = FirewallDirection.Both,
+                        Action = action,
+                        Protocol = FirewallProtocol.Any,
+                        ApplicationPath = path,
+                        Enabled = true,
+                        Profiles = FirewallProfile.All,
+                        Grouping = WindowsFirewallService.RuleGroup,
+                        IsManaged = true
+                    });
+                    if (!applied.Success)
+                        return applied;
 
-                        // 2. Синхронизируем Windows Firewall (удаляем блокирующее, ставим разрешающее)
-                        _firewall.DeleteRule(blockRuleName, FirewallDirection.Both);
-                        if (!string.IsNullOrWhiteSpace(path))
-                        {
-                            _firewall.CreateOrUpdateRule(new FirewallRuleDto
-                            {
-                                Name = allowRuleName,
-                                Description = $"Разрешено через Матрицу доступа StartupMonitor: {name}",
-                                Direction = FirewallDirection.Both,
-                                Action = FirewallAction.Allow,
-                                Protocol = FirewallProtocol.Any,
-                                ApplicationPath = path,
-                                Enabled = true,
-                                Profiles = FirewallProfile.All,
-                                Grouping = WindowsFirewallService.RuleGroup,
-                                IsManaged = true
-                            });
-                        }
-
-                        // 3. Обновляем сессионные кеши
-                        _alertService.ResolveAlert(new ResolveNetworkAlertRequest
-                        {
-                            AlertId = string.Empty,
-                            ProcessPath = path,
-                            ProcessName = name,
-                            Resolution = request.Scope == AccessRuleScope.Permanent
-                                ? NetworkAlertResolution.WhitelistProgram
-                                : NetworkAlertResolution.AllowSession
-                        });
-                        break;
-
-                    case AccessControlState.Blocked:
-                        // 1. Обновляем списки хранилища
-                        cfg.Settings.FirewallWhitelistedApps.RemoveAll(p => string.Equals(p, targetKey, StringComparison.OrdinalIgnoreCase));
-                        if (request.Scope == AccessRuleScope.Permanent)
-                        {
-                            if (!cfg.Settings.FirewallBlacklistedApps.Contains(targetKey, StringComparer.OrdinalIgnoreCase))
-                                cfg.Settings.FirewallBlacklistedApps.Add(targetKey);
-                        }
-                        _store.Save(cfg);
-
-                        // 2. Синхронизируем Windows Firewall (удаляем разрешающее, ставим блокирующее)
-                        _firewall.DeleteRule(allowRuleName, FirewallDirection.Both);
-                        if (!string.IsNullOrWhiteSpace(path))
-                        {
-                            _firewall.CreateOrUpdateRule(new FirewallRuleDto
-                            {
-                                Name = blockRuleName,
-                                Description = $"Заблокировано через Матрицу доступа StartupMonitor: {name}",
-                                Direction = FirewallDirection.Both,
-                                Action = FirewallAction.Block,
-                                Protocol = FirewallProtocol.Any,
-                                ApplicationPath = path,
-                                Enabled = true,
-                                Profiles = FirewallProfile.All,
-                                Grouping = WindowsFirewallService.RuleGroup,
-                                IsManaged = true
-                            });
-                        }
-
-                        // 3. Обновляем сессионные кеши
-                        _alertService.ResolveAlert(new ResolveNetworkAlertRequest
-                        {
-                            AlertId = string.Empty,
-                            ProcessPath = path,
-                            ProcessName = name,
-                            Resolution = request.Scope == AccessRuleScope.Permanent
-                                ? NetworkAlertResolution.BlacklistProgram
-                                : NetworkAlertResolution.BlockSession
-                        });
-                        break;
-
-                    case AccessControlState.Prompt:
-                        // Режим «По запросу»: удаляем из обоих списков и снимаем жесткие правила
-                        cfg.Settings.FirewallWhitelistedApps.RemoveAll(p => string.Equals(p, targetKey, StringComparison.OrdinalIgnoreCase));
-                        cfg.Settings.FirewallBlacklistedApps.RemoveAll(p => string.Equals(p, targetKey, StringComparison.OrdinalIgnoreCase));
-                        _store.Save(cfg);
-
-                        _firewall.DeleteRule(allowRuleName, FirewallDirection.Both);
-                        _firewall.DeleteRule(blockRuleName, FirewallDirection.Both);
-                        break;
+                    // Старые Auto/Managed правила очищаются только для этого полного пути.
+                    var removed = RemoveManagedApplicationRules(path, oppositeTo: action);
+                    if (!removed.Success)
+                        return removed;
+                    var target = action == FirewallAction.Allow ? cfg.Settings.FirewallWhitelistedApps : cfg.Settings.FirewallBlacklistedApps;
+                    var opposite = action == FirewallAction.Allow ? cfg.Settings.FirewallBlacklistedApps : cfg.Settings.FirewallWhitelistedApps;
+                    opposite.RemoveAll(app => string.Equals(app, targetKey, StringComparison.OrdinalIgnoreCase));
+                    if (!target.Contains(targetKey, StringComparer.OrdinalIgnoreCase))
+                        target.Add(targetKey);
                 }
+                else
+                {
+                    var removed = RemoveManagedApplicationRules(path);
+                    if (!removed.Success)
+                        return removed;
+                    cfg.Settings.FirewallWhitelistedApps.RemoveAll(app => string.Equals(app, targetKey, StringComparison.OrdinalIgnoreCase));
+                    cfg.Settings.FirewallBlacklistedApps.RemoveAll(app => string.Equals(app, targetKey, StringComparison.OrdinalIgnoreCase));
+                }
+
+                _store.Save(cfg);
+                _alertService.ClearSessionAccess(path, name);
 
                 Log.Information("Матрица доступа: для {Target} успешно установлено состояние {State} ({Scope})", targetKey, request.TargetState, request.Scope);
                 return FirewallOperationResult.Ok($"Состояние {request.TargetState} успешно сохранено.");
@@ -324,6 +286,24 @@ public sealed class AccessMatrixCoordinatorService
                 return FirewallOperationResult.Fail($"Ошибка обновления матрицы доступа: {ex.Message}");
             }
         }
+    }
+
+    /// <summary>Удаляет только собственные правила указанного полного пути, включая прежние имена Auto/Managed.</summary>
+    /// <param name="path">Точный путь приложения, на которое распространяется выбор.</param>
+    /// <param name="oppositeTo">При заданном действии удаляются только противоречащие ему правила.</param>
+    /// <returns>Успех полной очистки либо первый диагностируемый отказ.</returns>
+    private FirewallOperationResult RemoveManagedApplicationRules(string path, FirewallAction? oppositeTo = null)
+    {
+        if (!_firewall.GetStatus().Available)
+            return FirewallOperationResult.Fail("Брандмауэр Windows недоступен: нельзя подтвердить очистку правил.");
+        foreach (var rule in _firewall.GetAllRules().Where(rule => NetworkConnectionAlertService.IsManagedApplicationRule(rule, path) &&
+            (!oppositeTo.HasValue || rule.Action != oppositeTo.Value)))
+        {
+            var result = _firewall.DeleteRule(rule.Name, rule.Direction);
+            if (!result.Success)
+                return result;
+        }
+        return FirewallOperationResult.Ok("Правила указанного приложения синхронизированы.");
     }
 
     private static AppAccessMatrixItemDto CreateOrGetItem(Dictionary<string, AppAccessMatrixItemDto> dict, string rawPath)

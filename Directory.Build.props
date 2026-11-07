@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
-    <!-- Согласованный проверяемый выпуск приложения и сайта; версия выше опубликованной v2.1.0. -->
-    <Version>2.1.0</Version>
-    <AssemblyVersion>2.1.0.0</AssemblyVersion>
-    <FileVersion>2.1.0.0</FileVersion>
-    <InformationalVersion>2.1.0</InformationalVersion>
+    <!-- Локальная сборка для тестирования исправлений файрвола и завершённой интеграции ETW. -->
+    <Version>2.1.1</Version>
+    <AssemblyVersion>2.1.1.0</AssemblyVersion>
+    <FileVersion>2.1.1.0</FileVersion>
+    <InformationalVersion>2.1.1</InformationalVersion>
   </PropertyGroup>
 </Project>

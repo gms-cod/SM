@@ -6,7 +6,7 @@
 .PARAMETER ResultPath
 Файл результата, читаемый оркестратором из изолированной консольной сессии.
 .PARAMETER CloseAfterLaunch
-Штатно закрывает проверяемое окно после запуска для проверки независимости системной службы от UI.
+Проверяет крестик → трей → восстановление, затем завершает UI существующим пунктом «Выход» для проверки независимости службы.
 #>
 param([Parameter(Mandatory)][string]$ExecutablePath, [Parameter(Mandatory)][string]$ResultPath, [switch]$CloseAfterLaunch)
 $ErrorActionPreference = 'Stop'
@@ -34,6 +34,8 @@ public static class StartupMonitorInteractiveWindow {
     [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr window);
     /// <summary>Запрашивает передачу фокуса окну.</summary>
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+    /// <summary>Проверяет нативную видимость окна, не полагаясь на кэш Process.MainWindowHandle.</summary>
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
 }
 '@
     $null = [StartupMonitorInteractiveWindow]::ShowWindow($ui.MainWindowHandle, 9)
@@ -56,9 +58,41 @@ public static class StartupMonitorInteractiveWindow {
     $result = @{ Success = $true; ProcessId = $ui.Id; SessionId = $ui.SessionId; ExecutablePath = $ui.Path
         MainWindowHandle = $ui.MainWindowHandle.ToInt64(); Raised = $raised; Focused = $focused; ContentReady = $true; Error = $null }
     if ($CloseAfterLaunch) {
+        # Сохраняем прежнее ожидание первичной инициализации: оно исключает щелчок по меню под стартовым overlay.
         Start-Sleep -Seconds 5
+        # Нативный Close теперь обязан скрыть окно в трей и сохранить PID, а не завершать интерфейс.
+        $mainHandle = [IntPtr]$result.MainWindowHandle
         if (-not $ui.CloseMainWindow()) { throw 'Окно не приняло запрос штатного закрытия.' }
-        if (-not $ui.WaitForExit(15000)) { throw 'Интерфейс не завершился после закрытия окна.' }
+        $trayWait = [Diagnostics.Stopwatch]::StartNew()
+        do {
+            if ($ui.HasExited) { throw 'Крестик завершил UI вместо сворачивания в трей.' }
+            if (-not [StartupMonitorInteractiveWindow]::IsWindowVisible($mainHandle)) { break }
+            Start-Sleep -Milliseconds 100
+        } while ($trayWait.Elapsed.TotalSeconds -lt 5)
+        if ([StartupMonitorInteractiveWindow]::IsWindowVisible($mainHandle)) { throw 'Крестик не скрыл окно в трей.' }
+        $result.TrayCloseConfirmed = $true
+
+        # Штатный native Restore должен вернуть именно WPF-содержимое скрытого окна.
+        $null = [StartupMonitorInteractiveWindow]::ShowWindow($mainHandle, 9)
+        $restoreWait = [Diagnostics.Stopwatch]::StartNew()
+        $exitElement = $null
+        do {
+            $root = [Windows.Automation.AutomationElement]::FromHandle($mainHandle)
+            $exitElement = $root.FindFirst([Windows.Automation.TreeScope]::Descendants,
+                (New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::AutomationIdProperty, 'ExitApplication')))
+            if ($exitElement -and -not $exitElement.Current.IsOffscreen) { break }
+            Start-Sleep -Milliseconds 100
+        } while ($restoreWait.Elapsed.TotalSeconds -lt 10)
+        if (-not $exitElement -or $exitElement.Current.IsOffscreen) { throw 'После восстановления из трея отсутствует видимый пункт выхода WPF.' }
+        $result.RestoredAfterTray = $true
+
+        # Стандартный Invoke кнопки вызывает тот же Click, что мышь и клавиатура, без эмуляции входных сообщений.
+        $invoke = $null
+        if (-not $exitElement.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$invoke)) {
+            throw 'Кнопка выхода не поддерживает доступное действие UI Automation Invoke.'
+        }
+        ([Windows.Automation.InvokePattern]$invoke).Invoke()
+        if (-not $ui.WaitForExit(15000)) { throw 'Интерфейс не завершился после явного пункта выхода.' }
         $result.Exited = $true
     }
 }

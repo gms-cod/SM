@@ -620,8 +620,8 @@ public sealed class ProcessLifecycleTests
 
         var start1 = new ProcessLifecycleEvent(
             epoch, 1, LifecycleEventKind.Started, 2002, 100, 555UL, 1000L, now, "calc.exe", "");
-        var start2 = new ProcessLifecycleEvent(
-            epoch, 2, LifecycleEventKind.Started, 2002, 100, 555UL, 1001L, now.AddMilliseconds(100), "calc.exe", "");
+        // Повтор доставки меняет sequence приёма, но сохраняет исходные часы самого события.
+        var start2 = start1 with { Sequence = 2 };
 
         var r1 = registry.ApplyEvent(start1);
         var r2 = registry.ApplyEvent(start2);

@@ -141,6 +141,110 @@ public class ProcessMetricsTracker : IDisposable
         return CollectSnapshotCore();
     }
 
+    /// <summary>
+    /// Получает авторитетный снимок существующих процессов для baseline и сверки ETW.
+    /// Использует тот же нативный парсер, что и метрики, без сетевого опроса, метаданных и подписки на таймер.
+    /// Нулевой CreateTime обозначается неизвестным временем, а не временем выполнения сверки.
+    /// </summary>
+    /// <param name="cancellationToken">Отменяет чтение между попытками выделения буфера и записями снимка.</param>
+    /// <returns>PID, PPID, время создания UTC и имя каждого существующего процесса, кроме Idle.</returns>
+    public IReadOnlyList<(int Pid, int ParentPid, DateTime CreationTimeUtc, string ImageName)> CaptureLifecycleSnapshot(CancellationToken cancellationToken)
+    {
+        var entries = ReadRawProcessEntries(cancellationToken);
+        var result = new List<(int, int, DateTime, string)>(entries.Count);
+        foreach (var entry in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry.ProcessId > 0)
+                result.Add((entry.ProcessId, entry.ParentProcessId, GetCreationTimeUtc(entry.CreateTime), entry.ProcessName));
+        }
+        return result;
+    }
+
+    /// <summary>Преобразует нативный FILETIME; отсутствие времени сохраняется как неизвестная identity.</summary>
+    /// <param name="fileTime">Число интервалов по 100 нс с начала эпохи Windows.</param>
+    /// <returns>Время создания UTC либо MinValue для нулевого значения.</returns>
+    private static DateTime GetCreationTimeUtc(long fileTime) => fileTime <= 0 ? DateTime.MinValue : DateTime.FromFileTimeUtc(fileTime);
+
+    /// <summary>
+    /// Читает SystemProcessInformation в переиспользуемый буфер x64 с ограничением роста 64 МБ.
+    /// Проверяет NTSTATUS, границы записей и Unicode-строк до чтения указателей; ошибка не превращается в пустой снимок.
+    /// Блокировка совпадает с порядком Dispose и защищает lifetime общего unmanaged-буфера.
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены ограниченных повторов и разбора записей.</param>
+    /// <returns>Собственные копии полей процессов, не ссылающиеся на нативную память.</returns>
+    private List<RawProcessEntry> ReadRawProcessEntries(CancellationToken cancellationToken)
+    {
+        const int lengthMismatch = unchecked((int)0xC0000004);
+        const int minimumEntrySize = 0xF8;
+        const int maximumBufferSize = 64 * 1024 * 1024;
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_collectLock)
+        lock (_nativeBufferLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (IntPtr.Size != 8)
+                throw new PlatformNotSupportedException("Парсер SystemProcessInformation требует Windows x64.");
+            if (_nativeBuffer == IntPtr.Zero) _nativeBuffer = Marshal.AllocHGlobal(_nativeBufferSize);
+
+            int status;
+            int returnLength;
+            var attempts = 0;
+            while ((status = NtQuerySystemInformation(5, _nativeBuffer, _nativeBufferSize, out returnLength)) == lengthMismatch)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (++attempts > 8 || returnLength < 0)
+                    throw new InvalidOperationException("Размер SystemProcessInformation не стабилизировался за 8 попыток.");
+                var nextSize = Math.Max((long)_nativeBufferSize * 2, (long)returnLength + 64 * 1024);
+                if (nextSize > maximumBufferSize)
+                    throw new InvalidOperationException("Снимок SystemProcessInformation превышает бюджет 64 МБ.");
+                // Выделяем новый буфер до освобождения старого: отказ выделения не оставляет висячий указатель.
+                var replacement = Marshal.AllocHGlobal((int)nextSize);
+                Marshal.FreeHGlobal(_nativeBuffer);
+                _nativeBuffer = replacement;
+                _nativeBufferSize = (int)nextSize;
+            }
+            if (status != 0)
+                throw new InvalidOperationException($"NtQuerySystemInformation(SystemProcessInformation) завершился с NTSTATUS 0x{status:X8}.");
+            if (returnLength < minimumEntrySize || returnLength > _nativeBufferSize)
+                throw new InvalidOperationException("Ядро вернуло некорректный размер SystemProcessInformation.");
+
+            var result = new List<RawProcessEntry>(350);
+            var baseAddress = _nativeBuffer.ToInt64();
+            var offset = 0;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (offset < 0 || offset > returnLength - minimumEntrySize)
+                    throw new InvalidOperationException("Запись процесса выходит за границы нативного снимка.");
+                var current = IntPtr.Add(_nativeBuffer, offset);
+                var nextOffset = Marshal.ReadInt32(current, 0);
+                var nameLength = unchecked((ushort)Marshal.ReadInt16(current, 0x38));
+                var nameAddress = Marshal.ReadIntPtr(current, 0x40).ToInt64();
+                if (nameLength % 2 != 0 || (nameLength > 0 &&
+                    (nameAddress < baseAddress || nameAddress - baseAddress > returnLength - nameLength)))
+                    throw new InvalidOperationException("Имя процесса выходит за границы Unicode-буфера снимка.");
+
+                var pid = checked((int)Marshal.ReadIntPtr(current, 0x50).ToInt64());
+                var parentPid = checked((int)Marshal.ReadIntPtr(current, 0x58).ToInt64());
+                if (pid < 0 || parentPid < 0)
+                    throw new InvalidOperationException("Снимок содержит отрицательный PID.");
+                var name = nameLength > 0 ? Marshal.PtrToStringUni(new IntPtr(nameAddress), nameLength / 2) ?? string.Empty :
+                    pid == 0 ? "System Idle Process" : pid == 4 ? "System" : string.Empty;
+                if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) name = name[..^4];
+                result.Add(new RawProcessEntry(pid, parentPid, name, Marshal.ReadInt32(current, 0x04),
+                    Marshal.ReadInt32(current, 0x64), Marshal.ReadInt64(current, 0x90),
+                    Marshal.ReadInt64(current, 0x20), Marshal.ReadInt64(current, 0x28), Marshal.ReadInt64(current, 0x30),
+                    checked(Marshal.ReadInt64(current, 0xE8) + Marshal.ReadInt64(current, 0xF0))));
+                if (nextOffset == 0) break;
+                if (nextOffset < minimumEntrySize || nextOffset % 8 != 0 || nextOffset > returnLength - offset)
+                    throw new InvalidOperationException("Некорректное смещение следующего процесса в снимке.");
+                offset = checked(offset + nextOffset);
+            }
+            return result;
+        }
+    }
+
     /// <summary>Получает список активных сетевых соединений (сокетов) для процесса или всей системы.</summary>
     public List<ProcessNetworkSocket> GetProcessSockets(int pid = -1) =>
         _networkTracker.GetSockets(pid);
@@ -209,87 +313,15 @@ public class ProcessMetricsTracker : IDisposable
         var servicePidMap = _servicePidMap;
 
         // 5. Запрос всех процессов ядра через ntdll.dll!NtQuerySystemInformation
-        const int STATUS_SUCCESS = 0x00000000;
-        const int STATUS_INFO_LENGTH_MISMATCH = unchecked((int)0xC0000004);
-        const int SystemProcessInformation = 5;
-
-        var rawEntries = new List<RawProcessEntry>(350);
+        var rawEntries = ReadRawProcessEntries(CancellationToken.None);
         var activePids = new HashSet<int>(350);
         var pidToName = new Dictionary<int, string>(350);
-
-        lock (_nativeBufferLock)
+        foreach (var entry in rawEntries)
         {
-            if (_nativeBuffer == IntPtr.Zero)
+            if (entry.ProcessId > 0)
             {
-                _nativeBuffer = Marshal.AllocHGlobal(_nativeBufferSize);
-            }
-
-            int returnLength;
-            int status = NtQuerySystemInformation(SystemProcessInformation, _nativeBuffer, _nativeBufferSize, out returnLength);
-            while (status == STATUS_INFO_LENGTH_MISMATCH)
-            {
-                // Если буфер маловат при росте числа процессов в ОС — динамически удваиваем
-                Marshal.FreeHGlobal(_nativeBuffer);
-                _nativeBufferSize = Math.Max(_nativeBufferSize * 2, returnLength + 64 * 1024);
-                _nativeBuffer = Marshal.AllocHGlobal(_nativeBufferSize);
-                status = NtQuerySystemInformation(SystemProcessInformation, _nativeBuffer, _nativeBufferSize, out returnLength);
-            }
-
-            if (status == STATUS_SUCCESS)
-            {
-                IntPtr currentPtr = _nativeBuffer;
-                while (true)
-                {
-                    int nextOffset = Marshal.ReadInt32(currentPtr, 0x00);
-                    int numThreads = Marshal.ReadInt32(currentPtr, 0x04);
-                    long createTime = Marshal.ReadInt64(currentPtr, 0x20);
-                    long userTime = Marshal.ReadInt64(currentPtr, 0x28);
-                    long kernelTime = Marshal.ReadInt64(currentPtr, 0x30);
-                    ushort imgLen = (ushort)Marshal.ReadInt16(currentPtr, 0x38);
-                    IntPtr imgBuf = Marshal.ReadIntPtr(currentPtr, 0x40);
-                    int pid = Marshal.ReadIntPtr(currentPtr, 0x50).ToInt32();
-                    int parentPid = Marshal.ReadIntPtr(currentPtr, 0x58).ToInt32();
-                    int sessionId = Marshal.ReadInt32(currentPtr, 0x64);
-                    long workingSet = Marshal.ReadInt64(currentPtr, 0x90);
-                    long readTransfer = Marshal.ReadInt64(currentPtr, 0xE8);
-                    long writeTransfer = Marshal.ReadInt64(currentPtr, 0xF0);
-
-                    string processName = string.Empty;
-                    if (imgLen > 0 && imgBuf != IntPtr.Zero)
-                    {
-                        processName = Marshal.PtrToStringUni(imgBuf, imgLen / 2) ?? string.Empty;
-                    }
-                    else if (pid == 0)
-                    {
-                        processName = "System Idle Process";
-                    }
-                    else if (pid == 4)
-                    {
-                        processName = "System";
-                    }
-
-                    // Нормализуем имя процесса без .exe (каноничное соответствие .NET Process.ProcessName)
-                    if (processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                    {
-                        processName = processName[..^4];
-                    }
-
-                    if (pid > 0)
-                    {
-                        activePids.Add(pid);
-                        pidToName[pid] = processName;
-                    }
-
-                    rawEntries.Add(new RawProcessEntry(
-                        pid, parentPid, processName, numThreads, sessionId,
-                        workingSet, createTime, userTime, kernelTime,
-                        readTransfer + writeTransfer));
-
-                    if (nextOffset == 0)
-                        break;
-
-                    currentPtr = IntPtr.Add(currentPtr, nextOffset);
-                }
+                activePids.Add(entry.ProcessId);
+                pidToName[entry.ProcessId] = entry.ProcessName;
             }
         }
 
@@ -297,6 +329,8 @@ public class ProcessMetricsTracker : IDisposable
         long totalDiskIo = 0;
         int totalThreads = 0;
         var processInfos = new List<ProcessInfo>(rawEntries.Count);
+        // Только известное время создания даёт право переносить дельту между снимками.
+        var activeInstances = new HashSet<(int Pid, long CreateTimeTicks)>();
 
         // 6. Формирование ProcessInfo объектов (без единого OpenProcess или Toolhelp32)
         foreach (var entry in rawEntries)
@@ -338,15 +372,7 @@ public class ProcessMetricsTracker : IDisposable
             }
 
             // Время запуска процесса из FILETIME (без исключений Access Denied на PPL/Protected процессах)
-            DateTime startTime = DateTime.MinValue;
-            if (entry.CreateTime > 0)
-            {
-                try
-                {
-                    startTime = DateTime.FromFileTimeUtc(entry.CreateTime);
-                }
-                catch { }
-            }
+            var startTime = GetCreationTimeUtc(entry.CreateTime);
             info.StartTime = startTime;
 
             // Быстрое обогащение метаданных (после назначения StartTime для исключения гонок идентичности в кэше)
@@ -357,7 +383,7 @@ public class ProcessMetricsTracker : IDisposable
             long currentIoBytes = entry.TotalIoBytes;
             var historyKey = (pid, startTime.Ticks);
 
-            if (_history.TryGetValue(historyKey, out var prev))
+            if (startTime != DateTime.MinValue && _history.TryGetValue(historyKey, out var prev))
             {
                 var timeDelta = now - prev.Timestamp;
                 if (timeDelta.TotalMilliseconds > 200)
@@ -379,7 +405,11 @@ public class ProcessMetricsTracker : IDisposable
                 }
             }
 
-            _history[historyKey] = new ProcessMetricHistory(totalProcTime, currentIoBytes, now);
+            if (startTime != DateTime.MinValue)
+            {
+                activeInstances.Add(historyKey);
+                _history[historyKey] = new ProcessMetricHistory(totalProcTime, currentIoBytes, now);
+            }
 
             // Связываем с автозапуском за O(1)
             _linker.LinkProcess(info, pidToName);
@@ -437,11 +467,12 @@ public class ProcessMetricsTracker : IDisposable
         // Очищаем завершившиеся процессы из истории дельт
         foreach (var key in _history.Keys)
         {
-            if (!activePids.Contains(key.Pid))
+            if (!activeInstances.Contains(key))
                 _history.TryRemove(key, out _);
         }
 
-        _enricher.PruneDeadProcesses(activePids);
+        // Сохраняем только актуальные экземпляры: повторно использованный PID не удерживает старые метаданные.
+        _enricher.PruneDeadProcesses(activeInstances);
         return snapshot;
         }
     }

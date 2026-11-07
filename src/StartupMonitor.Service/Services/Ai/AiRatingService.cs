@@ -857,7 +857,13 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
             return cachedVerdict;
         }
 
-        // 4. Circuit Breaker и проверка наличия ключа
+        // 4. Circuit Breaker, пауза Rate Limit и проверка наличия ключа
+        if (DateTime.UtcNow < _cooldownUntil)
+        {
+            _logger.LogWarning("AiRatingService: запрос для {Process} пропущен (пауза Rate Limit до {Until} UTC)", pName, _cooldownUntil);
+            return null;
+        }
+
         if (DateTime.UtcNow < _networkCooldownUntil)
         {
             _logger.LogWarning("AiRatingService: запрос для {Process} отклонён (Circuit Breaker активен до {Until} UTC)", pName, _networkCooldownUntil);
@@ -916,9 +922,14 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
 
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
+                    var retryAfter = response.Headers.RetryAfter?.Delta?.TotalMilliseconds;
+                    var delayMs = retryAfter.HasValue ? Math.Clamp((long)retryAfter.Value, 1000L, 30_000L) : 5_000L;
+                    _cooldownUntil = DateTime.UtcNow.AddMinutes(CooldownMinutes);
+                    _logger.LogWarning("AiRatingService: 429 Too Many Requests для {Name}, пауза {Delay}мс, остывание {Min} мин",
+                        pName, delayMs, CooldownMinutes);
                     if (attempt < 3)
                     {
-                        await Task.Delay(2000);
+                        await Task.Delay((int)delayMs);
                         continue;
                     }
                     return null;

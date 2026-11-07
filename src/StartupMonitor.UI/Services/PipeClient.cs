@@ -1101,7 +1101,7 @@ public class PipeClient : IDisposable
     }
 
     /// <summary>Запрашивает расширенную информацию о службе (PID, версия, аптайм).</summary>
-    public async Task<ServiceInfoPayload?> GetServiceInfoAsync()
+    public virtual async Task<ServiceInfoPayload?> GetServiceInfoAsync()
     {
         var response = await SendAsync(new PipeMessage
         {

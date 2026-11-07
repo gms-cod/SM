@@ -12,7 +12,7 @@ public sealed class NetworkAlertCollectionEfficiencyTests
     public void RepeatedProcessConnections_ResolvePathOncePerSnapshot()
     {
         using var tracker = new ProcessNetworkTracker();
-        using var service = new NetworkConnectionAlertService(tracker, new WindowsFirewallService());
+        using var service = new NetworkConnectionAlertService(tracker, new WindowsFirewallService(), sessionFirewall: new TestSessionFirewallPolicy());
         var calls = 0;
         service.SocketsProvider = () => Enumerable.Range(0, 100).Select(index => new ProcessNetworkSocket
         {

@@ -129,7 +129,7 @@
     <value>PipeServer error while client connecting</value>
   </data>
   <data name="StrictModeDescription" xml:space="preserve">
-    <value>Immediately removes any new autorun entry from the system, terminates its process, saves a backup and displays a notification.</value>
+    <value>Disables new startup entries, preserves their restore data and displays a notification.</value>
   </data>
   <data name="NavLogs" xml:space="preserve">
     <value>Event log</value>
@@ -279,7 +279,7 @@
     <value>{0} removed from startup (blacklist)</value>
   </data>
   <data name="ActionNotifyRemove" xml:space="preserve">
-    <value>Notify and remove</value>
+    <value>Notify and disable</value>
   </data>
   <data name="Subtitle" xml:space="preserve">
     <value>Real-time startup monitoring</value>
@@ -1019,6 +1019,12 @@
   <data name="TmProcessInstanceChanged" xml:space="preserve">
     <value>The process restarted under a new ID; the action was cancelled for security reasons.</value>
   </data>
+  <data name="TmProcessIdentityUnavailable" xml:space="preserve">
+    <value>The process creation time is unavailable. Refresh the process list before trying again.</value>
+  </data>
+  <data name="TmProcessInstanceCommandsUnavailable" xml:space="preserve">
+    <value>The service cannot verify this process instance. Connect to the updated service before trying again.</value>
+  </data>
   <data name="TmError" xml:space="preserve">
     <value>Error</value>
   </data>
@@ -1408,7 +1414,7 @@ Do you really want to proceed?</value>
     <value>Audit only (log event and show notification)</value>
   </data>
   <data name="AutoGuardsModeEnforce" xml:space="preserve">
-    <value>Active Protection (terminate process and isolate to backup)</value>
+    <value>Active Protection (disable with the option to enable again)</value>
   </data>
   <data name="AutoGuardsRulesLabel" xml:space="preserve">
     <value>Security Guard Policies:</value>
@@ -2027,7 +2033,7 @@ Do you really want to proceed?</value>
 <data name="FwRuleBtnCancel" xml:space="preserve"><value>Cancel</value></data>
 <data name="NetAlertCloseTip" xml:space="preserve"><value>Close (allow for this session)</value></data>
 <data name="NetAlertAllowAlwaysTip" xml:space="preserve"><value>Create allow rule in Windows Firewall</value></data>
-<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Allow without creating a rule (until restart)</value></data>
+<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Apply a temporary outgoing rule until service restart or for up to 8 hours. Existing Windows or third-party blocks still take precedence.</value></data>
 <data name="NetAlertBlockTip" xml:space="preserve"><value>Create blocking rule in Windows Firewall</value></data>
 <data name="NetAlertCountdownHint" xml:space="preserve"><value>Auto-resolve in 15 sec...</value></data>
 <data name="NetBansCountFormat" xml:space="preserve"><value>Active bans: {0}</value></data>
@@ -2119,7 +2125,7 @@ Import with overwrite of existing rules?</value>
   <data name="NetAlertAiActionBlockAlways" xml:space="preserve"><value>Block always</value></data>
   <data name="NetAlertAiActionBlockSession" xml:space="preserve"><value>Block session</value></data>
   <data name="NetAlertAiRecommendedActionFormat" xml:space="preserve"><value>Recommendation: {0}</value></data>
-  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>AI analysis unavailable (check AI settings in parameters).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Standard application network connection.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Apply standard firewall rules.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Block for session</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Temporarily block outgoing requests of the process until restart</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Recommendation: Allow always</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Recommendation: Allow for session</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Recommendation: Block always</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Recommendation: Block for session</value></data>
+  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>AI analysis unavailable (check AI settings in parameters).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Standard application network connection.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Apply standard firewall rules.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Block for session</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Block outgoing connections of this application until service restart or for up to 8 hours. No persistent rule is created.</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Recommendation: Allow always</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Recommendation: Allow for session</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Recommendation: Block always</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Recommendation: Block for session</value></data>
   <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
   <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Autonomous AI Decisions:</value></data>
   <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Autonomous AI decisions for network connections</value></data>
@@ -2373,4 +2379,8 @@ Import with overwrite of existing rules?</value>
   <data name="DefenderOpenErrorFormat" xml:space="preserve"><value>Could not open Port Defender settings: {0}</value></data>
   <data name="DefenderSummaryRefreshed" xml:space="preserve"><value>Port Defender summary updated.</value></data>
   <data name="DefenderRefreshErrorFormat" xml:space="preserve"><value>Could not refresh Port Defender: {0}</value></data>
+  <data name="NetAlertApplying" xml:space="preserve"><value>Applying your decision…</value></data>
+  <data name="NetAlertApplyFailed" xml:space="preserve"><value>The service could not confirm the decision. Check the service and try again.</value></data>
+  <data name="NetAlertSessionAllowUnavailable" xml:space="preserve"><value>A temporary allow needs a known application path and normal filtering mode. In whitelist or kill switch mode, use a permanent rule or change the filtering mode.</value></data>
+  <data name="NetAlertPathRequired" xml:space="preserve"><value>The application path is unavailable. An application rule cannot be safely applied; you can allow the displayed remote port.</value></data>
 </root>

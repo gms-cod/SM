@@ -52,7 +52,7 @@ public static class WatcherHelper
     /// <summary>Добавляет запись в хранилище; если запись с таким Id уже есть —
     /// обновляет её при изменении командной строки (детект EntryModified).
     /// Если существующая запись заблокирована, а программа прописалась заново —
-    /// правило ЧС применяется повторно (авто-удаление).
+    /// правило ЧС применяется повторно через обратимое отключение.
     /// Возвращает true, если запись новая (нужно уведомление EntryAdded).</summary>
     public static bool AddOrUpdate(
         JsonDataStore store,
@@ -78,7 +78,7 @@ public static class WatcherHelper
 
         // Запись ранее была удалена: проверяем причину удаления
         var existingRemoved = store.GetRemovedEntryByOriginalId(entry.Id);
-        if (existingRemoved != null)
+        if (existingRemoved != null && !EntryOperations.IsRestoreInProgress(store, entry.Id))
         {
             // Если запись была удалена режимом Lockdown (StrictMode), но сейчас строгий режим выключен:
             // НЕ блокируем её повторно, а удаляем из бэкапа и разрешаем штатное добавление
@@ -90,7 +90,7 @@ public static class WatcherHelper
             else
             {
                 // Запись удалена пользователем осознанно (UserRemoved) либо строгий режим всё ещё активен:
-                // повторно стираем запись из системы (remove) с балуном.
+                // повторно отключаем запись, сохраняя ручную резервную копию.
                 // ВАЖНО: Если программы нет в Чёрном списке, её НЕЛЬЗЯ закрывать (KillProcess запрещён)!
                 // Мы только удаляем её из автозагрузки в системе, чтобы она не стартовала при загрузке Windows,
                 // но не мешаем работе запущенного приложения. Завершение процесса допустимо ТОЛЬКО при наличии
@@ -105,12 +105,10 @@ public static class WatcherHelper
                     EntryOperations.KillProcess(entry);
                 }
 
-                var (ok, _, payload) = EntryOperations.RemoveFromSystem(entry);
+                var (ok, error) = BlacklistManager.DisableAutomatically(entry, store, "PreviouslyRemovedReappeared");
                 if (ok)
                 {
-                    existingRemoved.RestorePayload = payload ?? "";
-                    existingRemoved.FilePath = entry.FilePath;
-                    store.AddRemovedEntry(existingRemoved);
+                    // Первый ручной backup не затирается при самовосстановлении программы.
                     notifications.Enqueue(new PipeMessage
                     {
                         Type = PipeMessageTypes.ActionNotice,
@@ -118,17 +116,17 @@ public static class WatcherHelper
                             /// <summary>ActionNoticePayload: Выполняет операцию ActionNoticePayload.</summary>
                             /// <param name="""">Входные данные: значение параметра "" (entry.Name ??).</param>
                             /// <param name=""removedAgain")">Входные данные: значение параметра "removedAgain") ().</param>
-                            new ActionNoticePayload(entry.Name ?? "", "removedAgain"))
+                            new ActionNoticePayload(entry.Name ?? "", "autoDisabled"))
                     });
                 }
-                store.RemoveEntry(entry.Id);
+                else Serilog.Log.Warning("Не удалось повторно отключить удалённую запись {Name}: {Error}", entry.Name, error);
                 Pipe.PipeServer.NotifyExternalEntriesChanged();
                 return false;
             }
         }
 
         // Если включён строгий режим (блокировка любых новых записей автозапуска):
-        // новая запись не добавляется, а сразу стирается из системы с завершением процесса и балуном.
+        // новая запись сохраняется в списке и отключается с данными для включения.
         // Исключение: собственные компоненты программы и системные службы/задачи ОС Windows.
         var isNewEntry = !store.EntryExists(entry.Id);
         if (isNewEntry && settings.StrictMode)
@@ -144,39 +142,16 @@ public static class WatcherHelper
                 return false;
             }
 
+            // Автоматический строгий режим отключает автозапуск с сохранением записи и снимка.
             EntryOperations.KillProcess(entry);
-            var (ok, _, payload) = EntryOperations.RemoveFromSystem(entry);
-            var removed = new RemovedEntry
-            {
-                Id = Guid.NewGuid().ToString("N")[..8],
-                OriginalEntryId = entry.Id,
-                Name = entry.Name,
-                Location = entry.Location,
-                LocationDetail = entry.LocationDetail,
-                FilePath = entry.FilePath,
-                RemovedAt = DateTime.UtcNow,
-                DetectedAt = entry.DetectedAt,
-                RestorePayload = payload ?? "",
-                RemovalReason = "LockdownBlocked"
-            };
-            store.AddRemovedEntry(removed);
-            store.AddHistory(new HistoryEntry
-            {
-                ChangeType = "BlockedByLockdown",
-                EntryName = entry.Name,
-                EntryPath = entry.FilePath,
-                Location = entry.Location.ToString()
-            });
-
+            var (disabled, error) = BlacklistManager.DisableAutomatically(entry, store, "LockdownDisabled");
+            if (!disabled) Serilog.Log.Warning("Lockdown disable failed for {Name}: {Error}", entry.Name, error);
             notifications.Enqueue(new PipeMessage
             {
                 Type = PipeMessageTypes.ActionNotice,
-                Payload = System.Text.Json.JsonSerializer.Serialize(
-                    /// <summary>ActionNoticePayload: Выполняет операцию ActionNoticePayload.</summary>
-                    /// <param name="""">Входные данные: значение параметра "" (entry.Name ??).</param>
-                    /// <param name=""lockdownBlocked")">Входные данные: значение параметра "lockdownBlocked") ().</param>
-                    new ActionNoticePayload(entry.Name ?? "", "lockdownBlocked"))
+                Payload = System.Text.Json.JsonSerializer.Serialize(new ActionNoticePayload(entry.Name ?? "", "lockdownBlocked"))
             });
+            Pipe.PipeServer.NotifyExternalEntriesChanged();
 
             return false;
         }
@@ -190,38 +165,21 @@ public static class WatcherHelper
                 var isEnforce = string.Equals(settings.AutoGuardMode, "EnforceBlock", StringComparison.OrdinalIgnoreCase);
                 if (isEnforce)
                 {
-                    // Режим активной блокировки: завершаем процесс, нейтрализуем точку старта и изолируем в бэкап
-                    EntryOperations.KillProcess(entry);
-                    var (ok, _, payload) = EntryOperations.RemoveFromSystem(entry);
-                    var removed = new RemovedEntry
-                    {
-                        Id = Guid.NewGuid().ToString("N")[..8],
-                        OriginalEntryId = entry.Id,
-                        Name = entry.Name,
-                        Location = entry.Location,
-                        LocationDetail = entry.LocationDetail,
-                        FilePath = entry.FilePath,
-                        RemovedAt = DateTime.UtcNow,
-                        DetectedAt = entry.DetectedAt,
-                        RestorePayload = payload ?? "",
-                        RemovalReason = $"AutoGuardBlocked:{policyMatch.PolicyKey}"
-                    };
-                    store.AddRemovedEntry(removed);
-                    store.AddHistory(new HistoryEntry
-                    {
-                        ChangeType = "BlockedByPolicy",
-                        EntryName = entry.Name,
-                        EntryPath = entry.FilePath,
-                        Location = entry.Location.ToString(),
-                        Action = policyMatch.RuleTitle
-                    });
-
+                    // Сохраняем прежнее завершение обычного EXE. Общий интерпретатор нельзя
+                    // завершать по образу: без identity команды это затронет независимые сценарии.
+                    if (!StartupMonitor.Shared.Helpers.SystemProtectionHelper.IsHostProcess(entry.FilePath))
+                        EntryOperations.KillProcess(entry);
+                    // Автоматическое правило отключает автозапуск; запись не переносится в удалённые.
+                    var (disabled, error) = BlacklistManager.DisableAutomatically(entry, store,
+                        $"AutoGuardDisabled:{policyMatch.PolicyKey}");
+                    if (!disabled) Serilog.Log.Warning("AutoGuard disable failed for {Name}: {Error}", entry.Name, error);
                     notifications.Enqueue(new PipeMessage
                     {
                         Type = PipeMessageTypes.ActionNotice,
                         Payload = System.Text.Json.JsonSerializer.Serialize(
                             new ActionNoticePayload(entry.Name ?? "", $"policyBlocked:{policyMatch.PolicyKey}"))
                     });
+                    Pipe.PipeServer.NotifyExternalEntriesChanged();
 
                     return false;
                 }

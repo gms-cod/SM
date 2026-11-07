@@ -280,8 +280,8 @@ public class SelfProtectionAndLockdownTests : IDisposable
         var isNew = WatcherHelper.AddOrUpdate(_store, _notifications, entry, matchedRule: null);
 
         Assert.False(isNew);
-        // Запись не добавлена в активные, так как была снова снята с автозапуска
-        Assert.Null(_store.FindEntry(e => e.Id == entryId));
+        // Автоматический повтор больше не удаляет данные записи даже при отказе отключения отсутствующего тестового значения.
+        Assert.NotNull(_store.FindEntry(e => e.Id == entryId));
         // Но бэкап удалённой записи остаётся
         Assert.NotNull(_store.GetRemovedEntryByOriginalId(entryId));
     }

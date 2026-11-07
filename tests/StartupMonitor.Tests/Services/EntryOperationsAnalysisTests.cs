@@ -232,6 +232,8 @@ public class EntryOperationsAnalysisTests
         finally
         {
             key.DeleteValue(uniqueName, throwOnMissingValue: false);
+            using var disabled = key.OpenSubKey("StartupMonitorDisabled", writable: true);
+            disabled?.DeleteValue(uniqueName, throwOnMissingValue: false);
         }
     }
 
@@ -259,7 +261,7 @@ public class EntryOperationsAnalysisTests
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.ContextMenuHandler)]
-    public void RemoveFromSystem_SpecialRegistryLocations_Success(EntryLocation loc)
+    public void RemoveFromSystem_SpecialRegistryLocations_MissingValueReturnsError(EntryLocation loc)
     {
         // БАГ ИСПРАВЛЕН: путь теперь HKCR\CLSID (вместо HKCR\Software\Classes\CLSID).
         // HKCR\CLSID существует всегда, DeleteValue с throwOnMissingValue: false не падает.
@@ -267,8 +269,9 @@ public class EntryOperationsAnalysisTests
         var entry = MakeEntry(loc, uniqueName);
         entry.FilePath = @"C:\test.dll";
         var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
-        Assert.True(success);
-        Assert.NotNull(payload);
+        Assert.False(success);
+        Assert.NotEmpty(error ?? string.Empty);
+        Assert.Null(payload);
     }
 
     /// <summary>
@@ -292,12 +295,15 @@ public class EntryOperationsAnalysisTests
     public void RemoveFromSystem_StartupFolder_FileExists_RemovesFile()
     {
         var tempFile = Path.GetTempFileName() + ".lnk";
+        string? createdBackup = null;
         try
         {
             File.WriteAllText(tempFile, "dummy");
             var entry = MakeEntry(EntryLocation.StartupFolder, filePath: tempFile);
 
             var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
+            var fp = string.IsNullOrEmpty(payload) ? null : JsonSerializer.Deserialize<EntryOperations.FilePayload>(payload, JsonOptions);
+            createdBackup = fp?.BackupPath;
             Assert.True(success, error);
             Assert.NotNull(payload);
 
@@ -305,14 +311,13 @@ public class EntryOperationsAnalysisTests
             Assert.False(File.Exists(tempFile));
 
             // Бэкап создан
-            var fp = JsonSerializer.Deserialize<EntryOperations.FilePayload>(payload, JsonOptions);
             Assert.NotNull(fp);
             Assert.True(File.Exists(fp.BackupPath));
         }
         finally
         {
             if (File.Exists(tempFile)) File.Delete(tempFile);
-            CleanupBackups();
+            CleanupBackup(createdBackup);
         }
     }
 
@@ -401,6 +406,8 @@ public class EntryOperationsAnalysisTests
         try
         {
             File.WriteAllText(tempBackup, "restore test content");
+            // Исходный файл был удалён; конфликтующий существующий файл проверяется отдельной регрессией.
+            File.Delete(tempOriginal);
             var payload = JsonSerializer.Serialize(
                 new EntryOperations.FilePayload(tempBackup, tempOriginal), JsonOptions);
 
@@ -699,9 +706,10 @@ public class EntryOperationsAnalysisTests
         var entry = MakeEntry(loc, uniqueName);
         entry.FilePath = @"C:\test.dll";
         var (success, error) = EntryOperations.DisableRegistry(entry);
-        // HKCR\CLSID существует, DeleteValue с throwOnMissingValue: false
-        Assert.True(success, error ?? "");
-        Assert.NotEmpty(entry.DisablePayload);
+        // Отсутствие исходного значения не является успешным отключением и не создаёт пустой backup.
+        Assert.False(success);
+        Assert.NotEmpty(error ?? string.Empty);
+        Assert.Empty(entry.DisablePayload);
     }
 
     /// <summary>
@@ -823,13 +831,14 @@ public class EntryOperationsAnalysisTests
     [InlineData(EntryLocation.ImageFileExecutionOptions)]
     [InlineData(EntryLocation.Winlogon)]
     [InlineData(EntryLocation.BootExecute)]
-    public void RemoveFromSystem_HklmRegistry_Success(EntryLocation loc)
+    public void RemoveFromSystem_HklmRegistry_MissingValueReturnsError(EntryLocation loc)
     {
         var uniqueName = "HklmTest_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
         var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
-        Assert.True(success);
-        Assert.NotNull(payload);
+        Assert.False(success);
+        Assert.NotEmpty(error ?? string.Empty);
+        Assert.Null(payload);
     }
 
     /// <summary>
@@ -840,13 +849,14 @@ public class EntryOperationsAnalysisTests
     [InlineData(EntryLocation.ImageFileExecutionOptions)]
     [InlineData(EntryLocation.Winlogon)]
     [InlineData(EntryLocation.BootExecute)]
-    public void DisableFromSystem_HklmRegistryTypes_Success(EntryLocation loc)
+    public void DisableFromSystem_HklmRegistryTypes_MissingValueReturnsError(EntryLocation loc)
     {
         var uniqueName = "DisableHklm_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
         var (success, error) = EntryOperations.DisableFromSystem(entry);
-        Assert.True(success, error ?? "");
-        Assert.NotEmpty(entry.DisablePayload);
+        Assert.False(success);
+        Assert.NotEmpty(error ?? string.Empty);
+        Assert.Empty(entry.DisablePayload);
     }
 
     /// <summary>
@@ -857,16 +867,17 @@ public class EntryOperationsAnalysisTests
     [InlineData(EntryLocation.ImageFileExecutionOptions)]
     [InlineData(EntryLocation.Winlogon)]
     [InlineData(EntryLocation.BootExecute)]
-    public void EnableFromSystem_HklmRegistryTypes_Success(EntryLocation loc)
+    public void EnableFromSystem_HklmRegistryTypes_MissingValueReturnsError(EntryLocation loc)
     {
         // Disable + Enable round-trip
         var uniqueName = "EnableHklm_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
-        EntryOperations.DisableFromSystem(entry);
-        Assert.NotEmpty(entry.DisablePayload);
+        Assert.False(EntryOperations.DisableFromSystem(entry).success);
+        Assert.Empty(entry.DisablePayload);
 
         var (success, error) = EntryOperations.EnableFromSystem(entry);
-        Assert.True(success, error ?? "");
+        Assert.False(success);
+        Assert.NotEmpty(error ?? string.Empty);
         Assert.Empty(entry.DisablePayload);
     }
 
@@ -901,14 +912,10 @@ public class EntryOperationsAnalysisTests
     // Helpers
     // ═══════════════════════════════════════════════════════════
 
-    /// <summary>Очищает временные бэкапы, созданные тестами.</summary>
-    private static void CleanupBackups()
+    /// <summary>Удаляет только конкретный бэкап, созданный текущим тестом, сохраняя пользовательские архивы.</summary>
+    /// <param name="createdBackup">Точный путь из payload операции текущего теста.</param>
+    private static void CleanupBackup(string? createdBackup)
     {
-        var backupDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            "StartupMonitor", "backups");
-        if (Directory.Exists(backupDir))
-            foreach (var f in Directory.GetFiles(backupDir))
-                try { File.Delete(f); } catch { }
+        if (createdBackup != null && File.Exists(createdBackup)) File.Delete(createdBackup);
     }
 }

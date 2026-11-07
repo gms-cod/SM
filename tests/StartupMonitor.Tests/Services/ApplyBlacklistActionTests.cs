@@ -4,7 +4,7 @@ using StartupMonitor.Shared.Models;
 namespace StartupMonitor.Tests.Services;
 
 /// <summary>
-/// Тесты для ApplyBlacklistAction: проверка двух режимов — NotifyAndRemove (удаление файла)
+/// Тесты для ApplyBlacklistAction: проверка двух режимов — NotifyAndRemove (обратимое отключение файла)
 /// и NotifyOnly (только пометка блокировки).
 /// </summary>
 public class ApplyBlacklistActionTests : IDisposable
@@ -26,10 +26,10 @@ public class ApplyBlacklistActionTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что NotifyAndRemove удаляет файл из системы, но запись остаётся как Blocked с бэкапом.
+    /// Проверяет, что старое имя NotifyAndRemove означает отключение с сохранением исходного файла и записи.
     /// </summary>
     [Fact]
-    public void NotifyAndRemove_RemovesFileButKeepsEntryBlocked()
+    public void NotifyAndRemove_DisablesFileAndKeepsEntryBlocked()
     {
         // Файл в "папке автозапуска"
         Directory.CreateDirectory(_dir);
@@ -58,11 +58,10 @@ public class ApplyBlacklistActionTests : IDisposable
         Assert.NotNull(stored);
         Assert.Equal(EntryStatus.Blocked, stored.Status);
         Assert.True(stored.FromBlacklist);
-        // Бэкап для восстановления создан
-        var removed = _store.GetRemovedEntries();
-        Assert.Single(removed);
-        Assert.Equal(entry.Id, removed[0].OriginalEntryId);
-        Assert.NotEmpty(removed[0].RestorePayload);
+        Assert.True(File.Exists(appFile + ".disabled"));
+        Assert.Equal("MZ fake", File.ReadAllText(appFile + ".disabled"));
+        Assert.NotEmpty(stored.DisablePayload);
+        Assert.Empty(_store.GetRemovedEntries());
     }
 
     /// <summary>

@@ -441,7 +441,7 @@ public record ServiceInfoPayload(
     DateTime StartTime,
     TimeSpan Uptime,
     bool IsPaused,
-    bool SupportsProcessInstanceCommands = true
+    bool SupportsProcessInstanceCommands = false
 );
 
 /// <summary>Полезная нагрузка настройки автоматических политик защиты (Auto-Guards).</summary>

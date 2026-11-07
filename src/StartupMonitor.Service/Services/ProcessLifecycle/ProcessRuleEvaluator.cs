@@ -49,7 +49,8 @@ public sealed class BlacklistRuleSnapshot
         ActiveRules = rules?
             .Where(r => r.Action == BlacklistAction.NotifyAndRemove &&
                         r.MatchType is BlacklistMatchType.Path or BlacklistMatchType.PathWildcard)
-            .ToList() ?? (IReadOnlyList<BlacklistRule>)Array.Empty<BlacklistRule>();
+            .Select(r => r.Clone())
+            .ToList().AsReadOnly() ?? (IReadOnlyList<BlacklistRule>)Array.Empty<BlacklistRule>();
     }
 }
 
@@ -59,6 +60,49 @@ public sealed class BlacklistRuleSnapshot
 /// </summary>
 public static class ProcessRuleEvaluator
 {
+    /// <summary>
+    /// Отбрасывает только доказуемые несовпадения имени до открытия process handle. У wildcard
+    /// учитывается лишь буквальный хвост после последнего * или ?: звёздочка может пересекать каталоги.
+    /// </summary>
+    /// <param name="processName">Имя из системного источника; расширение exe может быть опущено.</param>
+    /// <param name="rules">Активные правила.</param>
+    /// <returns>Истина, если хотя бы одно правило потенциально применимо и требуется проверка пути.</returns>
+    public static bool CouldMatchProcessName(string processName, IEnumerable<BlacklistRule> rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        if (string.IsNullOrEmpty(processName)) return true;
+        var slash = Math.Max(processName.LastIndexOf('/'), processName.LastIndexOf('\\'));
+        var name = processName[(slash + 1)..];
+        var nameWithExe = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : name + ".exe";
+        foreach (var rule in rules)
+        {
+            if (string.IsNullOrEmpty(rule.Value)) continue;
+            var value = rule.Value;
+            if (rule.MatchType == BlacklistMatchType.Path)
+            {
+                var delimiter = Math.Max(value.LastIndexOf('/'), value.LastIndexOf('\\'));
+                var fileName = value[(delimiter + 1)..];
+                if (string.Equals(fileName, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(fileName, nameWithExe, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            else if (rule.MatchType == BlacklistMatchType.PathWildcard)
+            {
+                var wildcard = Math.Max(value.LastIndexOf('*'), value.LastIndexOf('?'));
+                var suffix = value[(wildcard + 1)..];
+                var delimiter = Math.Max(suffix.LastIndexOf('/'), suffix.LastIndexOf('\\'));
+                if (delimiter >= 0)
+                {
+                    var literalName = suffix[(delimiter + 1)..];
+                    if (string.Equals(literalName, name, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(literalName, nameWithExe, StringComparison.OrdinalIgnoreCase)) return true;
+                }
+                else if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
+                         nameWithExe.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        return false;
+    }
+
     /// <summary>
     /// Проверяет, является ли процесс системным или защищённым от принудительного завершения.
     /// Сохраняет все существующие исключения для системных хостов и скриптовых интерпретаторов.

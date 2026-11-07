@@ -304,8 +304,6 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
 
     private ulong _sessionHandle;
     private IntPtr _propertiesBuffer;
-    private Mutex? _ownerMutex;
-    private bool _ownsMutex;
     private int _isStopped;
 
     #endregion
@@ -349,8 +347,6 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         ulong sessionHandle,
         Guid sessionGuid,
         EtwSessionLease lease,
-        Mutex ownerMutex,
-        bool ownsMutex,
         IntPtr propertiesBuffer,
         ILogger? logger)
     {
@@ -358,8 +354,6 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         _sessionHandle = sessionHandle;
         _sessionGuid = sessionGuid;
         _lease = lease;
-        _ownerMutex = ownerMutex;
-        _ownsMutex = ownsMutex;
         _propertiesBuffer = propertiesBuffer;
         _logger = logger;
     }
@@ -380,10 +374,17 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             throw new ArgumentException("Имя ETW-сессии не может быть пустым.", nameof(sessionName));
         }
 
+        if (Encoding.Unicode.GetByteCount(sessionName + "\0") > PropertiesBufferSize - Marshal.SizeOf<EVENT_TRACE_PROPERTIES>())
+        {
+            throw new ArgumentException("Имя ETW-сессии превышает вместимость буфера свойств.", nameof(sessionName));
+        }
+
         logger?.LogInformation("Инициализация запуска native ETW сессии '{SessionName}'...", sessionName);
 
         // 1. Захватываем машинный мьютекс для безопасного исключительного владения ресурсом
         var mutex = AcquireMachineMutex(TimeSpan.FromSeconds(10), out var ownsMutex, logger);
+        NativeProcessTraceSession? created = null;
+        IntPtr propertiesBuffer = IntPtr.Zero;
 
         try
         {
@@ -391,7 +392,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             ReconcileOrphanSessionIfNeeded(sessionName, logger);
 
             // 3. Формируем новый непредсказуемый nonce GUID и записываем атомарный Intent-Lease "Creating"
-            var currentProcess = Process.GetCurrentProcess();
+            using var currentProcess = Process.GetCurrentProcess();
             var sessionGuid = Guid.NewGuid();
             var lease = new EtwSessionLease
             {
@@ -407,20 +408,27 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             WriteLeaseAtomic(lease, logger);
 
             // 4. Подготавливаем зануленный unmanaged-буфер свойств EVENT_TRACE_PROPERTIES с корректными смещениями
-            var propertiesBuffer = AllocateStartPropertiesBuffer(sessionName, sessionGuid, out _);
+            propertiesBuffer = AllocateStartPropertiesBuffer(sessionName, sessionGuid, out _);
 
             // 5. Вызываем StartTraceW
             var status = StartTraceW(out var sessionHandle, sessionName, propertiesBuffer);
 
             if (status != ERROR_SUCCESS)
             {
-                // Неуспешное создание: освобождаем буфер и удаляем собственный intent-lease
+                // Неуспешный StartTrace не доказывает отсутствия частично созданного ресурса.
+                // Handle из неуспешного вызова не используется; право очистки подтверждается nonce.
                 Marshal.FreeHGlobal(propertiesBuffer);
-                DeleteLeaseFile(logger);
+                propertiesBuffer = IntPtr.Zero;
+                CleanupFailedStartLease(lease, logger);
 
                 logger?.LogError("StartTraceW для сессии '{SessionName}' вернул код ошибки Win32 {Status}", sessionName, status);
                 throw new NativeTraceSessionException(status, sessionName, $"Вызов StartTraceW завершился с кодом ошибки {status}");
             }
+
+            // Владение созданным handle фиксируется до любых последующих файловых операций.
+            // При отказе записи Active очистка выполняется тем же контроллером, intent-lease сохраняется.
+            created = new NativeProcessTraceSession(sessionName, sessionHandle, sessionGuid, lease, propertiesBuffer, logger);
+            propertiesBuffer = IntPtr.Zero;
 
             // 6. Успешный запуск ядра! Переводим lease в статус "Active"
             lease.Status = "Active";
@@ -431,24 +439,27 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
                 "Native ETW сессия '{SessionName}' успешно запущена (Handle: 0x{Handle:X16}, Guid: {Guid}, Режим: SystemTraceProvider)",
                 sessionName, sessionHandle, sessionGuid);
 
-            return new NativeProcessTraceSession(
-                sessionName,
-                sessionHandle,
-                sessionGuid,
-                lease,
-                mutex,
-                ownsMutex,
-                propertiesBuffer,
-                logger);
+            return created;
         }
         catch
         {
-            if (ownsMutex)
+            try
             {
-                try { mutex.ReleaseMutex(); } catch { }
+                created?.Dispose();
             }
-            mutex.Dispose();
+            catch (Exception cleanupError)
+            {
+                logger?.LogError(cleanupError, "Не удалось подтвердить остановку частично созданной ETW-сессии; lease оставлен для восстановления.");
+            }
             throw;
+        }
+        finally
+        {
+            if (propertiesBuffer != IntPtr.Zero) Marshal.FreeHGlobal(propertiesBuffer);
+            // Mutex принадлежит потоку: он сериализует создание и durable lease, а не весь
+            // асинхронный lifetime. После публикации lease повторный Start проверяет живого владельца.
+            if (ownsMutex) mutex.ReleaseMutex();
+            mutex.Dispose();
         }
     }
 
@@ -474,6 +485,14 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             errorMessage = null;
             errorCode = 0;
             return true;
+        }
+        catch (NativeTraceSessionException nativeEx)
+        {
+            session = null;
+            errorMessage = nativeEx.Message;
+            errorCode = unchecked((int)nativeEx.ErrorCode);
+            logger?.LogWarning(nativeEx, "Ошибка native ETW сессии '{SessionName}', Win32 {Code}", sessionName, errorCode);
+            return false;
         }
         catch (Win32Exception win32Ex)
         {
@@ -520,38 +539,50 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// </summary>
     public void Stop()
     {
-        if (Interlocked.Exchange(ref _isStopped, 1) != 0)
-        {
-            return;
-        }
-
-        _logger?.LogInformation("Остановка native ETW сессии '{SessionName}' (Handle: 0x{Handle:X16})...", _sessionName, _sessionHandle);
-
         lock (_syncRoot)
         {
+            if (Volatile.Read(ref _isStopped) != 0) return;
+
+            // Не теряем handle и не помечаем lease остановленным до подтверждения результата.
+            // Stop вызывается с любого worker-потока; thread-affine mutex здесь не используется.
             if (_sessionHandle != 0)
             {
                 var stopBuffer = AllocateControlPropertiesBuffer(null, out _);
                 try
                 {
+                    var queryStatus = ControlTraceW(_sessionHandle, null, stopBuffer, EVENT_TRACE_CONTROL_QUERY);
+                    if (queryStatus != ERROR_WMI_INSTANCE_NOT_FOUND && queryStatus != ERROR_SUCCESS && queryStatus != ERROR_MORE_DATA)
+                        throw new NativeTraceSessionException(queryStatus, _sessionName, "Не удалось подтвердить владение перед STOP");
+
+                    if (queryStatus != ERROR_WMI_INSTANCE_NOT_FOUND &&
+                        Marshal.PtrToStructure<EVENT_TRACE_PROPERTIES>(stopBuffer).Wnode.Guid != _sessionGuid)
+                        throw new InvalidOperationException("Handle ETW больше не соответствует GUID собственной сессии; остановка запрещена.");
+
                     // Остановка сессии через собственный валидный handle без указания имени (согласно SDK)
-                    var status = ControlTraceW(_sessionHandle, null, stopBuffer, EVENT_TRACE_CONTROL_STOP);
-                    if (status == ERROR_SUCCESS || status == ERROR_MORE_DATA || status == ERROR_WMI_INSTANCE_NOT_FOUND)
+                    var status = queryStatus == ERROR_WMI_INSTANCE_NOT_FOUND ? queryStatus :
+                        ControlTraceW(_sessionHandle, null, stopBuffer, EVENT_TRACE_CONTROL_STOP);
+                    if (status != ERROR_SUCCESS && status != ERROR_MORE_DATA && status != ERROR_WMI_INSTANCE_NOT_FOUND)
+                        throw new NativeTraceSessionException(status, _sessionName, "Остановка ETW не подтверждена; lease сохранён");
+
+                    // ERROR_MORE_DATA может означать выполненный STOP; повторный QUERY разрешает
+                    // неоднозначность, не повторяя операцию с потенциально переиспользованным handle.
+                    if (status == ERROR_MORE_DATA)
                     {
-                        _logger?.LogInformation("Native ETW сессия '{SessionName}' успешно остановлена в ядре (статус Win32 {Status})", _sessionName, status);
+                        var confirmation = ControlTraceW(0, _sessionName, stopBuffer, EVENT_TRACE_CONTROL_QUERY);
+                        if (confirmation != ERROR_WMI_INSTANCE_NOT_FOUND &&
+                            !((confirmation == ERROR_SUCCESS || confirmation == ERROR_MORE_DATA) &&
+                              Marshal.PtrToStructure<EVENT_TRACE_PROPERTIES>(stopBuffer).Wnode.Guid != _sessionGuid))
+                            throw new NativeTraceSessionException(confirmation, _sessionName, "STOP вернул MORE_DATA, отсутствие собственной сессии не подтверждено");
                     }
-                    else
-                    {
-                        _logger?.LogWarning("ControlTraceW(STOP) для сессии '{SessionName}' вернул статус Win32 {Status}", _sessionName, status);
-                    }
+                    _sessionHandle = 0;
                 }
                 finally
                 {
                     Marshal.FreeHGlobal(stopBuffer);
-                    _sessionHandle = 0;
                 }
             }
 
+            Volatile.Write(ref _isStopped, 1);
             // Фиксируем статус "Stopped" в lease-файле
             MarkLeaseStopped(_lease, _logger);
 
@@ -562,22 +593,6 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
                 _propertiesBuffer = IntPtr.Zero;
             }
 
-            // Освобождаем машинный мьютекс
-            if (_ownsMutex && _ownerMutex != null)
-            {
-                try
-                {
-                    _ownerMutex.ReleaseMutex();
-                }
-                catch (ApplicationException ex)
-                {
-                    _logger?.LogDebug(ex, "Мьютекс уже не принадлежит текущему потоку при завершении");
-                }
-                _ownsMutex = false;
-            }
-
-            _ownerMutex?.Dispose();
-            _ownerMutex = null;
         }
     }
 
@@ -615,8 +630,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
                         props.RealTimeBuffersLost);
                 }
 
-                _logger?.LogDebug("QueryStatistics для '{SessionName}' вернул статус {Status}", _sessionName, status);
-                return null;
+                throw new NativeTraceSessionException(status, _sessionName, "Не удалось получить статистику ETW");
             }
             finally
             {
@@ -639,12 +653,54 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// </summary>
     ~NativeProcessTraceSession()
     {
-        Stop();
+        try
+        {
+            Stop();
+        }
+        catch (Exception ex)
+        {
+            // Исключение финализатора не должно завершать SCM-службу; durable lease оставлен.
+            try { _logger?.LogError(ex, "Аварийное освобождение ETW не подтверждено; требуется восстановление по lease."); }
+            catch (Exception logError) { Trace.TraceError("Ошибка финализатора ETW: {0}; ошибка логирования: {1}", ex.GetType().Name, logError.GetType().Name); }
+        }
     }
 
     #endregion
 
     #region Orphan Reconciliation and Mutex Coordination
+
+    /// <summary>Разрешает частичный отказ StartTrace без потери intent-lease и без остановки чужой сессии.</summary>
+    /// <param name="lease">Intent с nonce текущей попытки запуска.</param>
+    /// <param name="logger">Журнал ошибок очистки.</param>
+    private static void CleanupFailedStartLease(EtwSessionLease lease, ILogger? logger)
+    {
+        var buffer = AllocateControlPropertiesBuffer(lease.SessionName, out _);
+        try
+        {
+            var query = ControlTraceW(0, lease.SessionName, buffer, EVENT_TRACE_CONTROL_QUERY);
+            if (query == ERROR_WMI_INSTANCE_NOT_FOUND)
+            {
+                MarkLeaseStopped(lease, logger);
+                return;
+            }
+            if ((query == ERROR_SUCCESS || query == ERROR_MORE_DATA) &&
+                Marshal.PtrToStructure<EVENT_TRACE_PROPERTIES>(buffer).Wnode.Guid == lease.SessionGuid)
+            {
+                var stop = ControlTraceW(0, lease.SessionName, buffer, EVENT_TRACE_CONTROL_STOP);
+                if (stop == ERROR_SUCCESS || stop == ERROR_WMI_INSTANCE_NOT_FOUND)
+                {
+                    MarkLeaseStopped(lease, logger);
+                    return;
+                }
+                logger?.LogWarning("Частичный StartTrace не очищен, STOP {Code}; intent-lease сохранён", stop);
+            }
+            else
+            {
+                logger?.LogWarning("Очистка после StartTrace не подтверждена, QUERY {Code}; чужая сессия не изменена, intent сохранён", query);
+            }
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
+    }
 
     /// <summary>
     /// Захватывает машинный мьютекс с обработкой аварийного оставления мьютекса предыдущим процессом.
@@ -697,23 +753,26 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         if (!string.Equals(existingLease.ProductId, "StartupMonitor", StringComparison.OrdinalIgnoreCase))
         {
             logger?.LogWarning("Lease-файл принадлежит стороннему продукту '{ProductId}', очистка пропущена", existingLease.ProductId);
-            return;
+            throw new InvalidOperationException("Не удалось подтвердить продукт владельца ETW lease.");
         }
 
+
+        if (!string.Equals(existingLease.MachineName, Environment.MachineName, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(existingLease.SessionName, sessionName, StringComparison.Ordinal) ||
+            existingLease.SessionGuid == Guid.Empty)
+            throw new InvalidOperationException("Lease не соответствует компьютеру, имени или GUID сессии; изменение запрещено.");
+
         // Проверяем, жив ли процесс владельца
-        if (existingLease.ProcessId > 0 && IsOwnerProcessAlive(existingLease.ProcessId, existingLease.ProcessCreationTimeUtc))
+        if (existingLease.Status != "Stopped" && existingLease.ProcessId > 0 &&
+            !(existingLease.Status == "Creating" && existingLease.ProcessId == Environment.ProcessId) &&
+            IsOwnerProcessAlive(existingLease.ProcessId, existingLease.ProcessCreationTimeUtc))
         {
-            if (existingLease.ProcessId != Environment.ProcessId)
-            {
                 logger?.LogWarning(
                     "Владелец сессии ETW (PID {Pid}, запущен {StartTimeUtc}) всё ещё активен. Сессия не является orphan",
                     existingLease.ProcessId, existingLease.ProcessCreationTimeUtc);
 
                 throw new InvalidOperationException(
                     $"Сессия ETW '{sessionName}' уже принадлежит работающему экземпляру StartupMonitor (PID: {existingLease.ProcessId}).");
-            }
-
-            return;
         }
 
         // Владелец процесса завершился или аварийно упал. Опрашиваем состояние нативной сессии ядра через QUERY.
@@ -748,6 +807,12 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
                     try
                     {
                         var stopStatus = ControlTraceW(0, sessionName, stopBuffer, EVENT_TRACE_CONTROL_STOP);
+                        if (stopStatus == ERROR_MORE_DATA)
+                        {
+                            var confirmation = ControlTraceW(0, sessionName, stopBuffer, EVENT_TRACE_CONTROL_QUERY);
+                            if (confirmation != ERROR_WMI_INSTANCE_NOT_FOUND)
+                                throw new NativeTraceSessionException(confirmation, sessionName, "Отсутствие orphan-сессии после MORE_DATA не подтверждено; lease сохранён");
+                        }
                         if (stopStatus == ERROR_SUCCESS || stopStatus == ERROR_MORE_DATA || stopStatus == ERROR_WMI_INSTANCE_NOT_FOUND)
                         {
                             logger?.LogInformation("Собственная orphan-сессия ETW успешно остановлена (статус {Status})", stopStatus);
@@ -755,7 +820,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
                         }
                         else
                         {
-                            logger?.LogError("Не удалось остановить подтверждённую orphan-сессию ETW: код ошибки Win32 {Status}", stopStatus);
+                            throw new NativeTraceSessionException(stopStatus, sessionName, "Не удалось остановить orphan-сессию; lease сохранён");
                         }
                     }
                     finally
@@ -775,7 +840,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             }
             else
             {
-                logger?.LogWarning("Запрос ControlTraceW(QUERY) для сессии '{SessionName}' вернул статус {Status}", sessionName, status);
+                throw new NativeTraceSessionException(status, sessionName, "Не удалось проверить orphan-сессию; lease сохранён");
             }
         }
         finally
@@ -799,7 +864,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             }
 
             var actualStartTimeUtc = process.StartTime.ToUniversalTime();
-            return Math.Abs((actualStartTimeUtc - expectedStartTimeUtc).TotalSeconds) < 2.0;
+            return actualStartTimeUtc == expectedStartTimeUtc;
         }
         catch (ArgumentException)
         {
@@ -813,8 +878,8 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         }
         catch (Win32Exception)
         {
-            // Системный процесс или нет доступа
-            return false;
+            // Отказ доступа не доказывает смерть владельца: безопасно считаем его живым.
+            return true;
         }
     }
 
@@ -847,13 +912,19 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         try
         {
             var json = JsonSerializer.Serialize(lease, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(tempPath, json, Encoding.UTF8);
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            {
+                var bytes = Encoding.UTF8.GetBytes(json);
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
             File.Move(tempPath, filePath, overwrite: true);
         }
         catch (Exception ex)
         {
             logger?.LogWarning(ex, "Ошибка атомарной записи lease-файла ETW: {FilePath}", filePath);
-            try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+            catch (Exception cleanupError) { logger?.LogWarning(cleanupError, "Не удалось удалить временный lease {FilePath}", tempPath); }
             throw;
         }
     }
