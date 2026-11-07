@@ -1,0 +1,2385 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root xmlns:ns1="urn:schemas-microsoft-com:xml-msdata" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  
+  <xs:schema id="root">
+    <xs:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xs:element name="root" ns1:IsDataSet="true">
+      <xs:complexType>
+        <xs:choice maxOccurs="unbounded">
+          <xs:element name="metadata">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" />
+              </xs:sequence>
+              <xs:attribute name="name" use="required" type="xsd:string" />
+              <xs:attribute name="type" type="xsd:string" />
+              <xs:attribute name="mimetype" type="xsd:string" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="assembly">
+            <xs:complexType>
+              <xs:attribute name="alias" type="xsd:string" />
+              <xs:attribute name="name" type="xsd:string" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="data">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+                <xs:element name="comment" type="xsd:string" minOccurs="0" ns1:Ordinal="2" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" ns1:Ordinal="1" />
+              <xs:attribute name="type" type="xsd:string" ns1:Ordinal="3" />
+              <xs:attribute name="mimetype" type="xsd:string" ns1:Ordinal="4" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="resheader">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" />
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="StatusLoaded" xml:space="preserve">
+    <value>Загружено: {0} записей</value>
+  </data>
+  <data name="CtxToggleOff" xml:space="preserve">
+    <value>Выключить</value>
+  </data>
+  <data name="ThemeDark" xml:space="preserve">
+    <value>Тёмная</value>
+  </data>
+  <data name="ServiceNotStarted" xml:space="preserve">
+    <value>Служба не запустилась за {0}мс</value>
+  </data>
+  <data name="PipeClientConnected" xml:space="preserve">
+    <value>UI-клиент подключился</value>
+  </data>
+  <data name="LocKeyboardHook" xml:space="preserve">
+    <value>Keyboard Hook</value>
+  </data>
+  <data name="LocAppxStartupTask" xml:space="preserve">
+    <value>AppX StartupTask</value>
+  </data>
+  <data name="LocActiveSetup" xml:space="preserve">
+    <value>Active Setup</value>
+  </data>
+  <data name="LocDrivers32" xml:space="preserve">
+    <value>Кодеки (Drivers32)</value>
+  </data>
+  <data name="StatusScanning" xml:space="preserve">
+    <value>Сканирование системы...</value>
+  </data>
+  <data name="BlacklistTitle" xml:space="preserve">
+    <value>Чёрный список</value>
+  </data>
+  <data name="TrayShowHide" xml:space="preserve">
+    <value>Показать / Скрыть</value>
+  </data>
+  <data name="TrayExit" xml:space="preserve">
+    <value>Выход</value>
+  </data>
+  <data name="TrayLabel" xml:space="preserve">
+    <value>Трей</value>
+  </data>
+  <data name="CardTotal" xml:space="preserve">
+    <value>Всего записей</value>
+  </data>
+  <data name="CardBlocked" xml:space="preserve">
+    <value>Заблокировано</value>
+  </data>
+  <data name="StatusError" xml:space="preserve">
+    <value>Ошибка: {0}</value>
+  </data>
+  <data name="LocIFEO" xml:space="preserve">
+    <value>IFEO</value>
+  </data>
+  <data name="ToggleEnable" xml:space="preserve">
+    <value>Включить</value>
+  </data>
+  <data name="LocStartupFolder" xml:space="preserve">
+    <value>Папка автозапуска</value>
+  </data>
+  <data name="UnknownMessageType" xml:space="preserve">
+    <value>Неизвестный тип сообщения: {0}</value>
+  </data>
+  <data name="CtxBlock" xml:space="preserve">
+    <value>Заблокировать</value>
+  </data>
+  <data name="PipeClientError" xml:space="preserve">
+    <value>Ошибка PipeServer при подключении клиента</value>
+  </data>
+  <data name="StrictModeDescription" xml:space="preserve">
+    <value>При обнаружении новой записи отключает её, сохраняет данные для включения и отображает уведомление.</value>
+  </data>
+  <data name="NavLogs" xml:space="preserve">
+    <value>Журнал</value>
+  </data>
+  <data name="LogsTitle" xml:space="preserve">
+    <value>Логи</value>
+  </data>
+  <data name="LogsSubtitle" xml:space="preserve">
+    <value>Логи приложения и службы</value>
+  </data>
+  <data name="LogSearchPlaceholder" xml:space="preserve">
+    <value>Поиск в логах...</value>
+  </data>
+  <data name="AutoBlockLabel" xml:space="preserve">
+    <value>Авто-блокировка при удалении</value>
+  </data>
+  <data name="AutoBlockToggle" xml:space="preserve">
+    <value>Автоматически добавлять удалённые записи в чёрный список</value>
+  </data>
+  <data name="SilentModeLabel" xml:space="preserve">
+    <value>Тихий режим</value>
+  </data>
+  <data name="SilentModeToggle" xml:space="preserve">
+    <value>Отключить все уведомления</value>
+  </data>
+  <data name="KillOnDisableLabel" xml:space="preserve">
+    <value>Завершение процессов</value>
+  </data>
+  <data name="KillOnDisableToggle" xml:space="preserve">
+    <value>Убивать процесс при отключении записи</value>
+  </data>
+  <data name="KillOnDisableDescription" xml:space="preserve">
+    <value>При отключении завершать запущенный процесс; при выключении запись только убирается из автозапуска</value>
+  </data>
+  <data name="ActionNotifTitle" xml:space="preserve">
+    <value>StartupMonitor</value>
+  </data>
+  <data name="ActionKilled" xml:space="preserve">
+    <value>Процесс завершён: {0}</value>
+  </data>
+  <data name="ActionDisabled" xml:space="preserve">
+    <value>Отключено: {0}</value>
+  </data>
+  <data name="ActionDisabledKilled" xml:space="preserve">
+    <value>Отключено, процесс завершён: {0}</value>
+  </data>
+  <data name="ActionAutoDisabled" xml:space="preserve">
+    <value>Авто-отключение: {0}</value>
+  </data>
+  <data name="ActionAutoDisabledKilled" xml:space="preserve">
+    <value>Авто-отключение, процесс завершён: {0}</value>
+  </data>
+  <data name="ActionDisabledKillSkipped" xml:space="preserve">
+    <value>Отключено: {0} — процесс не завершён: завершение процессов отключено в настройках</value>
+  </data>
+  <data name="ActionAutoDisabledKillSkipped" xml:space="preserve">
+    <value>Авто-отключение: {0} — процесс не завершён: завершение процессов отключено в настройках</value>
+  </data>
+  <data name="ActionRemoved" xml:space="preserve">
+    <value>Удалено из системы: {0}</value>
+  </data>
+  <data name="ActionRestored" xml:space="preserve">
+    <value>Восстановлено: {0}</value>
+  </data>
+  <data name="ActionRemovedAgain" xml:space="preserve">
+    <value>Программа {0} снова прописалась в автозапуск — удалена</value>
+  </data>
+  <data name="ActionPerformed" xml:space="preserve">
+    <value>Действие выполнено: {0}</value>
+  </data>
+  <data name="CleanStaleButton" xml:space="preserve">
+    <value>Очистить устаревшие записи</value>
+  </data>
+  <data name="FilterRegistry" xml:space="preserve">
+    <value>Реестр</value>
+  </data>
+  <data name="StatusServiceNotFound" xml:space="preserve">
+    <value>Служба не найдена: {0}</value>
+  </data>
+  <data name="LocComObject" xml:space="preserve">
+    <value>COM Object</value>
+  </data>
+  <data name="PipeServerStopped" xml:space="preserve">
+    <value>Сервер остановлен</value>
+  </data>
+  <data name="StatusStartingService" xml:space="preserve">
+    <value>Запуск службы...</value>
+  </data>
+  <data name="PipeServerStarted" xml:space="preserve">
+    <value>PipeServer запущен</value>
+  </data>
+  <data name="LocWinlogon" xml:space="preserve">
+    <value>Winlogon</value>
+  </data>
+  <data name="LocAppInit" xml:space="preserve">
+    <value>AppInit DLL</value>
+  </data>
+  <data name="LocUnknown" xml:space="preserve">
+    <value>Неизвестно</value>
+  </data>
+  <data name="LocGpoStartup" xml:space="preserve">
+    <value>GPO Startup Script</value>
+  </data>
+  <data name="FilterServices" xml:space="preserve">
+    <value>Службы</value>
+  </data>
+  <data name="LocContextMenuHandler" xml:space="preserve">
+    <value>Context Menu Handler</value>
+  </data>
+  <data name="LocWmi" xml:space="preserve">
+    <value>WMI Event</value>
+  </data>
+  <data name="RulePlaceholder" xml:space="preserve">
+    <value>Путь, маска, издатель или SHA256...</value>
+  </data>
+  <data name="ThemeLight" xml:space="preserve">
+    <value>Светлая</value>
+  </data>
+  <data name="ColumnRating" xml:space="preserve">
+    <value>Рейтинг</value>
+  </data>
+  <data name="ColumnStatus" xml:space="preserve">
+    <value>Статус</value>
+  </data>
+  <data name="ScanRegistry" xml:space="preserve">
+    <value>Сканирование реестра...</value>
+  </data>
+  <data name="LanguageLabel" xml:space="preserve">
+    <value>Язык</value>
+  </data>
+  <data name="FilterTasks" xml:space="preserve">
+    <value>Планировщик</value>
+  </data>
+  <data name="ServiceScCreateFailed" xml:space="preserve">
+    <value>sc create завершился с кодом {0}</value>
+  </data>
+  <data name="SectionTitle" xml:space="preserve">
+    <value>Программы автозапуска</value>
+  </data>
+  <data name="NotifTitle" xml:space="preserve">
+    <value>Новая запись автозапуска</value>
+  </data>
+  <data name="BlacklistNotifTitle" xml:space="preserve">
+    <value>Программа заблокирована</value>
+  </data>
+  <data name="BlacklistNotifText" xml:space="preserve">
+    <value>{0} удалена из автозапуска (чёрный список)</value>
+  </data>
+  <data name="ActionNotifyRemove" xml:space="preserve">
+    <value>Уведомить и отключить</value>
+  </data>
+  <data name="Subtitle" xml:space="preserve">
+    <value>Мониторинг автозапуска в реальном времени</value>
+  </data>
+  <data name="StatusConnectionFailed" xml:space="preserve">
+    <value>Не удалось подключиться к службе</value>
+  </data>
+  <data name="ColumnDate" xml:space="preserve">
+    <value>Дата</value>
+  </data>
+  <data name="StrictModeLabel" xml:space="preserve">
+    <value>Режим защиты</value>
+  </data>
+  <data name="ServiceRegistrationFailed" xml:space="preserve">
+    <value>Не удалось зарегистрировать службу</value>
+  </data>
+  <data name="MatchTypePath" xml:space="preserve">
+    <value>Путь</value>
+  </data>
+  <data name="CtxOpenFileLocation" xml:space="preserve">
+    <value>Открыть расположение файла</value>
+  </data>
+<data name="ScanTaskScheduler" xml:space="preserve">
+    <value>Сканирование планировщика задач...</value>
+  </data>
+  <data name="StatusServiceTimeout" xml:space="preserve">
+    <value>Таймаут запуска службы</value>
+  </data>
+  <data name="ToggleUnblock" xml:space="preserve">
+    <value>Разблокировать</value>
+  </data>
+  <data name="LangEnglish" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="LangRussian" xml:space="preserve">
+    <value>Русский</value>
+  </data>
+  <data name="LocNetworkProvider" xml:space="preserve">
+    <value>Network Provider</value>
+  </data>
+  <data name="TaskSchedulerError" xml:space="preserve">
+    <value>Не удалось подключиться к планировщику задач, TaskSchedulerWatcher остановлен</value>
+  </data>
+  <data name="LocPrintMonitor" xml:space="preserve">
+    <value>Print Monitor</value>
+  </data>
+  <data name="ServiceStartFailed" xml:space="preserve">
+    <value>Не удалось запустить службу</value>
+  </data>
+  <data name="LocBrowserPlugin" xml:space="preserve">
+    <value>Browser Plugin</value>
+  </data>
+  <data name="ServiceNotFound" xml:space="preserve">
+    <value>Служба не найдена: {0}</value>
+  </data>
+  <data name="NotifText" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="LocProtocol" xml:space="preserve">
+    <value>Protocol</value>
+  </data>
+  <data name="ThemeLabel" xml:space="preserve">
+    <value>Тема</value>
+  </data>
+  <data name="MatchTypeSHA256" xml:space="preserve">
+    <value>SHA256</value>
+  </data>
+  <data name="LocGpoLogon" xml:space="preserve">
+    <value>GPO Logon Script</value>
+  </data>
+  <data name="StatusScanTimeout" xml:space="preserve">
+    <value>Таймаут сканирования системы</value>
+  </data>
+  <data name="LocDriver" xml:space="preserve">
+    <value>Драйвер</value>
+  </data>
+  <data name="CardEnabled" xml:space="preserve">
+    <value>Включено</value>
+  </data>
+  <data name="CtxToggleOn" xml:space="preserve">
+    <value>Включить</value>
+  </data>
+  <data name="AddRuleTitle" xml:space="preserve">
+    <value>Добавить правило</value>
+  </data>
+  <data name="AddRuleButton" xml:space="preserve">
+    <value>+ Добавить</value>
+  </data>
+  <data name="FilterFolder" xml:space="preserve">
+    <value>Папки</value>
+  </data>
+  <data name="TaskSchedulerCrash" xml:space="preserve">
+    <value>TaskSchedulerWatcher аварийно завершился</value>
+  </data>
+  <data name="PipeClientDisconnected" xml:space="preserve">
+    <value>UI-клиент отключился</value>
+  </data>
+  <data name="SearchPlaceholder" xml:space="preserve">
+    <value>Поиск по имени, пути, издателю...</value>
+  </data>
+  <data name="ClearSearch" xml:space="preserve">
+    <value>Очистить поиск</value>
+  </data>
+  <data name="MatchTypePathWildcard" xml:space="preserve">
+    <value>Маска пути</value>
+  </data>
+  <data name="NavBlacklist" xml:space="preserve">
+    <value>Чёрный список</value>
+  </data>
+  <data name="LocBootExecute" xml:space="preserve">
+    <value>Boot Execute</value>
+  </data>
+  <data name="LocRegistryRun" xml:space="preserve">
+    <value>Реестр: Run</value>
+  </data>
+  <data name="LocTaskScheduler" xml:space="preserve">
+    <value>Планировщик задач</value>
+  </data>
+  <data name="NavOverview" xml:space="preserve">
+    <value>Автозапуск</value>
+  </data>
+  <data name="StatusStarting" xml:space="preserve">
+    <value>Запуск...</value>
+  </data>
+  <data name="FilterAll" xml:space="preserve">
+    <value>Все</value>
+  </data>
+  <data name="StatusBlockedShort" xml:space="preserve">
+    <value>Блок</value>
+  </data>
+  <data name="MinimizeToTrayToggle" xml:space="preserve">
+    <value>Сворачивать в трей</value>
+  </data>
+  <data name="LocRegistryRunOnce" xml:space="preserve">
+    <value>Реестр: RunOnce</value>
+  </data>
+  <data name="LocRegistryRunServices" xml:space="preserve">
+    <value>Реестр: RunServices</value>
+  </data>
+  <data name="DeleteRuleTooltip" xml:space="preserve">
+    <value>Удалить правило</value>
+  </data>
+  <data name="ScanServices" xml:space="preserve">
+    <value>Сканирование служб...</value>
+  </data>
+  <data name="StrictModeToggle" xml:space="preserve">
+    <value>Блокировать любые новые записи автозапуска</value>
+  </data>
+  <data name="MatchTypePublisher" xml:space="preserve">
+    <value>Издатель</value>
+  </data>
+  <data name="LocRegistryPolicies" xml:space="preserve">
+    <value>Реестр: Policies</value>
+  </data>
+  <data name="BlacklistSubtitle" xml:space="preserve">
+    <value>Программы, которым запрещён автозапуск</value>
+  </data>
+  <data name="NotifyToggle" xml:space="preserve">
+    <value>Уведомлять о новых записях</value>
+  </data>
+  <data name="StatusConnecting" xml:space="preserve">
+    <value>Подключение...</value>
+  </data>
+  <data name="CtxCopyPath" xml:space="preserve">
+    <value>Копировать путь</value>
+  </data>
+  <data name="LocBHO" xml:space="preserve">
+    <value>BHO</value>
+  </data>
+  <data name="LocService" xml:space="preserve">
+    <value>Служба</value>
+  </data>
+  <data name="ScanStartupFolder" xml:space="preserve">
+    <value>Сканирование папок автозапуска...</value>
+  </data>
+  <data name="ActionNotifyOnly" xml:space="preserve">
+    <value>Только уведомить</value>
+  </data>
+  <data name="NotificationsLabel" xml:space="preserve">
+    <value>Уведомления</value>
+  </data>
+  <data name="SettingsTitle" xml:space="preserve">
+    <value>Настройки</value>
+  </data>
+  <data name="ScanTimeoutMessage" xml:space="preserve">
+    <value>Таймаут ожидания завершения сканирования (60с)</value>
+  </data>
+  <data name="StatusEnabledShort" xml:space="preserve">
+    <value>Вкл</value>
+  </data>
+  <data name="LocAppPaths" xml:space="preserve">
+    <value>AppPaths</value>
+  </data>
+  <data name="RefreshTooltip" xml:space="preserve">
+    <value>Обновить</value>
+  </data>
+  <data name="LocLsa" xml:space="preserve">
+    <value>LSA Notification</value>
+  </data>
+  <data name="NavSettings" xml:space="preserve">
+    <value>Настройки</value>
+  </data>
+  <data name="PipeServerError" xml:space="preserve">
+    <value>Ошибка обработки клиента PipeServer</value>
+  </data>
+  <data name="ToggleDisable" xml:space="preserve">
+    <value>Выключить</value>
+  </data>
+  <data name="StatusDisabledShort" xml:space="preserve">
+    <value>Откл.</value>
+  </data>
+  <data name="GeneralSection" xml:space="preserve">
+    <value>Общие</value>
+  </data>
+  <data name="ColumnName" xml:space="preserve">
+    <value>Имя</value>
+  </data>
+  <data name="ThemeSystem" xml:space="preserve">
+    <value>Системный</value>
+  </data>
+  <data name="AppName" xml:space="preserve">
+    <value>Startup Monitor</value>
+  </data>
+  <data name="NavHistory" xml:space="preserve">
+    <value>Изменения</value>
+  </data>
+  <data name="HistoryTitle" xml:space="preserve">
+    <value>История изменений</value>
+  </data>
+  <data name="HistorySubtitle" xml:space="preserve">
+    <value>Лог изменений записей автозапуска</value>
+  </data>
+  <data name="NavRemoved" xml:space="preserve">
+    <value>Удалённые</value>
+  </data>
+  <data name="RemovedTitle" xml:space="preserve">
+    <value>Удалённые записи</value>
+  </data>
+  <data name="RemovedSubtitle" xml:space="preserve">
+    <value>Записи, удалённые из системы (доступны бэкапы для восстановления)</value>
+  </data>
+  <data name="RemovedEmpty" xml:space="preserve">
+    <value>Нет удалённых записей</value>
+  </data>
+  <data name="RemovedRestoreButton" xml:space="preserve">
+    <value>Восстановить</value>
+  </data>
+  <data name="CtxRemoveFromSystem" xml:space="preserve">
+    <value>Удалить из системы</value>
+  </data>
+  <data name="RemoveConfirmTitle" xml:space="preserve">
+    <value>Удаление из системы</value>
+  </data>
+  <data name="RemoveConfirmMessage" xml:space="preserve">
+    <value>Удалить "{0}" из системы?\n\nДа — удалить и добавить в чёрный список (больше не будет обнаружено)\nНет — только удалить\nОтмена — отменить</value>
+  </data>
+  <data name="RemoveWithBlock" xml:space="preserve">
+    <value>Да, добавить в чёрный список</value>
+  </data>
+  <data name="RemoveWithoutBlock" xml:space="preserve">
+    <value>Нет, только удалить</value>
+  </data>
+  <data name="AiSection" xml:space="preserve">
+    <value>AI-рейтинг</value>
+  </data>
+  <data name="AiEnableLabel" xml:space="preserve">
+    <value>AI-рейтинг</value>
+  </data>
+  <data name="AiEnableToggle" xml:space="preserve">
+    <value>Включить AI-анализ безопасности</value>
+  </data>
+  <data name="AiEnableDescription" xml:space="preserve">
+    <value>Анализ записей автозапуска через OpenAI-совместимый AI (Groq, Ollama, OpenRouter, DeepSeek)</value>
+  </data>
+  <data name="AiApiUrlLabel" xml:space="preserve">
+    <value>API URL</value>
+  </data>
+  <data name="AiApiUrlDescription" xml:space="preserve">
+    <value>OpenAI-совместимый адрес (Groq, OpenRouter, Ollama http://localhost:11434/v1/chat/completions)</value>
+  </data>
+  <data name="AiModelLabel" xml:space="preserve">
+    <value>Модель AI</value>
+  </data>
+  <data name="AiModelDescription" xml:space="preserve">
+    <value>Имя модели (по умолчанию openai/gpt-oss-120b для Groq; deepseek-chat, llama3 и др.)</value>
+  </data>
+  <data name="AiApiKeyLabel" xml:space="preserve">
+    <value>API-ключ</value>
+  </data>
+  <data name="AiApiKeyDescription" xml:space="preserve">
+    <value>API-ключ провайдера (для локальной Ollama/vLLM ключ не требуется; Groq: https://console.groq.com/keys)</value>
+  </data>
+  <data name="AiTestConnectionButton" xml:space="preserve">
+    <value>Проверить AI</value>
+  </data>
+  <data name="AiTestingStatus" xml:space="preserve">
+    <value>Проверка подключения к AI...</value>
+  </data>
+  <data name="NavExit" xml:space="preserve">
+    <value>Выход</value>
+  </data>
+  <data name="FilterRecent" xml:space="preserve">
+    <value>За 24ч</value>
+  </data>
+  <data name="FilterOther" xml:space="preserve">
+    <value>Прочее</value>
+  </data>
+  <data name="ColumnType" xml:space="preserve">
+    <value>Тип</value>
+  </data>
+  <data name="StartWithWindowsLabel" xml:space="preserve">
+    <value>Автозапуск</value>
+  </data>
+  <data name="StartWithWindowsToggle" xml:space="preserve">
+    <value>Запускать Startup Monitor при входе в Windows</value>
+  </data>
+  <data name="ColumnCircl" xml:space="preserve">
+    <value>CIRCL</value>
+  </data>
+  <data name="StatusConnected" xml:space="preserve">
+    <value>Служба подключена</value>
+  </data>
+  <data name="StatusDisconnected" xml:space="preserve">
+    <value>Служба не подключена</value>
+  </data>
+  <data name="TrayLockdownMode" xml:space="preserve">
+    <value>Режим защиты (блокировка автозапуска)</value>
+  </data>
+  <data name="CpuThrottleLabel" xml:space="preserve">
+    <value>Троттлинг сканирования</value>
+  </data>
+  <data name="CpuThrottleToggle" xml:space="preserve">
+    <value>Не сканировать реестр при высокой нагрузке CPU</value>
+  </data>
+  <data name="CpuThresholdLabel" xml:space="preserve">
+    <value>Порог загрузки CPU:</value>
+  </data>
+  <data name="CpuThrottleDescription" xml:space="preserve">
+    <value>Если сторонняя нагрузка на процессор превышает заданный порог, сканирование реестра пропускается во избежание лишней нагрузки на систему.</value>
+  </data>
+  <data name="CurrentCpuUsageFormat" xml:space="preserve">
+    <value>Загрузка ЦП: {0}% (сторонние: {1}%)</value>
+  </data>
+  <data name="ActionLockdownBlocked" xml:space="preserve">
+    <value>Новая запись «{0}» заблокирована и стёрта из автозагрузки режимом защиты.</value>
+  </data>
+  <data name="BadgeStable" xml:space="preserve">
+    <value>Стабильно</value>
+  </data>
+  <data name="SystemHealthSecure" xml:space="preserve">
+    <value>Защищено</value>
+  </data>
+  <data name="SystemHealthPrefix" xml:space="preserve">
+    <value>Состояние системы: </value>
+  </data>
+  <data name="TableHeaderStartupApps" xml:space="preserve">
+    <value>Программы в автозагрузке</value>
+  </data>
+  <data name="ColumnIcon" xml:space="preserve">
+    <value>Значок</value>
+  </data>
+  <data name="ColumnPublisher" xml:space="preserve">
+    <value>Издатель</value>
+  </data>
+  <data name="ColumnBootImpact" xml:space="preserve">
+    <value>Влияние</value>
+  </data>
+  <data name="ColumnSecurity" xml:space="preserve">
+    <value>Безопасность</value>
+  </data>
+  <data name="ColumnActions" xml:space="preserve">
+    <value>Действия</value>
+  </data>
+  <data name="ActionMore" xml:space="preserve">
+    <value>Подробнее</value>
+  </data>
+  <data name="ActionBlock" xml:space="preserve">
+    <value>Блок</value>
+  </data>
+  <data name="StatusOn" xml:space="preserve">
+    <value>Вкл</value>
+  </data>
+  <data name="StatusOff" xml:space="preserve">
+    <value>Выкл</value>
+  </data>
+  <data name="StatusCheckingService" xml:space="preserve">
+    <value>Проверка состояния службы...</value>
+  </data>
+  <data name="StatusRegisteringService" xml:space="preserve">
+    <value>Регистрация службы в автозапуске Windows...</value>
+  </data>
+  <data name="StatusConfiguringAutoStart" xml:space="preserve">
+    <value>Настройка автоматического запуска службы...</value>
+  </data>
+  <data name="StatusUpdatingServicePath" xml:space="preserve">
+    <value>Обновление пути к службе в системе...</value>
+  </data>
+  <data name="StatusStartingServiceProcess" xml:space="preserve">
+    <value>Запуск фоновой службы StartupMonitor...</value>
+  </data>
+  <data name="StatusWaitingServiceReady" xml:space="preserve">
+    <value>Ожидание готовности службы ({0} с)...</value>
+  </data>
+  <data name="StatusConnectingAttempt" xml:space="preserve">
+    <value>Подключение к службе (попытка {0} из {1})...</value>
+  </data>
+  <data name="StatusLoadingEntries" xml:space="preserve">
+    <value>Служба готова. Загрузка записей автозапуска...</value>
+  </data>
+  <data name="BtnRetry" xml:space="preserve">
+    <value>Повторить</value>
+  </data>
+  <data name="BtnExit" xml:space="preserve">
+    <value>Выход</value>
+  </data>
+  <data name="NavTaskManager" xml:space="preserve">
+    <value>Процессы</value>
+  </data>
+  <data name="TaskManagerTitle" xml:space="preserve">
+    <value>Диспетчер процессов</value>
+  </data>
+  <data name="TaskManagerSubtitle" xml:space="preserve">
+    <value>Мониторинг запущенных процессов, системных ресурсов и точек автозапуска в реальном времени</value>
+  </data>
+  <data name="CardCpu" xml:space="preserve">
+    <value>ЦП</value>
+  </data>
+  <data name="CardRam" xml:space="preserve">
+    <value>Память</value>
+  </data>
+  <data name="CardDisk" xml:space="preserve">
+    <value>Диск</value>
+  </data>
+  <data name="CardProcesses" xml:space="preserve">
+    <value>Процессы</value>
+  </data>
+  <data name="ColProcessName" xml:space="preserve">
+    <value>Имя процесса</value>
+  </data>
+  <data name="ColPid" xml:space="preserve">
+    <value>PID</value>
+  </data>
+  <data name="ColCpu" xml:space="preserve">
+    <value>ЦП</value>
+  </data>
+  <data name="ColRam" xml:space="preserve">
+    <value>Память</value>
+  </data>
+  <data name="ColDisk" xml:space="preserve">
+    <value>Диск</value>
+  </data>
+  <data name="ColNetwork" xml:space="preserve">
+    <value>Сеть</value>
+  </data>
+  <data name="ColPublisher" xml:space="preserve">
+    <value>Издатель</value>
+  </data>
+  <data name="ColStartupOrigin" xml:space="preserve">
+    <value>Источник автозапуска</value>
+  </data>
+  <data name="ColActions" xml:space="preserve">
+    <value>Действия</value>
+  </data>
+  <data name="FilterApps" xml:space="preserve">
+    <value>Приложения</value>
+  </data>
+  <data name="FilterBackground" xml:space="preserve">
+    <value>Фоновые</value>
+  </data>
+  <data name="FilterAutostart" xml:space="preserve">
+    <value>Автозапуск</value>
+  </data>
+  <data name="ActionKillProcess" xml:space="preserve">
+    <value>Снять задачу</value>
+  </data>
+  <data name="ActionSuspendProcess" xml:space="preserve">
+    <value>Приостановить процесс</value>
+  </data>
+  <data name="ActionResumeProcess" xml:space="preserve">
+    <value>Возобновить процесс</value>
+  </data>
+  <data name="ActionBlockProcess" xml:space="preserve">
+    <value>Заблокировать в ЧС</value>
+  </data>
+  <data name="ActionLocateStartup" xml:space="preserve">
+    <value>Найти в автозапуске</value>
+  </data>
+  <data name="ActionOpenFileLocation" xml:space="preserve">
+    <value>Открыть папку с файлом</value>
+  </data>
+  <data name="BadgeSuspended" xml:space="preserve">
+    <value>⏸ Приостановлен</value>
+  </data>
+  <data name="BtnExportReport" xml:space="preserve">
+    <value>Экспорт отчета</value>
+  </data>
+  <data name="TooltipExportReport" xml:space="preserve">
+    <value>Экспортировать отчет аудита безопасности системы (HTML, CSV, JSON)</value>
+  </data>
+  <data name="ExportReportDialogTitle" xml:space="preserve">
+    <value>Экспорт отчета аудита безопасности</value>
+  </data>
+  <data name="ExportReportFilter" xml:space="preserve">
+    <value>Интерактивный HTML-отчет (*.html)|*.html|Таблица CSV (*.csv)|*.csv|Данные JSON (*.json)|*.json</value>
+  </data>
+  <data name="ExportReportSuccess" xml:space="preserve">
+    <value>Отчет аудита успешно сохранен:\n{0}</value>
+  </data>
+  <data name="ExportReportError" xml:space="preserve">
+    <value>Не удалось экспортировать отчет:\n{0}</value>
+  </data>
+  <data name="RemoteNotificationsSection" xml:space="preserve">
+    <value>Удалённые уведомления (Telegram / Discord)</value>
+  </data>
+  <data name="RemoteNotificationsDescription" xml:space="preserve">
+    <value>Мгновенная отправка push-сообщений на ваш телефон при появлении новых записей, подозрительных команд и блокировках</value>
+  </data>
+  <data name="TelegramSection" xml:space="preserve">
+    <value>Telegram Бот</value>
+  </data>
+  <data name="TelegramEnableToggle" xml:space="preserve">
+    <value>Уведомления в Telegram</value>
+  </data>
+  <data name="TelegramBotTokenLabel" xml:space="preserve">
+    <value>Токен бота</value>
+  </data>
+  <data name="TelegramBotTokenDescription" xml:space="preserve">
+    <value>Токен Telegram бота от @BotFather (например, 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)</value>
+  </data>
+  <data name="TelegramChatIdLabel" xml:space="preserve">
+    <value>Chat ID</value>
+  </data>
+  <data name="TelegramChatIdDescription" xml:space="preserve">
+    <value>ID чата или канала Telegram (узнайте свой ID через бота @userinfobot)</value>
+  </data>
+  <data name="TestTelegramButton" xml:space="preserve">
+    <value>Проверить Telegram</value>
+  </data>
+  <data name="DiscordSection" xml:space="preserve">
+    <value>Discord Webhook</value>
+  </data>
+  <data name="DiscordEnableToggle" xml:space="preserve">
+    <value>Уведомления в Discord</value>
+  </data>
+  <data name="DiscordWebhookUrlLabel" xml:space="preserve">
+    <value>Webhook URL</value>
+  </data>
+  <data name="DiscordWebhookUrlDescription" xml:space="preserve">
+    <value>URL вебхука канала Discord (Настройки канала → Интеграция → Вебхуки → Создать вебхук)</value>
+  </data>
+  <data name="TestDiscordButton" xml:space="preserve">
+    <value>Проверить Discord</value>
+  </data>
+  <data name="RemoteEventsSection" xml:space="preserve">
+    <value>События для оповещения</value>
+  </data>
+  <data name="RemoteNotifyNewEntryToggle" xml:space="preserve">
+    <value>Новые записи автозапуска</value>
+  </data>
+  <data name="RemoteNotifyThreatToggle" xml:space="preserve">
+    <value>Подозрительные команды (CLI Threats)</value>
+  </data>
+  <data name="RemoteNotifyBlockedToggle" xml:space="preserve">
+    <value>Блокировки ЧС и Lockdown</value>
+  </data>
+  <data name="TestingRemoteNotificationStatus" xml:space="preserve">
+    <value>Отправка тестового оповещения...</value>
+  </data>
+  <data name="StatusDelayedShort" xml:space="preserve">
+    <value>Отложен</value>
+  </data>
+  <data name="CtxDelayedStartup" xml:space="preserve">
+    <value>Отложить запуск при входе</value>
+  </data>
+  <data name="CtxCancelDelay" xml:space="preserve">
+    <value>Отменить задержку (Включить сразу)</value>
+  </data>
+  <data name="CtxLaunchNow" xml:space="preserve">
+    <value>Запустить сейчас (проверка)</value>
+  </data>
+  <data name="CtxChangeDelay" xml:space="preserve">
+    <value>Изменить задержку</value>
+  </data>
+  <data name="SecondsShort" xml:space="preserve">
+    <value>с</value>
+  </data>
+  <data name="SnapshotsTitle" xml:space="preserve">
+    <value>Контрольные снимки автозапуска</value>
+  </data>
+  <data name="SnapshotsSubtitle" xml:space="preserve">
+    <value>Фиксация эталонного состояния системы и сравнение («Было — Стало»)</value>
+  </data>
+  <data name="SnapshotsBtn" xml:space="preserve">
+    <value>Снимки системы</value>
+  </data>
+  <data name="CreateSnapshotBtn" xml:space="preserve">
+    <value>Создать снимок</value>
+  </data>
+  <data name="SnapshotNamePrompt" xml:space="preserve">
+    <value>Имя снимка:</value>
+  </data>
+  <data name="SnapshotDescPrompt" xml:space="preserve">
+    <value>Описание / комментарий:</value>
+  </data>
+  <data name="SnapshotCreatedSuccess" xml:space="preserve">
+    <value>Контрольный снимок успешно создан</value>
+  </data>
+  <data name="CompareSnapshotBtn" xml:space="preserve">
+    <value>Сравнить с текущим</value>
+  </data>
+  <data name="DeleteSnapshotBtn" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="SnapshotDeleteConfirm" xml:space="preserve">
+    <value>Удалить этот контрольный снимок автозапуска?</value>
+  </data>
+  <data name="SnapshotDiffTitle" xml:space="preserve">
+    <value>Сравнение со снимком: {0}</value>
+  </data>
+  <data name="SnapshotDiffAdded" xml:space="preserve">
+    <value>Новые записи</value>
+  </data>
+  <data name="SnapshotDiffRemoved" xml:space="preserve">
+    <value>Удалённые записи</value>
+  </data>
+  <data name="SnapshotDiffModified" xml:space="preserve">
+    <value>Изменённые записи</value>
+  </data>
+  <data name="SnapshotDiffUnchanged" xml:space="preserve">
+    <value>Без изменений</value>
+  </data>
+  <data name="SnapshotApplyFilter" xml:space="preserve">
+    <value>Показать изменения в таблице</value>
+  </data>
+  <data name="SnapshotResetFilter" xml:space="preserve">
+    <value>Сбросить сравнение</value>
+  </data>
+  <data name="SnapshotActiveComparison" xml:space="preserve">
+    <value>Режим сравнения со снимком: {0} (+{1} новых, ~{2} измененных)</value>
+  </data>
+  <data name="SnapshotNoSnapshots" xml:space="preserve">
+    <value>Снимков системы пока нет. Создайте контрольный снимок, чтобы зафиксировать текущее состояние точек автозапуска и легко выявлять любые новые или изменённые программы.</value>
+  </data>
+  <data name="SnapshotBadgeNew" xml:space="preserve">
+    <value>+ Новая</value>
+  </data>
+  <data name="SnapshotBadgeModified" xml:space="preserve">
+    <value>~ Изменена</value>
+  </data>
+  <data name="NavBootTime" xml:space="preserve">
+    <value>Загрузка Windows</value>
+  </data>
+  <data name="NavSnapshots" xml:space="preserve">
+    <value>Снимки</value>
+  </data>
+  <data name="BootTimeTitle" xml:space="preserve">
+    <value>Анализатор времени загрузки Windows</value>
+  </data>
+  <data name="BootTimeSubtitle" xml:space="preserve">
+    <value>Диагностика скорости старта системы и выявление программ, замедляющих загрузку</value>
+  </data>
+  <data name="BootTimeRefresh" xml:space="preserve">
+    <value>Обновить</value>
+  </data>
+  <data name="BootTimeNoData" xml:space="preserve">
+    <value>Данные журнала диагностики Windows недоступны. Убедитесь, что журнал Microsoft-Windows-Diagnostics-Performance/Operational включён.</value>
+  </data>
+  <data name="BootTimeOverall" xml:space="preserve">
+    <value>Общее время</value>
+  </data>
+  <data name="BootTimeToDesktop" xml:space="preserve">
+    <value>До рабочего стола</value>
+  </data>
+  <data name="BootTimePostBoot" xml:space="preserve">
+    <value>Фоновая фаза</value>
+  </data>
+  <data name="BootTimeAppsCount" xml:space="preserve">
+    <value>Приложений в старте</value>
+  </data>
+  <data name="BootTimeOffendersTitle" xml:space="preserve">
+    <value>Виновники замедления загрузки</value>
+  </data>
+  <data name="BootTimeHistoryTitle" xml:space="preserve">
+    <value>История загрузок</value>
+  </data>
+  <data name="BootTimeColCategory" xml:space="preserve">
+    <value>Категория</value>
+  </data>
+  <data name="BootTimeColName" xml:space="preserve">
+    <value>Программа / Путь</value>
+  </data>
+  <data name="BootTimeColPublisher" xml:space="preserve">
+    <value>Издатель</value>
+  </data>
+  <data name="BootTimeColTotalTime" xml:space="preserve">
+    <value>Время работы</value>
+  </data>
+  <data name="BootTimeColDelay" xml:space="preserve">
+    <value>Замедление</value>
+  </data>
+  <data name="BootTimeHistColDate" xml:space="preserve">
+    <value>Дата / Время</value>
+  </data>
+  <data name="BootTimeHistColTotal" xml:space="preserve">
+    <value>Общее время</value>
+  </data>
+  <data name="BootTimeHistColDesktop" xml:space="preserve">
+    <value>До рабочего стола</value>
+  </data>
+  <data name="BootTimeHistColPost" xml:space="preserve">
+    <value>Фоновая фаза</value>
+  </data>
+  <data name="BootTimeHistColApps" xml:space="preserve">
+    <value>Приложений</value>
+  </data>
+  <data name="BootTimeHistColRating" xml:space="preserve">
+    <value>Оценка</value>
+  </data>
+  <data name="BootTimeFaster" xml:space="preserve">
+    <value>⚡ На {0} быстрее предыдущего</value>
+  </data>
+  <data name="BootTimeSlower" xml:space="preserve">
+    <value>⚠️ На {0} медленнее предыдущего</value>
+  </data>
+  <data name="TmKillConfirmMsg" xml:space="preserve">
+    <value>Вы действительно хотите принудительно завершить процесс "{0}" (PID {1})?</value>
+  </data>
+  <data name="TmKillConfirmTitle" xml:space="preserve">
+    <value>Завершение процесса</value>
+  </data>
+  <data name="TmProcessKilled" xml:space="preserve">
+    <value>Процесс завершён</value>
+  </data>
+  <data name="TmKillFailed" xml:space="preserve">
+    <value>Не удалось завершить процесс</value>
+  </data>
+  <data name="TmProcessInstanceChanged" xml:space="preserve">
+    <value>Процесс перезапустился под новым ID, действие отменено в целях безопасности.</value>
+  </data>
+  <data name="TmProcessIdentityUnavailable" xml:space="preserve">
+    <value>Время создания процесса недоступно. Обновите список процессов перед повторной попыткой.</value>
+  </data>
+  <data name="TmProcessInstanceCommandsUnavailable" xml:space="preserve">
+    <value>Служба не поддерживает проверку экземпляра процесса. Подключитесь к обновлённой службе перед повторной попыткой.</value>
+  </data>
+  <data name="TmError" xml:space="preserve">
+    <value>Ошибка</value>
+  </data>
+  <data name="TmBlockConfirmMsg" xml:space="preserve">
+    <value>Вы действительно хотите заблокировать "{0}" в Чёрном списке?\n\nФайл: {1}\n\nПроцесс будет немедленно завершён, а автозапуск заблокирован.</value>
+  </data>
+  <data name="TmBlockConfirmTitle" xml:space="preserve">
+    <value>Блокировка процесса</value>
+  </data>
+  <data name="TmProcessBlocked" xml:space="preserve">
+    <value>Процесс заблокирован</value>
+  </data>
+  <data name="TmBlockFailed" xml:space="preserve">
+    <value>Не удалось заблокировать процесс</value>
+  </data>
+  <data name="TmProcessSuspended" xml:space="preserve">
+    <value>Процесс приостановлен</value>
+  </data>
+  <data name="TmSuspendFailed" xml:space="preserve">
+    <value>Не удалось приостановить процесс</value>
+  </data>
+  <data name="TmProcessResumed" xml:space="preserve">
+    <value>Процесс возобновлен</value>
+  </data>
+  <data name="TmResumeFailed" xml:space="preserve">
+    <value>Не удалось возобновить процесс</value>
+  </data>
+  <data name="TmNoStartupMatch" xml:space="preserve">
+    <value>Данный процесс не сопоставлен с известной точкой автозапуска.</value>
+  </data>
+  <data name="TmInfo" xml:space="preserve">
+    <value>Информация</value>
+  </data>
+  <data name="TmNoProcessSelected" xml:space="preserve">
+    <value>Процесс не выбран.</value>
+  </data>
+  <data name="TmCantFindExePath" xml:space="preserve">
+    <value>Не удалось определить расположение исполняемого файла для процесса "{0}" (PID {1}).\n\nВозможно, это системный, защищённый компонент ядра Windows или внутренняя служба.</value>
+  </data>
+  <data name="TmExeNotFound" xml:space="preserve">
+    <value>Исполняемый файл не найден на диске по пути:\n{0}</value>
+  </data>
+  <data name="TmOpenLocationFailed" xml:space="preserve">
+    <value>Не удалось открыть расположение файла: {0}</value>
+  </data>
+  <data name="LocShellExtension" xml:space="preserve">
+    <value>Shell-расширение</value>
+  </data>
+  <data name="LocLocationLabel" xml:space="preserve">
+    <value>Расположение</value>
+  </data>
+  <data name="OriginRegistryRun" xml:space="preserve">
+    <value>Реестр (Run)</value>
+  </data>
+  <data name="OriginRegistryRunOnce" xml:space="preserve">
+    <value>Реестр (RunOnce)</value>
+  </data>
+  <data name="OriginRegistryRunServices" xml:space="preserve">
+    <value>Реестр (RunServices)</value>
+  </data>
+  <data name="OriginRegistryPolicies" xml:space="preserve">
+    <value>Групповая политика</value>
+  </data>
+  <data name="OriginStartupFolder" xml:space="preserve">
+    <value>Папка Автозагрузка</value>
+  </data>
+  <data name="OriginService" xml:space="preserve">
+    <value>Служба Windows</value>
+  </data>
+  <data name="OriginDriver" xml:space="preserve">
+    <value>Драйвер Windows</value>
+  </data>
+  <data name="OriginTaskScheduler" xml:space="preserve">
+    <value>Планировщик</value>
+  </data>
+  <data name="OriginWinlogon" xml:space="preserve">
+    <value>Winlogon</value>
+  </data>
+  <data name="OriginActiveSetup" xml:space="preserve">
+    <value>Active Setup</value>
+  </data>
+  <data name="OriginAppx" xml:space="preserve">
+    <value>UWP / AppX</value>
+  </data>
+  <data name="OriginAutostart" xml:space="preserve">
+    <value>Автозапуск</value>
+  </data>
+  <data name="OriginManualExplorer" xml:space="preserve">
+    <value>Вручную (Проводник)</value>
+  </data>
+  <data name="OriginParentPrefix" xml:space="preserve">
+    <value>Родитель: {0}</value>
+  </data>
+  <data name="OriginBackgroundProcess" xml:space="preserve">
+    <value>Фоновый процесс</value>
+  </data>
+  <data name="DetailMainInfo" xml:space="preserve">
+    <value>Основное</value>
+  </data>
+  <data name="DetailPath" xml:space="preserve">
+    <value>Путь:</value>
+  </data>
+  <data name="DetailCommand" xml:space="preserve">
+    <value>Команда:</value>
+  </data>
+  <data name="DetailDetected" xml:space="preserve">
+    <value>Обнаружен:</value>
+  </data>
+  <data name="DetailDelay" xml:space="preserve">
+    <value>Задержка:</value>
+  </data>
+  <data name="DetailHash" xml:space="preserve">
+    <value>Хеш</value>
+  </data>
+  <data name="DetailRefreshAi" xml:space="preserve">
+    <value>Обновить AI-рейтинг</value>
+  </data>
+  <data name="DetailDelay30s" xml:space="preserve">
+    <value>Отложить (30с)</value>
+  </data>
+  <data name="TooltipPath" xml:space="preserve">
+    <value>Путь: {0}</value>
+  </data>
+  <data name="TooltipCommand" xml:space="preserve">
+    <value>Команда: {0}</value>
+  </data>
+  <data name="TooltipPublisher" xml:space="preserve">
+    <value>Издатель: {0}</value>
+  </data>
+  <data name="TooltipLocation" xml:space="preserve">
+    <value>Расположение: {0}</value>
+  </data>
+  <data name="TooltipStatus" xml:space="preserve">
+    <value>Статус: {0}</value>
+  </data>
+  <data name="TooltipAiRating" xml:space="preserve">
+    <value>AI-оценка:</value>
+  </data>
+  <data name="TooltipAiCategory" xml:space="preserve">
+    <value>  Категория: {0}</value>
+  </data>
+  <data name="TooltipAiRecommendation" xml:space="preserve">
+    <value>  Рекомендация: {0}</value>
+  </data>
+  <data name="TooltipAiRisk" xml:space="preserve">
+    <value>  Риск: {0}</value>
+  </data>
+  <data name="PublisherUnverified" xml:space="preserve">
+    <value>Не проверен</value>
+  </data>
+  <data name="ImpactLow" xml:space="preserve">
+    <value>Низкое</value>
+  </data>
+  <data name="ImpactMedium" xml:space="preserve">
+    <value>Среднее</value>
+  </data>
+  <data name="ImpactHigh" xml:space="preserve">
+    <value>Высокое</value>
+  </data>
+  <data name="PipeAiTestNoResult" xml:space="preserve">
+    <value>Служба не вернула результат проверки AI</value>
+  </data>
+  <data name="PipeRemoteTestNoResult" xml:space="preserve">
+    <value>Служба не вернула результат проверки удалённых уведомлений</value>
+  </data>
+  <data name="PipeDelaySetError" xml:space="preserve">
+    <value>Ошибка установки отложенного запуска</value>
+  </data>
+  <data name="PipeDelayCancelError" xml:space="preserve">
+    <value>Ошибка отмены отложенного запуска</value>
+  </data>
+  <data name="PipeLaunchSuccess" xml:space="preserve">
+    <value>Программа успешно запущена</value>
+  </data>
+  <data name="PipeLaunchError" xml:space="preserve">
+    <value>Ошибка запуска отложенной программы</value>
+  </data>
+  <data name="PipeSnapshotParseError" xml:space="preserve">
+    <value>Ошибка разбора снимка: {0}</value>
+  </data>
+  <data name="PipeSnapshotCreateError" xml:space="preserve">
+    <value>Ошибка создания снимка</value>
+  </data>
+  <data name="PipeCompareParseError" xml:space="preserve">
+    <value>Ошибка разбора результатов сравнения: {0}</value>
+  </data>
+  <data name="PipeCompareError" xml:space="preserve">
+    <value>Ошибка сравнения со снимком</value>
+  </data>
+  <data name="CpuExternalFormat" xml:space="preserve">
+    <value>сторонние: {0}%</value>
+  </data>
+  <data name="SnapshotNewTooltip" xml:space="preserve">
+    <value>Запись появилась в системе после создания контрольного снимка</value>
+  </data>
+  <data name="SnapshotModifiedTooltip" xml:space="preserve">
+    <value>Параметры записи изменились со снимка: {0}</value>
+  </data>
+  <data name="NotifDelayedStartup" xml:space="preserve">
+    <value>Отложенный запуск</value>
+  </data>
+  <data name="NotifTestLaunch" xml:space="preserve">
+    <value>Тестовый запуск</value>
+  </data>
+  <data name="SnapSavedSnapshots" xml:space="preserve">
+    <value>Сохранённые контрольные снимки:</value>
+  </data>
+  <data name="SnapColName" xml:space="preserve">
+    <value>Название снимка</value>
+  </data>
+  <data name="SnapColDate" xml:space="preserve">
+    <value>Дата и время</value>
+  </data>
+  <data name="SnapColEntries" xml:space="preserve">
+    <value>Записей</value>
+  </data>
+  <data name="SnapColMachine" xml:space="preserve">
+    <value>Компьютер / ОС</value>
+  </data>
+  <data name="SnapColDesc" xml:space="preserve">
+    <value>Описание</value>
+  </data>
+  <data name="SnapBtnCompare" xml:space="preserve">
+    <value>🔍 Сравнить</value>
+  </data>
+  <data name="SnapCompareTooltip" xml:space="preserve">
+    <value>Выполнить дифференциальное сравнение с текущим состоянием автозапуска</value>
+  </data>
+  <data name="SnapDeleteTooltip" xml:space="preserve">
+    <value>Удалить этот контрольный снимок</value>
+  </data>
+  <data name="SnapResultsHeader" xml:space="preserve">
+    <value>Результаты сравнения:</value>
+  </data>
+  <data name="SnapColLocation" xml:space="preserve">
+    <value>Расположение</value>
+  </data>
+  <data name="SnapColCommandLine" xml:space="preserve">
+    <value>Командная строка / Путь</value>
+  </data>
+  <data name="SnapColChangedParams" xml:space="preserve">
+    <value>Изменившиеся параметры</value>
+  </data>
+  <data name="SnapColCurrentState" xml:space="preserve">
+    <value>Текущее состояние</value>
+  </data>
+  <data name="SnapColBaselineState" xml:space="preserve">
+    <value>Состояние в снимке</value>
+  </data>
+  <data name="SnapBtnClose" xml:space="preserve">
+    <value>Закрыть</value>
+  </data>
+  <data name="BtnPauseMonitoring" xml:space="preserve">
+    <value>Приостановить</value>
+  </data>
+  <data name="BtnResumeMonitoring" xml:space="preserve">
+    <value>Возобновить</value>
+  </data>
+  <data name="TooltipPauseMonitoring" xml:space="preserve">
+    <value>Приостановить глобальный фоновый мониторинг автозапуска системы</value>
+  </data>
+  <data name="TooltipResumeMonitoring" xml:space="preserve">
+    <value>Возобновить активный мониторинг автозапуска системы</value>
+  </data>
+  <data name="TrayPauseMonitoring" xml:space="preserve">
+    <value>Приостановить работу</value>
+  </data>
+  <data name="TrayResumeMonitoring" xml:space="preserve">
+    <value>Возобновить работу</value>
+  </data>
+  <data name="TrayMonitoringPausedStatus" xml:space="preserve">
+    <value>Мониторинг на паузе</value>
+  </data>
+  <data name="StatusServiceActive" xml:space="preserve">
+    <value>Служба активна (v{0}, PID: {1})</value>
+  </data>
+  <data name="StatusServicePaused" xml:space="preserve">
+    <value>Служба на паузе (v{0}, PID: {1})</value>
+  </data>
+  <data name="StatusServiceStopped" xml:space="preserve">
+    <value>Служба не подключена</value>
+  </data>
+  <data name="SystemHealthPaused" xml:space="preserve">
+    <value>Мониторинг на паузе</value>
+  </data>
+  <data name="BootColCategory" xml:space="preserve">
+    <value>Категория</value>
+  </data>
+  <data name="BootColApp" xml:space="preserve">
+    <value>Приложение / Путь</value>
+  </data>
+  <data name="BootColPublisher" xml:space="preserve">
+    <value>Издатель</value>
+  </data>
+  <data name="BootColTotalTime" xml:space="preserve">
+    <value>Время работы</value>
+  </data>
+  <data name="BootColDelay" xml:space="preserve">
+    <value>Замедление старта</value>
+  </data>
+  <data name="BootColSessionDate" xml:space="preserve">
+    <value>Дата и время</value>
+  </data>
+  <data name="BootColDesktopPhase" xml:space="preserve">
+    <value>До рабочего стола</value>
+  </data>
+  <data name="BootColPostPhase" xml:space="preserve">
+    <value>Фоновая фаза</value>
+  </data>
+  <data name="BootColAppsCount" xml:space="preserve">
+    <value>Программ</value>
+  </data>
+  <data name="BootColRating" xml:space="preserve">
+    <value>Оценка старта</value>
+  </data>
+  <data name="ViewModeList" xml:space="preserve">
+    <value>Список</value>
+  </data>
+  <data name="ViewModeTree" xml:space="preserve">
+    <value>Дерево</value>
+  </data>
+  <data name="TooltipViewModeList" xml:space="preserve">
+    <value>Отображение процессов плоским списком</value>
+  </data>
+  <data name="TooltipViewModeTree" xml:space="preserve">
+    <value>Иерархическое дерево процессов (родительские и дочерние ветви)</value>
+  </data>
+  <data name="SystemDangerTitle" xml:space="preserve">
+    <value>Предупреждение: системно значимый компонент</value>
+  </data>
+  <data name="SystemDangerMessage" xml:space="preserve">
+    <value>Внимание! Запись «{0}» является критически важным компонентом Windows.
+
+Её отключение, блокировка или удаление может привести к нестабильной работе или полному краху системы (синий экран смерти BSoD).
+
+Вы действительно хотите продолжить?</value>
+  </data>
+  <data name="ErrCannotBlockSystemProcess" xml:space="preserve">
+    <value>Запрещено блокировать системный процесс Windows в целях безопасности операционной системы.</value>
+  </data>
+  <data name="ActionProcessConnections" xml:space="preserve">
+    <value>Сетевые соединения...</value>
+  </data>
+  <data name="ProcessConnectionsTitle" xml:space="preserve">
+    <value>Сетевые соединения процесса</value>
+  </data>
+  <data name="AuthenticodeSection" xml:space="preserve">
+    <value>Криптографическая валидация цифровых подписей Authenticode</value>
+  </data>
+  <data name="AuthenticodeDescription" xml:space="preserve">
+    <value>Аппаратная и криптографическая проверка целостности исполняемых файлов (PE/EXE/DLL) с использованием системного Win32 API WinVerifyTrust (WINTRUST_ACTION_GENERIC_VERIFY_V2) и цепочек корневых сертификатов Windows (X509 Root CA). Позволяет мгновенно выявлять поддельные и повреждённые файлы, эксплойты и маскировку вредоносного ПО.</value>
+  </data>
+  <data name="AuthenticodeEngineStatus" xml:space="preserve">
+    <value>Статус движка: Активен (WinVerifyTrust v2 + X509 Root CA)</value>
+  </data>
+  <data name="AuthenticodeCacheNotice" xml:space="preserve">
+    <value>Интеллектуальное кэширование: результаты кэшируются по пути, размеру и штампу изменения файла, исключая нагрузку на CPU.</value>
+  </data>
+  <data name="AuthenticodeLegendTitle" xml:space="preserve">
+    <value>Индикация цифровых подписей в системе:</value>
+  </data>
+  <data name="AuthenticodeLegendValid" xml:space="preserve">
+    <value>Действительна (Valid): Подпись подлинна, цепочка доверия подтверждена, файл не модифицирован.</value>
+  </data>
+  <data name="AuthenticodeLegendTampered" xml:space="preserve">
+    <value>Модифицирован / Подделка (Tampered): Несовпадение контрольного хэша (0x80096010), файл повреждён или инжектирован.</value>
+  </data>
+  <data name="AuthenticodeLegendUntrusted" xml:space="preserve">
+    <value>Истёк / Недоверенный корень (Expired / Untrusted): Истёкший сертификат, самоподписанный или отозванный (Revoked).</value>
+  </data>
+  <data name="AuthenticodeLegendUnsigned" xml:space="preserve">
+    <value>Без подписи (Unsigned): У исполняемого файла отсутствует цифровая подпись разработчика.</value>
+  </data>
+  <data name="AuthenticodeAiIntegration" xml:space="preserve">
+    <value>Интеграция с ИИ: Результаты криптографической проверки Authenticode передаются в AI-рейтинг для выявления маскировки вредоносного ПО под системные утилиты.</value>
+  </data>
+  <data name="AutoGuardsSection" xml:space="preserve">
+    <value>Автоматические политики защиты (Auto-Guards)</value>
+  </data>
+  <data name="AutoGuardsDescription" xml:space="preserve">
+    <value>Превентивная нейтрализация и аудит подозрительных записей автозагрузки</value>
+  </data>
+  <data name="AutoGuardsModeLabel" xml:space="preserve">
+    <value>Режим действия:</value>
+  </data>
+  <data name="AutoGuardsModeAudit" xml:space="preserve">
+    <value>Только аудит (запись в историю и предупреждение)</value>
+  </data>
+  <data name="AutoGuardsModeEnforce" xml:space="preserve">
+    <value>Активная блокировка (отключение с возможностью включить обратно)</value>
+  </data>
+  <data name="AutoGuardsRulesLabel" xml:space="preserve">
+    <value>Политики автоматической защиты:</value>
+  </data>
+  <data name="GuardDangerousCliLabel" xml:space="preserve">
+    <value>Опасные параметры CLI</value>
+  </data>
+  <data name="GuardDangerousCliToggle" xml:space="preserve">
+    <value>Блокировать Base64, сетевые загрузчики и маскировку</value>
+  </data>
+  <data name="GuardDangerousCliDescription" xml:space="preserve">
+    <value>Выявляет закодированные PowerShell-команды, утилиты загрузки (IEX/bitsadmin) и двойные расширения</value>
+  </data>
+  <data name="GuardTempPathLabel" xml:space="preserve">
+    <value>Каталоги Temp и Public</value>
+  </data>
+  <data name="GuardTempPathToggle" xml:space="preserve">
+    <value>Блокировать запуск из %TEMP%, %WINDIR%\Temp, Users\Public</value>
+  </data>
+  <data name="GuardTempPathDescription" xml:space="preserve">
+    <value>Предотвращает закрепление троянов и дропперов из временных и общедоступных папок</value>
+  </data>
+  <data name="GuardScriptsLabel" xml:space="preserve">
+    <value>Скрипты и интерпретаторы</value>
+  </data>
+  <data name="GuardScriptsToggle" xml:space="preserve">
+    <value>Блокировать скрипты (.bat, .vbs, .js, .ps1, mshta, cscript, wscript)</value>
+  </data>
+  <data name="GuardScriptsDescription" xml:space="preserve">
+    <value>Запрещает небинарным командным сценариям и WMI-скриптам прописываться в автозагрузку</value>
+  </data>
+  <data name="GuardUnsignedLabel" xml:space="preserve">
+    <value>Цифровая подпись</value>
+  </data>
+  <data name="GuardUnsignedToggle" xml:space="preserve">
+    <value>Блокировать неподписанные файлы и нарушенные подписи</value>
+  </data>
+  <data name="GuardUnsignedDescription" xml:space="preserve">
+    <value>Допускает автозапуск только исполняемых файлов с действующей доверенной подписью Authenticode</value>
+  </data>
+  <data name="GuardNewServicesLabel" xml:space="preserve">
+    <value>Службы Windows</value>
+  </data>
+  <data name="GuardNewServicesToggle" xml:space="preserve">
+    <value>Блокировать регистрацию новых сторонних служб и драйверов</value>
+  </data>
+  <data name="GuardNewServicesDescription" xml:space="preserve">
+    <value>Пресекает скрытую установку фоновых служб и драйверов сторонними программами</value>
+  </data>
+  <data name="GuardSystemProtectedNotice" xml:space="preserve">
+    <value>Системные компоненты Windows (ядро, svchost, системные службы, задачи планировщика Microsoft) и собственные процессы StartupMonitor защищены безусловно.</value>
+  </data>
+  <data name="ActionPolicyBlocked" xml:space="preserve">
+    <value>Запись «{0}» заблокирована и нейтрализована политикой защиты Auto-Guards.</value>
+  </data>
+  <data name="TrayMixedTitle" xml:space="preserve">
+    <value>Уведомления ({0})</value>
+  </data>
+  <data name="TrayAndMore" xml:space="preserve">
+    <value>…и ещё {0}</value>
+  </data>
+  <data name="TmProcessTitle" xml:space="preserve">
+    <value>Действия над процессами</value>
+  </data>
+  <data name="SysInfoBtn" xml:space="preserve">
+    <value>О компьютере</value>
+  </data>
+  <data name="SysInfoTooltip" xml:space="preserve">
+    <value>Аппаратные характеристики компьютера: процессор, память, диски, ОС</value>
+  </data>
+  <data name="SysInfoTitle" xml:space="preserve">
+    <value>О компьютере и системе</value>
+  </data>
+  <data name="SysInfoSubtitle" xml:space="preserve">
+    <value>Сводка аппаратного обеспечения, состояния накопителей и операционной системы</value>
+  </data>
+  <data name="SysInfoCardHardware" xml:space="preserve">
+    <value>Аппаратное обеспечение</value>
+  </data>
+  <data name="SysInfoCardOs" xml:space="preserve">
+    <value>Операционная система</value>
+  </data>
+  <data name="SysInfoCardDisks" xml:space="preserve">
+    <value>Дисковые накопители</value>
+  </data>
+  <data name="SysInfoCpu" xml:space="preserve">
+    <value>Процессор</value>
+  </data>
+  <data name="SysInfoCores" xml:space="preserve">
+    <value>Логических ядер</value>
+  </data>
+  <data name="SysInfoRam" xml:space="preserve">
+    <value>Оперативная память</value>
+  </data>
+  <data name="SysInfoOsName" xml:space="preserve">
+    <value>Выпуск Windows</value>
+  </data>
+  <data name="SysInfoBuild" xml:space="preserve">
+    <value>Версия и сборка</value>
+  </data>
+  <data name="SysInfoMachine" xml:space="preserve">
+    <value>Имя компьютера</value>
+  </data>
+  <data name="SysInfoUser" xml:space="preserve">
+    <value>Текущий пользователь</value>
+  </data>
+  <data name="SysInfoUptime" xml:space="preserve">
+    <value>Время работы (аптайм)</value>
+  </data>
+  <data name="SysInfoCopyBtn" xml:space="preserve">
+    <value>Копировать отчёт</value>
+  </data>
+  <data name="SysInfoCopiedToast" xml:space="preserve">
+    <value>Характеристики компьютера скопированы в буфер обмена</value>
+  </data>
+  <data name="SysInfoRefreshBtn" xml:space="preserve">
+    <value>Обновить</value>
+  </data>
+  <data name="UpdateSectionTitle" xml:space="preserve">
+    <value>Обновление программы</value>
+  </data>
+  <data name="UpdateSectionDescription" xml:space="preserve">
+    <value>Проверка новых версий на GitHub, автоматическая фоновая загрузка и тихая установка</value>
+  </data>
+  <data name="AutoCheckUpdatesLabel" xml:space="preserve">
+    <value>Автопроверка</value>
+  </data>
+  <data name="AutoCheckUpdatesToggle" xml:space="preserve">
+    <value>Проверять обновления автоматически</value>
+  </data>
+  <data name="UpdateCheckActionLabel" xml:space="preserve">
+    <value>Наличие</value>
+  </data>
+  <data name="CheckUpdatesButton" xml:space="preserve">
+    <value>Проверить обновления</value>
+  </data>
+  <data name="UpdateInfoLabel" xml:space="preserve">
+    <value>Версия и статус</value>
+  </data>
+  <data name="CheckingForUpdatesText" xml:space="preserve">
+    <value>Проверка наличия обновлений...</value>
+  </data>
+  <data name="UpdateLatestVersionInstalledText" xml:space="preserve">
+    <value>У вас установлена последняя версия программы.</value>
+  </data>
+  <data name="UpdateCheckFailedText" xml:space="preserve">
+    <value>Не удалось проверить обновления.</value>
+  </data>
+  <data name="UpdateAvailableFormat" xml:space="preserve">
+    <value>Доступна новая версия: v{0}</value>
+  </data>
+  <data name="UpdateDialogTitle" xml:space="preserve">
+    <value>Доступно обновление</value>
+  </data>
+  <data name="UpdateDialogSubtitle" xml:space="preserve">
+    <value>Выпущена новая версия Startup Monitor</value>
+  </data>
+  <data name="UpdateNowButton" xml:space="preserve">
+    <value>Обновить сейчас</value>
+  </data>
+  <data name="RemindLaterButton" xml:space="preserve">
+    <value>Напомнить позже</value>
+  </data>
+  <data name="SkipVersionButton" xml:space="preserve">
+    <value>Пропустить эту версию</value>
+  </data>
+  <data name="InstallAndRestartButton" xml:space="preserve">
+    <value>Установить и перезапустить</value>
+  </data>
+  <data name="DownloadProgressStatusFormat" xml:space="preserve">
+    <value>Загружено {0} из {1} ({2}%) • {3}</value>
+  </data>
+  <data name="UpdateChangelogLabel" xml:space="preserve">
+    <value>Список изменений в этой версии</value>
+  </data>
+  <data name="FwStatusAllowed" xml:space="preserve">
+    <value>Разрешено</value>
+  </data>
+  <data name="FwStatusBlocked" xml:space="preserve">
+    <value>Заблокирован</value>
+  </data>
+  <data name="FwStatusBlockedInbound" xml:space="preserve">
+    <value>Заблокирован (входящий)</value>
+  </data>
+  <data name="FwStatusBlockedOutbound" xml:space="preserve">
+    <value>Заблокирован (исходящий)</value>
+  </data>
+  <data name="FwStatusBlockedBoth" xml:space="preserve">
+    <value>Заблокирован (оба направления)</value>
+  </data>
+  <data name="FwStatusBanned" xml:space="preserve">
+    <value>В бане</value>
+  </data>
+  <data name="FwStatusProtected" xml:space="preserve">
+    <value>Защищён Defender</value>
+  </data>
+  <data name="BlockIp" xml:space="preserve">
+    <value>Заблокировать IP</value>
+  </data>
+  <data name="UnblockIp" xml:space="preserve">
+    <value>Разблокировать IP</value>
+  </data>
+  <data name="BanDuration15m" xml:space="preserve">
+    <value>Бан на 15 минут</value>
+  </data>
+  <data name="BanDuration1h" xml:space="preserve">
+    <value>Бан на 1 час</value>
+  </data>
+  <data name="BanDuration24h" xml:space="preserve">
+    <value>Бан на 24 часа</value>
+  </data>
+  <data name="BanPermanent" xml:space="preserve">
+    <value>Бан навсегда</value>
+  </data>
+  <data name="BlockIpTooltip" xml:space="preserve">
+    <value>Заблокировать удалённый IP в брандмауэре Windows</value>
+  </data>
+  <data name="UnblockIpTooltip" xml:space="preserve">
+    <value>Снять блокировку IP</value>
+  </data>
+  <data name="BanDurationTooltip" xml:space="preserve">
+    <value>Выберите длительность бана</value>
+  </data>
+  <data name="PortDefenderTitle" xml:space="preserve">
+    <value>Port Defender</value>
+  </data>
+  <data name="PortDefenderSubtitle" xml:space="preserve">
+    <value>Автоматическая защита от флуда портов и перебора</value>
+  </data>
+  <data name="PortDefenderEnabledToggle" xml:space="preserve">
+    <value>Включить защиту Port Defender</value>
+  </data>
+  <data name="PortDefenderProtectedPortsLabel" xml:space="preserve">
+    <value>Защищаемые порты</value>
+  </data>
+  <data name="PortDefenderProtectedPortsTooltip" xml:space="preserve">
+    <value>Список локальных портов через запятую (например, 3389, 22, 443)</value>
+  </data>
+  <data name="PortDefenderThresholdLabel" xml:space="preserve">
+    <value>Порог (подключений)</value>
+  </data>
+  <data name="PortDefenderThresholdTooltip" xml:space="preserve">
+    <value>Число подключений в окне времени для срабатывания бана</value>
+  </data>
+  <data name="PortDefenderWindowLabel" xml:space="preserve">
+    <value>Временное окно</value>
+  </data>
+  <data name="PortDefenderWindowTooltip" xml:space="preserve">
+    <value>Скользящее окно детекта флуда (секунда / минута / час)</value>
+  </data>
+  <data name="PortDefenderBanDurationLabel" xml:space="preserve">
+    <value>Длительность бана</value>
+  </data>
+  <data name="PortDefenderBanDurationTooltip" xml:space="preserve">
+    <value>Базовый срок бана; растёт при рецидивах</value>
+  </data>
+  <data name="PortDefenderAutoEscalateToggle" xml:space="preserve">
+    <value>Автоэскалация бана при повторных атаках</value>
+  </data>
+  <data name="PortDefenderTrustPrivateToggle" xml:space="preserve">
+    <value>Доверять частным сетям (не банить локальные адреса)</value>
+  </data>
+  <data name="PortDefenderWhitelistLabel" xml:space="preserve">
+    <value>Белый список (доверенные IP / подсети)</value>
+  </data>
+  <data name="PortDefenderWhitelistTooltip" xml:space="preserve">
+    <value>IP и подсети, которые никогда не банятся (например, 192.168.1.100, 10.0.0.0/8)</value>
+  </data>
+  <data name="PortDefenderRulesTitle" xml:space="preserve">
+    <value>Правила по портам</value>
+  </data>
+  <data name="PortDefenderActiveBansTitle" xml:space="preserve">
+    <value>Активные баны</value>
+  </data>
+  <data name="PortDefenderUnbanAllButton" xml:space="preserve">
+    <value>Разбанить все</value>
+  </data>
+  <data name="PortDefenderSaveButton" xml:space="preserve">
+    <value>Сохранить</value>
+  </data>
+  <data name="PortDefenderCloseButton" xml:space="preserve">
+    <value>Закрыть</value>
+  </data>
+  <data name="PortDefenderBanStatusFormat" xml:space="preserve">
+    <value>В бане до {0} (рецидив x{1})</value>
+  </data>
+  <data name="PortDefenderBanPermanentFormat" xml:space="preserve">
+    <value>В бане навсегда (рецидив x{0})</value>
+  </data>
+  <data name="FwSocketCountFormat" xml:space="preserve">
+    <value>Соединений: {0} (установлено: {1}, прослушивается: {2})</value>
+  </data>
+  <data name="NavFirewall" xml:space="preserve">
+    <value>Сетевой экран</value>
+  </data>
+  <data name="FirewallHubTitle" xml:space="preserve">
+    <value>Центр сетевой безопасности</value>
+  </data>
+  <data name="RuleActionAllow" xml:space="preserve">
+    <value>Разрешить</value>
+  </data>
+  <data name="RuleActionBlock" xml:space="preserve">
+    <value>Блокировать</value>
+  </data>
+  <data name="RuleDirIn" xml:space="preserve">
+    <value>Входящее</value>
+  </data>
+  <data name="RuleDirOut" xml:space="preserve">
+    <value>Исходящее</value>
+  </data>
+  <data name="FilteringModeNormal" xml:space="preserve">
+    <value>Обычный</value>
+  </data>
+  <data name="FilteringModeWhitelist" xml:space="preserve">
+    <value>Белый список</value>
+  </data>
+  <data name="FilteringModeKillswitch" xml:space="preserve">
+    <value>Killswitch</value>
+  </data>
+  <data name="BtnCreateRule" xml:space="preserve">
+    <value>Создать правило</value>
+  </data>
+  <data name="BtnEditRule" xml:space="preserve">
+    <value>Редактировать</value>
+  </data>
+  <data name="BtnDeleteRule" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="NetFwStateUnknown" xml:space="preserve">
+    <value>Брандмауэр: неизвестно</value>
+  </data>
+  <data name="NetStatusLoading" xml:space="preserve">
+    <value>Статус загружается…</value>
+  </data>
+  <data name="NetProfileDomainDefault" xml:space="preserve">
+    <value>Доменный: —</value>
+  </data>
+  <data name="NetProfilePrivateDefault" xml:space="preserve">
+    <value>Частный: —</value>
+  </data>
+  <data name="NetProfilePublicDefault" xml:space="preserve">
+    <value>Публичный: —</value>
+  </data>
+  <data name="NetBtnRefreshStatus" xml:space="preserve">
+    <value>Обновить статус</value>
+  </data>
+  <data name="NetFilteringModeHeader" xml:space="preserve">
+    <value>Режим фильтрации</value>
+  </data>
+  <data name="NetFilterModeNormal" xml:space="preserve">
+    <value>Обычный</value>
+  </data>
+  <data name="NetFilterModeWhitelist" xml:space="preserve">
+    <value>Белый список (блокировать исходящие по умолчанию)</value>
+  </data>
+  <data name="NetFilterModeKillswitch" xml:space="preserve">
+    <value>Экстренный Killswitch (блокировать всю сеть)</value>
+  </data>
+  <data name="NetInteractiveAlertsCheck" xml:space="preserve">
+    <value>Интерактивные уведомления о неизвестных программах</value>
+  </data>
+  <data name="NetInteractiveAlertsTip" xml:space="preserve">
+    <value>Показывать всплывающее окно при новом исходящем подключении неизвестной программы</value>
+  </data>
+  <data name="NetLiveConnectionsHeader" xml:space="preserve">
+    <value>Активные соединения (Live)</value>
+  </data>
+  <data name="NetFilterAll" xml:space="preserve">
+    <value>Все</value>
+  </data>
+  <data name="NetFilterWan" xml:space="preserve">
+    <value>Интернет WAN</value>
+  </data>
+  <data name="NetFilterLan" xml:space="preserve">
+    <value>Локальные LAN</value>
+  </data>
+  <data name="NetFilterEstablished" xml:space="preserve">
+    <value>Установленные</value>
+  </data>
+  <data name="NetFilterListen" xml:space="preserve">
+    <value>Прослушиваемые</value>
+  </data>
+  <data name="NetAutoRefresh2s" xml:space="preserve">
+    <value>Автообновление (2 сек)</value>
+  </data>
+  <data name="NetBtnRefreshNow" xml:space="preserve">
+    <value>Обновить сейчас</value>
+  </data>
+  <data name="NetConnectionsSummaryFormat" xml:space="preserve">
+    <value>Соединений: {0} • WAN: {1} • Процессов: {2}</value>
+  </data>
+  <data name="NetRulesTabHeader" xml:space="preserve">
+    <value>Правила</value>
+  </data>
+  <data name="NetAttackLogTabHeader" xml:space="preserve">
+    <value>Журнал атак</value>
+  </data>
+  <data name="NetTabFirewallRules" xml:space="preserve">
+    <value>Правила брандмауэра</value>
+  </data>
+  <data name="NetRulesFilterLabel" xml:space="preserve">
+    <value>Фильтр:</value>
+  </data>
+  <data name="NetRulesFilterAll" xml:space="preserve">
+    <value>Все</value>
+  </data>
+  <data name="NetRulesFilterInbound" xml:space="preserve">
+    <value>Входящие</value>
+  </data>
+  <data name="NetRulesFilterOutbound" xml:space="preserve">
+    <value>Исходящие</value>
+  </data>
+  <data name="NetRulesFilterBlock" xml:space="preserve">
+    <value>Блокирующие</value>
+  </data>
+  <data name="NetBtnCreateRule" xml:space="preserve">
+    <value>Создать правило</value>
+  </data>
+  <data name="NetBtnEditRule" xml:space="preserve">
+    <value>Редактировать</value>
+  </data>
+  <data name="NetBtnDeleteRule" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="NetBtnExport" xml:space="preserve">
+    <value>Экспорт...</value>
+  </data>
+  <data name="NetBtnExportTip" xml:space="preserve">
+    <value>Экспорт правил в JSON-файл</value>
+  </data>
+  <data name="NetBtnImport" xml:space="preserve">
+    <value>Импорт...</value>
+  </data>
+  <data name="NetBtnImportTip" xml:space="preserve">
+    <value>Импорт правил из JSON-файла</value>
+  </data>
+  <data name="NetBtnSecurityPresets" xml:space="preserve">
+    <value>Пресеты безопасности</value>
+  </data>
+  <data name="NetPresetMaxPrivacy" xml:space="preserve">
+    <value>Максимальная приватность (Анти-телеметрия)</value>
+  </data>
+  <data name="NetPresetGaming" xml:space="preserve">
+    <value>Игровой режим (Steam, Battle.net, LAN)</value>
+  </data>
+  <data name="NetPresetPublicWifi" xml:space="preserve">
+    <value>Публичный Wi-Fi (Изоляция сети)</value>
+  </data>
+  <data name="NetPresetReset" xml:space="preserve">
+    <value>Сбросить добавленные пресеты</value>
+  </data>
+  <data name="NetBtnRefreshRules" xml:space="preserve">
+    <value>Обновить</value>
+  </data>
+  <data name="NetBtnAntiTelemetry" xml:space="preserve">
+    <value>Анти-телеметрия (1 клик)</value>
+  </data>
+  <data name="NetBtnAntiTelemetryTip" xml:space="preserve">
+    <value>Создаёт исходящие блокирующие правила для известных телеметрических адресов Microsoft</value>
+  </data>
+  <data name="NetTabPortDefender" xml:space="preserve">
+    <value>Port Defender</value>
+  </data>
+  <data name="NetTabAttackBans" xml:space="preserve">
+    <value>Журнал атак и банов</value>
+  </data>
+  <data name="NetBtnUnbanSelectedIp" xml:space="preserve">
+    <value>Разблокировать выбранный IP</value>
+  </data>
+  <data name="NetBtnResetAllBans" xml:space="preserve">
+    <value>Сбросить все баны</value>
+  </data>
+  <data name="NetNoConnectionsTitle" xml:space="preserve">
+    <value>Активных сетевых соединений не найдено</value>
+  </data>
+  <data name="NetNoConnectionsSubtitle" xml:space="preserve">
+    <value>Измените фильтр поиска или обновите список</value>
+  </data>
+  <data name="NetNoRulesTitle" xml:space="preserve">
+    <value>Правила не найдены</value>
+  </data>
+  <data name="NetNoBansTitle" xml:space="preserve">
+    <value>Активных банов нет</value>
+  </data>
+  <data name="FwRuleCreateTitle" xml:space="preserve">
+    <value>Создание правила брандмауэра</value>
+  </data>
+  <data name="FwRuleEditTitle" xml:space="preserve">
+    <value>Редактирование правила</value>
+  </data>
+  <data name="FwRuleSubtitle" xml:space="preserve">
+    <value>Правило брандмауэра Windows (INetFwRules)</value>
+  </data>
+  <data name="FwRuleNameLabel" xml:space="preserve">
+    <value>Имя правила *</value>
+  </data>
+  <data name="FwRuleDescLabel" xml:space="preserve">
+    <value>Описание</value>
+  </data>
+  <data name="FwRuleActionLabel" xml:space="preserve">
+    <value>Действие</value>
+  </data>
+  <data name="FwRuleActionAllow" xml:space="preserve">
+    <value>Разрешить подключение</value>
+  </data>
+  <data name="FwRuleActionBlock" xml:space="preserve">
+    <value>Блокировать подключение</value>
+  </data>
+  <data name="FwRuleDirectionLabel" xml:space="preserve">
+    <value>Направление</value>
+  </data>
+  <data name="FwRuleDirInbound" xml:space="preserve">
+    <value>Входящее</value>
+  </data>
+  <data name="FwRuleDirOutbound" xml:space="preserve">
+    <value>Исходящее</value>
+  </data>
+  <data name="FwRuleProtocolLabel" xml:space="preserve">
+    <value>Протокол</value>
+  </data>
+  <data name="FwRuleLocalPortsLabel" xml:space="preserve">
+    <value>Локальные порты</value>
+  </data>
+  <data name="FwRuleRemotePortsLabel" xml:space="preserve">
+    <value>Удаленные порты</value>
+  </data>
+  <data name="FwRuleRemoteIpsLabel" xml:space="preserve">
+    <value>Удаленные IP-адреса / подсети</value>
+  </data>
+  <data name="FwRuleProgramPathLabel" xml:space="preserve">
+    <value>Путь к программе</value>
+  </data>
+  <data name="FwRuleBtnBrowse" xml:space="preserve">
+    <value>Обзор...</value>
+  </data>
+  <data name="FwRuleServiceNameLabel" xml:space="preserve">
+    <value>Имя службы</value>
+  </data>
+  <data name="FwRuleProfilesLabel" xml:space="preserve">
+    <value>Профили сети</value>
+  </data>
+  <data name="FwRuleProfileDomain" xml:space="preserve">
+    <value>Доменный</value>
+  </data>
+  <data name="FwRuleProfilePrivate" xml:space="preserve">
+    <value>Частный</value>
+  </data>
+  <data name="FwRuleProfilePublic" xml:space="preserve">
+    <value>Общедоступный</value>
+  </data>
+  <data name="FwRuleEnabledCheck" xml:space="preserve">
+    <value>Правило включено</value>
+  </data>
+  <data name="FwRuleBtnSave" xml:space="preserve">
+    <value>Сохранить правило</value>
+  </data>
+  <data name="NetAlertTitle" xml:space="preserve">
+    <value>Новое сетевое подключение</value>
+  </data>
+  <data name="NetAlertBtnAllowAlways" xml:space="preserve">
+    <value>🟢 Разрешить всегда</value>
+  </data>
+  <data name="NetAlertBtnAllowSession" xml:space="preserve">
+    <value>🟡 На этот сеанс</value>
+  </data>
+  <data name="NetAlertBtnBlock" xml:space="preserve">
+    <value>🔴 Заблокировать</value>
+  </data>
+  <data name="NetAlertBtnWhitelist" xml:space="preserve">
+    <value>🛡️ Добавить программу в белый список</value>
+  </data>
+  <data name="NetAlertWhitelistTip" xml:space="preserve">
+    <value>Разрешить программе всё (добавить в белый список и создать постоянное правило)</value>
+  </data>
+<data name="NetColProcess" xml:space="preserve"><value>Процесс</value></data>
+<data name="NetColProtocol" xml:space="preserve"><value>Протокол</value></data>
+<data name="NetColLocalAddress" xml:space="preserve"><value>Локальный адрес</value></data>
+<data name="NetColRemoteAddress" xml:space="preserve"><value>Удалённый адрес</value></data>
+<data name="NetColStatus" xml:space="preserve"><value>Статус</value></data>
+<data name="NetColNetworkGeo" xml:space="preserve"><value>Сеть / Гео</value></data>
+<data name="NetColFirewall" xml:space="preserve"><value>Брандмауэр</value></data>
+<data name="NetColEnabled" xml:space="preserve"><value>Вкл</value></data>
+<data name="NetColAction" xml:space="preserve"><value>Действие</value></data>
+<data name="NetColDirection" xml:space="preserve"><value>Направление</value></data>
+<data name="NetColName" xml:space="preserve"><value>Имя</value></data>
+<data name="NetColProgram" xml:space="preserve"><value>Программа</value></data>
+<data name="NetColLocalPorts" xml:space="preserve"><value>Локальные порты</value></data>
+<data name="NetColRemoteAddresses" xml:space="preserve"><value>Удалённые адреса</value></data>
+<data name="NetColProfiles" xml:space="preserve"><value>Профили</value></data>
+<data name="NetColIp" xml:space="preserve"><value>IP</value></data>
+<data name="NetColPort" xml:space="preserve"><value>Порт</value></data>
+<data name="NetColAttempts" xml:space="preserve"><value>Попытки</value></data>
+<data name="NetColReason" xml:space="preserve"><value>Причина</value></data>
+<data name="NetColRemaining" xml:space="preserve"><value>Осталось</value></data>
+<data name="NetColRepeats" xml:space="preserve"><value>Повторы</value></data>
+<data name="NetSearchConnectionsHint" xml:space="preserve"><value>Поиск по процессу, PID, IP, порту...</value></data>
+<data name="NetSearchRulesHint" xml:space="preserve"><value>Поиск по имени, порту, IP, процессу...</value></data>
+<data name="NetCtxBlockRemoteIp" xml:space="preserve"><value>🚫 Заблокировать удалённый IP</value></data>
+<data name="NetCtxCreateRuleForProcess" xml:space="preserve"><value>🛡️ Создать правило для процесса...</value></data>
+<data name="NetCtxCopyRemoteIp" xml:space="preserve"><value>📋 Копировать удалённый IP</value></data>
+<data name="NetCtxCopyEndpoint" xml:space="preserve"><value>📋 Копировать адрес и порт</value></data>
+<data name="NetCtxWhois" xml:space="preserve"><value>🌐 Информация об IP (Whois / IPInfo)</value></data>
+<data name="NetCtxVirusTotal" xml:space="preserve"><value>🔍 Проверить IP в VirusTotal</value></data>
+<data name="NetCtxKillProcess" xml:space="preserve"><value>❌ Завершить процесс (Kill)</value></data>
+<data name="NetNoRulesSubtitle" xml:space="preserve"><value>Измените поисковый запрос или фильтр</value></data>
+<data name="NetNoBansSubtitle" xml:space="preserve"><value>Port Defender не зафиксировал атак</value></data>
+<data name="NetDefenderStateLoading" xml:space="preserve"><value>Port Defender: статус загружается...</value></data>
+<data name="NetStatusReady" xml:space="preserve"><value>Готово</value></data>
+<data name="FwRuleProtocolAny" xml:space="preserve"><value>Любой</value></data>
+<data name="FwRuleNameHint" xml:space="preserve"><value>Например: StartupMonitor — блокировка 192.168.1.0/24</value></data>
+<data name="FwRuleDescHint" xml:space="preserve"><value>Необязательный комментарий</value></data>
+<data name="FwRulePortsHint" xml:space="preserve"><value>80, 443 или 8000-8080 (только TCP/UDP)</value></data>
+<data name="FwRuleRemoteIpsHint" xml:space="preserve"><value>192.168.1.0/24 или * (пусто = любые)</value></data>
+<data name="FwRuleProgramHint" xml:space="preserve"><value>Пусто = применяется ко всей системе</value></data>
+<data name="FwRuleServiceHint" xml:space="preserve"><value>Пусто = без привязки к службе</value></data>
+<data name="FwRuleBtnCancel" xml:space="preserve"><value>Отмена</value></data>
+<data name="NetAlertCloseTip" xml:space="preserve"><value>Закрыть (разрешить на этот сеанс)</value></data>
+<data name="NetAlertAllowAlwaysTip" xml:space="preserve"><value>Создать разрешающее правило в Windows Firewall</value></data>
+<data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Временное исходящее правило до перезапуска службы, максимум на 8 часов. Блокировки Windows и других средств защиты сохраняют приоритет.</value></data>
+<data name="NetAlertBlockTip" xml:space="preserve"><value>Создать блокирующее правило в Windows Firewall</value></data>
+<data name="NetAlertCountdownHint" xml:space="preserve"><value>Автоматическое решение через 15 сек...</value></data>
+<data name="NetBansCountFormat" xml:space="preserve"><value>Активных банов: {0}</value></data>
+<data name="PortDefenderPortsHint" xml:space="preserve"><value>Например: 3389, 22, 445</value></data>
+<data name="PortDefenderWhitelistHint" xml:space="preserve"><value>Например: 192.168.1.10, 10.0.0.0/24</value></data>
+  <data name="NetKillswitchConfirmMsg" xml:space="preserve">
+    <value>Экстренный Killswitch заблокирует ВЕСЬ сетевой трафик.
+Продолжить?</value>
+  </data>
+  <data name="NetKillswitchConfirmTitle" xml:space="preserve">
+    <value>Подтверждение Killswitch</value>
+  </data>
+  <data name="NetDeleteRuleConfirmTitle" xml:space="preserve">
+    <value>Подтверждение удаления</value>
+  </data>
+  <data name="NetDeleteRuleConfirmFormat" xml:space="preserve">
+    <value>Удалить правило «{0}» ({1})?</value>
+  </data>
+  <data name="NetClearBansConfirmTitle" xml:space="preserve">
+    <value>Сброс всех банов</value>
+  </data>
+  <data name="NetClearBansConfirmFormat" xml:space="preserve">
+    <value>Снять все активные баны ({0})?</value>
+  </data>
+  <data name="NetKillProcessConfirmTitle" xml:space="preserve">
+    <value>Подтверждение завершения</value>
+  </data>
+  <data name="NetKillProcessConfirmFormat" xml:space="preserve">
+    <value>Завершить процесс «{0}» (PID {1})?</value>
+  </data>
+  <data name="NetImportConfirmTitle" xml:space="preserve">
+    <value>Подтверждение импорта</value>
+  </data>
+  <data name="NetImportConfirmFormat" xml:space="preserve">
+    <value>В файле найдено правил: {0}.
+Импортировать с перезаписью существующих правил?</value>
+  </data>
+  <data name="NetStatusExportedFormat" xml:space="preserve">
+    <value>Экспортировано {0} правил в файл {1}.</value>
+  </data>
+  <data name="NetStatusPresetAppliedFormat" xml:space="preserve">
+    <value>Пресет «{0}» применён (правил: {1}).</value>
+  </data>
+  <data name="NetPresetAppliedTitle" xml:space="preserve">
+    <value>Пресет безопасности</value>
+  </data>
+  <data name="NetImportCompletedTitle" xml:space="preserve">
+    <value>Импорт правил</value>
+  </data>
+  <data name="NetImportCompletedFormat" xml:space="preserve">
+    <value>Импорт завершён: импортировано {0}, пропущено {1}.</value>
+  </data>
+  <data name="FwPortsOnlyTcpUdpMsg" xml:space="preserve">
+    <value>Порты применимы только к протоколам TCP и UDP. Очистить поля портов и продолжить?</value>
+  </data>
+  <data name="FwPortsOnlyTcpUdpTitle" xml:space="preserve">
+    <value>Предупреждение</value>
+  </data>
+  <data name="FwSelfBlockGuardTitle" xml:space="preserve">
+    <value>Защита от самоблокировки</value>
+  </data>
+  <data name="NavToolbox" xml:space="preserve">
+    <value>Инструменты</value>
+  </data>
+  <data name="ToolboxTitle" xml:space="preserve">
+    <value>Набор повседневных инструментов</value>
+  </data>
+  <data name="ToolboxSubtitle" xml:space="preserve">
+    <value>Полезные системные утилиты: Разблокировщик файлов, Бодрствование, Очистка диска, Сканер Wi-Fi/LAN, Хеши и пароли</value>
+  </data>
+  <data name="ToolboxTabLocksmith" xml:space="preserve">
+    <value>Разблокировщик</value>
+  </data>
+  <data name="ToolboxTabAwake" xml:space="preserve">
+    <value>Бодрствование</value>
+  </data>
+  <data name="ToolboxTabCleaner" xml:space="preserve">
+    <value>Очистка диска</value>
+  </data>
+  <data name="ToolboxTabLanScanner" xml:space="preserve">
+    <value>Сканер сети</value>
+  </data>
+  <data name="ToolboxTabSecurity" xml:space="preserve">
+    <value>Хеши и пароли</value>
+  </data>
+<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Разрешить этот порт</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Разрешить сетевые подключения по данному порту и больше не показывать по нему уведомления</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Тихий режим для системных сокетов (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Подавлять всплывающие уведомления о сетевой активности сокетов ядра и завершающихся соединений</value></data><data name="NetAlertAiAnalyzing" xml:space="preserve"><value>Анализ программы нейросетью...</value></data><data name="NetAlertAiVerdictBadge" xml:space="preserve"><value>⚡ Вердикт ИИ</value></data><data name="NetAlertAiPurposeLabel" xml:space="preserve"><value>Назначение программы:</value></data><data name="NetAlertAiBlockingRiskLabel" xml:space="preserve"><value>Риски блокировки (ОС / печать / сеть):</value></data><data name="NetAlertAiRecommendationLabel" xml:space="preserve"><value>Рекомендация ИИ:</value></data><data name="NetAlertCountdownPaused" xml:space="preserve"><value>Обратный отсчёт приостановлен (курсор мыши)</value></data><data name="NetAlertProcessUnknown" xml:space="preserve"><value>Неизвестный процесс</value></data><data name="NetAlertPathUnknown" xml:space="preserve"><value>Путь неизвестен</value></data><data name="NetAlertInternet" xml:space="preserve"><value>Интернет</value></data><data name="NetAlertProtocolDefault" xml:space="preserve"><value>TCP</value></data><data name="NetAlertCountdownFormat" xml:space="preserve"><value>Автоматическое решение через {0} сек...</value></data><data name="NetAlertAiPurposeFallback" xml:space="preserve"><value>Назначение не определено.</value></data><data name="NetAlertAiRiskFallback" xml:space="preserve"><value>Особых рисков для критических служб не выявлено.</value></data><data name="NetAlertAiRecommendationFallback" xml:space="preserve"><value>Решение на усмотрение пользователя.</value></data>
+  <data name="NetAlertAiActionAllowAlways" xml:space="preserve"><value>Всегда разрешать</value></data>
+  <data name="NetAlertAiActionAllowSession" xml:space="preserve"><value>Разрешить на сессию</value></data>
+  <data name="NetAlertAiActionBlockAlways" xml:space="preserve"><value>Всегда блокировать</value></data>
+  <data name="NetAlertAiActionBlockSession" xml:space="preserve"><value>Заблокировать на сессию</value></data>
+  <data name="NetAlertAiRecommendedActionFormat" xml:space="preserve"><value>Рекомендация: {0}</value></data>
+  <data name="NetAlertAiUnavailable" xml:space="preserve"><value>Анализ нейросетью недоступен (проверьте настройки AI в параметрах).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Стандартное сетевое подключение приложения.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Применяйте стандартные правила брандмауэра.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Блок на сеанс</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Блокировать исходящие подключения программы до перезапуска службы, максимум на 8 часов. Постоянное правило не создаётся.</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Рекомендация: Разрешить всегда</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Рекомендация: Разрешить на сеанс</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Рекомендация: Заблокировать всегда</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Рекомендация: Заблокировать на сеанс</value></data>  <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
+  <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Автономные решения ИИ:</value></data>
+  <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Автономные решения ИИ для сетевых подключений</value></data>
+  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>Автоматически анализировать новые исходящие подключения нейросетью и применять решение без показа всплывающего окна</value></data>
+  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>Действие ИИ по умолчанию:</value></data>
+  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>Действие, автоматически применяемое для соединений при автономном режиме работы ИИ</value></data>
+  <data name="NetTabAclMatrix" xml:space="preserve"><value>Контроль приложений (ACL)</value></data>
+  <data name="NetTabAclMatrixTip" xml:space="preserve"><value>Единая матрица контроля доступа к сети, белые и чёрные списки</value></data>
+  <data name="NetAclFilterAll" xml:space="preserve"><value>Все программы</value></data>
+  <data name="NetAclFilterAllow" xml:space="preserve"><value>🟢 Разрешено</value></data>
+  <data name="NetAclFilterPrompt" xml:space="preserve"><value>🟡 По запросу</value></data>
+  <data name="NetAclFilterBlock" xml:space="preserve"><value>🔴 Заблокировано</value></data>
+  <data name="NetAclFilterSystem" xml:space="preserve"><value>🛡️ Системные Windows</value></data>
+  <data name="NetAclFilterSession" xml:space="preserve"><value>⏱️ Сессионные</value></data>
+  <data name="NetAclSearchPlaceholder" xml:space="preserve"><value>Поиск процесса или пути...</value></data>
+  <data name="NetAclBtnAddExe" xml:space="preserve"><value>➕ Добавить EXE...</value></data>
+  <data name="NetAclRefreshTip" xml:space="preserve"><value>Обновить матрицу доступа</value></data>
+  <data name="NetAclColApp" xml:space="preserve"><value>Приложение</value></data>
+  <data name="NetAclColPolicy" xml:space="preserve"><value>Политика доступа</value></data>
+  <data name="NetAclColDuration" xml:space="preserve"><value>Срок действия</value></data>
+  <data name="NetAclColSource" xml:space="preserve"><value>Источник правила</value></data>
+  <data name="NetAclColSockets" xml:space="preserve"><value>Сокеты</value></data>
+  <data name="NetAclColActions" xml:space="preserve"><value>Действия</value></data>
+  <data name="NetAclRowWhitelistTip" xml:space="preserve"><value>Разрешить (в белый список)</value></data>
+  <data name="NetAclRowBlacklistTip" xml:space="preserve"><value>Заблокировать (в чёрный список)</value></data>
+  <data name="NetAclRowKillProcessTip" xml:space="preserve"><value>Завершить процесс</value></data>
+  <data name="NetAclEmptyText" xml:space="preserve"><value>В матрице доступа нет приложений по выбранному фильтру.</value></data>
+  <data name="TimelineTitle" xml:space="preserve"><value>Трафик сетевых интерфейсов</value></data>
+  <data name="TimelineNoMeasurements" xml:space="preserve"><value>В этом интервале нет измерений</value></data>
+  <data name="TimelineTooltipFormat" xml:space="preserve"><value>{0} • ↓ {1} • ↑ {2}{3}</value></data>
+  <data name="TimelineBlockedFormat" xml:space="preserve"><value> | Блокировок: {0}</value></data>
+  <data name="TimelineSliceFormat" xml:space="preserve"><value>• Срез: {0:HH:mm:ss}</value></data>
+  <data name="TimelineHour" xml:space="preserve"><value>1 час</value></data>
+  <data name="TimelineDay" xml:space="preserve"><value>24 часа</value></data>
+  <data name="TimelineWeek" xml:space="preserve"><value>7 дней</value></data>
+  <data name="TimelineReset" xml:space="preserve"><value>↩ Сброс среза</value></data>
+  <data name="TimelineResetTip" xml:space="preserve"><value>Вернуться ко всем текущим соединениям</value></data>
+  <data name="UnitBytesPerSecond" xml:space="preserve"><value>Б/с</value></data>
+  <data name="UnitKilobytesPerSecond" xml:space="preserve"><value>КБ/с</value></data>
+  <data name="UnitMegabytesPerSecond" xml:space="preserve"><value>МБ/с</value></data>
+  <data name="UnitGigabytes" xml:space="preserve"><value>ГБ</value></data>
+  <data name="NetConnectionHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
+  <data name="NetUxTitle" xml:space="preserve"><value>Сетевой экран</value></data>
+  <data name="NetUxSettings" xml:space="preserve"><value>Параметры защиты</value></data>
+  <data name="NetUxModeHint" xml:space="preserve"><value>Режим применяется ко всей системе. Для отдельной программы используйте вкладку «Приложения».</value></data>
+  <data name="NetUxNormalTip" xml:space="preserve"><value>Работают обычные правила брандмауэра Windows.</value></data>
+  <data name="NetUxWhitelistTip" xml:space="preserve"><value>Разрешены только программы с разрешающими правилами. Остальные подключения блокируются.</value></data>
+  <data name="NetUxKillswitchTip" xml:space="preserve"><value>Экстренно блокирует сетевой доступ. Потребуется подтверждение.</value></data>
+  <data name="NetUxNavApps" xml:space="preserve"><value>Приложения</value></data>
+  <data name="NetUxNavConnections" xml:space="preserve"><value>Соединения</value></data>
+  <data name="NetUxNavPorts" xml:space="preserve"><value>Защита портов</value></data>
+  <data name="NetUxNavBans" xml:space="preserve"><value>Блокировки</value></data>
+  <data name="NetUxNavHistory" xml:space="preserve"><value>История</value></data>
+  <data name="NetUxNavRules" xml:space="preserve"><value>Правила</value></data>
+  <data name="NetUxAppsTitle" xml:space="preserve"><value>Контроль приложений</value></data>
+  <data name="NetUxAppsHelp" xml:space="preserve"><value>Управляйте доступом программ к сети. Выбор политики сохраняется после подтверждения службы.</value></data>
+  <data name="NetUxConnectionsTitle" xml:space="preserve"><value>Что происходит в сети</value></data>
+  <data name="NetUxConnectionsHelp" xml:space="preserve"><value>Активные подключения и измеренный трафик. Поиск и фильтры помогут найти нужный процесс или адрес.</value></data>
+  <data name="NetUxPortsTitle" xml:space="preserve"><value>Защита открытых портов</value></data>
+  <data name="NetUxPortsHelp" xml:space="preserve"><value>Выберите порты и условия обнаружения подозрительных входящих подключений.</value></data>
+  <data name="NetUxBansTitle" xml:space="preserve"><value>Заблокированные адреса</value></data>
+  <data name="NetUxBansHelp" xml:space="preserve"><value>Проверьте причину и срок блокировки. Снятие блокировки снова разрешит подключения с этого адреса.</value></data>
+  <data name="NetUxHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
+  <data name="NetUxHistoryHelp" xml:space="preserve"><value>Найдите приложение, адрес и принятое решение. Фильтры журнала не меняют правила защиты.</value></data>
+  <data name="NetUxRulesTitle" xml:space="preserve"><value>Правила брандмауэра</value></data>
+  <data name="NetUxRulesHelp" xml:space="preserve"><value>Подробные настройки Windows Firewall. Резервные копии и готовые наборы доступны в дополнительных действиях.</value></data>
+  <data name="NetUxPolicyAllowed" xml:space="preserve"><value>Разрешено</value></data>
+  <data name="NetUxPolicyPrompt" xml:space="preserve"><value>Спрашивать</value></data>
+  <data name="NetUxPolicyBlocked" xml:space="preserve"><value>Не разрешено</value></data>
+  <data name="NetUxPolicyHelp" xml:space="preserve"><value>Выберите полный вариант в списке: разрешать, спрашивать или блокировать. Критические компоненты Windows защищены от блокировки.</value></data>
+  <data name="NetUxAddApp" xml:space="preserve"><value>Добавить приложение</value></data>
+  <data name="NetUxInspectRules" xml:space="preserve"><value>Открыть правила приложения</value></data>
+  <data name="NetUxResetPolicy" xml:space="preserve"><value>Вернуть режим «Спрашивать»</value></data>
+  <data name="NetUxAdvancedActions" xml:space="preserve"><value>Дополнительные действия</value></data>
+  <data name="NetUxPolicyApplying" xml:space="preserve"><value>Сохранение политики для {0}…</value></data>
+  <data name="NetUxPolicySaved" xml:space="preserve"><value>Политика для {0} сохранена.</value></data>
+  <data name="NetUxPolicyFailed" xml:space="preserve"><value>Не удалось сохранить политику. Предыдущее значение сохранено.</value></data>
+  <data name="NetUxPolicyError" xml:space="preserve"><value>Ошибка изменения политики: {0}</value></data>
+  <data name="NetUxHistoryVerdict" xml:space="preserve"><value>Решение</value></data>
+  <data name="NetUxHistoryPeriod" xml:space="preserve"><value>Период</value></data>
+  <data name="NavGroupAnalysis" xml:space="preserve"><value>Анализ</value></data>
+  <data name="NavGroupMaintenance" xml:space="preserve"><value>Управление</value></data>
+  <data name="NavTip0" xml:space="preserve"><value>Программы, запускаемые вместе с Windows.</value></data>
+  <data name="NavTip6" xml:space="preserve"><value>Работающие процессы и их потребление ресурсов.</value></data>
+  <data name="NavTip8" xml:space="preserve"><value>Доступ приложений к сети и правила сетевой защиты.</value></data>
+  <data name="NavTip7" xml:space="preserve"><value>Время загрузки Windows и причины замедления.</value></data>
+  <data name="NavTipSnapshots" xml:space="preserve"><value>Сохранённые состояния автозапуска и сравнение изменений.</value></data>
+  <data name="NavTip4" xml:space="preserve"><value>История изменений записей автозапуска.</value></data>
+  <data name="NavTip1" xml:space="preserve"><value>Правила блокировки нежелательного автозапуска.</value></data>
+  <data name="NavTip3" xml:space="preserve"><value>Удалённые записи автозапуска.</value></data>
+  <data name="NavTip5" xml:space="preserve"><value>События мониторинга и диагностика приложения.</value></data>
+
+  <!-- Локализованные подписи истории подключений и управления Port Defender. -->
+  <data name="DefenderCriticalTip" xml:space="preserve"><value>Критический системный компонент ядра ОС. Блокировка запрещена.</value></data>
+  <data name="DefenderHighRiskTip" xml:space="preserve"><value>Системный компонент Windows. Блокировка требует подтверждения.</value></data>
+  <data name="DefenderPortsEmpty" xml:space="preserve"><value>0 портов</value></data>
+  <data name="DefenderAddPort" xml:space="preserve"><value>Добавить порт</value></data>
+  <data name="DefenderEdit" xml:space="preserve"><value>Редактировать</value></data>
+  <data name="DefenderDelete" xml:space="preserve"><value>Удалить</value></data>
+  <data name="DefenderPortColumn" xml:space="preserve"><value>Порт</value></data>
+  <data name="DefenderServiceColumn" xml:space="preserve"><value>Служба</value></data>
+  <data name="DefenderRiskColumn" xml:space="preserve"><value>Уровень риска</value></data>
+  <data name="DefenderDescriptionColumn" xml:space="preserve"><value>Описание защиты</value></data>
+  <data name="DefenderActionsColumn" xml:space="preserve"><value>Действия</value></data>
+  <data name="DefenderEditPortTip" xml:space="preserve"><value>Редактировать порт</value></data>
+  <data name="DefenderDeletePortTip" xml:space="preserve"><value>Удалить порт</value></data>
+  <data name="DefenderRemoveProtectionTip" xml:space="preserve"><value>Удалить порт из защиты</value></data>
+  <data name="DefenderLiveHint" xml:space="preserve"><value>💡 Изменения защищаемых портов применяются на лету без перезапуска службы.</value></data>
+  <data name="DefenderActivePorts" xml:space="preserve"><value>Активные порты: </value></data>
+  <data name="DefenderEditHint" xml:space="preserve"><value>💡 Двойной щелчок по строке для редактирования. Клавиша Delete удаляет выбранный порт.</value></data>
+  <data name="NetHistoryTitle" xml:space="preserve"><value>История подключений</value></data>
+  <data name="NetHistorySearch" xml:space="preserve"><value>Поиск по имени процесса, PID, IP или порту...</value></data>
+  <data name="NetHistoryAllVerdicts" xml:space="preserve"><value>Все вердикты</value></data>
+  <data name="NetHistoryPending" xml:space="preserve"><value>Ожидает алерта</value></data>
+  <data name="NetHistoryAllowed" xml:space="preserve"><value>Разрешено</value></data>
+  <data name="NetHistoryBlocked" xml:space="preserve"><value>Заблокировано</value></data>
+  <data name="NetHistoryWhitelist" xml:space="preserve"><value>Белый список</value></data>
+  <data name="NetHistoryBlacklist" xml:space="preserve"><value>Чёрный список</value></data>
+  <data name="NetHistoryRuleCreated" xml:space="preserve"><value>Создано правило</value></data>
+  <data name="NetHistoryAllTime" xml:space="preserve"><value>Все время</value></data>
+  <data name="NetHistoryLastHour" xml:space="preserve"><value>Последний час</value></data>
+  <data name="NetHistoryToday" xml:space="preserve"><value>Сегодня</value></data>
+  <data name="NetHistoryLastDay" xml:space="preserve"><value>Последние 24 ч</value></data>
+  <data name="NetHistoryAll" xml:space="preserve"><value>Все</value></data>
+  <data name="NetHistoryRefresh" xml:space="preserve"><value>Обновить</value></data>
+  <data name="NetHistoryRefreshTip" xml:space="preserve"><value>Обновить список истории</value></data>
+  <data name="NetHistoryClear" xml:space="preserve"><value>Очистить</value></data>
+  <data name="NetHistoryClearTip" xml:space="preserve"><value>Очистить весь журнал истории</value></data>
+  <data name="NetHistoryTimeColumn" xml:space="preserve"><value>Время</value></data>
+  <data name="NetHistoryProcessColumn" xml:space="preserve"><value>Процесс</value></data>
+  <data name="NetHistoryProtocolColumn" xml:space="preserve"><value>Протокол</value></data>
+  <data name="NetHistoryAddressColumn" xml:space="preserve"><value>Удалённый адрес / Порт</value></data>
+  <data name="NetHistoryCountryColumn" xml:space="preserve"><value>Страна</value></data>
+  <data name="NetHistoryVerdictColumn" xml:space="preserve"><value>Вердикт</value></data>
+  <data name="NetHistoryDetailsColumn" xml:space="preserve"><value>Детали</value></data>
+  <data name="NetHistoryAllow" xml:space="preserve"><value>Разрешить в брандмауэре</value></data>
+  <data name="NetHistoryAllowTip" xml:space="preserve"><value>Создать разрешающее исходящее правило Windows Firewall</value></data>
+  <data name="NetHistoryBlock" xml:space="preserve"><value>Заблокировать в брандмауэре</value></data>
+  <data name="NetHistoryBlockTip" xml:space="preserve"><value>Создать блокирующее исходящее правило Windows Firewall</value></data>
+  <data name="NetHistoryAddWhitelist" xml:space="preserve"><value>В белый список</value></data>
+  <data name="NetHistoryAddWhitelistTip" xml:space="preserve"><value>Добавить программу в постоянный белый список</value></data>
+  <data name="NetHistoryAddBlacklist" xml:space="preserve"><value>В чёрный список</value></data>
+  <data name="NetHistoryAddBlacklistTip" xml:space="preserve"><value>Добавить программу в постоянный чёрный список</value></data>
+  <data name="NetHistoryOpenFolder" xml:space="preserve"><value>Папка файла</value></data>
+  <data name="NetHistoryOpenFolderTip" xml:space="preserve"><value>Открыть папку с исполняемым файлом</value></data>
+  <data name="NetHistoryCopyIp" xml:space="preserve"><value>Копировать IP</value></data>
+  <data name="NetHistoryCopyIpTip" xml:space="preserve"><value>Скопировать удалённый IP-адрес в буфер обмена</value></data>
+  <data name="DefenderPortEditTitle" xml:space="preserve"><value>Настройка защищаемого порта</value></data>
+  <data name="DefenderPortHeader" xml:space="preserve"><value>Защищаемый порт</value></data>
+  <data name="DefenderPortRangeHint" xml:space="preserve"><value>Укажите номер порта TCP в диапазоне 1..65535</value></data>
+  <data name="DefenderPresetLabel" xml:space="preserve"><value>Популярный шаблон (быстрый выбор):</value></data>
+  <data name="DefenderNumberLabel" xml:space="preserve"><value>Номер TCP-порта (1..65535):</value></data>
+  <data name="DefenderNumberPlaceholder" xml:space="preserve"><value>Например: 3389, 22, 445</value></data>
+  <data name="DefenderPreviewService" xml:space="preserve"><value>Служба: RDP</value></data>
+  <data name="DefenderRiskCritical" xml:space="preserve"><value>Критический</value></data>
+  <data name="DefenderPreviewRdp" xml:space="preserve"><value>Удалённый рабочий стол Windows</value></data>
+  <data name="DefenderCancel" xml:space="preserve"><value>Отмена</value></data>
+  <data name="DefenderSave" xml:space="preserve"><value>Сохранить</value></data>
+  <data name="DefenderRiskHigh" xml:space="preserve"><value>Высокий</value></data>
+  <data name="DefenderRiskMedium" xml:space="preserve"><value>Средний</value></data>
+  <data name="DefenderRiskLow" xml:space="preserve"><value>Инфо</value></data>
+  <data name="DefenderRiskCustom" xml:space="preserve"><value>Пользовательский</value></data>
+  <data name="DefenderAddTitle" xml:space="preserve"><value>Добавление защищаемого порта</value></data>
+  <data name="DefenderEditTitle" xml:space="preserve"><value>Редактирование защищаемого порта</value></data>
+  <data name="DefenderApply" xml:space="preserve"><value>Применить</value></data>
+  <data name="DefenderAdd" xml:space="preserve"><value>Добавить</value></data>
+  <data name="DefenderChoosePreset" xml:space="preserve"><value>— Выберите шаблон из каталога —</value></data>
+  <data name="DefenderServiceFormat" xml:space="preserve"><value>Служба: {0}</value></data>
+  <data name="DefenderUnknown" xml:space="preserve"><value>Неизвестно</value></data>
+  <data name="DefenderPortRequired" xml:space="preserve"><value>Укажите номер порта для защиты.</value></data>
+  <data name="DefenderPortInteger" xml:space="preserve"><value>Номер порта должен быть целым числом.</value></data>
+  <data name="DefenderPortRangeError" xml:space="preserve"><value>Номер порта должен находиться в диапазоне от 1 до 65535.</value></data>
+  <data name="DefenderDuplicatePortFormat" xml:space="preserve"><value>Порт {0} уже присутствует в списке отслеживания.</value></data>
+  <data name="DefenderSystemPort" xml:space="preserve"><value>Системный порт</value></data>
+  <data name="DefenderCustomPort" xml:space="preserve"><value>Пользовательский порт</value></data>
+  <data name="DefenderSystemPortFormat" xml:space="preserve"><value>Системный привилегированный порт TCP {0}</value></data>
+  <data name="DefenderCustomPortFormat" xml:space="preserve"><value>Пользовательский отслеживаемый TCP порт {0}</value></data>
+  <data name="DefenderPortsCountFormat" xml:space="preserve"><value>Портов: {0}</value></data>
+  <data name="DefenderNoPorts" xml:space="preserve"><value>Нет защищаемых портов</value></data>
+  <data name="DefenderConfigLoading" xml:space="preserve"><value>Загрузка конфигурации Port Defender...</value></data>
+  <data name="DefenderInitialAddedFormat" xml:space="preserve"><value>Порт {0} успешно добавлен в список для настройки.</value></data>
+  <data name="DefenderConfigLoaded" xml:space="preserve"><value>Конфигурация успешно загружена.</value></data>
+  <data name="DefenderConfigLoadErrorFormat" xml:space="preserve"><value>Не удалось загрузить конфигурацию: {0}</value></data>
+  <data name="DefenderListAddedFormat" xml:space="preserve"><value>Порт #{0} ({1}) добавлен в список отслеживания.</value></data>
+  <data name="DefenderSelectEdit" xml:space="preserve"><value>Выберите порт в таблице для редактирования.</value></data>
+  <data name="DefenderListMovedFormat" xml:space="preserve"><value>Порт #{0} изменён на #{1} ({2}).</value></data>
+  <data name="DefenderSelectDelete" xml:space="preserve"><value>Выберите порт в таблице для удаления.</value></data>
+  <data name="DefenderListRemovedFormat" xml:space="preserve"><value>Порт #{0} ({1}) удалён из списка отслеживаемых.</value></data>
+  <data name="DefenderConfigSaving" xml:space="preserve"><value>Синхронизация конфигурации со службой...</value></data>
+  <data name="DefenderConfigSaved" xml:space="preserve"><value>Конфигурация Port Defender успешно синхронизирована.</value></data>
+  <data name="DefenderConfigSaveFailedFormat" xml:space="preserve"><value>Служба не подтвердила сохранение конфигурации: {0}</value></data>
+  <data name="DefenderConfigSaveErrorFormat" xml:space="preserve"><value>Ошибка сохранения конфигурации: {0}</value></data>
+  <data name="DefenderConfigUnavailable" xml:space="preserve"><value>Не удалось получить актуальную конфигурацию Port Defender.</value></data>
+  <data name="DefenderPortAddErrorFormat" xml:space="preserve"><value>Ошибка добавления порта: {0}</value></data>
+  <data name="DefenderPortEditErrorFormat" xml:space="preserve"><value>Ошибка редактирования порта: {0}</value></data>
+  <data name="DefenderPortDeleteErrorFormat" xml:space="preserve"><value>Ошибка при удалении порта: {0}</value></data>
+  <data name="DefenderPortsSaveFailedFormat" xml:space="preserve"><value>Служба не подтвердила сохранение обновлённых портов: {0}</value></data>
+  <data name="DefenderPortAddedFormat" xml:space="preserve"><value>Порт #{0} успешно добавлен в мониторинг Port Defender.</value></data>
+  <data name="DefenderPortMovedFormat" xml:space="preserve"><value>Порт #{0} успешно заменён на #{1} в Port Defender.</value></data>
+  <data name="DefenderPortRemovedFormat" xml:space="preserve"><value>Порт #{0} ({1}) удалён из мониторинга Port Defender.</value></data>
+  <data name="DefenderPortRemoveFailedFormat" xml:space="preserve"><value>Служба не подтвердила удаление порта #{0}: {1}</value></data>
+  <data name="NetHistoryLoading" xml:space="preserve"><value>Загрузка истории сетевых подключений...</value></data>
+  <data name="NetHistoryLoadErrorFormat" xml:space="preserve"><value>Ошибка загрузки: {0}</value></data>
+  <data name="NetHistoryCountFormat" xml:space="preserve"><value>Отображено записей: {0} из {1}</value></data>
+  <data name="NetHistoryClearConfirm" xml:space="preserve"><value>Очистить всю историю сетевых подключений?</value></data>
+  <data name="NetHistoryClearTitle" xml:space="preserve"><value>Подтверждение очистки</value></data>
+  <data name="NetHistoryClearErrorFormat" xml:space="preserve"><value>Ошибка очистки истории: {0}</value></data>
+  <data name="NetHistoryAllowCreatedFormat" xml:space="preserve"><value>Создано разрешающее правило для программы {0}.</value></data>
+  <data name="NetHistoryBlockCreatedFormat" xml:space="preserve"><value>Создано блокирующее правило для программы {0}.</value></data>
+  <data name="NetHistoryRuleErrorFormat" xml:space="preserve"><value>Ошибка создания правила: {0}</value></data>
+  <data name="NetHistoryWhitelistedFormat" xml:space="preserve"><value>Программа «{0}» добавлена в белый список.</value></data>
+  <data name="NetHistoryBlacklistedFormat" xml:space="preserve"><value>Программа «{0}» добавлена в чёрный список.</value></data>
+  <data name="NetHistoryWhitelistErrorFormat" xml:space="preserve"><value>Ошибка белого списка: {0}</value></data>
+  <data name="NetHistoryBlacklistErrorFormat" xml:space="preserve"><value>Ошибка чёрного списка: {0}</value></data>
+  <data name="DefenderPortDescription21" xml:space="preserve"><value>Передача файлов (незащищённый протокол)</value></data>
+  <data name="DefenderPortDescription22" xml:space="preserve"><value>Защищённая удалённая оболочка Secure Shell</value></data>
+  <data name="DefenderPortDescription23" xml:space="preserve"><value>Незащищённая консоль удалённого доступа</value></data>
+  <data name="DefenderPortDescription25" xml:space="preserve"><value>Простой протокол передачи почты</value></data>
+  <data name="DefenderPortDescription53" xml:space="preserve"><value>Служба доменных имён</value></data>
+  <data name="DefenderPortDescription80" xml:space="preserve"><value>Веб-сервер без шифрования</value></data>
+  <data name="DefenderPortDescription110" xml:space="preserve"><value>Получение почтовых сообщений</value></data>
+  <data name="DefenderPortDescription135" xml:space="preserve"><value>Удалённый вызов процедур Microsoft Windows</value></data>
+  <data name="DefenderPortDescription139" xml:space="preserve"><value>Служба сеансов NetBIOS Windows</value></data>
+  <data name="DefenderPortDescription143" xml:space="preserve"><value>Протокол доступа к электронной почте</value></data>
+  <data name="DefenderPortDescription443" xml:space="preserve"><value>Защищённый веб-трафик (TLS/SSL)</value></data>
+  <data name="DefenderPortDescription445" xml:space="preserve"><value>Общий доступ к файлам и принтерам Windows</value></data>
+  <data name="DefenderPortDescription993" xml:space="preserve"><value>Защищённый доступ к почте IMAP over TLS</value></data>
+  <data name="DefenderPortDescription995" xml:space="preserve"><value>Защищённый доступ к почте POP3 over TLS</value></data>
+  <data name="DefenderPortDescription1433" xml:space="preserve"><value>DefenderPortDescription1433</value></data>
+  <data name="DefenderPortDescription1521" xml:space="preserve"><value>DefenderPortDescription1521</value></data>
+  <data name="DefenderPortDescription3306" xml:space="preserve"><value>Сервер баз данных MySQL / MariaDB</value></data>
+  <data name="DefenderPortDescription3389" xml:space="preserve"><value>Удалённый рабочий стол Microsoft Windows</value></data>
+  <data name="DefenderPortDescription5432" xml:space="preserve"><value>Сервер реляционной СУБД PostgreSQL</value></data>
+  <data name="DefenderPortDescription5900" xml:space="preserve"><value>Удалённое графическое управление экраном</value></data>
+  <data name="DefenderPortDescription6379" xml:space="preserve"><value>Сетевое хранилище данных в памяти Redis</value></data>
+  <data name="DefenderPortDescription8080" xml:space="preserve"><value>Альтернативный веб-порт / Прокси-сервер</value></data>
+  <data name="DefenderPortDescription8443" xml:space="preserve"><value>Альтернативный защищённый веб-порт</value></data>
+  <data name="DefenderPortDescription27017" xml:space="preserve"><value>Документоориентированная СУБД MongoDB</value></data>
+  <data name="NetHistoryAllowedSession" xml:space="preserve"><value>Разрешено на сессию</value></data>
+  <data name="NetHistoryBlockedSession" xml:space="preserve"><value>Заблокировано на сессию</value></data>
+  <data name="DefenderStateError" xml:space="preserve"><value>Port Defender: ошибка</value></data>
+  <data name="DefenderStateMissing" xml:space="preserve"><value>Port Defender: нет данных</value></data>
+  <data name="DefenderStateActive" xml:space="preserve"><value>Port Defender: защита активна</value></data>
+  <data name="DefenderStateInactive" xml:space="preserve"><value>Port Defender: защита выключена</value></data>
+  <data name="DefenderServiceUnavailable" xml:space="preserve"><value>Служба недоступна.</value></data>
+  <data name="DefenderSummaryFormat" xml:space="preserve"><value>Порог: {0} попыток / {1} с • Бан: {2} • Доверять локальным сетям: {3}</value></data>
+  <data name="DefenderYes" xml:space="preserve"><value>да</value></data>
+  <data name="DefenderNo" xml:space="preserve"><value>нет</value></data>
+  <data name="DefenderDaysFormat" xml:space="preserve"><value>{0} дн.</value></data>
+  <data name="DefenderMinutesFormat" xml:space="preserve"><value>{0} мин.</value></data>
+  <data name="DefenderOpenErrorFormat" xml:space="preserve"><value>Не удалось открыть настройку Port Defender: {0}</value></data>
+  <data name="DefenderSummaryRefreshed" xml:space="preserve"><value>Сводка Port Defender обновлена.</value></data>
+  <data name="DefenderRefreshErrorFormat" xml:space="preserve"><value>Ошибка обновления Port Defender: {0}</value></data>
+  <data name="NetAlertApplying" xml:space="preserve"><value>Применяется выбранное решение…</value></data>
+  <data name="NetAlertApplyFailed" xml:space="preserve"><value>Служба не подтвердила применение решения. Проверьте службу и повторите выбор.</value></data>
+  <data name="NetAlertSessionAllowUnavailable" xml:space="preserve"><value>Для временного разрешения нужен путь программы и обычный режим фильтрации. В режиме белого списка или полного запрета используйте постоянное правило либо измените режим.</value></data>
+  <data name="NetAlertPathRequired" xml:space="preserve"><value>Путь программы недоступен. Безопасно применить правило к приложению нельзя; можно разрешить показанный удалённый порт.</value></data>
+</root>

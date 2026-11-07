@@ -1,0 +1,179 @@
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using StartupMonitor.Shared.Models;
+using StartupMonitor.UI.Services;
+using Wpf.Ui.Controls;
+
+namespace StartupMonitor.UI.Views.Dialogs;
+
+public partial class UpdateAvailableWindow : FluentWindow
+{
+    private readonly UpdateInfo _updateInfo;
+    private readonly PipeClient _pipeClient;
+    private readonly Action<string>? _onVersionSkipped;
+    private bool _isReadyToInstall;
+
+    public UpdateAvailableWindow(UpdateInfo updateInfo, PipeClient pipeClient, Action<string>? onVersionSkipped = null)
+    {
+        InitializeComponent();
+        _updateInfo = updateInfo;
+        _pipeClient = pipeClient;
+        _onVersionSkipped = onVersionSkipped;
+
+        PopulateData();
+
+        _pipeClient.UpdateProgressReceived += OnUpdateProgressReceived;
+        Closed += (_, _) => _pipeClient.UpdateProgressReceived -= OnUpdateProgressReceived;
+    }
+
+    private void PopulateData()
+    {
+        var versionText = $"Startup Monitor v{_updateInfo.Version}";
+        if (_updateInfo.IsNewerByDate)
+        {
+            versionText += " (Обновлённый билд)";
+        }
+        TxtNewVersion.Text = versionText;
+
+        var effectiveDate = _updateInfo.InstallerDate ?? _updateInfo.ReleaseDate;
+        var dateStr = effectiveDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+        var currentVer = string.IsNullOrEmpty(_updateInfo.CurrentVersion) ? "1.4.0" : _updateInfo.CurrentVersion;
+
+        if (_updateInfo.IsNewerByDate)
+        {
+            TxtSubtitle.Text = $"Инсталлятор обновлен: {dateStr} • Текущая версия: v{currentVer}";
+        }
+        else
+        {
+            TxtSubtitle.Text = $"Опубликовано: {dateStr} • Текущая версия: v{currentVer}";
+        }
+
+        TxtChangelog.Text = string.IsNullOrWhiteSpace(_updateInfo.Changelog)
+            ? "Информация об изменениях не предоставлена автором релиза."
+            : _updateInfo.Changelog;
+    }
+
+    private void OnUpdateProgressReceived(object? sender, UpdateProgressInfo progress)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            DownloadProgressPanel.Visibility = Visibility.Visible;
+            ProgressBarDownload.Value = progress.Percent;
+            TxtProgressPercent.Text = $"{progress.Percent}%";
+
+            if (progress.Status == "Downloading")
+            {
+                var dlMb = (progress.BytesDownloaded / 1048576.0).ToString("0.0");
+                var totMb = (progress.TotalBytes / 1048576.0).ToString("0.0");
+                var speedMb = (progress.SpeedBytesPerSec / 1048576.0).ToString("0.0");
+                TxtProgressStatus.Text = $"Загрузка: {dlMb} МБ из {totMb} МБ ({speedMb} МБ/с)...";
+            }
+            else if (progress.Status == "Verifying")
+            {
+                TxtProgressStatus.Text = "Проверка контрольной суммы SHA-256...";
+            }
+            else if (progress.Status == "Ready")
+            {
+                _isReadyToInstall = true;
+                TxtProgressStatus.Text = "Обновление готово к установке!";
+                BtnUpdateAction.IsEnabled = true;
+                BtnUpdateAction.Content = LocalizationService.Instance.InstallAndRestartButton;
+            }
+            else if (progress.Status == "Failed")
+            {
+                TxtProgressStatus.Text = $"Ошибка: {progress.ErrorMessage ?? "Не удалось скачать обновление."}";
+                BtnUpdateAction.IsEnabled = true;
+                BtnUpdateAction.Content = LocalizationService.Instance.UpdateNowButton;
+            }
+        });
+    }
+
+    private async void OnUpdateActionClick(object sender, RoutedEventArgs e)
+    {
+        if (_isReadyToInstall)
+        {
+            BtnUpdateAction.IsEnabled = false;
+            var (ok, msg) = await _pipeClient.InstallUpdateAsync();
+            if (!ok)
+            {
+                System.Windows.MessageBox.Show(this, msg, "Startup Monitor", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                BtnUpdateAction.IsEnabled = true;
+                return;
+            }
+
+            // Запускаем watchdog в интерактивной сессии пользователя:
+            // ждём завершения инсталлятора StartupMonitorSetup и перезапускаем UI
+            try
+            {
+                var uiExe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "StartupMonitor.UI.exe");
+                // Создаем надежный временный .cmd скрипт-сторож в сессии пользователя.
+                // ВАЖНО: В командной строке 'cmd /c' переходы 'goto' не поддерживаются и ведут к вылету процесса.
+                var watchdogScript = Path.Combine(Path.GetTempPath(), $"StartupMonitor_UI_Watchdog_{Environment.TickCount}.cmd");
+                var batchContent =
+                    "@echo off\r\n" +
+                    "rem Сторожевой скрипт для ожидания завершения обновления и перезапуска StartupMonitor.UI\r\n" +
+                    "setlocal\r\n" +
+                    "for /l %%i in (1,1,60) do (\r\n" +
+                    "    tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && goto found\r\n" +
+                    "    timeout /t 1 /nobreak >nul\r\n" +
+                    ")\r\n" +
+                    "goto launch\r\n" +
+                    ":found\r\n" +
+                    ":loop\r\n" +
+                    "tasklist /fi \"imagename eq StartupMonitorSetup*\" | find /i \"StartupMonitorSetup\" >nul && (\r\n" +
+                    "    timeout /t 2 /nobreak >nul\r\n" +
+                    "    goto loop\r\n" +
+                    ")\r\n" +
+                    "timeout /t 3 /nobreak >nul\r\n" +
+                    ":launch\r\n" +
+                    "tasklist /fi \"imagename eq StartupMonitor.UI.exe\" | find /i \"StartupMonitor.UI.exe\" >nul || start \"\" \"" + uiExe + "\" --minimized\r\n" +
+                    "rem Самоудаление временного файла скрипта\r\n" +
+                    "(goto) 2>nul & del \"%~f0\"\r\n";
+
+                File.WriteAllText(watchdogScript, batchContent, System.Text.Encoding.ASCII);
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{watchdogScript}\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                });
+            }
+            catch
+            {
+                // Игнорируем ошибки запуска сторожевого процесса
+            }
+
+            Close();
+            return;
+        }
+
+        // Запуск скачивания
+        BtnUpdateAction.IsEnabled = false;
+        DownloadProgressPanel.Visibility = Visibility.Visible;
+        TxtProgressStatus.Text = "Подключение к серверу GitHub...";
+        ProgressBarDownload.Value = 0;
+        TxtProgressPercent.Text = "0%";
+
+        var started = await _pipeClient.DownloadUpdateAsync();
+        if (!started)
+        {
+            TxtProgressStatus.Text = "Не удалось запустить процесс загрузки.";
+            BtnUpdateAction.IsEnabled = true;
+        }
+    }
+
+    private void OnRemindLaterClick(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void OnSkipVersionClick(object sender, RoutedEventArgs e)
+    {
+        _onVersionSkipped?.Invoke(_updateInfo.Version);
+        Close();
+    }
+}

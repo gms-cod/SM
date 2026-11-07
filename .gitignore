@@ -1,0 +1,58 @@
+# Visual Studio & JetBrains
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+SMon2/
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+
+# Logs & temp files
+logs/
+*.log
+*.tmp
+*.bak
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# OpenCode / AI cache (optional)
+.opencode/
+.agents/
+AGENTS.md
+GEMINI.md
+SWARM_RULES.md
+Rulez/
+opencode.json
+mcp_config.json
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Local deleted / clean up folder
+delete/
+
+# Website compiled binaries
+www/downloads/*.exe
+www/downloads/*.zip
+www/downloads/*.sha256
+
+tools/*.exe
+tools/*.apk
+tools/apk_build_env/
+.gradle/
+tools/**/.gradle/
