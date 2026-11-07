@@ -1,32 +1,16 @@
 @echo off
 chcp 65001 >nul
-title Синхронизация Startup Monitor с GitHub (gms-cod/SM)
+title Синхронизация Startup Monitor с GitHub (origin: SM ^| startup-monitor: Startup-Monitor)
 
 echo ============================================================
-echo      Синхронизация Startup Monitor с GitHub: gms-cod/SM
+echo      Синхронизация Startup Monitor с репозиториями GitHub
 echo ============================================================
 echo.
-echo Репозиторий: https://github.com/gms-cod/SM
-echo.
-echo Отправка ветки main и тегов в GitHub...
+echo 1. Публичный репозиторий:  https://github.com/gms-cod/SM
+echo 2. Приватный репозиторий: https://github.com/gms-cod/Startup-Monitor
 echo.
 
-git push -u origin main --tags --force
-
-echo.
-if %ERRORLEVEL% EQU 0 (
-    echo ============================================================
-    echo [УСПЕХ] Синхронизация успешно завершена!
-    echo.
-    echo GitHub Actions сейчас соберет инсталлятор и создаст релиз:
-    echo https://github.com/gms-cod/SM/actions
-    echo https://github.com/gms-cod/SM/releases
-    echo ============================================================
-) else (
-    echo ============================================================
-    echo [ОШИБКА] Произошла ошибка при отправке.
-    echo ============================================================
-)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0sync-repositories.ps1"
 
 echo.
 pause
