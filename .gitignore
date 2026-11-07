@@ -41,14 +41,7 @@ mcp_config.json
 .stignore
 
 # Internal swarm scripts and private audits (Local Only)
-scripts/run_*.py
-scripts/benchmark_*.py
-scripts/test_*.py
-scripts/analyze_*.py
-scripts/opencode_*.py
-scripts/generate_*.py
-scripts/fetch_*.py
-scripts/find_*.py
+scripts/*.py
 docs/SWARM_*.md
 docs/AUDIT_*.md
 
