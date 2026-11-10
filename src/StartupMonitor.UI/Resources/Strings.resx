@@ -1987,7 +1987,7 @@ Do you really want to proceed?</value>
     <value>🛡️ Add program to whitelist</value>
   </data>
   <data name="NetAlertWhitelistTip" xml:space="preserve">
-    <value>Allow all network activity for this program and add to whitelist</value>
+    <value>Permanently allow this program: incoming and outgoing traffic, all protocols and profiles. Other blocking rules may still apply.</value>
   </data>
 <data name="NetColProcess" xml:space="preserve"><value>Process</value></data>
 <data name="NetColProtocol" xml:space="preserve"><value>Protocol</value></data>
@@ -2031,11 +2031,11 @@ Do you really want to proceed?</value>
 <data name="FwRuleProgramHint" xml:space="preserve"><value>Empty = applies to whole system</value></data>
 <data name="FwRuleServiceHint" xml:space="preserve"><value>Empty = no service binding</value></data>
 <data name="FwRuleBtnCancel" xml:space="preserve"><value>Cancel</value></data>
-<data name="NetAlertCloseTip" xml:space="preserve"><value>Close (allow for this session)</value></data>
+<data name="NetAlertCloseTip" xml:space="preserve"><value>Defer this request without changing network rules</value></data>
 <data name="NetAlertAllowAlwaysTip" xml:space="preserve"><value>Create allow rule in Windows Firewall</value></data>
 <data name="NetAlertAllowSessionTip" xml:space="preserve"><value>Apply a temporary outgoing rule until service restart or for up to 8 hours. Existing Windows or third-party blocks still take precedence.</value></data>
-<data name="NetAlertBlockTip" xml:space="preserve"><value>Create blocking rule in Windows Firewall</value></data>
-<data name="NetAlertCountdownHint" xml:space="preserve"><value>Auto-resolve in 15 sec...</value></data>
+<data name="NetAlertBlockTip" xml:space="preserve"><value>Permanently block this program: incoming and outgoing traffic, all protocols and profiles.</value></data>
+<data name="NetAlertCountdownHint" xml:space="preserve"><value>The countdown blocks outgoing traffic for this program; hovering pauses it.</value></data>
 <data name="NetBansCountFormat" xml:space="preserve"><value>Active bans: {0}</value></data>
 <data name="PortDefenderPortsHint" xml:space="preserve"><value>E.g.: 3389, 22, 445</value></data>
 <data name="PortDefenderWhitelistHint" xml:space="preserve"><value>E.g.: 192.168.1.10, 10.0.0.0/24</value></data>
@@ -2119,7 +2119,7 @@ Import with overwrite of existing rules?</value>
   <data name="ToolboxTabSecurity" xml:space="preserve">
     <value>Hash &amp; Passwords</value>
   </data>
-<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Allow this port</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Allow connections on this port and suppress future alerts for it</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Silent mode for system sockets (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Suppress pop-up alerts for kernel sockets and terminating connections</value></data><data name="NetAlertAiAnalyzing" xml:space="preserve"><value>Analyzing program with neural network...</value></data><data name="NetAlertAiVerdictBadge" xml:space="preserve"><value>⚡ AI Verdict</value></data><data name="NetAlertAiPurposeLabel" xml:space="preserve"><value>Program purpose:</value></data><data name="NetAlertAiBlockingRiskLabel" xml:space="preserve"><value>Blocking risks (OS / printing / network):</value></data><data name="NetAlertAiRecommendationLabel" xml:space="preserve"><value>AI recommendation:</value></data><data name="NetAlertCountdownPaused" xml:space="preserve"><value>Countdown paused (mouse cursor)</value></data><data name="NetAlertProcessUnknown" xml:space="preserve"><value>Unknown process</value></data><data name="NetAlertPathUnknown" xml:space="preserve"><value>Path unknown</value></data><data name="NetAlertInternet" xml:space="preserve"><value>Internet</value></data><data name="NetAlertProtocolDefault" xml:space="preserve"><value>TCP</value></data><data name="NetAlertCountdownFormat" xml:space="preserve"><value>Auto-resolve in {0} sec...</value></data><data name="NetAlertAiPurposeFallback" xml:space="preserve"><value>Purpose not determined.</value></data><data name="NetAlertAiRiskFallback" xml:space="preserve"><value>No significant risks to critical services detected.</value></data><data name="NetAlertAiRecommendationFallback" xml:space="preserve"><value>Decision at user's discretion.</value></data>
+<data name="NetAlertBtnAllowPort" xml:space="preserve"><value>Allow this port</value></data><data name="NetAlertAllowPortTip" xml:space="preserve"><value>Permanently allow this outgoing TCP port for every program and every remote address. This is a system-wide exception.</value></data><data name="FirewallSilentPid0Label" xml:space="preserve"><value>Silent mode for system sockets (PID = 0)</value></data><data name="FirewallSilentPid0Hint" xml:space="preserve"><value>Suppress pop-up alerts for kernel sockets and terminating connections</value></data><data name="NetAlertAiAnalyzing" xml:space="preserve"><value>Analyzing program with neural network...</value></data><data name="NetAlertAiVerdictBadge" xml:space="preserve"><value>⚡ AI Verdict</value></data><data name="NetAlertAiPurposeLabel" xml:space="preserve"><value>Program purpose:</value></data><data name="NetAlertAiBlockingRiskLabel" xml:space="preserve"><value>Blocking risks (OS / printing / network):</value></data><data name="NetAlertAiRecommendationLabel" xml:space="preserve"><value>AI recommendation:</value></data><data name="NetAlertCountdownPaused" xml:space="preserve"><value>Countdown paused (mouse cursor)</value></data><data name="NetAlertProcessUnknown" xml:space="preserve"><value>Unknown process</value></data><data name="NetAlertPathUnknown" xml:space="preserve"><value>Path unknown</value></data><data name="NetAlertInternet" xml:space="preserve"><value>Internet</value></data><data name="NetAlertProtocolDefault" xml:space="preserve"><value>TCP</value></data><data name="NetAlertCountdownFormat" xml:space="preserve"><value>In {0} sec: block outgoing traffic for this program until service restart, for up to 8 hours.</value></data><data name="NetAlertAiPurposeFallback" xml:space="preserve"><value>Purpose not determined.</value></data><data name="NetAlertAiRiskFallback" xml:space="preserve"><value>No significant risks to critical services detected.</value></data><data name="NetAlertAiRecommendationFallback" xml:space="preserve"><value>Decision at user's discretion.</value></data>
   <data name="NetAlertAiActionAllowAlways" xml:space="preserve"><value>Allow always</value></data>
   <data name="NetAlertAiActionAllowSession" xml:space="preserve"><value>Allow session</value></data>
   <data name="NetAlertAiActionBlockAlways" xml:space="preserve"><value>Block always</value></data>
@@ -2380,7 +2380,19 @@ Import with overwrite of existing rules?</value>
   <data name="DefenderSummaryRefreshed" xml:space="preserve"><value>Port Defender summary updated.</value></data>
   <data name="DefenderRefreshErrorFormat" xml:space="preserve"><value>Could not refresh Port Defender: {0}</value></data>
   <data name="NetAlertApplying" xml:space="preserve"><value>Applying your decision…</value></data>
-  <data name="NetAlertApplyFailed" xml:space="preserve"><value>The service could not confirm the decision. Check the service and try again.</value></data>
+  <data name="NetAlertApplyFailed" xml:space="preserve"><value>The service rejected this action. Review the reason or defer this request without changing rules.</value></data>
   <data name="NetAlertSessionAllowUnavailable" xml:space="preserve"><value>A temporary allow needs a known application path and normal filtering mode. In whitelist or kill switch mode, use a permanent rule or change the filtering mode.</value></data>
-  <data name="NetAlertPathRequired" xml:space="preserve"><value>The application path is unavailable. An application rule cannot be safely applied; you can allow the displayed remote port.</value></data>
+  <data name="NetAlertPathRequired" xml:space="preserve"><value>The application path is unavailable. You can defer this request without changing network rules.</value></data>
+  <data name="NetAlertUnknownOutcome" xml:space="preserve"><value>The outcome is unknown. Retry the same operation to check it, or defer this request. A different rule cannot be sent until the outcome is confirmed.</value></data>
+  <data name="NetAlertRetryOperation" xml:space="preserve"><value>Check same operation</value></data>
+  <data name="NetAlertDefer" xml:space="preserve"><value>Defer request</value></data>
+  <data name="NetAlertDeferTip" xml:space="preserve"><value>Hide this request temporarily without allowing or blocking network traffic.</value></data>
+  <data name="NetAlertDeferCountdownFormat" xml:space="preserve"><value>Application path unavailable. Defer this request in {0} sec without changing rules.</value></data>
+  <data name="NetAlertScopeNotice" xml:space="preserve"><value>Program actions apply to the whole application. The connection may have started before this notification. The TCP port exception applies to every program.</value></data>
+  <data name="NetAlertConnectionSummaryFormat" xml:space="preserve"><value>Connections in this group: {0}. Last observed: {1}. {2}</value></data>
+  <data name="NetAlertConnectionActive" xml:space="preserve"><value>Observed in the latest snapshot.</value></data>
+  <data name="NetAlertConnectionInactive" xml:space="preserve"><value>No longer observed; the request concerns future application access.</value></data>
+  <data name="NetAlertAllowPortScopeFormat" xml:space="preserve"><value>Allow TCP {0} for all programs</value></data>
+  <data name="NetHistoryRequestClosed" xml:space="preserve"><value>Request closed</value></data>
+  <data name="NetHistoryDeferred" xml:space="preserve"><value>Request deferred; rules unchanged</value></data>
 </root>

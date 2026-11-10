@@ -1,5 +1,6 @@
 using StartupMonitor.Shared.Models;
 using StartupMonitor.UI.ViewModels;
+using System.ComponentModel;
 
 namespace StartupMonitor.UI.Views.Dialogs;
 
@@ -11,41 +12,105 @@ public partial class EntryDetailWindow
     /// <summary>Идентификатор открытой записи.</summary>
     private readonly string _entryId;
     /// <summary>Объект записи автозапуска.</summary>
-    private readonly StartupEntry _entry;
+    private StartupEntry _entry;
+    /// <summary>Получение новой оценки; рабочее окно использует MainViewModel, тесты — управляемый ответ.</summary>
+    private readonly Func<string, Task<StartupEntry?>> _ratingRefresher;
+    /// <summary>Не позволяет запустить повторную переоценку до завершения первой.</summary>
+    private bool _isRefreshingRating;
+    /// <summary>Запоздалые события после закрытия больше не меняют visual tree.</summary>
+    private bool _isClosed;
 
     /// <summary>Инициализирует окно деталей с записью и ссылкой на ViewModel.</summary>
     public EntryDetailWindow(StartupEntry entry, MainViewModel viewModel)
+        : this(entry, viewModel, null)
     {
+    }
+
+    /// <summary>Создаёт настоящее окно с изолируемым источником переоценки без подмены производственной логики привязок.</summary>
+    /// <param name="entry">Выбранный объект, который мог устареть после нового снимка.</param>
+    /// <param name="viewModel">Владелец актуальных объектов списка.</param>
+    /// <param name="ratingRefresher">Необязательный источник результата для регрессионных проверок.</param>
+    internal EntryDetailWindow(StartupEntry entry, MainViewModel viewModel, Func<string, Task<StartupEntry?>>? ratingRefresher)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(viewModel);
         InitializeComponent();
-        DataContext = entry;
         _entry = entry;
         _vm = viewModel;
         _entryId = entry.Id;
-        Loaded += (_, _) => UpdateRatingUiState();
+        _ratingRefresher = ratingRefresher ?? viewModel.ReRateEntryAsync;
+        _entry.PropertyChanged += OnEntryPropertyChanged;
+        _vm.PropertyChanged += OnViewModelPropertyChanged;
+        Loaded += OnWindowLoaded;
+        Closed += OnWindowClosed;
+        SynchronizeLiveEntry();
+    }
+
+    /// <summary>Перед первым отображением выбирает последний экземпляр объекта вместо сохранённой устаревшей строки.</summary>
+    private void OnWindowLoaded(object sender, System.Windows.RoutedEventArgs e) => SynchronizeLiveEntry();
+
+    /// <summary>Разрывает внешние подписки: закрытое окно не удерживается ViewModel и прежней записью.</summary>
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        _isClosed = true;
+        _vm.PropertyChanged -= OnViewModelPropertyChanged;
+        _entry.PropertyChanged -= OnEntryPropertyChanged;
+        Loaded -= OnWindowLoaded;
+    }
+
+    /// <summary>Новый снимок или фильтр списка может заменить экземпляр записи, сохранив тот же Id.</summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainViewModel.FilteredEntries) or nameof(MainViewModel.Entries) or null or "")
+            SynchronizeLiveEntry();
+    }
+
+    /// <summary>Изменение происхождения оценки обновляет badge и кнопку сброса без повторного назначения DataContext.</summary>
+    private void OnEntryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(StartupEntry.IsUserRating) or null or "")
+        {
+            if (Dispatcher.CheckAccess()) UpdateRatingUiState();
+            else _ = Dispatcher.InvokeAsync(UpdateRatingUiState);
+        }
+    }
+
+    /// <summary>Перепривязывает окно к live item даже при исключении записи текущим фильтром основного списка.</summary>
+    private void SynchronizeLiveEntry()
+    {
+        if (_isClosed) return;
+        if (!Dispatcher.CheckAccess())
+        {
+            _ = Dispatcher.InvokeAsync(SynchronizeLiveEntry);
+            return;
+        }
+        var current = _vm.GetLiveEntryById(_entryId);
+        if (current != null && !ReferenceEquals(current, _entry))
+        {
+            _entry.PropertyChanged -= OnEntryPropertyChanged;
+            _entry = current;
+            _entry.PropertyChanged += OnEntryPropertyChanged;
+        }
+        if (!ReferenceEquals(DataContext, _entry)) DataContext = _entry;
+        UpdateRatingUiState();
     }
 
     /// <summary>Обновляет визуальные индикаторы принадлежности рейтинга (ручной или AI).</summary>
     private void UpdateRatingUiState()
     {
-        try
+        if (_isClosed) return;
+        if (_entry.IsUserRating)
         {
-            if (_entry.IsUserRating)
-            {
-                TxtRatingOrigin.Text = "Установлено вручную";
-                TxtRatingOrigin.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x10, 0xB9, 0x81));
-                BtnResetUserRating.Visibility = System.Windows.Visibility.Visible;
-            }
-            else
-            {
-                TxtRatingOrigin.Text = "Определено AI";
-                TxtRatingOrigin.Foreground = (System.Windows.Media.Brush)FindResource("TextFillColorSecondaryBrush");
-                BtnResetUserRating.Visibility = System.Windows.Visibility.Collapsed;
-            }
-
-            DataContext = null;
-            DataContext = _entry;
+            TxtRatingOrigin.Text = "Установлено вручную";
+            TxtRatingOrigin.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x10, 0xB9, 0x81));
+            BtnResetUserRating.Visibility = System.Windows.Visibility.Visible;
         }
-        catch { }
+        else
+        {
+            TxtRatingOrigin.Text = "Определено AI";
+            TxtRatingOrigin.Foreground = TryFindResource("TextFillColorSecondaryBrush") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Gray;
+            BtnResetUserRating.Visibility = System.Windows.Visibility.Collapsed;
+        }
     }
 
     /// <summary>Обрабатывает ручной выбор количества звёзд (1–5) пользователем.</summary>
@@ -153,45 +218,58 @@ public partial class EntryDetailWindow
         Close();
     }
 
-    /// <summary>Обрабатывает нажатие кнопки переоценки AI-рейтинга с мгновенным сбросом в окне и моментальным запросом к AI.</summary>
+    /// <summary>Обрабатывает нажатие переоценки, сохраняя подтверждённый рейтинг до получения нового результата.</summary>
     private async void OnRefreshRatingClick(object sender, System.Windows.RoutedEventArgs e)
+        => await RefreshRatingAsync();
+
+    /// <summary>Обновляет рейтинг и его происхождение; ожидание отражается состоянием кнопки, не фиктивной заменой данных.</summary>
+    /// <returns>Завершение подтверждённого обновления либо отображения причины отсутствия результата.</returns>
+    internal async Task RefreshRatingAsync()
     {
+        if (_isRefreshingRating || _isClosed) return;
+        _isRefreshingRating = true;
         BtnRefreshAi.IsEnabled = false;
         var prevContent = BtnRefreshAi.Content;
         BtnRefreshAi.Content = "Оценка AI...";
-
-        // Мгновенный сброс текущего рейтинга прямо в окне для моментального визуального отклика
-        _entry.AiRating = 0;
-        _entry.AiCategory = "Подключение к AI...";
-        _entry.AiRisk = "Отправлен прямой запрос нейросети. Ожидание вердикта...";
-        _entry.AiRecommendation = "Идёт расчет рейтинга безопасности...";
-
-        // Принудительное обновление интерфейса окна
-        DataContext = null;
-        DataContext = _entry;
+        TxtRatingRefreshStatus.Visibility = System.Windows.Visibility.Collapsed;
 
         try
         {
-            var updated = await _vm.ReRateEntryAsync(_entryId);
+            var updated = await _ratingRefresher(_entryId);
+            if (_isClosed) return;
+            SynchronizeLiveEntry();
             if (updated != null)
             {
                 _entry.AiRating = updated.AiRating;
                 _entry.AiCategory = updated.AiCategory;
                 _entry.AiRisk = updated.AiRisk;
                 _entry.AiRecommendation = updated.AiRecommendation;
+                _entry.IsUserRating = updated.IsUserRating;
+                UpdateRatingUiState();
             }
+            else ShowRatingRefreshFailure();
         }
         catch (System.Exception ex)
         {
-            _entry.AiRisk = $"Ошибка запроса к AI: {ex.Message}";
+            App.Log($"EntryDetailWindow.RefreshRating: {ex.Message}");
+            if (!_isClosed) ShowRatingRefreshFailure();
         }
         finally
         {
-            DataContext = null;
-            DataContext = _entry;
-            BtnRefreshAi.IsEnabled = true;
-            BtnRefreshAi.Content = prevContent;
+            _isRefreshingRating = false;
+            if (!_isClosed)
+            {
+                BtnRefreshAi.IsEnabled = true;
+                BtnRefreshAi.Content = prevContent;
+            }
         }
+    }
+
+    /// <summary>Показывает ошибку отдельно от сохранённого результата рейтинга и позволяет повторить запрос.</summary>
+    private void ShowRatingRefreshFailure()
+    {
+        TxtRatingRefreshStatus.Text = "Не удалось получить новую оценку. Сохранён предыдущий рейтинг; попробуйте ещё раз.";
+        TxtRatingRefreshStatus.Visibility = System.Windows.Visibility.Visible;
     }
 
     /// <summary>Обрабатывает нажатие кнопки проверки в Kaspersky OpenTIP.</summary>

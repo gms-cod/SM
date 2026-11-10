@@ -247,6 +247,12 @@ public static class PipeMessageTypes
     public const string GetFirewallFilteringModeResponse = "GetFirewallFilteringModeResponse";
     /// <summary>Запрос ожидающих алертов о новых сетевых подключениях программ.</summary>
     public const string GetPendingNetworkAlerts = "GetPendingNetworkAlerts";
+
+    /// <summary>Проверка актуальности показанного запроса и продление права показа клиентом.</summary>
+    public const string GetNetworkAlertStatus = "GetNetworkAlertStatus";
+
+    /// <summary>Ответ о состоянии текущей карточки без получения новых запросов.</summary>
+    public const string GetNetworkAlertStatusResponse = "GetNetworkAlertStatusResponse";
     /// <summary>Ответ службы со списком ожидающих сетевых алертов.</summary>
     public const string GetPendingNetworkAlertsResponse = "GetPendingNetworkAlertsResponse";
     /// <summary>Решение пользователя по сетевому алерту (разрешить/блокировать).</summary>
@@ -576,7 +582,19 @@ public record AlertsEnabledPayload(bool Enabled);
 public record FirewallSilentPid0Payload(bool Silent);
 
 /// <summary>Полезная нагрузка ответа на решение по сетевому алерту.</summary>
-public record ResolveNetworkAlertResultPayload(bool Success, string Message);
+public record ResolveNetworkAlertResultPayload(
+    bool Success,
+    string Message,
+    NetworkAlertResolutionStatus Status = NetworkAlertResolutionStatus.UnknownOutcome,
+    string OperationId = "",
+    NetworkAlertResolution? AppliedResolution = null);
+
+/// <summary>Состояние выданной карточки; отсутствие объекта с Superseded означает завершение, а не ошибку применения.</summary>
+public record NetworkAlertStatusPayload(
+    bool Enabled,
+    NetworkConnectionAlertDto? Alert,
+    NetworkAlertResolutionStatus Status,
+    string Message = "");
 
 /// <summary>Запрос оценки сетевого подключения нейросетью.</summary>
 public record EvaluateNetworkAlertRequest(

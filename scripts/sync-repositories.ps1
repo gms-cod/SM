@@ -9,7 +9,9 @@ param(
     [switch]$SkipPublic,
     [switch]$SkipPrivate,
     [switch]$NoForcePrivate,
-    [switch]$Force
+    [switch]$Force,
+    # Создаёт новый релиз из уже проверенного установщика; существующие релизы не перезаписываются.
+    [switch]$PublishRelease
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,6 +46,23 @@ $headCommit = (git rev-parse HEAD).Trim()
 Write-Host "Текущий коммит: $headCommit" -ForegroundColor DarkGray
 Write-Host "Версия продукта: v$version" -ForegroundColor DarkGray
 Write-Host ""
+
+# До первого push проверяются версия, подпись, checksum и отсутствие уже выпущенного тега.
+if ($PublishRelease) {
+    if ($Force) { throw 'Выпуск релиза требует чистого зафиксированного дерева; -Force недопустим.' }
+    $installer = Join-Path $repoRoot "installers\StartupMonitorSetup-$version.exe"
+    $releaseNotes = Join-Path $repoRoot "docs\releases\v$version.md"
+    foreach ($path in @($installer, "$installer.sha256", $releaseNotes)) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Не найден артефакт выпуска: $path" }
+    }
+    if ((Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') { throw 'Подпись установщика не подтверждена.' }
+    $releaseRepos = @()
+    if (-not $SkipPublic) { $releaseRepos += 'gms-cod/SM' }
+    if (-not $SkipPrivate) { $releaseRepos += 'gms-cod/Startup-Monitor' }
+    if ($releaseRepos.Count -eq 0) { throw 'Не выбран репозиторий для выпуска.' }
+    & python (Join-Path $PSScriptRoot 'publish_github_release.py') --version $version --repos @releaseRepos --check-only
+    if ($LASTEXITCODE -ne 0) { throw 'Предварительная проверка выпуска не пройдена.' }
+}
 
 # ============================================================
 # ШАГ 1: Публикация в открытый публичный репозиторий (gms-cod/SM)
@@ -147,5 +166,20 @@ else {
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
+
+# Выпуск проходит тем же каноническим маршрутом, после синхронизации обеих исходных веток.
+if ($PublishRelease) {
+    $publisher = Join-Path $PSScriptRoot 'publish_github_release.py'
+    $releaseName = "Startup Monitor v$version — Firewall reliability and security"
+    if (-not $SkipPublic) {
+        & python $publisher --version $version --repos gms-cod/SM --target-commitish $headCommit --body-file $releaseNotes --release-name $releaseName --create-only
+        if ($LASTEXITCODE -ne 0) { throw 'Публикация нового публичного релиза не завершена.' }
+    }
+    if (-not $SkipPrivate) {
+        & python $publisher --version $version --repos gms-cod/Startup-Monitor --target-commitish $privateCommit --body-file $releaseNotes --release-name $releaseName --create-only --skip-verify
+        if ($LASTEXITCODE -ne 0) { throw 'Публикация нового приватного релиза не завершена.' }
+    }
+}
+
 Write-Host "         Синхронизация обоих репозиториев завершена!        " -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Cyan

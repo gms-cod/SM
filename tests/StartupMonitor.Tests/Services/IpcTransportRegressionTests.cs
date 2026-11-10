@@ -114,6 +114,7 @@ public sealed class IpcTransportRegressionTests
         SetField(server, "_uiClientsSync", new object());
         SetField(server, "_logger", NullLogger<PipeServer>.Instance);
         SetField(server, "_metricsTracker", metrics);
+        SetField(server, "_alertClaims", new NetworkAlertClaimRegistry());
         var first = await AttachCommandSessionAsync(server, timeout.Token);
         var second = await AttachCommandSessionAsync(server, timeout.Token);
         using var firstClient = first.Client;
@@ -176,8 +177,10 @@ public sealed class IpcTransportRegressionTests
     [Theory]
     [InlineData(PipeMessageTypes.GetStatus, true)]
     [InlineData(PipeMessageTypes.GetNetworkTrafficHistory, true)]
-    [InlineData(PipeMessageTypes.ResolveNetworkAlert, true)]
-    [InlineData(PipeMessageTypes.EvaluateNetworkAlert, true)]
+    [InlineData(PipeMessageTypes.ResolveNetworkAlert, false)]
+    [InlineData(PipeMessageTypes.EvaluateNetworkAlert, false)]
+    [InlineData(PipeMessageTypes.GetPendingNetworkAlerts, false)]
+    [InlineData(PipeMessageTypes.GetNetworkAlertStatus, false)]
     [InlineData(PipeMessageTypes.GetAiConfig, false)]
     [InlineData(PipeMessageTypes.KillProcessById, false)]
     [InlineData(PipeMessageTypes.BlockIp, false)]

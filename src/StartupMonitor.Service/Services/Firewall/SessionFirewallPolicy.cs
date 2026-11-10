@@ -54,7 +54,7 @@ internal sealed class SessionFirewallPolicy : ISessionFirewallPolicy
     }
 
     /// <inheritdoc />
-    public bool CanAllowSession => _firewall.GetFilteringMode() is FirewallFilteringMode.Normal or FirewallFilteringMode.Disabled;
+    public bool CanAllowSession => _firewall.TryGetFilteringMode(out var mode) && mode is FirewallFilteringMode.Normal or FirewallFilteringMode.Disabled;
 
     /// <inheritdoc />
     public FirewallOperationResult Apply(string path, FirewallAction action, TimeSpan lifetime)

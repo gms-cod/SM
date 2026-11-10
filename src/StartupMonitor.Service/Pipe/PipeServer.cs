@@ -145,6 +145,9 @@ public class PipeServer : BackgroundService
 
     private readonly NetworkConnectionAlertService? _alertService;
 
+    /// <summary>Право показа принадлежит подключению; не заменяет проверку административных полномочий.</summary>
+    private readonly NetworkAlertClaimRegistry _alertClaims = new();
+
     // Координатор единой матрицы контроля доступа сетевых приложений
 
     private readonly AccessMatrixCoordinatorService? _accessMatrixCoordinator;
@@ -434,6 +437,7 @@ public class PipeServer : BackgroundService
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
         var metricsSubscribed = false;
+        var alertClientId = Guid.NewGuid().ToString("N");
         OnUiClientConnected();
         try
         {
@@ -481,7 +485,7 @@ public class PipeServer : BackgroundService
                     }
                     else
                     {
-                        response = await ProcessMessage(message, ct);
+                        response = await ProcessMessage(message, ct, alertClientId);
                     }
                     var json = JsonSerializer.Serialize(response, JsonOptions);
                     if (json.Length > BoundedLineReader.MaximumFrameCharacters)
@@ -502,7 +506,11 @@ public class PipeServer : BackgroundService
             {
                 if (metricsSubscribed) _metricsTracker.Unsubscribe();
             }
-            finally { OnUiClientDisconnected(); }
+            finally
+            {
+                _alertClaims.ReleaseClient(alertClientId);
+                OnUiClientDisconnected();
+            }
         }
     }
 
@@ -539,11 +547,68 @@ public class PipeServer : BackgroundService
         PipeMessageTypes.GetProcessNetworkConnections or PipeMessageTypes.GetProcessModules or
         PipeMessageTypes.GetUpdateStatus or PipeMessageTypes.GetFirewallStatus or PipeMessageTypes.GetPortDefenderConfig or
         PipeMessageTypes.GetActiveBans or PipeMessageTypes.GetAllFirewallRules or PipeMessageTypes.GetFirewallFilteringMode or
-        PipeMessageTypes.GetPendingNetworkAlerts or PipeMessageTypes.GetConnectionHistory or PipeMessageTypes.GetAlertsEnabled or
+        PipeMessageTypes.GetConnectionHistory or PipeMessageTypes.GetAlertsEnabled or
         PipeMessageTypes.GetFirewallSilentPid0 or PipeMessageTypes.GetFirewallWhitelist or PipeMessageTypes.GetFirewallBlacklist or
         PipeMessageTypes.GetAppAccessMatrix or PipeMessageTypes.GetNetworkTrafficHistory or
-        PipeMessageTypes.ResolveNetworkAlert or PipeMessageTypes.EvaluateNetworkAlert or
         PipeMessageTypes.SubscribeProcessMetrics or PipeMessageTypes.UnsubscribeProcessMetrics;
+
+    /// <summary>Преобразует подтверждённый результат политики в транспортный ответ без потери отказа.</summary>
+    /// <param name="result">Результат координатора после записи и проверки политики.</param>
+    /// <returns>Success только после успеха; при отказе Error содержит его точную причину.</returns>
+    internal static PipeMessage FirewallOperationReply(FirewallOperationResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return new PipeMessage
+        {
+            Type = result.Success ? PipeMessageTypes.Success : PipeMessageTypes.Error,
+            Payload = JsonSerializer.Serialize(result, JsonOptions)
+        };
+    }
+
+    /// <summary>Изменяет список исключительно через координатор реальных правил; недоступность не подменяется записью JSON.</summary>
+    /// <param name="path">Полный путь, прошедший административную проверку IPC.</param>
+    /// <param name="state">Требуемое постоянное состояние приложения.</param>
+    /// <returns>Проверяемый результат сохранения либо содержательный отказ.</returns>
+    private FirewallOperationResult ChangeFirewallApplicationList(string? path, AccessControlState state)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
+            return FirewallOperationResult.Fail("Для изменения сетевого доступа нужен полный путь приложения.");
+        if (_accessMatrixCoordinator == null)
+            return FirewallOperationResult.Fail("Координатор сетевого доступа недоступен; списки не изменены.");
+        return _accessMatrixCoordinator.ApplyAccessState(new SetAppAccessStateRequest
+        {
+            ApplicationPath = path,
+            ProcessName = Path.GetFileName(path),
+            TargetState = state,
+            Scope = AccessRuleScope.Permanent
+        });
+    }
+
+    /// <summary>Согласует проекции списков с успешно изменёнными правилами, явно сообщая о частичном результате.</summary>
+    /// <param name="operation">Подтверждение непосредственной операции COM.</param>
+    /// <param name="paths">Полные пути затронутых приложений до и после изменения.</param>
+    /// <returns>Первичный результат либо явный частичный отказ проекции, не подменённый успехом.</returns>
+    private FirewallOperationResult CompleteFirewallRuleMutation(FirewallOperationResult operation, IEnumerable<string?> paths)
+    {
+        if (!operation.Success) return operation;
+        foreach (var path in paths.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var reconciled = _accessMatrixCoordinator?.ReconcileApplicationLists(path!)
+                ?? FirewallOperationResult.Fail("Координатор проекций недоступен.");
+            if (!reconciled.Success)
+                return FirewallOperationResult.Fail("Правило изменено, но согласование списков не подтверждено: " + reconciled.Message, operation.RuleName);
+        }
+        return operation;
+    }
+
+    /// <summary>Получает затронутые пути из полного снимка до удаления/переключения пары правил.</summary>
+    /// <param name="name">Имя правила либо общей In/Out-пары.</param>
+    /// <returns>Независимые пути для последующей сверки списков.</returns>
+    private List<string?> GetAffectedRulePaths(string name) => _firewallService.GetAllRules()
+        .Where(rule => string.Equals(rule.Name, name, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rule.Name, name + "_In", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rule.Name, name + "_Out", StringComparison.OrdinalIgnoreCase))
+        .Select(rule => rule.ApplicationPath).ToList();
 
     /// <summary>
 
@@ -598,7 +663,7 @@ public class PipeServer : BackgroundService
 
     /// <returns>Ответное сообщение с результатом выполнения</returns>
 
-    private async Task<PipeMessage> ProcessMessage(PipeMessage message, CancellationToken ct = default)
+    private async Task<PipeMessage> ProcessMessage(PipeMessage message, CancellationToken ct = default, string? alertClientId = null)
 
     {
 
@@ -1436,7 +1501,7 @@ public class PipeServer : BackgroundService
 
                         if (!string.IsNullOrWhiteSpace(aiPayload.ApiKey) && cfg.Entries.Count > 0)
 
-                            _ = PrefetchAndLogAsync(cfg.Entries);
+                            _ = PrefetchAndLogAsync(cfg.Entries, _lifetime.ApplicationStopping);
 
                     }
 
@@ -1458,7 +1523,7 @@ public class PipeServer : BackgroundService
 
                     var testModel = testPayload?.Model;
 
-                    var (testSuccess, testMsg) = await _aiRating.TestConnectionAsync(testKey, testUrl, testModel);
+                    var (testSuccess, testMsg) = await _aiRating.TestConnectionAsync(testKey, testUrl, testModel, ct);
 
                     response.Type = PipeMessageTypes.TestAiConnectionResponse;
 
@@ -1684,7 +1749,7 @@ public class PipeServer : BackgroundService
 
                             // Мгновенный запрос к AI без фонового ожидания
 
-                            await _aiRating.ForceFetchRatingAsync(entry);
+                            await _aiRating.ForceFetchRatingAsync(entry, ct);
 
                             NotifyExternalEntriesChanged();
 
@@ -1742,7 +1807,7 @@ public class PipeServer : BackgroundService
 
                                 _logger.LogInformation("SetUserRating: сброс к AI-оценке для {Name}", entry.Name);
 
-                                await _aiRating.ForceFetchRatingAsync(entry);
+                                await _aiRating.ForceFetchRatingAsync(entry, ct);
 
                             }
 
@@ -3389,7 +3454,9 @@ public class PipeServer : BackgroundService
 
 
 
-                        var result = _firewallService.CreateOrUpdateRule(ruleDto);
+                        var affectedPaths = GetAffectedRulePaths(ruleDto.Name);
+                        affectedPaths.Add(ruleDto.ApplicationPath);
+                        var result = CompleteFirewallRuleMutation(_firewallService.CreateOrUpdateRule(ruleDto), affectedPaths);
 
                         response.Type = PipeMessageTypes.FirewallOperationResponse;
 
@@ -3465,7 +3532,8 @@ public class PipeServer : BackgroundService
 
 
 
-                        var result = _firewallService.DeleteRule(ruleName, direction);
+                        var affectedPaths = GetAffectedRulePaths(ruleName);
+                        var result = CompleteFirewallRuleMutation(_firewallService.DeleteRule(ruleName, direction), affectedPaths);
 
                         response.Type = PipeMessageTypes.FirewallOperationResponse;
 
@@ -3549,7 +3617,8 @@ public class PipeServer : BackgroundService
 
 
 
-                        var result = _firewallService.ToggleRule(toggleName, toggleDir, toggleEnable);
+                        var affectedPaths = GetAffectedRulePaths(toggleName);
+                        var result = CompleteFirewallRuleMutation(_firewallService.ToggleRule(toggleName, toggleDir, toggleEnable), affectedPaths);
 
                         response.Type = PipeMessageTypes.FirewallOperationResponse;
 
@@ -3853,7 +3922,9 @@ public class PipeServer : BackgroundService
 
                         // Чтение очереди не запускает повторный обход сети: снимками владеет фоновый цикл.
 
-                        var alerts = _alertService.GetPendingAlerts();
+                        // Авторизованный клиент арендует одну группу; другие UI не показывают тот же AlertId.
+                        var pendingAlerts = _alertService.GetPendingAlerts();
+                        var alerts = _alertClaims.GetNext(alertClientId ?? "internal", pendingAlerts);
 
                         response.Type = PipeMessageTypes.GetPendingNetworkAlertsResponse;
 
@@ -3911,13 +3982,20 @@ public class PipeServer : BackgroundService
 
 
 
-                        var resolved = _alertService.ResolveAlert(resolveReq);
+                        var client = alertClientId ?? "internal";
+                        var ownsAlert = _alertClaims.TryAcquire(client, resolveReq.AlertId);
+                        var resolved = ownsAlert
+                            ? _alertService.ResolveAlertDetailed(resolveReq)
+                            : new ResolveNetworkAlertResultPayload(false, "Запрос уже показан другому клиенту.",
+                                NetworkAlertResolutionStatus.Conflict, resolveReq.OperationId);
+                        if (resolved.Success || resolved.Status == NetworkAlertResolutionStatus.Superseded)
+                            _alertClaims.Release(client, resolveReq.AlertId);
 
                         response.Type = PipeMessageTypes.ResolveNetworkAlertResponse;
 
                         response.Payload = JsonSerializer.Serialize(
 
-                            new ResolveNetworkAlertResultPayload(resolved, resolved ? "Решение применено." : "Решение не подтверждено: алерт отсутствует, правило недоступно либо действие не поддерживается. Проверьте журнал службы и повторите выбор."),
+                            resolved,
 
                             JsonOptions);
 
@@ -3964,6 +4042,34 @@ public class PipeServer : BackgroundService
                     break;
 
 
+
+                case PipeMessageTypes.GetNetworkAlertStatus:
+                    try
+                    {
+                        var alertId = JsonSerializer.Deserialize<string>(message.Payload ?? "\"\"", JsonOptions);
+                        if (_alertService == null || string.IsNullOrWhiteSpace(alertId))
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Не указан действующий запрос сетевого доступа.";
+                            break;
+                        }
+                        var current = _alertService.GetPendingAlerts().FirstOrDefault(a => a.AlertId == alertId);
+                        var client = alertClientId ?? "internal";
+                        var owns = current != null && _alertClaims.TryAcquire(client, alertId);
+                        response.Type = PipeMessageTypes.GetNetworkAlertStatusResponse;
+                        response.Payload = JsonSerializer.Serialize(new NetworkAlertStatusPayload(
+                            _alertService.AlertsEnabled, owns ? current : null,
+                            current == null ? NetworkAlertResolutionStatus.Superseded
+                                : owns ? NetworkAlertResolutionStatus.UnknownOutcome : NetworkAlertResolutionStatus.Conflict,
+                            owns ? "Запрос ожидает решения." : "Запрос завершён, отложен либо принадлежит другому клиенту."), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Не удалось проверить актуальность сетевой карточки");
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = "Состояние запроса временно недоступно.";
+                    }
+                    break;
 
                 case PipeMessageTypes.ClearConnectionHistory:
 
@@ -4015,9 +4121,16 @@ public class PipeServer : BackgroundService
 
 
 
-                        var verdict = await _aiRating.EvaluateNetworkProcessAsync(
-
-                            evalReq.ProcessName, evalReq.ProcessPath, evalReq.RemoteAddress, evalReq.RemotePort);
+                        // Даже администратор оценивает выданную группу, а не произвольный клиентский путь.
+                        var authoritative = _alertService?.GetPendingAlerts().FirstOrDefault(a => a.AlertId == evalReq.AlertId);
+                        if (authoritative == null)
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Запрос сетевого доступа уже завершён или недоступен.";
+                            break;
+                        }
+                        var verdict = await _alertService!.EvaluateAlertAsync(authoritative.AlertId,
+                            authoritative.ProcessName, authoritative.ProcessPath, authoritative.RemoteAddress, authoritative.RemotePort, ct);
 
 
 
@@ -4366,133 +4479,35 @@ public class PipeServer : BackgroundService
 
 
                 case PipeMessageTypes.AddToFirewallWhitelist:
-
                     try
-
                     {
-
-                        var addPayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
-
-                        if (addPayload != null && !string.IsNullOrWhiteSpace(addPayload.Path))
-
-                        {
-
-                            if (_accessMatrixCoordinator != null)
-
-                            {
-
-                                _accessMatrixCoordinator.ApplyAccessState(new StartupMonitor.Shared.Models.Firewall.SetAppAccessStateRequest
-
-                                {
-
-                                    ApplicationPath = addPayload.Path,
-
-                                    TargetState = StartupMonitor.Shared.Models.Firewall.AccessControlState.Allowed,
-
-                                    Scope = StartupMonitor.Shared.Models.Firewall.AccessRuleScope.Permanent
-
-                                });
-
-                            }
-
-                            else
-
-                            {
-
-                                var cfg = _store.Load();
-
-                                if (!cfg.Settings.FirewallWhitelistedApps.Contains(addPayload.Path, StringComparer.OrdinalIgnoreCase))
-
-                                {
-
-                                    cfg.Settings.FirewallWhitelistedApps.Add(addPayload.Path);
-
-                                    _store.Save(cfg);
-
-                                }
-
-                            }
-
-                        }
-
-                        response.Type = PipeMessageTypes.Success;
-
+                        // ?????? ?????????? ?????? ?????? ? ?????????????? ?????????; ????? ???????????? ?? ?????????? Success.
+                        var appRequest = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        var operation = ChangeFirewallApplicationList(appRequest?.Path, AccessControlState.Allowed);
+                        response = FirewallOperationReply(operation);
                     }
-
                     catch (Exception ex)
-
                     {
-
-                        response.Type = PipeMessageTypes.Error;
-
-                        response.Payload = ex.Message;
-
+                        _logger.LogWarning(ex, "?? ??????? ???????? ?????? ???????? ???????");
+                        response = FirewallOperationReply(FirewallOperationResult.Fail(ex.Message));
                     }
-
                     break;
 
 
 
                 case PipeMessageTypes.RemoveFromFirewallWhitelist:
-
                     try
-
                     {
-
-                        var removePayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
-
-                        if (removePayload != null && !string.IsNullOrWhiteSpace(removePayload.Path))
-
-                        {
-
-                            if (_accessMatrixCoordinator != null)
-
-                            {
-
-                                _accessMatrixCoordinator.ApplyAccessState(new StartupMonitor.Shared.Models.Firewall.SetAppAccessStateRequest
-
-                                {
-
-                                    ApplicationPath = removePayload.Path,
-
-                                    TargetState = StartupMonitor.Shared.Models.Firewall.AccessControlState.Prompt,
-
-                                    Scope = StartupMonitor.Shared.Models.Firewall.AccessRuleScope.Permanent
-
-                                });
-
-                            }
-
-                            else
-
-                            {
-
-                                var cfg = _store.Load();
-
-                                cfg.Settings.FirewallWhitelistedApps.RemoveAll(p =>
-
-                                    string.Equals(p, removePayload.Path, StringComparison.OrdinalIgnoreCase));
-
-                                _store.Save(cfg);
-
-                            }
-
-                        }
-
-                        response.Type = PipeMessageTypes.Success;
-
+                        // ?????? ?????????? ?????? ?????? ? ?????????????? ?????????; ????? ???????????? ?? ?????????? Success.
+                        var appRequest = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        var operation = ChangeFirewallApplicationList(appRequest?.Path, AccessControlState.Prompt);
+                        response = FirewallOperationReply(operation);
                     }
-
                     catch (Exception ex)
-
                     {
-
-                        response.Type = PipeMessageTypes.Error;
-
-                        response.Payload = ex.Message;
-
+                        _logger.LogWarning(ex, "?? ??????? ???????? ?????? ???????? ???????");
+                        response = FirewallOperationReply(FirewallOperationResult.Fail(ex.Message));
                     }
-
                     break;
 
 
@@ -4528,133 +4543,35 @@ public class PipeServer : BackgroundService
 
 
                 case PipeMessageTypes.AddToFirewallBlacklist:
-
                     try
-
                     {
-
-                        var addPayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
-
-                        if (addPayload != null && !string.IsNullOrWhiteSpace(addPayload.Path))
-
-                        {
-
-                            if (_accessMatrixCoordinator != null)
-
-                            {
-
-                                _accessMatrixCoordinator.ApplyAccessState(new StartupMonitor.Shared.Models.Firewall.SetAppAccessStateRequest
-
-                                {
-
-                                    ApplicationPath = addPayload.Path,
-
-                                    TargetState = StartupMonitor.Shared.Models.Firewall.AccessControlState.Blocked,
-
-                                    Scope = StartupMonitor.Shared.Models.Firewall.AccessRuleScope.Permanent
-
-                                });
-
-                            }
-
-                            else
-
-                            {
-
-                                var cfg = _store.Load();
-
-                                if (!cfg.Settings.FirewallBlacklistedApps.Contains(addPayload.Path, StringComparer.OrdinalIgnoreCase))
-
-                                {
-
-                                    cfg.Settings.FirewallBlacklistedApps.Add(addPayload.Path);
-
-                                    _store.Save(cfg);
-
-                                }
-
-                            }
-
-                        }
-
-                        response.Type = PipeMessageTypes.Success;
-
+                        // ?????? ?????????? ?????? ?????? ? ?????????????? ?????????; ????? ???????????? ?? ?????????? Success.
+                        var appRequest = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        var operation = ChangeFirewallApplicationList(appRequest?.Path, AccessControlState.Blocked);
+                        response = FirewallOperationReply(operation);
                     }
-
                     catch (Exception ex)
-
                     {
-
-                        response.Type = PipeMessageTypes.Error;
-
-                        response.Payload = ex.Message;
-
+                        _logger.LogWarning(ex, "?? ??????? ???????? ?????? ???????? ???????");
+                        response = FirewallOperationReply(FirewallOperationResult.Fail(ex.Message));
                     }
-
                     break;
 
 
 
                 case PipeMessageTypes.RemoveFromFirewallBlacklist:
-
                     try
-
                     {
-
-                        var removePayload = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
-
-                        if (removePayload != null && !string.IsNullOrWhiteSpace(removePayload.Path))
-
-                        {
-
-                            if (_accessMatrixCoordinator != null)
-
-                            {
-
-                                _accessMatrixCoordinator.ApplyAccessState(new StartupMonitor.Shared.Models.Firewall.SetAppAccessStateRequest
-
-                                {
-
-                                    ApplicationPath = removePayload.Path,
-
-                                    TargetState = StartupMonitor.Shared.Models.Firewall.AccessControlState.Prompt,
-
-                                    Scope = StartupMonitor.Shared.Models.Firewall.AccessRuleScope.Permanent
-
-                                });
-
-                            }
-
-                            else
-
-                            {
-
-                                var cfg = _store.Load();
-
-                                cfg.Settings.FirewallBlacklistedApps.RemoveAll(p =>
-
-                                    string.Equals(p, removePayload.Path, StringComparison.OrdinalIgnoreCase));
-
-                                _store.Save(cfg);
-
-                            }
-
-                        }
-
-                        response.Type = PipeMessageTypes.Success;
-
+                        // ?????? ?????????? ?????? ?????? ? ?????????????? ?????????; ????? ???????????? ?? ?????????? Success.
+                        var appRequest = JsonSerializer.Deserialize<FirewallAppActionPayload>(message.Payload ?? "{}", JsonOptions);
+                        var operation = ChangeFirewallApplicationList(appRequest?.Path, AccessControlState.Prompt);
+                        response = FirewallOperationReply(operation);
                     }
-
                     catch (Exception ex)
-
                     {
-
-                        response.Type = PipeMessageTypes.Error;
-
-                        response.Payload = ex.Message;
-
+                        _logger.LogWarning(ex, "?? ??????? ???????? ?????? ???????? ???????");
+                        response = FirewallOperationReply(FirewallOperationResult.Fail(ex.Message));
                     }
-
                     break;
 
 
@@ -4696,11 +4613,14 @@ public class PipeServer : BackgroundService
     /// </summary>
 
     /// <param name="entries">Список записей для оценки</param>
+    /// <param name="cancellationToken">Отмена прекращает HTTP и retry перед ожиданием завершения PipeServer.</param>
 
-    private async Task PrefetchAndLogAsync(List<StartupEntry> entries)
+    private async Task PrefetchAndLogAsync(List<StartupEntry> entries, CancellationToken cancellationToken)
 
     {
-
+        // Fire-and-forget вызов из изменения конфигурации также принадлежит времени жизни хоста.
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.ApplicationStopping);
+        cancellationToken = lifetime.Token;
         try
 
         {
@@ -4711,7 +4631,7 @@ public class PipeServer : BackgroundService
 
             var before = _ratingsCache.Count;
 
-            await _aiRating.PrefetchAllAsync(entries);
+            await _aiRating.PrefetchAllAsync(entries, cancellationToken);
 
             var after = _ratingsCache.Count;
 
@@ -4725,6 +4645,10 @@ public class PipeServer : BackgroundService
 
         }
 
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogDebug("Фоновая загрузка AI-рейтингов отменена при остановке службы");
+        }
         catch (Exception ex)
 
         {
@@ -4825,12 +4749,13 @@ public class PipeServer : BackgroundService
 
                         _aiRating.UpdateConfig(cfg.Settings.AiApiKey, cfg.Settings.AiApiUrl, cfg.Settings.AiModel);
 
-                        await PrefetchAndLogAsync(cfg.Entries);
+                        await PrefetchAndLogAsync(cfg.Entries, ct);
 
                     }
 
                 }
 
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
                 catch (Exception ex)
 
                 {

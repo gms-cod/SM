@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
-    <!-- Релизная сборка 2.1.2: двуязычная документация, адаптивная витрина и отчет инспекции роя. -->
-    <Version>2.1.2</Version>
-    <AssemblyVersion>2.1.2.0</AssemblyVersion>
-    <FileVersion>2.1.2.0</FileVersion>
-    <InformationalVersion>2.1.2</InformationalVersion>
+    <!-- Релизная сборка 2.1.3: согласованные решения фаирвола, очередь уведомлений и проверка полномочий. -->
+    <Version>2.1.3</Version>
+    <AssemblyVersion>2.1.3.0</AssemblyVersion>
+    <FileVersion>2.1.3.0</FileVersion>
+    <InformationalVersion>2.1.3</InformationalVersion>
   </PropertyGroup>
 </Project>

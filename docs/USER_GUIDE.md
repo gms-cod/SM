@@ -102,10 +102,12 @@ Monitors over 29 persistence locations across Windows:
 ### Tab 9: Network Security Hub
 - **Windows Firewall Control**: Inspect and toggle Inbound/Outbound rules across Domain, Private, and Public profiles.
 - **Port Defender (Fail2ban for Windows)**: Safeguards exposed endpoints (RDP: 3389, SSH: 22, SMB: 445). Detects brute-force floods and creates transient WFP block rules while preserving local RFC 1918 subnets.
-- **Connection Alerts & GeoIP**: Instant desktop toast flyouts upon outbound socket activity with country flag, city, and ISP attribution.
+- **Connection Alerts & GeoIP**: One active prompt per executable, with connection count, last observation and remote address information. System-wide decisions require an elevated interface. Periodic TCP snapshots do not hold the first packet pending a decision.
 - **Silent Mode for Kernel Sockets**: Suppresses notifications for internal system sockets (PID = 0).
 
 ### Tab 10: Settings & Customization
+
+Closing a connection prompt defers it without changing network policy. The countdown performs the displayed temporary outgoing block when an application path is available. Temporary policies last until service restart, for at most eight hours. Permanent application decisions cover both directions, all protocols and profiles. Allowing a TCP port for all applications is explicitly system-wide. A lost reply is shown as an unknown outcome and retried using the same operation identity. External blocks retain priority; UDP/QUIC detection is outside this TCP prompt mechanism.
 - Seamless UI theme switching (Dark, Light, Mica / Acrylic).
 - Realtime UI language hot-swapping (English / Russian).
 - Credentials vault for external API tokens and push channels.

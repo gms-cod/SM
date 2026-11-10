@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using StartupMonitor.Shared.Models;
 using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.UI.Services;
 
@@ -13,7 +14,7 @@ namespace StartupMonitor.UI.Views.Dialogs;
 /// <summary>
 /// Всплывающее Toast/Flyout окно уведомления о новом сетевом подключении.
 /// Не забирает фокус ввода (ShowActivated = false, Focusable = false).
-/// Поддерживает 5 действий, 30-секундный таймер с интеллектуальной паузой при наведении курсора.
+/// Показывает область политики и состояние группы; поддерживает откладывание без изменения правил.
 /// Окно использует нижнюю привязку (Bottom-Anchored): при росте высоты из-за ответа ИИ
 /// верхняя граница смещается вверх, а кнопки действий остаются неподвижными над панелью задач.
 /// </summary>
@@ -51,13 +52,13 @@ public partial class NetworkConnectionAlertWindow : Window
     private const double FallbackWindowHeight = 440.0;
 
     /// <summary>Данные алерта, отображаемые в карточке.</summary>
-    private readonly NetworkConnectionAlertDto _alert;
+    private NetworkConnectionAlertDto _alert;
 
     /// <summary>Клиент IPC для отправки решения и запроса AI-оценки.</summary>
     private readonly PipeClient _pipeClient;
 
     /// <summary>Отправитель решения; внедрение позволяет проверить настоящий жизненный цикл окна без IPC.</summary>
-    private readonly Func<ResolveNetworkAlertRequest, CancellationToken, Task<bool>> _resolutionSender;
+    private readonly Func<ResolveNetworkAlertRequest, CancellationToken, Task<ResolveNetworkAlertResultPayload>> _resolutionSender;
 
     /// <summary>Таймер обратного отсчёта с шагом в одну секунду.</summary>
     private readonly DispatcherTimer _countdownTimer;
@@ -76,6 +77,12 @@ public partial class NetworkConnectionAlertWindow : Window
 
     /// <summary>Флаг «окно закрыто» (0 — нет, 1 — да). Доступ через Interlocked/Volatile.</summary>
     private int _isClosed;
+
+    /// <summary>Закрытие резервируется до анимации, чтобы новый клик не начал операцию в уходящей карточке.</summary>
+    private int _isClosing;
+
+    /// <summary>Операция с неизвестным исходом: до сверки разрешён только повтор с прежним идентификатором или откладывание.</summary>
+    private ResolveNetworkAlertRequest? _uncertainRequest;
 
     /// <summary>Подтверждение службы, разрешающее окончательное закрытие карточки.</summary>
     private bool _resolutionConfirmed;
@@ -100,6 +107,12 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <summary>Решение, выбранное пользователем (или применённое по таймауту).</summary>
     public NetworkAlertResolution? Resolution { get; private set; }
 
+    /// <summary>Идентификатор группы, аренду и актуальность которой поддерживает поллер.</summary>
+    public string AlertId => _alert.AlertId;
+
+    /// <summary>Уведомляет поллер о локальном откладывании, в том числе при недоставленном подтверждении службы.</summary>
+    public event Action<string>? DeferredLocally;
+
     /// <summary>
     /// Создаёт окно уведомления о новом сетевом подключении.
     /// </summary>
@@ -107,15 +120,24 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="pipeClient">Клиент IPC (не может быть null).</param>
     /// <param name="countdownSeconds">Длительность обратного отсчёта; значения ≤ 0 заменяются на 30 секунд.</param>
     /// <param name="resolutionSender">Необязательный адаптер подтверждения решения для изолированной проверки.</param>
+    /// <param name="detailedResolutionSender">Адаптер точных статусов; bool-адаптер сохранён для совместимых проверок.</param>
     public NetworkConnectionAlertWindow(
         NetworkConnectionAlertDto alert,
         PipeClient pipeClient,
         int countdownSeconds = 30,
-        Func<ResolveNetworkAlertRequest, CancellationToken, Task<bool>>? resolutionSender = null)
+        Func<ResolveNetworkAlertRequest, CancellationToken, Task<bool>>? resolutionSender = null,
+        Func<ResolveNetworkAlertRequest, CancellationToken, Task<ResolveNetworkAlertResultPayload>>? detailedResolutionSender = null)
     {
         _alert = alert ?? throw new ArgumentNullException(nameof(alert));
         _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
-        _resolutionSender = resolutionSender ?? _pipeClient.ResolveNetworkAlertAsync;
+        _resolutionSender = detailedResolutionSender ?? (resolutionSender == null
+            ? _pipeClient.ResolveNetworkAlertDetailedAsync
+            : async (request, ct) =>
+            {
+                var success = await resolutionSender(request, ct);
+                return new(success, string.Empty, success ? NetworkAlertResolutionStatus.Applied : NetworkAlertResolutionStatus.Failed,
+                    request.OperationId, success ? request.Resolution : null);
+            });
         _totalSeconds = countdownSeconds > 0 ? countdownSeconds : 30;
         _remainingSeconds = _totalSeconds;
 
@@ -196,22 +218,16 @@ public partial class NetworkConnectionAlertWindow : Window
         CancelAiEvaluation();
     }
 
-    /// <summary>Преобразует системное закрытие в подтверждаемую блокировку на сеанс.</summary>
+    /// <summary>Системное закрытие откладывает карточку; оно не является согласием на изменение сетевой политики.</summary>
     /// <param name="sender">Закрываемое окно.</param>
     /// <param name="e">Аргументы, позволяющие дождаться ответа службы без блокировки диспетчера.</param>
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (_resolutionConfirmed || !IsLoaded || _forceClosing)
+        if (_resolutionConfirmed || !IsLoaded || _forceClosing || Volatile.Read(ref _isClosing) != 0)
             return;
-
-        if (_resolutionFailed)
-        {
-            _forceClosing = true;
-            return;
-        }
 
         e.Cancel = true;
-        ResolveAndClose(NetworkAlertResolution.BlockSession);
+        ResolveAndClose(NetworkAlertResolution.Defer);
     }
 
     /// <summary>
@@ -298,8 +314,12 @@ public partial class NetworkConnectionAlertWindow : Window
             var (countryName, countryFlag, _) = GeoIpLookupService.Resolve(_alert.RemoteAddress);
             TxtCountryFlag.Text = string.IsNullOrEmpty(countryFlag) ? "🌐" : countryFlag;
             TxtCountryName.Text = string.IsNullOrEmpty(countryName) ? loc.NetAlertCountryInternet : countryName;
-
-            UpdateCountdownText();
+            TxtConnectionSummary.Text = loc.Format("NetAlertConnectionSummaryFormat", Math.Max(1, _alert.ConnectionCount),
+                (_alert.LastSeenAt == default ? _alert.DetectedAt : _alert.LastSeenAt).ToLocalTime().ToString("g"),
+                loc[_alert.IsActive ? "NetAlertConnectionActive" : "NetAlertConnectionInactive"]);
+            BtnAllowPort.Content = loc.Format("NetAlertAllowPortScopeFormat", _alert.RemotePort);
+            if (!_resolutionFailed && Volatile.Read(ref _isResolved) == 0)
+                UpdateCountdownText();
         }
         catch (Exception ex)
         {
@@ -627,27 +647,30 @@ public partial class NetworkConnectionAlertWindow : Window
         if (_isPausedByHover)
             return;
 
-        TxtCountdown.Text = string.Format(
-            LocalizationService.Instance.NetAlertCountdownFormat,
-            _remainingSeconds);
+        TxtCountdown.Text = LocalizationService.Instance.Format(
+            _alert.CanBlockSession ? "NetAlertCountdownFormat" : "NetAlertDeferCountdownFormat", _remainingSeconds);
         CountdownBar.Value = Math.Max(0, _remainingSeconds);
     }
 
     /// <summary>
     /// Обрабатывает секундный тик обратного отсчёта. По истечении времени
-    /// применяется безопасное решение — блокировка на текущую сессию.
+    /// запрашивается блокировка на сеанс; при неизвестном пути показ откладывается без изменения правил.
     /// </summary>
     /// <param name="sender">Источник события таймера.</param>
     /// <param name="e">Аргументы события.</param>
     private void OnCountdownTick(object? sender, EventArgs e)
     {
-        if (Volatile.Read(ref _isResolved) != 0 || _isPausedByHover || _resolutionFailed)
+        if (Volatile.Read(ref _isResolved) != 0 || Volatile.Read(ref _isClosing) != 0 || _isPausedByHover || _resolutionFailed)
             return;
 
         if (!_alert.CanBlockSession)
         {
-            _countdownTimer.Stop();
-            TxtCountdown.Text = LocalizationService.Instance["NetAlertPathRequired"];
+            // Неизвестный путь не требует глобального разрешения порта: по таймеру безопасно откладываем показ.
+            _remainingSeconds--;
+            if (_remainingSeconds <= 0)
+                ResolveAndClose(NetworkAlertResolution.Defer);
+            else
+                TxtCountdown.Text = LocalizationService.Instance.Format("NetAlertDeferCountdownFormat", _remainingSeconds);
             return;
         }
 
@@ -681,17 +704,48 @@ public partial class NetworkConnectionAlertWindow : Window
     private void OnAllowPortClick(object sender, RoutedEventArgs e) =>
         ResolveAndClose(NetworkAlertResolution.AllowPort);
 
-    /// <summary>Пользователь закрыл окно крестиком (трактуется как блокировка на сессию).</summary>
-    private void OnCloseClick(object sender, RoutedEventArgs e)
+    /// <summary>Крестик откладывает карточку без скрытого разрешения или запрета сети.</summary>
+    private void OnCloseClick(object sender, RoutedEventArgs e) => ResolveAndClose(NetworkAlertResolution.Defer);
+
+    /// <summary>Явное откладывание не изменяет правила и освобождает очередь других программ.</summary>
+    private void OnDeferClick(object sender, RoutedEventArgs e) => ResolveAndClose(NetworkAlertResolution.Defer);
+
+    /// <summary>Повторяет только исходную операцию с прежним OperationId после потери подтверждения.</summary>
+    private void OnRetryClick(object sender, RoutedEventArgs e)
     {
-        if (_resolutionFailed)
+        if (_uncertainRequest != null)
+            ResolveAndClose(_uncertainRequest.Resolution);
+    }
+
+    /// <summary>Обновляет метаданные и capabilities открытой группы либо завершает устаревшую карточку без Block.</summary>
+    /// <param name="status">Подтверждённое текущее состояние службы, полученное поллером.</param>
+    public void UpdateFromService(NetworkAlertStatusPayload status)
+    {
+        ArgumentNullException.ThrowIfNull(status);
+        if (Volatile.Read(ref _isClosed) != 0 || Volatile.Read(ref _isClosing) != 0)
+            return;
+        if (!status.Enabled || status.Alert == null && status.Status is NetworkAlertResolutionStatus.Superseded
+            or NetworkAlertResolutionStatus.Deferred or NetworkAlertResolutionStatus.Applied or NetworkAlertResolutionStatus.AlreadyApplied
+            or NetworkAlertResolutionStatus.Conflict)
         {
-            _forceClosing = true;
-            FadeOutAndClose();
+            CloseWithoutResolution();
             return;
         }
+        if (status.Alert == null || !string.Equals(status.Alert.AlertId, AlertId, StringComparison.Ordinal))
+            return;
+        _alert = status.Alert;
+        FillAlertFields();
+        if (Volatile.Read(ref _isResolved) == 0)
+            SetButtonsEnabled(true);
+    }
 
-        ResolveAndClose(NetworkAlertResolution.BlockSession);
+    /// <summary>Закрывает карточку после остановки, перезапуска службы или внешнего решения, не отправляя новое действие.</summary>
+    public void CloseWithoutResolution()
+    {
+        _forceClosing = true;
+        _countdownTimer.Stop();
+        CancelAiEvaluation();
+        FadeOutAndClose();
     }
 
     /// <summary>
@@ -704,7 +758,8 @@ public partial class NetworkConnectionAlertWindow : Window
         // Interlocked.Exchange гарантирует ровно одно срабатывание даже при одновременном
         // клике и тике таймера: проверка и установка флага выполняются атомарно,
         // что защищает от повторного входа через асинхронные пути и повторную отправку решения.
-        if (Interlocked.Exchange(ref _isResolved, 1) != 0)
+        if (Volatile.Read(ref _isClosing) != 0 || Volatile.Read(ref _isClosed) != 0 ||
+            Interlocked.Exchange(ref _isResolved, 1) != 0)
             return;
 
         // Мгновенная отмена AI-запроса: пользовательское действие имеет приоритет.
@@ -714,8 +769,12 @@ public partial class NetworkConnectionAlertWindow : Window
         _resolutionFailed = false;
         TxtCountdown.Text = LocalizationService.Instance["NetAlertApplying"];
 
-        var request = new ResolveNetworkAlertRequest
+        // Неизвестный исход запрещает новое противоположное действие до идемпотентной сверки.
+        var request = resolution != NetworkAlertResolution.Defer && _uncertainRequest != null
+            ? _uncertainRequest
+            : new ResolveNetworkAlertRequest
         {
+            OperationId = Guid.NewGuid().ToString("N"),
             AlertId = _alert.AlertId,
             ProcessPath = _alert.ProcessPath ?? string.Empty,
             ProcessName = _alert.ProcessName ?? string.Empty,
@@ -734,37 +793,60 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="request">Запрос резолва алерта.</param>
     private async Task SendResolutionInBackgroundAsync(ResolveNetworkAlertRequest request)
     {
-        var applied = false;
+        ResolveNetworkAlertResultPayload result;
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            applied = await _resolutionSender(request, cts.Token).WaitAsync(cts.Token).ConfigureAwait(true);
+            result = await _resolutionSender(request, cts.Token).WaitAsync(cts.Token).ConfigureAwait(true);
         }
         catch (OperationCanceledException ex)
         {
             App.Log($"NetworkConnectionAlertWindow.Resolve timeout: {ex.Message}");
+            result = new(false, string.Empty, NetworkAlertResolutionStatus.UnknownOutcome, request.OperationId);
         }
         catch (Exception ex)
         {
             App.Log($"NetworkConnectionAlertWindow.Resolve: {ex.Message}");
+            result = new(false, string.Empty, NetworkAlertResolutionStatus.UnknownOutcome, request.OperationId);
         }
 
-        if (Volatile.Read(ref _isClosed) != 0)
+        if (Volatile.Read(ref _isClosed) != 0 || Volatile.Read(ref _isClosing) != 0)
             return;
 
-        if (applied)
+        if (request.Resolution == NetworkAlertResolution.Defer)
         {
-            Resolution = request.Resolution;
+            // Даже при недоступном транспорте локальное скрытие ограничивает повторы и не меняет сетевую политику.
+            DeferredLocally?.Invoke(AlertId);
+            Resolution = result.Success ? NetworkAlertResolution.Defer : null;
+            _forceClosing = true;
+            FadeOutAndClose();
+            return;
+        }
+
+        if (result.Success && result.Status is NetworkAlertResolutionStatus.Applied or NetworkAlertResolutionStatus.AlreadyApplied)
+        {
+            _uncertainRequest = null;
+            Resolution = result.AppliedResolution ?? request.Resolution;
             _resolutionConfirmed = true;
             FadeOutAndClose();
             return;
         }
 
-        App.Log($"NetworkConnectionAlertWindow.Resolve rejected: alert={request.AlertId}, decision={request.Resolution}");
+        if (result.Status is NetworkAlertResolutionStatus.Superseded or NetworkAlertResolutionStatus.Deferred)
+        {
+            CloseWithoutResolution();
+            return;
+        }
+
+        App.Log($"NetworkConnectionAlertWindow.Resolve: alert={request.AlertId}, operation={request.OperationId}, decision={request.Resolution}, status={result.Status}");
+        _uncertainRequest = result.Status is NetworkAlertResolutionStatus.UnknownOutcome or NetworkAlertResolutionStatus.PartialFailure
+            ? request : null;
         _resolutionFailed = true;
         Interlocked.Exchange(ref _isResolved, 0);
         SetButtonsEnabled(true);
-        TxtCountdown.Text = LocalizationService.Instance["NetAlertApplyFailed"];
+        TxtCountdown.Text = string.IsNullOrWhiteSpace(result.Message)
+            ? LocalizationService.Instance[_uncertainRequest == null ? "NetAlertApplyFailed" : "NetAlertUnknownOutcome"]
+            : result.Message;
     }
 
     /// <summary>
@@ -788,12 +870,17 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <param name="enabled">True — включить кнопки, false — заблокировать.</param>
     private void SetButtonsEnabled(bool enabled)
     {
-        BtnWhitelist.IsEnabled = enabled && _alert.CanBlockSession;
-        BtnAllowSession.IsEnabled = enabled && _alert.CanAllowSession;
-        BtnBlockSession.IsEnabled = enabled && _alert.CanBlockSession;
-        BtnBlockAlways.IsEnabled = enabled && _alert.CanBlockSession;
-        BtnAllowPort.IsEnabled = enabled;
-        BtnClose.IsEnabled = enabled && _alert.CanBlockSession;
+        var idle = enabled && Volatile.Read(ref _isClosing) == 0;
+        var canChange = idle && _uncertainRequest == null;
+        BtnWhitelist.IsEnabled = canChange && _alert.CanBlockSession;
+        BtnAllowSession.IsEnabled = canChange && _alert.CanAllowSession;
+        BtnBlockSession.IsEnabled = canChange && _alert.CanBlockSession;
+        BtnBlockAlways.IsEnabled = canChange && _alert.CanBlockSession;
+        BtnAllowPort.IsEnabled = canChange;
+        BtnClose.IsEnabled = idle;
+        BtnDefer.IsEnabled = idle;
+        BtnRetry.IsEnabled = idle && _uncertainRequest != null;
+        BtnRetry.Visibility = _uncertainRequest == null ? Visibility.Collapsed : Visibility.Visible;
         BtnAllowSession.ToolTip = _alert.CanAllowSession
             ? LocalizationService.Instance.NetAlertAllowSessionTip
             : LocalizationService.Instance["NetAlertSessionAllowUnavailable"];
@@ -928,6 +1015,10 @@ public partial class NetworkConnectionAlertWindow : Window
     /// <summary>Плавное затухание перед закрытием (200 мс).</summary>
     private void FadeOutAndClose()
     {
+        if (Volatile.Read(ref _isClosed) != 0 || Interlocked.Exchange(ref _isClosing, 1) != 0)
+            return;
+        _countdownTimer.Stop();
+        SetButtonsEnabled(false);
         try
         {
             var anim = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(200));

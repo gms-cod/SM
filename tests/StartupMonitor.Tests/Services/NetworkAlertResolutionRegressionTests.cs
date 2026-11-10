@@ -139,7 +139,7 @@ public sealed class NetworkAlertResolutionRegressionTests
     public void ResolveAlert_AllowPort_DoesNotResolveOtherPortsOfSameApplication()
     {
         using var service = CreateService([Socket(), Socket(1001, 8443, "9.9.9.9"), Socket(1002)], _ => { });
-        Assert.Equal(3, service.ScanNewConnections());
+        Assert.Equal(2, service.ScanNewConnections());
         var alert = Assert.Single(service.GetPendingAlerts(), item => item.ProcessPath == AppPath && item.RemotePort == 443);
 
         Assert.True(service.ResolveAlert(Request(alert, NetworkAlertResolution.AllowPort)));

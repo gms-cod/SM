@@ -38,6 +38,17 @@ $backupDirectory = Join-Path $repoDirectory ('out\deployment-backup-' + [Guid]::
 
 # Одинаковая остановка вызывается перед установкой и перед откатом, освобождая EXE после частичного старта.
 $stopApplication = {
+    # Сначала закрываем UI: иначе его reconnect успевает повторно запустить остановленную службу.
+    Get-Process -Name 'StartupMonitor.UI' -ErrorAction SilentlyContinue | Where-Object { $_.Path -in $targetUiPaths } | ForEach-Object {
+        try {
+            $null = $_.CloseMainWindow()
+            if (-not $_.WaitForExit(3000)) {
+                Stop-Process -Id $_.Id -Force -ErrorAction Stop
+                if (-not $_.WaitForExit(10000)) { throw "Процесс UI $($_.Id) не завершился после остановки." }
+            }
+        }
+        finally { $_.Dispose() }
+    }
     if ($registered) {
         $service = Get-Service -Name 'StartupMonitor' -ErrorAction Stop
         # SCM может сообщить Stopped до завершения .NET-host: ожидаем освобождение EXE самим процессом.
@@ -57,16 +68,6 @@ $stopApplication = {
             if ($serviceProcess) { $serviceProcess.Dispose() }
             $service.Dispose()
         }
-    }
-    Get-Process -Name 'StartupMonitor.UI' -ErrorAction SilentlyContinue | Where-Object { $_.Path -in $targetUiPaths } | ForEach-Object {
-        try {
-            $null = $_.CloseMainWindow()
-            if (-not $_.WaitForExit(3000)) {
-                Stop-Process -Id $_.Id -Force -ErrorAction Stop
-                if (-not $_.WaitForExit(10000)) { throw "Процесс UI $($_.Id) не завершился после остановки." }
-            }
-        }
-        finally { $_.Dispose() }
     }
 }.GetNewClosure()
 

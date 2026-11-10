@@ -150,6 +150,9 @@
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Рекомендация:" FontWeight="SemiBold" Margin="0 8 0 0" />
                         <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding AiRecommendation}" Style="{StaticResource SelectableText}" Margin="0 8 0 0" />
                     </Grid>
+                    <!-- Ошибка обновления отделена от сохранённого вердикта и не подменяет поля модели. -->
+                    <TextBlock x:Name="TxtRatingRefreshStatus" Visibility="Collapsed" TextWrapping="Wrap"
+                               Margin="0,8,0,0" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </ui:Card>
 

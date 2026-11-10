@@ -4,7 +4,7 @@
 
 #ifndef MyAppVersion
   ; Версия по умолчанию совпадает с проверяемой сборкой и новым релизным тегом.
-  #define MyAppVersion "2.1.2"
+  #define MyAppVersion "2.1.3"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -113,9 +113,12 @@ Filename: "sc.exe"; Parameters: "sdset {#MyServiceName} D:(A;;CCLCSWRPWPDTLOCRRC
 ; Запуск службы после установки/обновления
 Filename: "sc.exe"; Parameters: "start {#MyServiceName}"; Flags: runhidden; StatusMsg: "{cm:StartService}"
 ; Опциональный запуск UI для пользователя при интерактивной установке
+; Повышенная задача регистрируется до первого входа пользователя; старый Run служит только bootstrap.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--configure-autostart"; Flags: runhidden waituntilterminated; Tasks: autostart
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--disable-autostart"; Flags: runhidden waituntilterminated; RunOnceId: "DisableUIAutostart"
 ; Остановка и удаление службы при удалении программы
 Filename: "sc.exe"; Parameters: "stop {#MyServiceName}"; Flags: runhidden; RunOnceId: "StopService"
 Filename: "sc.exe"; Parameters: "delete {#MyServiceName}"; Flags: runhidden; RunOnceId: "DeleteService"

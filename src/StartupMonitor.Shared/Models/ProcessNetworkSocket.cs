@@ -17,6 +17,9 @@ public class ProcessNetworkSocket
     /// <summary>Протокол передачи данных ("TCP", "TCPv6", "UDP", "UDPv6").</summary>
     public string Protocol { get; set; } = "TCP";
 
+    /// <summary>Подтверждённое направление: Outbound для SYN_SENT; Unknown, если системная таблица его не определяет.</summary>
+    public string Direction { get; set; } = "Unknown";
+
     /// <summary>Локальный IP-адрес.</summary>
     public string LocalAddress { get; set; } = string.Empty;
 

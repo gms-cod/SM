@@ -1597,9 +1597,18 @@ public class PipeClient : IDisposable
     /// <param name="ct">Токен отмены операции.</param>
     /// <returns>True, если служба применила решение.</returns>
     public async Task<bool> ResolveNetworkAlertAsync(ResolveNetworkAlertRequest request, CancellationToken ct = default)
+        => (await ResolveNetworkAlertDetailedAsync(request, ct).ConfigureAwait(false)).Success;
+
+    /// <summary>Сохраняет точный исход и идентификатор операции; потерянный ответ не выдаётся за подтверждённый отказ политики.</summary>
+    /// <param name="request">Выбор с устойчивым OperationId для идемпотентного повтора.</param>
+    /// <param name="ct">Отмена ожидания транспорта.</param>
+    /// <returns>Подтверждение службы либо UnknownOutcome, требующий сверки или повтора той же операции.</returns>
+    public async Task<ResolveNetworkAlertResultPayload> ResolveNetworkAlertDetailedAsync(ResolveNetworkAlertRequest request, CancellationToken ct = default)
     {
         if (request == null)
-            return false;
+            return new(false, LocalizationService.Instance["NetAlertApplyFailed"], NetworkAlertResolutionStatus.Failed);
+        if (string.IsNullOrWhiteSpace(request.OperationId))
+            request.OperationId = Guid.NewGuid().ToString("N");
 
         try
         {
@@ -1610,7 +1619,7 @@ public class PipeClient : IDisposable
             }, ct);
 
             if (response == null)
-                return false;
+                return new(false, LocalizationService.Instance["NetAlertUnknownOutcome"], NetworkAlertResolutionStatus.UnknownOutcome, request.OperationId);
 
             if (response.Type == PipeMessageTypes.ResolveNetworkAlertResponse
                 && !string.IsNullOrWhiteSpace(response.Payload))
@@ -1618,22 +1627,53 @@ public class PipeClient : IDisposable
                 try
                 {
                     var result = JsonSerializer.Deserialize<ResolveNetworkAlertResultPayload>(response.Payload, JsonOptions);
-                    return result?.Success ?? false;
+                    if (result != null)
+                    {
+                        // Совместимость с прежним положительным ACK без поля Status; отрицательный не угадываем.
+                        return result.Success && result.Status == NetworkAlertResolutionStatus.UnknownOutcome
+                            ? result with { Status = NetworkAlertResolutionStatus.Applied, OperationId = request.OperationId }
+                            : result;
+                    }
                 }
                 catch (Exception ex)
                 {
                     LogResponseFailure(ex);
-                    return false;
                 }
             }
 
-            return response?.Type == PipeMessageTypes.Success;
+            if (response.Type == PipeMessageTypes.Success)
+                return new(true, string.Empty, NetworkAlertResolutionStatus.Applied, request.OperationId, request.Resolution);
+            if (response.Type == PipeMessageTypes.Error)
+                return new(false, response.Payload ?? LocalizationService.Instance["NetAlertApplyFailed"], NetworkAlertResolutionStatus.Failed, request.OperationId);
         }
         catch (Exception ex)
         {
             LogResponseFailure(ex);
-            return false;
         }
+        return new(false, LocalizationService.Instance["NetAlertUnknownOutcome"], NetworkAlertResolutionStatus.UnknownOutcome, request.OperationId);
+    }
+
+    /// <summary>Проверяет актуальность показанной группы и продлевает принадлежащую клиенту аренду показа.</summary>
+    /// <param name="alertId">Идентификатор текущей карточки.</param>
+    /// <param name="ct">Токен поколения поллера; отменённый ответ не применяется к новому UI-сеансу.</param>
+    /// <returns>Состояние службы либо null, если достоверного ответа нет.</returns>
+    public async Task<NetworkAlertStatusPayload?> GetNetworkAlertStatusAsync(string alertId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(alertId);
+        try
+        {
+            var response = await SendAsync(new PipeMessage
+            {
+                Type = PipeMessageTypes.GetNetworkAlertStatus,
+                Payload = JsonSerializer.Serialize(alertId, JsonOptions)
+            }, ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            if (response?.Type == PipeMessageTypes.GetNetworkAlertStatusResponse && !string.IsNullOrWhiteSpace(response.Payload))
+                return JsonSerializer.Deserialize<NetworkAlertStatusPayload>(response.Payload, JsonOptions);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex) { LogResponseFailure(ex); }
+        return null;
     }
 
     /// <summary>Запрашивает у службы список ожидающих сетевых алертов о новых подключениях.</summary>

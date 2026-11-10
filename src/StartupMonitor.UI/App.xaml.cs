@@ -58,6 +58,30 @@ public partial class App : Application
     /// <summary>Обрабатывает запуск приложения: проверяет единственный экземпляр, настраивает тему, создаёт иконку трея.</summary>
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Установщик настраивает только собственный автозапуск из повышенного процесса без обычного UI и глобального mutex.
+        if (e.Args.Contains("--configure-autostart") || e.Args.Contains("--disable-autostart"))
+        {
+            try
+            {
+                if (e.Args.Contains("--configure-autostart") && e.Args.Contains("--disable-autostart"))
+                    throw new ArgumentException("Указаны взаимоисключающие режимы настройки автозапуска.");
+                var configured = Services.AutostartService.EnsureSingleAutostartEntry(e.Args.Contains("--configure-autostart"));
+                if (configured)
+                {
+                    var enable = e.Args.Contains("--configure-autostart");
+                    ViewModels.MainViewModel.SaveSetting("startWithWindows", enable);
+                    if (ViewModels.MainViewModel.LoadStartWithWindowsFromFile() != enable)
+                        throw new InvalidOperationException("Сохранение настройки автозапуска не подтверждено.");
+                }
+                Shutdown(configured ? 0 : 1);
+            }
+            catch (Exception ex)
+            {
+                Log($"Autostart configuration failed: {ex.GetType().Name}: {ex.Message}");
+                Shutdown(1);
+            }
+            return;
+        }
         IsMinimized = e.Args.Contains("--minimized");
         Log($"OnStartup: вход в OnStartup, IsMinimized={IsMinimized}, Args={string.Join(' ', e.Args)}");
 

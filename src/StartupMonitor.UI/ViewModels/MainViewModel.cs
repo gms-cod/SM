@@ -39,6 +39,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Флаг защиты от повторного входа в поллер сетевых алертов.</summary>
     private int _isPollingNetworkAlerts;
 
+    /// <summary>Отмена и поколение отделяют ответы прежнего подключения от текущего поллера.</summary>
+    private readonly object _networkAlertPollerSync = new();
+    private CancellationTokenSource? _networkAlertPollerCts;
+    private int _networkAlertPollerGeneration;
+
+    /// <summary>Только одно принадлежащее модели окно; ссылки читаются атомарно, действия выполняются диспетчером.</summary>
+    private NetworkConnectionAlertWindow? _activeNetworkAlertWindow;
+
+    /// <summary>Локальное откладывание ограничивает повторный показ даже при недоставленном Defer.</summary>
+    private readonly Dictionary<string, DateTime> _networkAlertDeferrals = new(StringComparer.Ordinal);
+
+    /// <summary>Изолированные источники поллера позволяют проверить настоящие async-ветки без IPC и автозапуска.</summary>
+    private readonly Func<CancellationToken, Task<List<NetworkConnectionAlertDto>>>? _networkAlertsProvider;
+    private readonly Func<string, CancellationToken, Task<NetworkAlertStatusPayload?>>? _networkAlertStatusProvider;
+    private readonly Func<NetworkConnectionAlertDto, NetworkConnectionAlertWindow>? _networkAlertWindowFactory;
+
     /// <summary>Таймер периодического опроса изменений данных (polling).</summary>
     private System.Threading.Timer? _pollingTimer;
 
@@ -447,8 +463,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.EventsReceived -= OnPipeClientEventsReceived;
         _pipeClient.Disconnected -= OnPipeClientDisconnected;
         StopSystemThemeWatcher();
-        _networkAlertPollerTimer?.Dispose();
-        _networkAlertPollerTimer = null;
+        StopNetworkAlertPoller();
         _pollingTimer?.Dispose();
         _cpuUsageTimer?.Dispose();
         _logWatchTimer?.Dispose();
@@ -1502,6 +1517,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return LoadSetting("startWithWindows", true);
     }
 
+    /// <summary>Создаёт изолированную модель для проверки производственного поллера без реестра, CPU-таймеров и подключения службы.</summary>
+    /// <param name="pipeClient">Клиент, освобождаемый вместе с моделью.</param>
+    /// <param name="alertsProvider">Источник выдачи очереди.</param>
+    /// <param name="statusProvider">Источник состояния уже открытой карточки.</param>
+    /// <param name="windowFactory">Фабрика настоящего WPF-окна с управляемой отправкой решения.</param>
+    internal MainViewModel(PipeClient pipeClient,
+        Func<CancellationToken, Task<List<NetworkConnectionAlertDto>>> alertsProvider,
+        Func<string, CancellationToken, Task<NetworkAlertStatusPayload?>> statusProvider,
+        Func<NetworkConnectionAlertDto, NetworkConnectionAlertWindow> windowFactory)
+    {
+        _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
+        _networkAlertsProvider = alertsProvider ?? throw new ArgumentNullException(nameof(alertsProvider));
+        _networkAlertStatusProvider = statusProvider ?? throw new ArgumentNullException(nameof(statusProvider));
+        _networkAlertWindowFactory = windowFactory ?? throw new ArgumentNullException(nameof(windowFactory));
+        TaskManager = new TaskManagerViewModel(pipeClient);
+    }
+
     /// <summary>Создаёт MainViewModel, инициализирует опции и подписывается на события PipeClient.</summary>
     public MainViewModel(PipeClient pipeClient)
     {
@@ -2024,7 +2056,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 return true;
             if (old.Status != e.Status)
                 return true;
-            if (old.AiRating != e.AiRating)
+            if (old.AiRating != e.AiRating || old.IsUserRating != e.IsUserRating ||
+                old.AiCategory != e.AiCategory || old.AiRisk != e.AiRisk || old.AiRecommendation != e.AiRecommendation)
                 return true;
             if (old.KasperskyZone != e.KasperskyZone)
                 return true;
@@ -2900,20 +2933,51 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Запрашивает немедленную переоценку AI-рейтинга для указанной записи и обновляет локальную модель.</summary>
     public async Task<StartupEntry?> ReRateEntryAsync(string entryId)
+        => await ReRateEntryCoreAsync(entryId, _pipeClient.ReRateEntryAsync);
+
+    /// <summary>Применяет полученный AI-результат к действительным экземплярам списка; управляемый sender позволяет проверять UI без IPC.</summary>
+    /// <param name="entryId">Идентификатор переоцениваемой записи.</param>
+    /// <param name="sender">Получение нового результата от службы либо изолированного теста.</param>
+    /// <returns>Полученная запись либо null при отсутствии подтверждённого результата.</returns>
+    internal async Task<StartupEntry?> ReRateEntryCoreAsync(string entryId, Func<string, Task<StartupEntry?>> sender)
     {
-        var updated = await _pipeClient.ReRateEntryAsync(entryId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
+        ArgumentNullException.ThrowIfNull(sender);
+        var updated = await sender(entryId);
         if (updated != null)
+            await ApplyRatingUpdateAsync(updated);
+        return updated;
+    }
+
+    /// <summary>Возвращает актуальную запись из полного списка независимо от действующего фильтра и прежних экземпляров строк.</summary>
+    /// <param name="entryId">Постоянный идентификатор открытого объекта.</param>
+    /// <returns>Последний объект снимка либо null, если запись больше не существует.</returns>
+    internal StartupEntry? GetLiveEntryById(string entryId)
+    {
+        lock (_entriesLock) return _allEntries.FirstOrDefault(entry => entry.Id == entryId);
+    }
+
+    /// <summary>Публикует все поля рейтинга в UI-потоке, включая происхождение оценки и сохранившиеся экземпляры коллекций.</summary>
+    /// <param name="updated">Подтверждённое состояние рейтинга службы.</param>
+    private async Task ApplyRatingUpdateAsync(StartupEntry updated)
+    {
+        void Apply()
         {
-            var existing = Entries.FirstOrDefault(e => e.Id == entryId);
-            if (existing != null)
+            StartupEntry[] targets;
+            lock (_entriesLock) { targets = _allEntries.Where(entry => entry.Id == updated.Id).ToArray(); }
+            foreach (var target in targets.Concat(Entries.Where(entry => entry.Id == updated.Id))
+                         .Concat(FilteredEntries.Where(entry => entry.Id == updated.Id)).Distinct())
             {
-                existing.AiRating = updated.AiRating;
-                existing.AiCategory = updated.AiCategory;
-                existing.AiRisk = updated.AiRisk;
-                existing.AiRecommendation = updated.AiRecommendation;
+                target.AiRating = updated.AiRating;
+                target.AiCategory = updated.AiCategory;
+                target.AiRisk = updated.AiRisk;
+                target.AiRecommendation = updated.AiRecommendation;
+                target.IsUserRating = updated.IsUserRating;
             }
         }
-        return updated;
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess()) await dispatcher.InvokeAsync(Apply);
+        else Apply();
     }
 
     /// <summary>Устанавливает ручной рейтинг для записи (от 1 до 5 звёзд) или сбрасывает к автоматической AI-оценке.</summary>
@@ -2921,17 +2985,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         var updated = await _pipeClient.SetUserRatingAsync(entryId, stars, resetToAi);
         if (updated != null)
-        {
-            var existing = Entries.FirstOrDefault(e => e.Id == entryId);
-            if (existing != null)
-            {
-                existing.IsUserRating = updated.IsUserRating;
-                existing.AiRating = updated.AiRating;
-                existing.AiCategory = updated.AiCategory;
-                existing.AiRisk = updated.AiRisk;
-                existing.AiRecommendation = updated.AiRecommendation;
-            }
-        }
+            await ApplyRatingUpdateAsync(updated);
         return updated;
     }
 
@@ -3174,113 +3228,179 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     public void StartNetworkAlertPoller()
     {
-        _networkAlertPollerTimer?.Dispose();
-        _networkAlertPollerTimer = new Timer(_ => _ = SafePollNetworkAlertsAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        StopNetworkAlertPoller();
+        lock (_networkAlertPollerSync)
+        {
+            var cts = new CancellationTokenSource();
+            _networkAlertPollerCts = cts;
+            var generation = ++_networkAlertPollerGeneration;
+            var token = cts.Token;
+            _networkAlertPollerTimer = new Timer(_ => _ = SafePollNetworkAlertsAsync(generation, token),
+                null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        }
     }
 
-    private async Task SafePollNetworkAlertsAsync()
+    /// <summary>Изолирует отказ одного тика; отмена предыдущего поколения является штатным завершением.</summary>
+    /// <param name="generation">Поколение подключения, создавшего таймер.</param>
+    /// <param name="ct">Отмена при остановке или переподключении.</param>
+    private async Task SafePollNetworkAlertsAsync(int generation, CancellationToken ct)
     {
         try
         {
-            await PollNetworkAlertsAsync();
+            await PollNetworkAlertsAsync(generation, ct).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
             App.Log($"MainViewModel.SafePollNetworkAlerts: {ex.Message}");
         }
     }
 
-    /// <summary>Останавливает глобальный опрос сетевых алертов брандмауэра.</summary>
+    /// <summary>Инвалидирует старые ответы и закрывает принадлежащую модели карточку без скрытого BlockSession.</summary>
     public void StopNetworkAlertPoller()
     {
-        _networkAlertPollerTimer?.Dispose();
-        _networkAlertPollerTimer = null;
-        Interlocked.Exchange(ref _isPollingNetworkAlerts, 0);
-
-        var hasActiveAlertWindow = false;
+        CancellationTokenSource? cts;
+        Timer? timer;
+        lock (_networkAlertPollerSync)
+        {
+            ++_networkAlertPollerGeneration;
+            cts = _networkAlertPollerCts;
+            _networkAlertPollerCts = null;
+            timer = _networkAlertPollerTimer;
+            _networkAlertPollerTimer = null;
+        }
+        timer?.Dispose();
+        cts?.Cancel();
+        cts?.Dispose();
+        var window = Volatile.Read(ref _activeNetworkAlertWindow);
+        if (window == null)
+            return;
         try
         {
-            System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-            {
-                hasActiveAlertWindow = System.Windows.Application.Current.Windows
-                    .OfType<Views.Dialogs.NetworkConnectionAlertWindow>()
-                    .Any(w => w.IsLoaded);
-            });
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.HasShutdownStarted)
+                return;
+            if (dispatcher.CheckAccess())
+                window.CloseWithoutResolution();
+            else
+                dispatcher.BeginInvoke(new Action(window.CloseWithoutResolution));
         }
-        catch { }
-
-        if (!hasActiveAlertWindow)
-        {
-            Interlocked.Exchange(ref _isAlertWindowOpen, 0);
-        }
+        catch (InvalidOperationException ex) { App.Log($"MainViewModel.StopNetworkAlertPoller: {ex.Message}"); }
     }
 
-    /// <summary>
-    /// Неблокирующий глобальный опрос ожидающих сетевых подключений.
-    /// Показывает ненавязчивое окно без перехвата фокуса.
-    /// </summary>
-    private async Task PollNetworkAlertsAsync()
+    /// <summary>Выполняет явное обновление тем же путём, что и таймер; доступно для проверки отмены и актуальности окна.</summary>
+    /// <returns>Задача одного тика текущего поколения.</returns>
+    internal Task RefreshNetworkAlertsAsync()
+    {
+        lock (_networkAlertPollerSync)
+            return _networkAlertPollerCts == null ? Task.CompletedTask
+                : SafePollNetworkAlertsAsync(_networkAlertPollerGeneration, _networkAlertPollerCts.Token);
+    }
+
+    /// <summary>Проверяет поколение и соединение после каждого ожидания, включая очередь UI-диспетчера.</summary>
+    /// <param name="generation">Поколение выполняющегося тика.</param>
+    /// <param name="ct">Токен поколения.</param>
+    /// <returns>Можно ли применять результат к текущему UI.</returns>
+    private bool IsCurrentNetworkAlertPoll(int generation, CancellationToken ct) =>
+        !ct.IsCancellationRequested && generation == Volatile.Read(ref _networkAlertPollerGeneration) && IsConnected;
+
+    /// <summary>Обновляет открытую карточку либо выдаёт следующую группу, не создавая второе окно.</summary>
+    /// <param name="generation">Поколение подключения.</param>
+    /// <param name="ct">Отмена и освобождение даже некооперативного источника снимка.</param>
+    /// <returns>Задача завершения тика.</returns>
+    private async Task PollNetworkAlertsAsync(int generation, CancellationToken ct)
     {
         if (Interlocked.CompareExchange(ref _isPollingNetworkAlerts, 1, 0) != 0)
             return;
 
-        var windowOpened = false;
+        var reserved = false;
         try
         {
-            if (!IsConnected)
+            if (!IsCurrentNetworkAlertPoll(generation, ct))
                 return;
-            if (Interlocked.CompareExchange(ref _isAlertWindowOpen, 0, 0) == 1)
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.HasShutdownStarted)
                 return;
-
-            List<NetworkConnectionAlertDto>? alerts = null;
-            try
+            var active = Volatile.Read(ref _activeNetworkAlertWindow);
+            if (active != null)
             {
-                alerts = await _pipeClient.GetPendingNetworkAlertsAsync();
+                var status = await (_networkAlertStatusProvider?.Invoke(active.AlertId, ct)
+                    ?? _pipeClient.GetNetworkAlertStatusAsync(active.AlertId, ct)).WaitAsync(ct).ConfigureAwait(false);
+                if (!IsCurrentNetworkAlertPoll(generation, ct) || status == null)
+                    return;
+                await dispatcher.InvokeAsync(() =>
+                {
+                    if (IsCurrentNetworkAlertPoll(generation, ct) && ReferenceEquals(_activeNetworkAlertWindow, active))
+                        active.UpdateFromService(status);
+                }, System.Windows.Threading.DispatcherPriority.Normal, ct).Task.ConfigureAwait(false);
+                return;
             }
-            catch
+            if (Volatile.Read(ref _isAlertWindowOpen) != 0)
+                return;
+            var alerts = await (_networkAlertsProvider?.Invoke(ct) ?? _pipeClient.GetPendingNetworkAlertsAsync(ct))
+                .WaitAsync(ct).ConfigureAwait(false);
+            if (!IsCurrentNetworkAlertPoll(generation, ct) || alerts == null || alerts.Count == 0)
+                return;
+            NetworkConnectionAlertDto? alert;
+            lock (_networkAlertPollerSync)
             {
-                return;
+                var now = DateTime.UtcNow;
+                foreach (var key in _networkAlertDeferrals.Where(pair => pair.Value <= now).Select(pair => pair.Key).ToArray())
+                    _networkAlertDeferrals.Remove(key);
+                alert = alerts.FirstOrDefault(candidate => !_networkAlertDeferrals.ContainsKey(candidate.AlertId));
             }
-
-            if (alerts == null || alerts.Count == 0)
+            if (alert == null || !IsCurrentNetworkAlertPoll(generation, ct))
                 return;
-            if (Interlocked.CompareExchange(ref _isAlertWindowOpen, 0, 0) == 1)
-                return;
-
             if (Interlocked.CompareExchange(ref _isAlertWindowOpen, 1, 0) != 0)
                 return;
-            windowOpened = true;
-
-            var alert = alerts[0];
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            reserved = true;
+            await dispatcher.InvokeAsync(() =>
             {
+                if (!IsCurrentNetworkAlertPoll(generation, ct) || _activeNetworkAlertWindow != null)
+                    return;
                 try
                 {
-                    var window = new NetworkConnectionAlertWindow(alert, _pipeClient, countdownSeconds: 30);
-                    window.Closed += (_, _) => Interlocked.Exchange(ref _isAlertWindowOpen, 0);
+                    var window = _networkAlertWindowFactory?.Invoke(alert)
+                        ?? new NetworkConnectionAlertWindow(alert, _pipeClient, countdownSeconds: 30);
+                    window.DeferredLocally += alertId =>
+                    {
+                        lock (_networkAlertPollerSync)
+                            _networkAlertDeferrals[alertId] = DateTime.UtcNow.AddMinutes(1);
+                    };
+                    window.Closed += (_, _) =>
+                    {
+                        if (ReferenceEquals(_activeNetworkAlertWindow, window))
+                        {
+                            _activeNetworkAlertWindow = null;
+                            Interlocked.Exchange(ref _isAlertWindowOpen, 0);
+                        }
+                    };
                     // Owner устанавливаем только если главное окно видимо и не свёрнуто — иначе тост
                     // может оказаться «заперт» за скрытым окном при работе из трея.
-                    var owner = System.Windows.Application.Current.MainWindow;
-                    if (owner != null && owner.IsVisible && owner.WindowState != System.Windows.WindowState.Minimized)
+                    var owner = System.Windows.Application.Current?.MainWindow;
+                    if (owner != null && !ReferenceEquals(owner, window) && owner.IsVisible && owner.WindowState != System.Windows.WindowState.Minimized)
                         window.Owner = owner;
+                    _activeNetworkAlertWindow = window;
                     window.Show();
+                    reserved = false;
                 }
                 catch (Exception ex)
                 {
                     Interlocked.Exchange(ref _isAlertWindowOpen, 0);
-                    windowOpened = false;
+                    _activeNetworkAlertWindow = null;
                     App.Log($"MainViewModel.PollNetworkAlerts.Show: {ex.Message}");
                 }
-            });
+            }, System.Windows.Threading.DispatcherPriority.Normal, ct).Task.ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            if (windowOpened)
-                Interlocked.Exchange(ref _isAlertWindowOpen, 0);
             App.Log($"MainViewModel.PollNetworkAlerts: {ex.Message}");
         }
         finally
         {
+            if (reserved)
+                Interlocked.Exchange(ref _isAlertWindowOpen, 0);
             Interlocked.Exchange(ref _isPollingNetworkAlerts, 0);
         }
     }

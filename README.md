@@ -11,10 +11,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/version-v2.1.2-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Version v2.1.2"></a>
+  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/version-v2.1.3-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Version v2.1.3"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Platform Windows">
   <img src="https://img.shields.io/badge/stack-.NET%208%20%7C%20C%23%20%7C%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Tech Stack">
-  <img src="https://img.shields.io/badge/tests-1%2C676%20passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests 100% Passing">
+  <img src="https://img.shields.io/badge/tests-1%2C755%20passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests 100% Passing">
   <img src="https://img.shields.io/badge/signing-SHA256%20Authenticode-06B6D4?style=for-the-badge&logo=hackthebox&logoColor=white" alt="Authenticode">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3B82F6?style=for-the-badge" alt="License MIT"></a>
 </p>
@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.md"><strong>User Guide</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Architecture</strong></a> •
-  <a href="docs/releases/v2.1.2.md"><strong>Release Notes</strong></a> •
+  <a href="docs/releases/v2.1.3.md"><strong>Release Notes</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Download Setup</strong></a>
 </p>
 

@@ -23,7 +23,7 @@
     <!--
         Корневой контейнер с тенью и адаптивной разметкой:
         * Row 0 (*)    — общая прокручиваемая информация и ответ ИИ;
-        * Row 1 (Auto) — FooterPanel: закрепленные снизу таймер, 5 кнопок действий и прогресс-бар.
+        * Row 1 (Auto) — FooterPanel: таймер, действия, безопасное откладывание и прогресс-бар.
         При малой рабочей области прокручивается вся информация, поэтому верхняя панель
         не вытесняет кнопки действий за нижний край окна.
         Нижняя кромка окна зафиксирована над панелью задач (Bottom-Anchoring),
@@ -164,6 +164,12 @@
                         </Border>
                     </Grid>
                 </Border>
+                <!-- Сводка относится ко всей группе; отдельные сокеты не создают самостоятельных карточек. -->
+                <TextBlock x:Name="TxtConnectionSummary" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,6" />
+                <TextBlock Text="{Binding [NetAlertScopeNotice], Source={StaticResource Loc}}"
+                           FontSize="11" TextWrapping="Wrap"
+                           Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
             </StackPanel>
 
             <!-- Карточка вердикта ИИ: назначение, риски блокировки, рекомендация -->
@@ -263,6 +269,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <!-- 1. Белый список (Всегда разрешать) -->
@@ -318,10 +325,21 @@
                                Appearance="Secondary"
                                Content="{Binding NetAlertBtnAllowPort, Source={StaticResource Loc}}"
                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                               Padding="8,6"
+                               Padding="8,6" Margin="0,0,0,6"
                                Focusable="False"
                                Click="OnAllowPortClick"
                                ToolTip="{Binding NetAlertAllowPortTip, Source={StaticResource Loc}}" />
+
+                    <!-- Неизвестный исход повторяется с прежним OperationId; откладывание не изменяет правила. -->
+                    <ui:Button x:Name="BtnRetry" Grid.Row="3" Grid.Column="0" Visibility="Collapsed"
+                               Appearance="Secondary" Content="{Binding [NetAlertRetryOperation], Source={StaticResource Loc}}"
+                               HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,6" Margin="0,0,4,0"
+                               Focusable="False" Click="OnRetryClick" />
+                    <ui:Button x:Name="BtnDefer" Grid.Row="3" Grid.Column="1"
+                               Appearance="Secondary" Content="{Binding [NetAlertDefer], Source={StaticResource Loc}}"
+                               ToolTip="{Binding [NetAlertDeferTip], Source={StaticResource Loc}}"
+                               HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,6" Margin="4,0,0,0"
+                               Focusable="False" Click="OnDeferClick" />
                 </Grid>
 
                 <!-- Тонкий ProgressBar обратного отсчета -->

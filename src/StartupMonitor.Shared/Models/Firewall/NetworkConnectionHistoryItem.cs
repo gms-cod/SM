@@ -22,7 +22,11 @@ public enum NetworkConnectionVerdict
     /// <summary>Заблокировано, так как процесс находится в чёрном списке.</summary>
     Blacklisted,
     /// <summary>Создано постоянное правило брандмауэра по решению пользователя.</summary>
-    RuleCreated
+    RuleCreated,
+    /// <summary>Запрос завершён или заменён без утверждения о применении сетевого разрешения/запрета.</summary>
+    RequestClosed,
+    /// <summary>Показ запроса отложен; действующая сетевая политика не изменена.</summary>
+    Deferred
 }
 
 /// <summary>
@@ -75,8 +79,8 @@ public sealed class NetworkConnectionHistoryItem
     /// <summary>Вердикт подсистемы сетевой безопасности.</summary>
     public NetworkConnectionVerdict Verdict { get; set; } = NetworkConnectionVerdict.PendingAlert;
 
-    /// <summary>Направление трафика (Outbound — исходящий, Inbound — входящий).</summary>
-    public string Direction { get; set; } = "Outbound";
+    /// <summary>Подтверждённое направление либо Unknown, когда снимок не позволяет определить инициатора.</summary>
+    public string Direction { get; set; } = "Unknown";
 
     /// <summary>Имя сработавшего правила или пояснение вердикта.</summary>
     public string Details { get; set; } = string.Empty;

@@ -3351,6 +3351,9 @@
                                                         <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Whitelisted}"><Setter Property="Text" Value="{Binding [NetHistoryWhitelist], Source={StaticResource Loc}}" /></DataTrigger>
                                                         <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Blacklisted}"><Setter Property="Text" Value="{Binding [NetHistoryBlacklist], Source={StaticResource Loc}}" /></DataTrigger>
                                                         <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.RuleCreated}"><Setter Property="Text" Value="{Binding [NetHistoryRuleCreated], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <!-- Завершение запроса и откладывание не означают разрешение либо блокировку трафика. -->
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.RequestClosed}"><Setter Property="Text" Value="{Binding [NetHistoryRequestClosed], Source={StaticResource Loc}}" /></DataTrigger>
+                                                        <DataTrigger Binding="{Binding Verdict}" Value="{x:Static firewall:NetworkConnectionVerdict.Deferred}"><Setter Property="Text" Value="{Binding [NetHistoryDeferred], Source={StaticResource Loc}}" /></DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>

@@ -81,6 +81,14 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
     private const int HResultFirewallServiceDown = unchecked((int)0x8007042C);
 
     private readonly object _sync = new();
+    /// <summary>Ревизия подтверждённых изменений; частичный отказ также инвалидирует проекции политики.</summary>
+    private long _policyRevision;
+    /// <summary>Текущая версия политики для немедленного сброса кэшей детектора.</summary>
+    public long PolicyRevision => Interlocked.Read(ref _policyRevision);
+    /// <summary>Изолированный источник коллекции в тестах; рабочий экземпляр всегда использует COM Windows.</summary>
+    internal Func<object>? PolicyFactoryOverride { get; set; }
+    /// <summary>Изолированный конструктор правила в тестах без изменения правил ОС.</summary>
+    internal Func<object>? RuleFactoryOverride { get; set; }
     private static readonly Serilog.ILogger Log =
         Serilog.Log.ForContext<WindowsFirewallService>();
 
@@ -476,15 +484,15 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             object? rulesObj = null;
             try
             {
-                dynamic policy = CreatePolicy(out policyObj);
+                dynamic policy = OpenPolicy(out policyObj);
                 dynamic rules = policy.Rules;
                 rulesObj = rules;
                 return EnumerateRules((object)rules);
             }
-            catch (Exception ex) when (IsFirewallDown(ex))
+            catch (Exception ex)
             {
-                Log.Warning(ex, "Firewall недоступен при перечислении правил");
-                return Array.Empty<FirewallRuleDto>();
+                Log.Warning(ex, "Firewall: полный снимок правил недоступен");
+                throw;
             }
             finally
             {
@@ -597,61 +605,46 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
     /// Это устраняет ложные срабатывания фильтра «у программы уже есть правило».
     /// </remarks>
     public HashSet<string> GetOutboundAllowApplicationRulePaths()
+        => GetUnrestrictedOutboundAllowApplicationRulePaths();
+
+    /// <summary>Возвращает только полные разрешения приложения без ограничений протокола, портов, адресов, службы и интерфейсов.</summary>
+    /// <returns>Канонические пути разрешений, покрывающих все активные профили; неполное чтение не выдаёт разрешение.</returns>
+    public HashSet<string> GetUnrestrictedOutboundAllowApplicationRulePaths()
     {
         lock (_sync)
         {
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             object? policyObj = null;
             object? rulesObj = null;
-            System.Collections.IEnumerator? enumerator = null;
+            List<RuleSnapshot>? snapshot = null;
+            var held = new List<object>();
             try
             {
-                dynamic policy = CreatePolicy(out policyObj);
+                dynamic policy = OpenPolicy(out policyObj);
                 dynamic rules = policy.Rules;
                 rulesObj = rules;
-
-                enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
-                int count = 0;
-                while (true)
+                var profiles = Convert.ToInt32(policy.CurrentProfileTypes) & 7;
+                if (profiles == 0)
+                    throw new InvalidOperationException("Не определены активные профили брандмауэра.");
+                snapshot = CaptureRules((object)rules, held);
+                foreach (var item in snapshot)
                 {
-                    bool moved;
-                    try { moved = enumerator.MoveNext(); }
-                    catch { break; }
-                    if (!moved) break;
-
-                    dynamic r = enumerator.Current;
-                    try
-                    {
-                        // Отбираем только включённые исходящие разрешающие правила.
-                        int dir = SafeGetInt(r, "Direction", DirIn);
-                        int action = SafeGetInt(r, "Action", ActionBlock);
-                        if (dir != DirOut || action != ActionAllow)
-                            continue;
-                        if (!SafeGetBool(r, "Enabled", true))
-                            continue;
-
-                        var normalized = NormalizeRuleAppPath(SafeGet(r, "ApplicationName"));
-                        if (normalized != null)
-                            set.Add(normalized);
-                    }
-                    catch { }
-                    finally
-                    {
-                        Release(r);
-                    }
-
-                    count++;
-                    if (count % 100 == 0)
-                        Thread.Yield();
+                    var dto = item.Dto;
+                    if (dto.Direction != FirewallDirection.Outbound || dto.Action != FirewallAction.Allow || !dto.Enabled ||
+                        (((int)dto.Profiles & profiles) != profiles) || !IsUnrestrictedApplicationRule(item))
+                        continue;
+                    var path = NormalizeRuleAppPath(dto.ApplicationPath);
+                    if (path != null && Path.IsPathFullyQualified(path)) set.Add(path);
                 }
             }
-            catch (Exception ex) when (IsFirewallDown(ex))
+            catch (Exception ex)
             {
-                Log.Warning(ex, "Firewall недоступен при чтении разрешающих исходящих правил");
+                Log.Warning(ex, "Firewall: полный снимок разрешений приложений недоступен");
+                throw;
             }
             finally
             {
-                Release(enumerator);
+                ReleaseHeldRules(held);
                 Release(rulesObj);
                 Release(policyObj);
             }
@@ -670,11 +663,43 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
     {
         if (string.IsNullOrWhiteSpace(app))
             return null;
+        try
+        {
+            var path = Environment.ExpandEnvironmentVariables(app.Trim().Trim('"')).Replace('/', '\\');
+            if (!Path.IsPathFullyQualified(path)) return null;
+            return Path.GetFullPath(path).TrimEnd('\\').ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            Log.Debug(ex, "Firewall: некорректный путь приложения");
+            return null;
+        }
+    }
 
-        var path = app.Trim().Trim('"');
-        try { path = Environment.ExpandEnvironmentVariables(path); } catch { }
-        path = path.Replace('/', '\\').TrimEnd('\\');
-        return path.Length == 0 ? null : path.ToLowerInvariant();
+    /// <summary>Канонизирует полный путь одинаково для очереди, постоянных правил и списков.</summary>
+    /// <param name="path">Возможный путь с кавычками, переменными окружения или альтернативными разделителями.</param>
+    /// <returns>Полный канонический путь либо null; имя файла само по себе идентичностью не является.</returns>
+    public static string? NormalizeApplicationPath(string? path) => NormalizeRuleAppPath(path);
+
+    /// <summary>Получает подтверждённые действия только собственных полных включённых политик одного приложения.</summary>
+    internal HashSet<FirewallAction> GetApplicationPolicyActions(string path)
+    {
+        var normalized = NormalizeRuleAppPath(path) ?? throw new ArgumentException("Необходим полный путь приложения.", nameof(path));
+        lock (_sync)
+        {
+            object? policyObj = null;
+            object? rulesObj = null;
+            var held = new List<object>();
+            try
+            {
+                dynamic policy = OpenPolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+                return CaptureRules((object)rules, held).Where(item => item.Dto.Enabled && item.Dto.Direction == FirewallDirection.Outbound &&
+                    IsOwnedApplicationPolicy(item, normalized)).Select(item => item.Dto.Action).ToHashSet();
+            }
+            finally { ReleaseHeldRules(held); Release(rulesObj); Release(policyObj); }
+        }
     }
 
     /// <summary>
@@ -683,158 +708,285 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
     /// </summary>
     public FirewallOperationResult CreateOrUpdateRule(FirewallRuleDto rule)
     {
-        if (rule is null)
-            return FirewallOperationResult.Fail("Пустое правило.");
-        if (string.IsNullOrWhiteSpace(rule.Name))
-            return FirewallOperationResult.Fail("Пустое имя правила.");
-
-        lock (_sync)
-        {
-            try
-            {
-                var targets = rule.Direction == FirewallDirection.Both
-                    ? new[] { FirewallDirection.Inbound, FirewallDirection.Outbound }
-                    : new[] { rule.Direction is FirewallDirection.Outbound ? FirewallDirection.Outbound : FirewallDirection.Inbound };
-
-                var written = new List<string>(targets.Length);
-                foreach (var dir in targets)
-                {
-                    var name = targets.Length == 1 ? rule.Name.Trim() : rule.Name.Trim() + (dir == FirewallDirection.Outbound ? "_Out" : "_In");
-                    written.Add(UpsertGenericRule(rule, name, dir == FirewallDirection.Outbound ? DirOut : DirIn));
-                }
-
-                Log.Information("Firewall: правило {Name} создано/обновлено ({Dir})", rule.Name, rule.Direction);
-                return FirewallOperationResult.Ok($"Правило {rule.Name} сохранено.", string.Join("+", written), created: true);
-            }
-            catch (Exception ex) when (IsFirewallDown(ex))
-            {
-                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).", rule.Name);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "CreateOrUpdateRule({Name}) не выполнен", rule.Name);
-                return FirewallOperationResult.Fail($"Не удалось сохранить правило {rule.Name}: {FriendlyError(ex)}", rule.Name);
-            }
-        }
+        var validation = ValidateRule(rule);
+        if (validation != null) return FirewallOperationResult.Fail(validation, rule?.Name);
+        return ExecuteRuleTransaction(_ => ExpandRule(rule!).Select(pair => new RuleMutation(pair.Name, pair.Rule)).ToList(), null, rule!.Name);
     }
 
-    /// <summary>Удаляет правило по имени (Both удаляет In+Out варианты).</summary>
-    public FirewallOperationResult DeleteRule(string ruleName, FirewallDirection direction = FirewallDirection.Both)
+    /// <summary>Применяет собственную программную/портовую политику и сохранение настроек с компенсацией любых записанных правил.</summary>
+    /// <param name="rule">Авторитетное правило приложения либо явного глобального порта.</param>
+    /// <param name="persist">Сохранение настроек; хранилище обязано само откатывать отказавшую файловую запись.</param>
+    /// <returns>Успех после проверки правил и persist; PartialFailure явно означает неуспешную компенсацию.</returns>
+    public FirewallOperationResult ApplyPolicyRule(FirewallRuleDto rule, Action? persist = null)
     {
-        if (string.IsNullOrWhiteSpace(ruleName))
-            return FirewallOperationResult.Fail("Пустое имя правила.");
+        var validation = ValidateRule(rule);
+        if (validation != null) return FirewallOperationResult.Fail(validation, rule?.Name);
+        var path = NormalizeRuleAppPath(rule!.ApplicationPath);
+        return ExecuteRuleTransaction(snapshot =>
+        {
+            var writes = ExpandRule(rule).Select(pair => new RuleMutation(pair.Name, pair.Rule)).ToList();
+            if (path != null)
+            {
+                var names = writes.Select(item => item.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                foreach (var previous in snapshot.Where(item => IsOwnedApplicationPolicy(item, path) && !names.Contains(item.Dto.Name)))
+                    writes.Add(new RuleMutation(previous.Dto.Name, null));
+            }
+            return writes;
+        }, persist, rule.Name);
+    }
 
-        var name = ruleName.Trim();
+    /// <summary>Удаляет только собственную полную политику приложения, сохраняя узкие пользовательские исключения.</summary>
+    /// <param name="path">Полный канонизируемый путь приложения.</param>
+    /// <param name="persist">Сохранение нового состояния списков после проверки удаления.</param>
+    /// <returns>Подтверждённое удаление либо диагностируемый отказ с результатом компенсации.</returns>
+    public FirewallOperationResult RemoveApplicationPolicy(string path, Action? persist = null)
+    {
+        var normalized = NormalizeRuleAppPath(path);
+        if (normalized == null || !Path.IsPathFullyQualified(normalized))
+            return FirewallOperationResult.Fail("Для удаления политики необходим полный путь приложения.");
+        return ExecuteRuleTransaction(snapshot => snapshot.Where(item => IsOwnedApplicationPolicy(item, normalized))
+            .Select(item => new RuleMutation(item.Dto.Name, null)).ToList(), persist, normalized);
+    }
+
+    /// <summary>Создаёт единственное имя полной политики независимо от источника выбора, имени exe и действия.</summary>
+    /// <param name="path">Полный путь, определяющий идентичность.</param>
+    /// <param name="name">Отображаемое имя только для описания.</param>
+    /// <param name="action">Разрешение или запрет всей программы.</param>
+    /// <returns>Правило Both/Any/All, пригодное для popup и матрицы.</returns>
+    public static FirewallRuleDto BuildApplicationRule(string path, string name, FirewallAction action)
+    {
+        var normalized = NormalizeRuleAppPath(path);
+        if (normalized == null || !Path.IsPathFullyQualified(normalized)) throw new ArgumentException("Необходим полный путь приложения.", nameof(path));
+        if (!Enum.IsDefined(action)) throw new ArgumentOutOfRangeException(nameof(action));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)))[..24];
+        var displayPath = Path.GetFullPath(Environment.ExpandEnvironmentVariables(path.Trim().Trim('"')).Replace('/', '\\'));
+        return new FirewallRuleDto
+        {
+            Name = $"{RulePrefix}Application_{hash}", Description = $"Политика приложения StartupMonitor: {name} ({displayPath})",
+            Direction = FirewallDirection.Both, Action = action, Protocol = FirewallProtocol.Any,
+            ApplicationPath = displayPath, Enabled = true, Profiles = FirewallProfile.All,
+            LocalPorts = "*", RemotePorts = "*", RemoteAddresses = "*", Grouping = RuleGroup, IsManaged = true
+        };
+    }
+
+    /// <summary>План одной точной записи/удаления; null означает удаление.</summary>
+    private sealed record RuleMutation(string Name, FirewallRuleDto? Rule, bool? EnabledOnly = null);
+
+    /// <summary>Полный снимок затрагиваемых полей и удерживаемый native-объект для восстановления удалённого правила без потери расширенных свойств.</summary>
+    private sealed record RuleSnapshot(object Native, FirewallRuleDto Dto, Dictionary<string, object?> Values);
+
+    /// <summary>Выполняет проверяемую последовательность записей и компенсирует её при любом отказе, включая persist.</summary>
+    /// <param name="plan">План на основании достоверного полного снимка.</param>
+    /// <param name="persist">Последняя потенциально отказавшая запись настроек.</param>
+    /// <param name="operationName">Имя для диагностического результата.</param>
+    /// <returns>Успех либо отказ с явным признаком неполного отката.</returns>
+    private FirewallOperationResult ExecuteRuleTransaction(Func<IReadOnlyList<RuleSnapshot>, List<RuleMutation>> plan, Action? persist, string operationName)
+    {
         lock (_sync)
         {
             object? policyObj = null;
             object? rulesObj = null;
+            List<RuleSnapshot>? snapshot = null;
+            var touched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var changedOriginals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var created = new List<object>();
+            var held = new List<object>();
             try
             {
-                dynamic policy = CreatePolicy(out policyObj);
+                dynamic policy = OpenPolicy(out policyObj);
                 dynamic rules = policy.Rules;
                 rulesObj = rules;
-
-                int removed = 0;
-                foreach (var candidate in CandidateNames(name, direction))
+                snapshot = CaptureRules((object)rules, held);
+                var changes = plan(snapshot);
+                foreach (var change in changes)
                 {
-                    if (direction is FirewallDirection.Inbound or FirewallDirection.Outbound)
-                    {
-                        dynamic? found = FindRule(rules, candidate);
-                        if (found is null) continue;
-                        try
-                        {
-                            int dir = SafeGetInt(found, "Direction", DirIn);
-                            bool match = direction == FirewallDirection.Inbound ? dir == DirIn : dir == DirOut;
-                            if (!match) continue;
-                        }
-                        finally { Release(found); }
-                    }
-
-                    if (RemoveRuleByName(rules, candidate)) removed++;
+                    if (snapshot.Count(item => string.Equals(item.Dto.Name, change.Name, StringComparison.OrdinalIgnoreCase)) > 1)
+                        throw new InvalidOperationException($"Правило {change.Name} имеет неоднозначные дубликаты имени; изменение отменено.");
                 }
-
-                return removed > 0
-                    ? FirewallOperationResult.Ok($"Правило {name} удалено (удалено: {removed}).", name)
-                    : FirewallOperationResult.Fail($"Правило {name} не найдено.", name);
-            }
-            catch (Exception ex) when (IsFirewallDown(ex))
-            {
-                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).", name);
+                foreach (var change in changes)
+                {
+                    touched.Add(change.Name);
+                    var old = snapshot.SingleOrDefault(item => string.Equals(item.Dto.Name, change.Name, StringComparison.OrdinalIgnoreCase));
+                    if (change.Rule == null)
+                    {
+                        if (!RemoveRuleByName(rules, change.Name)) throw new InvalidOperationException($"Правило {change.Name} исчезло во время изменения политики.");
+                        continue;
+                    }
+                    // COM не принимает ServiceName="" при Add. Снятие/смена optional identity выполняется
+                    // на подготовленном новом объекте; исходный RCW удерживается неизменным для компенсации.
+                    var replaceIdentity = old != null && !change.EnabledOnly.HasValue &&
+                        (!string.Equals(NormalizeRuleAppPath(old.Dto.ApplicationPath), NormalizeRuleAppPath(change.Rule.ApplicationPath), StringComparison.OrdinalIgnoreCase) ||
+                         !string.Equals(old.Dto.ServiceName ?? "", change.Rule.ServiceName ?? "", StringComparison.OrdinalIgnoreCase));
+                    object native = old == null || replaceIdentity ? NewRuleObject() : old.Native;
+                    if (old == null || replaceIdentity)
+                    {
+                        created.Add(native);
+                        if (old != null) CopyUnchangedScope(old, native);
+                    }
+                    else changedOriginals.Add(change.Name);
+                    if (change.EnabledOnly.HasValue) ((dynamic)native).Enabled = change.EnabledOnly.Value;
+                    else ApplyDtoToComRule((dynamic)native, change.Rule, change.Name, (int)change.Rule.Direction);
+                    if (replaceIdentity && !RemoveRuleByName(rules, change.Name))
+                        throw new InvalidOperationException($"Исходное правило {change.Name} исчезло при замене привязки.");
+                    if (old == null || replaceIdentity) rules.Add((dynamic)native);
+                }
+                var observed = CaptureRules((object)rules, held);
+                foreach (var change in changes)
+                {
+                    var matches = observed.Where(item => string.Equals(item.Dto.Name, change.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (change.Rule == null ? matches.Count != 0 : matches.Count != 1 || !RuleMatches(matches[0].Dto, change.Rule))
+                        throw new InvalidOperationException($"Брандмауэр не подтвердил итоговое состояние правила {change.Name}.");
+                }
+                persist?.Invoke();
+                Interlocked.Increment(ref _policyRevision);
+                return FirewallOperationResult.Ok("Правила и настройки подтверждены.", operationName, created: created.Count > 0);
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "DeleteRule({Name}) не выполнен", name);
-                return FirewallOperationResult.Fail($"Не удалось удалить правило {name}: {FriendlyError(ex)}", name);
+                Log.Warning(ex, "Firewall: операция политики {Operation} не завершена", operationName);
+                var failures = new List<Exception>();
+                if (rulesObj != null && snapshot != null)
+                {
+                    dynamic rules = rulesObj;
+                    foreach (var name in touched.Reverse())
+                    {
+                        try
+                        {
+                            var previous = snapshot.SingleOrDefault(item => string.Equals(item.Dto.Name, name, StringComparison.OrdinalIgnoreCase));
+                            if (previous == null)
+                            {
+                                RemoveRuleByName(rules, name);
+                                continue;
+                            }
+                            if (changedOriginals.Contains(name)) RestoreRule(previous);
+                            object? current = FindRuleDirect(rules, name);
+                            if (current != null) held.Add(current);
+                            if (current == null) rules.Add((dynamic)previous.Native);
+                            else if (!ReferenceEquals(current, previous.Native))
+                            {
+                                RemoveRuleByName(rules, name);
+                                rules.Add((dynamic)previous.Native);
+                            }
+                        }
+                        catch (Exception rollbackError)
+                        {
+                            failures.Add(rollbackError);
+                            Log.Error(rollbackError, "Firewall: компенсация правила {Rule} не завершена", name);
+                        }
+                    }
+                    if (touched.Count > 0) Interlocked.Increment(ref _policyRevision);
+                }
+                return FirewallOperationResult.Fail(failures.Count == 0 && !ex.Message.StartsWith("PartialFailure:", StringComparison.Ordinal)
+                    ? $"Изменение не применено; прежние правила восстановлены. {FriendlyError(ex)}"
+                    : $"PartialFailure: компенсация правил или профилей не завершена. Проверьте журнал службы. {FriendlyError(ex)}", operationName);
             }
             finally
             {
+                held.AddRange(created);
+                ReleaseHeldRules(held);
                 Release(rulesObj);
                 Release(policyObj);
             }
         }
+    }
+
+    /// <summary>Проверяет базовые enum и область до первого обращения к изменению COM.</summary>
+    private static string? ValidateRule(FirewallRuleDto? rule)
+    {
+        if (rule == null || string.IsNullOrWhiteSpace(rule.Name)) return "Не указано правило или его имя.";
+        if (!Enum.IsDefined(rule.Direction) || !Enum.IsDefined(rule.Action) || !Enum.IsDefined(rule.Protocol) ||
+            (rule.Profiles & FirewallProfile.All) == 0 || ((int)rule.Profiles & ~7) != 0)
+            return "Некорректное направление, действие, протокол или профиль правила.";
+        if (!string.IsNullOrWhiteSpace(rule.ApplicationPath) && !Path.IsPathFullyQualified(Environment.ExpandEnvironmentVariables(rule.ApplicationPath.Trim().Trim('"'))))
+            return "Путь приложения должен быть абсолютным.";
+        return null;
+    }
+
+    /// <summary>Разворачивает Both в независимые In/Out без изменения DTO вызывающего кода.</summary>
+    private static IEnumerable<(string Name, FirewallRuleDto Rule)> ExpandRule(FirewallRuleDto rule)
+    {
+        foreach (var direction in rule.Direction == FirewallDirection.Both
+                     ? new[] { FirewallDirection.Inbound, FirewallDirection.Outbound } : new[] { rule.Direction })
+        {
+            var name = rule.Name.Trim() + (rule.Direction == FirewallDirection.Both ? direction == FirewallDirection.Inbound ? "_In" : "_Out" : "");
+            yield return (name, CopyRule(rule, name, direction));
+        }
+    }
+
+    /// <summary>Копирует изменяемые поля правила для независимого плана.</summary>
+    private static FirewallRuleDto CopyRule(FirewallRuleDto rule, string name, FirewallDirection direction) => new()
+    {
+        Name = name, Direction = direction, Description = rule.Description, Action = rule.Action, Protocol = rule.Protocol,
+        Profiles = rule.Profiles, Enabled = rule.Enabled, ApplicationPath = rule.ApplicationPath, ServiceName = rule.ServiceName,
+        LocalPorts = rule.LocalPorts, RemotePorts = rule.RemotePorts, RemoteAddresses = rule.RemoteAddresses,
+        Grouping = rule.Grouping, IsManaged = rule.IsManaged
+    };
+
+    /// <summary>Сравнивает подтверждённую COM-проекцию с намерением, включая явное снятие ограничений.</summary>
+    private static bool RuleMatches(FirewallRuleDto actual, FirewallRuleDto expected) =>
+        actual.Direction == expected.Direction && actual.Action == expected.Action && actual.Protocol == expected.Protocol &&
+        actual.Enabled == expected.Enabled && actual.Profiles == expected.Profiles &&
+        string.Equals(NormalizeRuleAppPath(actual.ApplicationPath), NormalizeRuleAppPath(expected.ApplicationPath), StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(actual.ServiceName ?? "", expected.ServiceName ?? "", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(actual.Description ?? "", expected.Description ?? "", StringComparison.Ordinal) &&
+        string.Equals(actual.Grouping ?? "", expected.Grouping ?? (expected.Name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase) ? RuleGroup : ""), StringComparison.Ordinal) &&
+        (expected.Protocol is not (FirewallProtocol.Tcp or FirewallProtocol.Udp) ||
+            Wildcard(actual.LocalPorts) == Wildcard(expected.LocalPorts) && Wildcard(actual.RemotePorts) == Wildcard(expected.RemotePorts)) &&
+        Wildcard(actual.RemoteAddresses) == Wildcard(expected.RemoteAddresses);
+
+    /// <summary>Нормализует отсутствие ограничения к явному wildcard Windows.</summary>
+    private static string Wildcard(string? value) => string.IsNullOrWhiteSpace(value) ? "*" : value.Trim();
+
+    /// <summary>Отбирает лишь полную программную политику, не портовые/адресные пользовательские исключения.</summary>
+    private static bool IsUnrestrictedApplicationRule(RuleSnapshot item) => item.Dto.Protocol == FirewallProtocol.Any &&
+        !string.IsNullOrWhiteSpace(item.Dto.ApplicationPath) && string.IsNullOrWhiteSpace(item.Dto.ServiceName) &&
+        Wildcard(item.Dto.RemoteAddresses) == "*" && Wildcard(Convert.ToString(item.Values["LocalAddresses"])) == "*" &&
+        (string.IsNullOrWhiteSpace(Convert.ToString(item.Values["InterfaceTypes"])) || string.Equals(Convert.ToString(item.Values["InterfaceTypes"]), "All", StringComparison.OrdinalIgnoreCase)) &&
+        (item.Values["Interfaces"] == null || item.Values["Interfaces"] is Array { Length: 0 }) &&
+        !Convert.ToBoolean(item.Values["EdgeTraversal"]);
+
+    /// <summary>Распознаёт каноничную и прежнюю генерируемую политику, сохраняя любые узкие или произвольно названные custom-правила.</summary>
+    private static bool IsOwnedApplicationPolicy(RuleSnapshot item, string path) =>
+        item.Dto.IsManaged && item.Dto.Profiles == FirewallProfile.All && IsUnrestrictedApplicationRule(item) &&
+        string.Equals(NormalizeRuleAppPath(item.Dto.ApplicationPath), path, StringComparison.OrdinalIgnoreCase) &&
+        (item.Dto.Name.StartsWith(RulePrefix + "Application_", StringComparison.OrdinalIgnoreCase) ||
+         item.Dto.Name.StartsWith(RulePrefix + "Access_", StringComparison.OrdinalIgnoreCase) && item.Dto.Name.Contains("_Managed", StringComparison.OrdinalIgnoreCase) ||
+         (item.Dto.Name.StartsWith(RulePrefix + "Allow_", StringComparison.OrdinalIgnoreCase) || item.Dto.Name.StartsWith(RulePrefix + "Block_", StringComparison.OrdinalIgnoreCase)) && item.Dto.Name.Contains("_Auto", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Удаляет правило по имени (Both удаляет In+Out варианты).</summary>
+    public FirewallOperationResult DeleteRule(string ruleName, FirewallDirection direction = FirewallDirection.Both)
+    {
+        if (string.IsNullOrWhiteSpace(ruleName) || !Enum.IsDefined(direction))
+            return FirewallOperationResult.Fail("Не указано имя или направление правила.");
+        return ExecuteRuleTransaction(snapshot =>
+        {
+            var names = CandidateNames(ruleName.Trim(), direction).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var changes = snapshot.Where(item => names.Contains(item.Dto.Name) &&
+                (direction == FirewallDirection.Both || item.Dto.Direction == direction)).Select(item => new RuleMutation(item.Dto.Name, null)).ToList();
+            if (changes.Count == 0) throw new InvalidOperationException("Правило не найдено.");
+            return changes;
+        }, null, ruleName.Trim());
     }
 
     /// <summary>Включает/выключает правило по имени.</summary>
     public FirewallOperationResult ToggleRule(string ruleName, FirewallDirection direction, bool enable)
     {
-        if (string.IsNullOrWhiteSpace(ruleName))
-            return FirewallOperationResult.Fail("Пустое имя правила.");
-
-        var name = ruleName.Trim();
-        lock (_sync)
+        if (string.IsNullOrWhiteSpace(ruleName) || !Enum.IsDefined(direction))
+            return FirewallOperationResult.Fail("Не указано имя или направление правила.");
+        return ExecuteRuleTransaction(snapshot =>
         {
-            object? policyObj = null;
-            object? rulesObj = null;
-            try
+            var names = CandidateNames(ruleName.Trim(), direction).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var changes = new List<RuleMutation>();
+            foreach (var item in snapshot.Where(item => names.Contains(item.Dto.Name) &&
+                         (direction == FirewallDirection.Both || item.Dto.Direction == direction)))
             {
-                dynamic policy = CreatePolicy(out policyObj);
-                dynamic rules = policy.Rules;
-                rulesObj = rules;
-
-                int toggled = 0;
-                foreach (var candidate in CandidateNames(name, direction))
-                {
-                    dynamic? found = FindRule(rules, candidate);
-                    if (found is null) continue;
-                    try
-                    {
-                        if (direction is FirewallDirection.Inbound or FirewallDirection.Outbound)
-                        {
-                            int dir = SafeGetInt(found, "Direction", DirIn);
-                            bool match = direction == FirewallDirection.Inbound ? dir == DirIn : dir == DirOut;
-                            if (!match) continue;
-                        }
-
-                        found.Enabled = enable;
-                        toggled++;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(ex, "ToggleRule({Name}): не удалось переключить Enabled", candidate);
-                    }
-                    finally { Release(found); }
-                }
-
-                return toggled > 0
-                    ? FirewallOperationResult.Ok($"Правило {name} {(enable ? "включено" : "выключено")}.", name)
-                    : FirewallOperationResult.Fail($"Правило {name} не найдено.", name);
+                var copy = CopyRule(item.Dto, item.Dto.Name, item.Dto.Direction);
+                copy.Enabled = enable;
+                changes.Add(new RuleMutation(copy.Name, copy, enable));
             }
-            catch (Exception ex) when (IsFirewallDown(ex))
-            {
-                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).", name);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "ToggleRule({Name}) не выполнен", name);
-                return FirewallOperationResult.Fail($"Не удалось переключить правило {name}: {FriendlyError(ex)}", name);
-            }
-            finally
-            {
-                Release(rulesObj);
-                Release(policyObj);
-            }
-        }
+            if (changes.Count == 0) throw new InvalidOperationException("Правило не найдено.");
+            return changes;
+        }, null, ruleName.Trim());
     }
 
     /// <summary>
@@ -849,48 +1001,62 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
         lock (_sync)
         {
             object? policyObj = null;
-            object? rulesObj = null;
             try
             {
-                dynamic policy = CreatePolicy(out policyObj);
-                dynamic rules = policy.Rules;
-                rulesObj = rules;
-
-                switch (mode)
+                dynamic policy = OpenPolicy(out policyObj);
+                var profiles = new[] { ProfileDomain, ProfilePrivate, ProfilePublic };
+                var before = new Dictionary<int, (bool Enabled, int Outbound)>();
+                foreach (var profile in profiles)
+                    before[profile] = (Convert.ToBoolean(policy.FirewallEnabled[profile]), Convert.ToInt32(policy.DefaultOutboundAction[profile]));
+                return ExecuteRuleTransaction(snapshot =>
                 {
-                    case FirewallFilteringMode.Normal:
-                        SetFirewallEnabledAll(policy, true);
-                        SetDefaultOutboundAll(policy, ActionAllow);
-                        RemoveRuleByName(rules, KillswitchRuleNameIn);
-                        RemoveRuleByName(rules, KillswitchRuleNameOut);
-                        break;
-
-                    case FirewallFilteringMode.WhitelistOutbound:
-                        SetFirewallEnabledAll(policy, true);
-                        RemoveRuleByName(rules, KillswitchRuleNameIn);
-                        RemoveRuleByName(rules, KillswitchRuleNameOut);
-                        SetDefaultOutboundAll(policy, ActionBlock);
-                        break;
-
-                    case FirewallFilteringMode.KillswitchBlockAll:
-                        SetFirewallEnabledAll(policy, true);
-                        UpsertKillswitchRule(rules, KillswitchRuleNameIn, DirIn);
-                        UpsertKillswitchRule(rules, KillswitchRuleNameOut, DirOut);
-                        break;
-
-                    case FirewallFilteringMode.Disabled:
-                        RemoveRuleByName(rules, KillswitchRuleNameIn);
-                        RemoveRuleByName(rules, KillswitchRuleNameOut);
-                        SetFirewallEnabledAll(policy, false);
-                        break;
-                }
-
-                Log.Information("Firewall: режим фильтрации -> {Mode}", mode);
-                return FirewallOperationResult.Ok($"Режим фильтрации: {mode}.");
-            }
-            catch (Exception ex) when (IsFirewallDown(ex))
-            {
-                return FirewallOperationResult.Fail("Служба брандмауэра Windows недоступна (MpsSvc остановлена?).");
+                    if (mode == FirewallFilteringMode.KillswitchBlockAll)
+                        return new List<RuleMutation>
+                        {
+                            new(KillswitchRuleNameIn, BuildKillswitchRule(KillswitchRuleNameIn, FirewallDirection.Inbound)),
+                            new(KillswitchRuleNameOut, BuildKillswitchRule(KillswitchRuleNameOut, FirewallDirection.Outbound))
+                        };
+                    return snapshot.Where(item => item.Dto.Name is KillswitchRuleNameIn or KillswitchRuleNameOut)
+                        .Select(item => new RuleMutation(item.Dto.Name, null)).ToList();
+                }, () =>
+                {
+                    try
+                    {
+                        foreach (var profile in profiles)
+                        {
+                            if (mode is FirewallFilteringMode.Normal or FirewallFilteringMode.WhitelistOutbound)
+                                policy.DefaultOutboundAction[profile] = mode == FirewallFilteringMode.Normal ? ActionAllow : ActionBlock;
+                            policy.FirewallEnabled[profile] = mode != FirewallFilteringMode.Disabled;
+                        }
+                        foreach (var profile in profiles)
+                        {
+                            if (Convert.ToBoolean(policy.FirewallEnabled[profile]) != (mode != FirewallFilteringMode.Disabled) ||
+                                mode is FirewallFilteringMode.Normal or FirewallFilteringMode.WhitelistOutbound &&
+                                Convert.ToInt32(policy.DefaultOutboundAction[profile]) != (mode == FirewallFilteringMode.Normal ? ActionAllow : ActionBlock))
+                                throw new InvalidOperationException("Брандмауэр не подтвердил состояние профиля после изменения режима.");
+                        }
+                    }
+                    catch (Exception changeError)
+                    {
+                        var rollbackErrors = new List<Exception>();
+                        foreach (var profile in profiles)
+                        {
+                            try
+                            {
+                                policy.DefaultOutboundAction[profile] = before[profile].Outbound;
+                                policy.FirewallEnabled[profile] = before[profile].Enabled;
+                            }
+                            catch (Exception rollbackError)
+                            {
+                                rollbackErrors.Add(rollbackError);
+                                Log.Error(rollbackError, "Firewall: профиль {Profile} не восстановлен", profile);
+                            }
+                        }
+                        Interlocked.Increment(ref _policyRevision);
+                        if (rollbackErrors.Count > 0) throw new InvalidOperationException("PartialFailure: профили брандмауэра восстановлены не полностью.", changeError);
+                        throw;
+                    }
+                }, mode.ToString());
             }
             catch (Exception ex)
             {
@@ -899,7 +1065,6 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             }
             finally
             {
-                Release(rulesObj);
                 Release(policyObj);
             }
         }
@@ -907,37 +1072,63 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
 
     /// <summary>Возвращает текущий режим фильтрации (эвристика по политике и Killswitch-правилу).</summary>
     public FirewallFilteringMode GetFilteringMode()
+        => TryGetFilteringMode(out var mode) ? mode : throw new FirewallNotAvailableException("Невозможно достоверно определить режим брандмауэра.");
+
+    /// <summary>Формирует полный глобальный запрет для компенсируемой смены режима.</summary>
+    private static FirewallRuleDto BuildKillswitchRule(string name, FirewallDirection direction) => new()
     {
-        object? policyObj = null;
-        object? rulesObj = null;
-        try
+        Name = name, Description = "Killswitch StartupMonitor: блокировка всего трафика.", Direction = direction,
+        Action = FirewallAction.Block, Protocol = FirewallProtocol.Any, Enabled = true, Profiles = FirewallProfile.All,
+        RemoteAddresses = "*", Grouping = RuleGroup, IsManaged = true
+    };
+
+    /// <summary>Читает режим без подмены отказа COM разрешающим Normal.</summary>
+    /// <param name="mode">Действительный режим только при возвращённом true.</param>
+    /// <returns>False при любом неполном чтении профилей или killswitch-правила.</returns>
+    public bool TryGetFilteringMode(out FirewallFilteringMode mode)
+    {
+        lock (_sync)
         {
-            dynamic policy = CreatePolicy(out policyObj);
-            dynamic rules = policy.Rules;
-            rulesObj = rules;
-
-            bool d = IsEnabledSafe(policy, ProfileDomain);
-            bool p = IsEnabledSafe(policy, ProfilePrivate);
-            bool pub = IsEnabledSafe(policy, ProfilePublic);
-            if (!d && !p && !pub)
-                return FirewallFilteringMode.Disabled;
-
-            if (IsKillswitchActive(rules))
-                return FirewallFilteringMode.KillswitchBlockAll;
-
-            if (IsDefaultOutboundBlocked(policy))
-                return FirewallFilteringMode.WhitelistOutbound;
-
-            return FirewallFilteringMode.Normal;
-        }
-        catch
-        {
-            return FirewallFilteringMode.Normal;
-        }
-        finally
-        {
-            Release(rulesObj);
-            Release(policyObj);
+            mode = default;
+            object? policyObj = null;
+            object? rulesObj = null;
+            try
+            {
+                dynamic policy = OpenPolicy(out policyObj);
+                dynamic rules = policy.Rules;
+                rulesObj = rules;
+                var profiles = new[] { ProfileDomain, ProfilePrivate, ProfilePublic };
+                var enabled = profiles.Select(profile => Convert.ToBoolean(policy.FirewallEnabled[profile])).ToArray();
+                if (enabled.All(value => !value))
+                {
+                    mode = FirewallFilteringMode.Disabled;
+                    return true;
+                }
+                foreach (var name in new[] { KillswitchRuleNameIn, KillswitchRuleNameOut })
+                {
+                    object? native = FindRuleDirect(rules, name);
+                    try
+                    {
+                        if (native == null) continue;
+                        dynamic candidate = native;
+                        if (Convert.ToBoolean(candidate.Enabled) && Convert.ToInt32(candidate.Action) == ActionBlock)
+                        {
+                            mode = FirewallFilteringMode.KillswitchBlockAll;
+                            return true;
+                        }
+                    }
+                    finally { Release(native); }
+                }
+                mode = profiles.Any(profile => Convert.ToInt32(policy.DefaultOutboundAction[profile]) == ActionBlock)
+                    ? FirewallFilteringMode.WhitelistOutbound : FirewallFilteringMode.Normal;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Firewall: режим фильтрации недоступен");
+                return false;
+            }
+            finally { Release(rulesObj); Release(policyObj); }
         }
     }
 
@@ -1329,47 +1520,32 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
     /// <param name="direction">Направление трафика.</param>
     private static void ApplyDtoToComRule(dynamic comRule, FirewallRuleDto dto, string name, int direction)
     {
+        // Ограничения устанавливаются раньше действия/включения; поздний setter не подтверждает неполную политику.
+        var oldProtocol = Convert.ToInt32(comRule.Protocol);
+        var protocol = dto.Protocol switch { FirewallProtocol.Tcp => ProtoTcp, FirewallProtocol.Udp => ProtoUdp, _ => ProtoAny };
+        if (oldProtocol != protocol && oldProtocol is ProtoTcp or ProtoUdp)
+        {
+            comRule.LocalPorts = "*";
+            comRule.RemotePorts = "*";
+        }
+        comRule.Protocol = protocol;
         comRule.Name = name;
-        if (!string.IsNullOrWhiteSpace(dto.Description))
-            comRule.Description = dto.Description;
+        comRule.Description = dto.Description ?? string.Empty;
         comRule.Direction = direction;
+        comRule.Profiles = ToComProfiles(dto.Profiles);
+        // Не присваиваем пустое optional-поле: detached INetFwRule принимает setter, но Rules.Add
+        // отклоняет явно пустой ServiceName. Очистка прежней привязки обеспечивается заменой объекта выше.
+        if (!string.IsNullOrWhiteSpace(dto.ApplicationPath)) comRule.ApplicationName = dto.ApplicationPath.Trim().Trim('"');
+        if (!string.IsNullOrWhiteSpace(dto.ServiceName)) comRule.ServiceName = dto.ServiceName.Trim();
+        if (protocol is ProtoTcp or ProtoUdp)
+        {
+            comRule.LocalPorts = Wildcard(dto.LocalPorts);
+            comRule.RemotePorts = Wildcard(dto.RemotePorts);
+        }
+        comRule.RemoteAddresses = Wildcard(dto.RemoteAddresses);
+        comRule.Grouping = dto.Grouping ?? (name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase) ? RuleGroup : string.Empty);
         comRule.Action = dto.Action == FirewallAction.Allow ? ActionAllow : ActionBlock;
         comRule.Enabled = dto.Enabled;
-        comRule.Profiles = ToComProfiles(dto.Profiles);
-        comRule.Protocol = dto.Protocol switch
-        {
-            FirewallProtocol.Tcp => ProtoTcp,
-            FirewallProtocol.Udp => ProtoUdp,
-            _ => ProtoAny,
-        };
-
-        var app = dto.ApplicationPath ?? dto.ApplicationName;
-        if (!string.IsNullOrWhiteSpace(app))
-            comRule.ApplicationName = app;
-        if (!string.IsNullOrWhiteSpace(dto.ServiceName))
-        {
-            comRule.ServiceName = dto.ServiceName;
-        }
-
-        if (comRule.Protocol is ProtoTcp or ProtoUdp)
-        {
-            if (!string.IsNullOrWhiteSpace(dto.LocalPorts))
-            {
-                comRule.LocalPorts = dto.LocalPorts.Trim();
-            }
-            if (!string.IsNullOrWhiteSpace(dto.RemotePorts))
-            {
-                comRule.RemotePorts = dto.RemotePorts.Trim();
-            }
-        }
-        if (!string.IsNullOrWhiteSpace(dto.RemoteAddresses))
-        {
-            comRule.RemoteAddresses = dto.RemoteAddresses.Trim();
-        }
-        if (!string.IsNullOrWhiteSpace(dto.Grouping))
-            comRule.Grouping = dto.Grouping;
-        else if (name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase))
-            comRule.Grouping = RuleGroup;
     }
 
     private static int ToComProfiles(FirewallProfile profiles)
@@ -1690,6 +1866,128 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
 
     // --- COM-инфраструктура ----------------------------------------------------
 
+    /// <summary>Открывает политику текущего экземпляра; управляемая подмена доступна только внутренним тестам.</summary>
+    /// <param name="raw">Владелец COM-объекта для освобождения.</param>
+    /// <returns>Настоящая политика Windows или явный изолированный адаптер.</returns>
+    private dynamic OpenPolicy(out object? raw)
+    {
+        if (PolicyFactoryOverride == null) return CreatePolicy(out raw);
+        raw = PolicyFactoryOverride() ?? throw new InvalidOperationException("Источник политики вернул null.");
+        return raw;
+    }
+
+    /// <summary>Создаёт самостоятельный native-объект, который не добавляется в политику до полной валидации setter.</summary>
+    private object NewRuleObject() => RuleFactoryOverride?.Invoke() ?? (object)CreateRuleObject();
+
+    /// <summary>Ищет только в прямом индексе без перечисления и освобождения удерживаемых транзакцией RCW.</summary>
+    private static object? FindRuleDirect(dynamic rules, string name)
+    {
+        try { return rules.Item(name); }
+        catch (FileNotFoundException) { return null; }
+        catch (COMException ex) when (ex.ErrorCode is unchecked((int)0x80070002) or unchecked((int)0x80070490)) { return null; }
+    }
+
+    /// <summary>Получает достоверный снимок; отказ одного getter или enumerator отменяет весь результат.</summary>
+    /// <param name="rules">Коллекция INetFwRules или управляемый адаптер.</param>
+    /// <param name="held">Владельцы RCW; удерживаются до завершения/компенсации всей операции.</param>
+    /// <returns>Полные записи без подстановки разрешающих значений при ошибке.</returns>
+    private static List<RuleSnapshot> CaptureRules(object rules, List<object> held)
+    {
+        var result = new List<RuleSnapshot>();
+        var enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
+        try
+        {
+            while (enumerator.MoveNext())
+            {
+                var native = enumerator.Current ?? throw new InvalidDataException("Коллекция содержит пустое правило.");
+                held.Add(native);
+                result.Add(CaptureRule(native));
+            }
+            return result;
+        }
+        finally { (enumerator as IDisposable)?.Dispose(); Release(enumerator); }
+    }
+
+    /// <summary>Читает обязательные свойства без SafeGet-fallback и сохраняет исходные значения для точного отката.</summary>
+    private static RuleSnapshot CaptureRule(object native)
+    {
+        var values = new Dictionary<string, object?>();
+        foreach (var property in new[] { "Name", "Description", "Direction", "Action", "Enabled", "Profiles", "Protocol", "ApplicationName", "ServiceName", "RemoteAddresses", "Grouping", "LocalAddresses", "InterfaceTypes", "Interfaces", "EdgeTraversal" })
+            values[property] = ReadRuleProperty(native, property);
+        var name = Convert.ToString(values["Name"]);
+        if (string.IsNullOrWhiteSpace(name)) throw new InvalidDataException("Правило не содержит имени.");
+        foreach (var property in new[] { "Direction", "Action", "Enabled", "Profiles", "Protocol", "EdgeTraversal" })
+            if (values[property] == null) throw new InvalidDataException($"Не прочитано обязательное поле {property} правила {name}.");
+        var protocol = Convert.ToInt32(values["Protocol"]);
+        if (protocol is ProtoTcp or ProtoUdp)
+        {
+            values["LocalPorts"] = ReadRuleProperty(native, "LocalPorts");
+            values["RemotePorts"] = ReadRuleProperty(native, "RemotePorts");
+        }
+        if (protocol is 1 or 58) values["IcmpTypesAndCodes"] = ReadRuleProperty(native, "IcmpTypesAndCodes");
+        var direction = Convert.ToInt32(values["Direction"]);
+        var action = Convert.ToInt32(values["Action"]);
+        if (direction is not (DirIn or DirOut) || action is not (ActionAllow or ActionBlock))
+            throw new InvalidDataException($"Неизвестное действие/направление правила {name}.");
+        var dto = new FirewallRuleDto
+        {
+            Name = name, Description = Convert.ToString(values["Description"]) ?? "", Direction = (FirewallDirection)direction,
+            Action = (FirewallAction)action, Enabled = Convert.ToBoolean(values["Enabled"]),
+            Profiles = (FirewallProfile)(Convert.ToInt32(values["Profiles"]) & 7), Protocol = (FirewallProtocol)protocol,
+            ApplicationPath = Convert.ToString(values["ApplicationName"]), ServiceName = Convert.ToString(values["ServiceName"]),
+            LocalPorts = Convert.ToString(values.GetValueOrDefault("LocalPorts")) ?? "*",
+            RemotePorts = Convert.ToString(values.GetValueOrDefault("RemotePorts")) ?? "*",
+            RemoteAddresses = Convert.ToString(values["RemoteAddresses"]) ?? "*", Grouping = Convert.ToString(values["Grouping"]),
+            IsManaged = name.StartsWith(RulePrefix, StringComparison.OrdinalIgnoreCase)
+        };
+        return new RuleSnapshot(native, dto, values);
+    }
+
+    /// <summary>Восстанавливает сохранённые поля существующего RCW; интерфейсы и прочие нетронутые свойства остаются на исходном объекте.</summary>
+    private static void RestoreRule(RuleSnapshot item)
+    {
+        dynamic rule = item.Native;
+        var values = item.Values;
+        rule.Enabled = false;
+        var currentProtocol = Convert.ToInt32(rule.Protocol);
+        if (currentProtocol is ProtoTcp or ProtoUdp) { rule.LocalPorts = "*"; rule.RemotePorts = "*"; }
+        rule.Protocol = Convert.ToInt32(values["Protocol"]);
+        if (values.TryGetValue("LocalPorts", out var local)) rule.LocalPorts = Wildcard(Convert.ToString(local));
+        if (values.TryGetValue("RemotePorts", out var remote)) rule.RemotePorts = Wildcard(Convert.ToString(remote));
+        if (values.TryGetValue("IcmpTypesAndCodes", out var icmp)) rule.IcmpTypesAndCodes = Convert.ToString(icmp) ?? "*";
+        rule.Name = item.Dto.Name;
+        rule.Description = Convert.ToString(values["Description"]) ?? "";
+        rule.Direction = Convert.ToInt32(values["Direction"]);
+        rule.Profiles = Convert.ToInt32(values["Profiles"]);
+        var application = Convert.ToString(values["ApplicationName"]);
+        var service = Convert.ToString(values["ServiceName"]);
+        if (!string.IsNullOrWhiteSpace(application)) rule.ApplicationName = application;
+        if (!string.IsNullOrWhiteSpace(service)) rule.ServiceName = service;
+        rule.RemoteAddresses = Wildcard(Convert.ToString(values["RemoteAddresses"]));
+        rule.Grouping = Convert.ToString(values["Grouping"]) ?? "";
+        rule.Action = Convert.ToInt32(values["Action"]);
+        rule.Enabled = Convert.ToBoolean(values["Enabled"]);
+    }
+
+    /// <summary>При замене optional-привязки сохраняет интерфейсную и локальную область, отсутствующую в редактируемом DTO.</summary>
+    /// <param name="previous">Достоверный снимок исходного правила.</param>
+    /// <param name="replacement">Новый, ещё не установленный INetFwRule.</param>
+    private static void CopyUnchangedScope(RuleSnapshot previous, object replacement)
+    {
+        dynamic rule = replacement;
+        rule.LocalAddresses = Wildcard(Convert.ToString(previous.Values["LocalAddresses"]));
+        rule.InterfaceTypes = string.IsNullOrWhiteSpace(Convert.ToString(previous.Values["InterfaceTypes"]))
+            ? "All" : Convert.ToString(previous.Values["InterfaceTypes"]);
+        if (previous.Values["Interfaces"] is Array { Length: > 0 } interfaces) rule.Interfaces = interfaces;
+        rule.EdgeTraversal = Convert.ToBoolean(previous.Values["EdgeTraversal"]);
+    }
+
+    /// <summary>Освобождает каждый удерживаемый RCW ровно один раз, когда он больше не нужен для компенсации.</summary>
+    private static void ReleaseHeldRules(IEnumerable<object> held)
+    {
+        foreach (var native in held.Distinct(ReferenceEqualityComparer.Instance)) Release(native);
+    }
+
     private static dynamic CreatePolicy(out object? raw)
     {
         var type = Type.GetTypeFromProgID(PolicyProgId, throwOnError: false);
@@ -1812,36 +2110,10 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
 
     private static List<FirewallRuleDto> EnumerateRules(dynamic rules)
     {
-        var list = new List<FirewallRuleDto>();
-        System.Collections.IEnumerator? enumerator = null;
-        try
-        {
-            enumerator = ((System.Collections.IEnumerable)rules).GetEnumerator();
-            while (true)
-            {
-                bool moved;
-                try { moved = enumerator.MoveNext(); }
-                catch { break; }
-                if (!moved) break;
-
-                dynamic r = enumerator.Current;
-                try { list.Add(ReadRule(r)); }
-                catch { /* битое правило — пропускаем */ }
-                finally { Release(r); }
-
-                // Кооперативный Time-Slicing: отдаем квант времени каждые 50 правил
-                if (list.Count % 50 == 0)
-                {
-                    Thread.Yield();
-                }
-            }
-        }
-        finally
-        {
-            Release(enumerator);
-        }
-
-        return list;
+        // Полный снимок не допускает пропуска повреждённого элемента: иначе отсутствие запрета можно принять за разрешение.
+        var held = new List<object>();
+        try { return CaptureRules((object)rules, held).Select(item => item.Dto).ToList(); }
+        finally { ReleaseHeldRules(held); }
     }
 
     private static FirewallRuleDto ReadRule(dynamic r)
@@ -1935,6 +2207,11 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
             "LocalPorts" => (object?)nativeRule.LocalPorts,
             "RemotePorts" => (object?)nativeRule.RemotePorts,
             "RemoteAddresses" => (object?)nativeRule.RemoteAddresses,
+            "LocalAddresses" => (object?)nativeRule.LocalAddresses,
+            "InterfaceTypes" => (object?)nativeRule.InterfaceTypes,
+            "Interfaces" => (object?)nativeRule.Interfaces,
+            "EdgeTraversal" => (object?)nativeRule.EdgeTraversal,
+            "IcmpTypesAndCodes" => (object?)nativeRule.IcmpTypesAndCodes,
             "ServiceName" => (object?)nativeRule.ServiceName,
             "Enabled" => (object?)nativeRule.Enabled,
             "Grouping" => (object?)nativeRule.Grouping,

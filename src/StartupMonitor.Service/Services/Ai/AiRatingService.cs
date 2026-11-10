@@ -27,9 +27,10 @@ public class AiRatingService : IDisposable
     private static readonly string WindowsVersion = RuntimeInformation.OSDescription;
 
     public AiRatingService(RatingsCache cache, ILogger<AiRatingService> logger, string apiKey, string uiLang = "ru",
-        string? apiUrl = null, string? model = null)
+        string? apiUrl = null, string? model = null, HttpMessageHandler? httpHandler = null)
     {
-        _http = new HttpClient();
+        // Явный обработчик позволяет проверять объединение и отмену HTTP без реальной сети.
+        _http = httpHandler == null ? new HttpClient() : new HttpClient(httpHandler);
         // Каноничный User-Agent для исключения блокировок Cloudflare/Groq WAF (403 Forbidden)
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("StartupMonitor/2.0");
         _cache = cache;
@@ -81,13 +82,17 @@ public class AiRatingService : IDisposable
 
     /// <summary>PrefetchAsync: Выполняет операцию PrefetchAsync.</summary>
     /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
-    public async Task PrefetchAsync(StartupEntry entry)
+    /// <param name="cancellationToken">Отмена остановки службы, передаваемая до HTTP и retry-задержек.</param>
+    public async Task PrefetchAsync(StartupEntry entry, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+        cancellationToken.ThrowIfCancellationRequested();
         if (entry.AiRating > 0) return;
         if (_cache.Get(entry) != null) return;
         if (string.IsNullOrWhiteSpace(_apiKey) && !IsLocalUrl(_apiUrl)) return;
 
-        var rating = await FetchRatingAsync(entry);
+        var rating = await FetchRatingAsync(entry, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (rating != null)
             _cache.Set(entry, rating);
     }
@@ -96,15 +101,19 @@ public class AiRatingService : IDisposable
     /// Принудительно запрашивает свежий AI-рейтинг для записи, сбрасывая сетевой предохранитель Circuit Breaker.
     /// </summary>
     /// <param name="entry">Оцениваемая запись автозапуска.</param>
+    /// <param name="cancellationToken">Отмена ручного запроса при остановке службы.</param>
     /// <returns>Полученный рейтинг или null в случае ошибки.</returns>
-    public async Task<StartupRating?> ForceFetchRatingAsync(StartupEntry entry)
+    public async Task<StartupRating?> ForceFetchRatingAsync(StartupEntry entry, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(entry);
+        cancellationToken.ThrowIfCancellationRequested();
         // Немедленно сбрасываем Circuit Breaker при ручном запросе пользователя
         _networkCooldownUntil = DateTime.MinValue;
         _consecutiveNetworkErrors = 0;
 
         _logger.LogInformation("ForceFetchRatingAsync: немедленный запрос к AI для {Name} ({Model})", entry.Name, _model);
-        var rating = await FetchRatingAsync(entry);
+        var rating = await FetchRatingAsync(entry, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (rating != null)
         {
             _cache.Set(entry, rating);
@@ -118,7 +127,8 @@ public class AiRatingService : IDisposable
         return rating;
     }
 
-    public async Task<(bool Success, string Message)> TestConnectionAsync(string? apiKey, string? apiUrl, string? model)
+    /// <summary>Проверяет провайдер с ограничением ожидания и сквозной отменой службы.</summary>
+    public async Task<(bool Success, string Message)> TestConnectionAsync(string? apiKey, string? apiUrl, string? model, CancellationToken cancellationToken = default)
     {
         var url = string.IsNullOrWhiteSpace(apiUrl) ? _apiUrl : apiUrl.Trim();
         var mdl = string.IsNullOrWhiteSpace(model) ? _model : model.Trim();
@@ -147,15 +157,16 @@ public class AiRatingService : IDisposable
                 request.Headers.Add("Authorization", "Bearer ollama");
 
             request.Content = content;
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            var response = await _http.SendAsync(request, cts.Token);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _networkLifetime.Token);
+            cts.CancelAfter(TimeSpan.FromSeconds(20));
+            using var response = await _http.SendAsync(request, cts.Token);
 
             if (response.IsSuccessStatusCode)
             {
                 return (true, $"Соединение успешно! Модель '{mdl}' активна.");
             }
 
-            var errBody = await response.Content.ReadAsStringAsync();
+            var errBody = await response.Content.ReadAsStringAsync(cts.Token);
             if ((int)response.StatusCode == 401 || (int)response.StatusCode == 403)
                 return (false, $"Ошибка авторизации ({response.StatusCode}): неверный API-ключ");
             if ((int)response.StatusCode == 404)
@@ -164,6 +175,10 @@ public class AiRatingService : IDisposable
                 return (false, "Превышен лимит запросов API (429 Rate Limit)");
 
             return (false, $"Ошибка сервера {(int)response.StatusCode}: {errBody}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _networkLifetime.IsCancellationRequested)
+        {
+            throw;
         }
         catch (TaskCanceledException)
         {
@@ -181,10 +196,15 @@ public class AiRatingService : IDisposable
 
     /// <summary>PrefetchAllAsync: Выполняет операцию PrefetchAllAsync.</summary>
     /// <param name="entries">Входные данные: значение параметра entries (List<StartupEntry>).</param>
-    public async Task PrefetchAllAsync(List<StartupEntry> entries)
+    /// <param name="cancellationToken">Отмена всего пакета, в том числе cooldown, retry и незавершённого HTTP.</param>
+    public async Task PrefetchAllAsync(List<StartupEntry> entries, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(entries);
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _networkLifetime.Token);
+        cancellationToken = lifetime.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         using var _prof = ExecutionProfiler.Measure("Service.Ai.PrefetchAll");
-        if (!await _prefetchLock.WaitAsync(0)) return;
+        if (!await _prefetchLock.WaitAsync(0, cancellationToken)) return;
 
         try
         {
@@ -193,6 +213,7 @@ public class AiRatingService : IDisposable
                 .GroupBy(e => e.SHA256, StringComparer.OrdinalIgnoreCase);
             foreach (var grp in byHash)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var rated = grp.FirstOrDefault(e => _cache.Get(e) != null);
                 if (rated == null) continue;
                 var src = _cache.Get(rated);
@@ -228,15 +249,17 @@ public class AiRatingService : IDisposable
             var errors = 0;
             foreach (var entry in unrated)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (_cache.Get(entry) != null) continue;
                 // Окно остывания после повторных 429: ждём восстановления лимита
                 if (DateTime.UtcNow < _cooldownUntil)
                 {
                     var wait = (int)(_cooldownUntil - DateTime.UtcNow).TotalMilliseconds + 1000;
                     _logger.LogWarning("AI API: пауза из-за rate limit, жду {Wait}ms", wait);
-                    await Task.Delay(wait);
+                    await Task.Delay(wait, cancellationToken);
                 }
-                var rating = await FetchRatingAsync(entry);
+                var rating = await FetchRatingAsync(entry, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (rating != null)
                 {
                     _cache.Set(entry, rating);
@@ -313,8 +336,12 @@ public class AiRatingService : IDisposable
             || cmd.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase);
     }
 
-    private async Task<StartupRating?> FetchRatingAsync(StartupEntry entry)
+    /// <summary>Получает рейтинг с локальным timeout каждой попытки; остановка службы отменяет также backoff и не повторяется как сетевой сбой.</summary>
+    private async Task<StartupRating?> FetchRatingAsync(StartupEntry entry, CancellationToken cancellationToken)
     {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _networkLifetime.Token);
+        cancellationToken = lifetime.Token;
+        cancellationToken.ThrowIfCancellationRequested();
         using var _prof = ExecutionProfiler.Measure("Service.Ai.FetchRating");
 
         // Собственные файлы проекта StartupMonitor всегда получают высшую оценку 5 звёзд (Score=1)
@@ -344,6 +371,7 @@ public class AiRatingService : IDisposable
         var waitedFor429 = false;
         for (var attempt = 1; attempt <= 5; attempt++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var prompt = BuildPrompt(entry);
@@ -366,8 +394,9 @@ public class AiRatingService : IDisposable
 
                 request.Content = content;
 
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                var response = await _http.SendAsync(request, cts.Token);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromSeconds(30));
+                using var response = await _http.SendAsync(request, cts.Token);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
@@ -385,13 +414,13 @@ public class AiRatingService : IDisposable
                     }
                     waitedFor429 = true;
                     _logger.LogWarning("Groq API 429 для {Name}, жду {Delay}ms", entry.Name, delay);
-                    await Task.Delay(delay);
+                    await Task.Delay(delay, cancellationToken);
                     continue;
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var err = await response.Content.ReadAsStringAsync();
+                    var err = await response.Content.ReadAsStringAsync(cts.Token);
                     if ((int)response.StatusCode is 400 or 401 or 403)
                     {
                         _logger.LogWarning("Groq API {Code} для {Name}: {Error} — ретрай отключён",
@@ -402,7 +431,7 @@ public class AiRatingService : IDisposable
                     {
                         _logger.LogWarning("Groq API {Code} для {Name}, попытка {Attempt}: {Error}",
                             response.StatusCode, entry.Name, attempt, err);
-                        await Task.Delay(2000);
+                        await Task.Delay(2000, cancellationToken);
                         continue;
                     }
                     _logger.LogWarning("Groq API {Code} для {Name}: {Error}",
@@ -410,9 +439,13 @@ public class AiRatingService : IDisposable
                     return null;
                 }
 
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
                 _consecutiveNetworkErrors = 0;
                 return ParseResponse(json, entry.Name);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex) when (IsNetworkConnectionError(ex))
             {
@@ -429,7 +462,7 @@ public class AiRatingService : IDisposable
 
                 if (attempt < 5)
                 {
-                    await Task.Delay(2000);
+                    await Task.Delay(2000, cancellationToken);
                     continue;
                 }
                 return null;
@@ -439,7 +472,7 @@ public class AiRatingService : IDisposable
                 _logger.LogWarning("Groq API таймаут для {Name}, попытка {Attempt}", entry.Name, attempt);
                 if (attempt < 5)
                 {
-                    await Task.Delay(2000);
+                    await Task.Delay(2000, cancellationToken);
                     continue;
                 }
                 return null;
@@ -449,7 +482,7 @@ public class AiRatingService : IDisposable
                 _logger.LogWarning(ex, "Ошибка Groq API для {Name}, попытка {Attempt}", entry.Name, attempt);
                 if (attempt < 5)
                 {
-                    await Task.Delay(2000);
+                    await Task.Delay(2000, cancellationToken);
                     continue;
                 }
                 return null;
@@ -808,7 +841,27 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
     }
 
     /// <summary>Кэш оценок сетевых процессов для исключения повторных запросов к API.</summary>
-    private readonly ConcurrentDictionary<string, (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)> _networkEvaluationsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, (DateTime ExpiresAt, (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction) Verdict)> _networkEvaluationsCache = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Общие выполняющиеся оценки объединяют запрос карточки и фонового обогащения.</summary>
+    private readonly ConcurrentDictionary<string, NetworkEvaluationWork> _networkInFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _networkSlots = new(4, 4);
+    private readonly CancellationTokenSource _networkLifetime = new();
+
+    /// <summary>Одна отменяемая оценка с числом ожидающих потребителей; отмена одного окна не обрывает чужое ожидание.</summary>
+    private sealed class NetworkEvaluationWork
+    {
+        public readonly object Sync = new();
+        public readonly CancellationTokenSource Cancellation;
+        public readonly Lazy<Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?>> Task;
+        public int Waiters;
+
+        /// <summary>Создаёт ленивую общую задачу, отменяемую при остановке сервиса либо уходе последнего потребителя.</summary>
+        public NetworkEvaluationWork(CancellationToken lifetime, Func<CancellationToken, Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?>> factory)
+        {
+            Cancellation = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+            Task = new(() => factory(Cancellation.Token), LazyThreadSafetyMode.ExecutionAndPublication);
+        }
+    }
 
     /// <summary>
     /// Выполняет анализ сетевого процесса с помощью LLM (Groq / OpenAI) для формирования контекстной справки и рекомендации.
@@ -819,7 +872,70 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
     /// <param name="remotePort">Удалённый порт назначения.</param>
     /// <returns>Кортеж с назначением, рисками, рекомендацией и действием или null при сбое.</returns>
     public async Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?> EvaluateNetworkProcessAsync(
-        string processName, string? processPath, string remoteAddress, int remotePort)
+        string processName, string? processPath, string remoteAddress, int remotePort, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_networkLifetime.IsCancellationRequested) return null;
+        var key = $"{processPath?.Trim().ToLowerInvariant()}|{processName?.Trim().ToLowerInvariant()}|{remoteAddress}:{remotePort}|{_apiUrl}|{_model}|{_uiLang}";
+        if (_networkEvaluationsCache.TryGetValue(key, out var cached) && cached.ExpiresAt > DateTime.UtcNow) return cached.Verdict;
+        _networkEvaluationsCache.TryRemove(key, out _);
+        if (_networkInFlight.Count >= 128 && !_networkInFlight.ContainsKey(key)) return null;
+        NetworkEvaluationWork work;
+        while (true)
+        {
+            work = _networkInFlight.GetOrAdd(key, _ => new NetworkEvaluationWork(_networkLifetime.Token,
+                token => RunNetworkEvaluationAsync(key, processName ?? string.Empty, processPath, remoteAddress, remotePort, token)));
+            lock (work.Sync)
+            {
+                if (work.Cancellation.IsCancellationRequested)
+                {
+                    ((ICollection<KeyValuePair<string, NetworkEvaluationWork>>)_networkInFlight).Remove(new(key, work));
+                    continue;
+                }
+                work.Waiters++;
+                break;
+            }
+        }
+        var task = work.Task.Value;
+        try { return await task.WaitAsync(cancellationToken).ConfigureAwait(false); }
+        finally
+        {
+            lock (work.Sync)
+            {
+                if (--work.Waiters == 0)
+                {
+                    ((ICollection<KeyValuePair<string, NetworkEvaluationWork>>)_networkInFlight).Remove(new(key, work));
+                    if (!task.IsCompleted) work.Cancellation.Cancel();
+                    _ = task.ContinueWith(_ => work.Cancellation.Dispose(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
+            }
+        }
+    }
+
+    /// <summary>Ограничивает параллелизм сетевых оценок и хранит только ограниченный по сроку подтверждённый результат.</summary>
+    private async Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?> RunNetworkEvaluationAsync(
+        string key, string processName, string? processPath, string remoteAddress, int remotePort, CancellationToken cancellationToken)
+    {
+        await _networkSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var verdict = await EvaluateNetworkProcessCoreAsync(processName, processPath, remoteAddress, remotePort, cancellationToken).ConfigureAwait(false);
+            if (verdict.HasValue && !cancellationToken.IsCancellationRequested)
+            {
+                _networkEvaluationsCache[key] = (DateTime.UtcNow.AddMinutes(30), verdict.Value);
+                foreach (var old in _networkEvaluationsCache.Where(pair => pair.Value.ExpiresAt <= DateTime.UtcNow).ToArray())
+                    _networkEvaluationsCache.TryRemove(old.Key, out _);
+                while (_networkEvaluationsCache.Count > 512)
+                    _networkEvaluationsCache.TryRemove(_networkEvaluationsCache.MinBy(pair => pair.Value.ExpiresAt).Key, out _);
+            }
+            return verdict;
+        }
+        finally { _networkSlots.Release(); }
+    }
+
+    /// <summary>Выполняет единственный запрос оценки с проверкой отмены и доверенной идентичности.</summary>
+    private async Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?> EvaluateNetworkProcessCoreAsync(
+        string processName, string? processPath, string remoteAddress, int remotePort, CancellationToken cancellationToken)
     {
         using var _prof = ExecutionProfiler.Measure("Service.Ai.EvaluateNetworkProcess");
 
@@ -828,8 +944,9 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         var remote = string.IsNullOrWhiteSpace(remoteAddress) ? "0.0.0.0" : remoteAddress.Trim();
 
         // 1. Собственные компоненты StartupMonitor всегда считаются доверенными
-        if (pName.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase) ||
-            pPath.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase))
+        if (StartupMonitor.Service.Services.Firewall.NetworkConnectionAlertService.IsTrustedProcess(pName, pPath) &&
+            (Path.GetFileName(pPath).Equals("StartupMonitor.Service.exe", StringComparison.OrdinalIgnoreCase) ||
+             Path.GetFileName(pPath).Equals("StartupMonitor.UI.exe", StringComparison.OrdinalIgnoreCase)))
         {
             return (
                 "Официальный служебный компонент защитного комплекса Startup Monitor.",
@@ -851,12 +968,6 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         }
 
         // 3. Проверка локального кэша
-        var cacheKey = $"{pPath.ToLowerInvariant()}|{pName.ToLowerInvariant()}|{remote}:{remotePort}";
-        if (_networkEvaluationsCache.TryGetValue(cacheKey, out var cachedVerdict))
-        {
-            return cachedVerdict;
-        }
-
         // 4. Circuit Breaker, пауза Rate Limit и проверка наличия ключа
         if (DateTime.UtcNow < _cooldownUntil)
         {
@@ -917,8 +1028,9 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
 
                 request.Content = content;
 
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
-                var response = await _http.SendAsync(request, cts.Token);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromSeconds(25));
+                using var response = await _http.SendAsync(request, cts.Token).ConfigureAwait(false);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
@@ -929,7 +1041,7 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
                         pName, delayMs, CooldownMinutes);
                     if (attempt < 3)
                     {
-                        await Task.Delay((int)delayMs);
+                        await Task.Delay((int)delayMs, cancellationToken).ConfigureAwait(false);
                         continue;
                     }
                     return null;
@@ -937,19 +1049,19 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var err = await response.Content.ReadAsStringAsync();
+                    var err = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                     _logger.LogWarning("AiRatingService: ошибка {Status} при оценке процесса {Name}: {Error}", response.StatusCode, pName, err);
                     return null;
                 }
 
-                var respJson = await response.Content.ReadAsStringAsync();
+                var respJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var verdict = ParseNetworkEvaluationResponse(respJson, pName);
                 if (verdict != null)
                 {
-                    _networkEvaluationsCache[cacheKey] = verdict.Value;
                     return verdict;
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "AiRatingService: исключение при сетевой оценке процесса {Process} (попытка {Attempt})", pName, attempt);
@@ -1048,21 +1160,22 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
             using var innerDoc = JsonDocument.Parse(cleaned);
             var root = innerDoc.RootElement;
 
-            string purpose = GetJsonStringProperty(root, "purpose", "Назначение не определено.");
-            string blockingRisk = GetJsonStringProperty(root, "blocking_risk", "blockingRisk", "Особых рисков для критических служб не выявлено.");
-            string recommendation = GetJsonStringProperty(root, "recommendation", "Применяйте стандартные правила брандмауэра.");
-            string rawAction = GetJsonStringProperty(root, "recommended_action", "recommendedAction", "AllowSession");
+            string purpose = GetJsonStringProperty(root, "purpose", string.Empty);
+            string blockingRisk = GetJsonStringProperty(root, "blocking_risk", "blockingRisk", string.Empty);
+            string recommendation = GetJsonStringProperty(root, "recommendation", string.Empty);
+            string rawAction = GetJsonStringProperty(root, "recommended_action", "recommendedAction", string.Empty);
+            if (string.IsNullOrWhiteSpace(purpose) || string.IsNullOrWhiteSpace(blockingRisk) || string.IsNullOrWhiteSpace(recommendation))
+                return null;
 
-            string action = rawAction.Trim() switch
+            string? action = rawAction.Trim() switch
             {
                 var a when a.Equals("AllowAlways", StringComparison.OrdinalIgnoreCase) => "AllowAlways",
                 var a when a.Equals("AllowSession", StringComparison.OrdinalIgnoreCase) => "AllowSession",
                 var a when a.Equals("BlockAlways", StringComparison.OrdinalIgnoreCase) => "BlockAlways",
                 var a when a.Equals("BlockSession", StringComparison.OrdinalIgnoreCase) => "BlockSession",
-                var a when a.Contains("Block", StringComparison.OrdinalIgnoreCase) => "BlockSession",
-                _ => "AllowSession"
+                _ => null
             };
-
+            if (action == null) return null;
             return (purpose, blockingRisk, recommendation, action);
         }
         catch (Exception ex)
@@ -1100,5 +1213,10 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         return defaultValue;
     }
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _networkLifetime.Cancel();
+        _networkEvaluationsCache.Clear();
+        _http.Dispose();
+    }
 }

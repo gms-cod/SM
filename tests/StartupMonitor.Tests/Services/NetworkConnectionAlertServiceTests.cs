@@ -50,7 +50,8 @@ public sealed class NetworkConnectionAlertServiceTests
             SocketsProvider = () => sockets ?? new List<ProcessNetworkSocket>(),
             ProcessPathResolver = pid =>
                 pathsByPid != null && pathsByPid.TryGetValue(pid, out var p) ? p : null,
-            HasFirewallRuleOverride = hasRule ?? (_ => false),
+            HasFirewallRuleOverride = hasRule ?? (path => appliedRules?.Any(rule => rule.Action == FirewallAction.Allow && string.Equals(rule.ApplicationPath, path, StringComparison.OrdinalIgnoreCase)) == true),
+            HasApplicationPolicyOverride = (path, action) => appliedRules?.Any(rule => rule.Action == action && string.Equals(rule.ApplicationPath, path, StringComparison.OrdinalIgnoreCase)) == true,
             ApplyFirewallRuleOverride = rule => appliedRules?.Add(rule),
         };
         return svc;
@@ -105,9 +106,13 @@ public sealed class NetworkConnectionAlertServiceTests
     [InlineData("StartupMonitor.UI.exe")]
     public void ScanNewConnections_SystemProcesses_AreIgnored(string processName)
     {
+        // Доверие проверяется по реальному расположению компонента, а не одному имени.
+        var path = processName.StartsWith("StartupMonitor", StringComparison.OrdinalIgnoreCase)
+            ? Path.Combine(AppContext.BaseDirectory, processName)
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", processName == "System" ? "ntoskrnl.exe" : processName);
         using var svc = CreateService(
             new List<ProcessNetworkSocket> { Sock(4, processName, "8.8.8.8", 443) },
-            Paths((4, @"C:\Windows\System32\" + processName.TrimEnd('m', 'M'))));
+            Paths((4, path)));
 
         var added = svc.ScanNewConnections();
 
@@ -116,9 +121,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Theory]
-    [InlineData("svchost.exe", true)]
-    [InlineData("SVCHOST.EXE", true)]
-    [InlineData("System", true)]
+    [InlineData("svchost.exe", false)]
+    [InlineData("SVCHOST.EXE", false)]
+    [InlineData("System", false)]
     [InlineData("notepad.exe", false)]
     [InlineData("evil.exe", false)]
     [InlineData("", false)]
@@ -177,7 +182,7 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
-    public void ScanNewConnections_DifferentRemotes_ProduceSeparateAlerts()
+    public void ScanNewConnections_DifferentRemotes_AggregateIntoOneApplicationGroup()
     {
         using var svc = CreateService(
             new List<ProcessNetworkSocket>
@@ -187,8 +192,8 @@ public sealed class NetworkConnectionAlertServiceTests
             },
             Paths((1234, EvilPath)));
 
-        Assert.Equal(2, svc.ScanNewConnections());
-        Assert.Equal(2, svc.GetPendingAlerts().Count);
+        Assert.Equal(1, svc.ScanNewConnections());
+        Assert.Equal(2, Assert.Single(svc.GetPendingAlerts()).ConnectionCount);
     }
 
     [Fact]
@@ -756,12 +761,12 @@ public sealed class NetworkConnectionAlertServiceTests
             var cache = new StartupMonitor.Service.Services.Ai.RatingsCache(store);
             var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<StartupMonitor.Service.Services.Ai.AiRatingService>.Instance;
 
-            using var aiService = new StartupMonitor.Service.Services.Ai.AiRatingService(cache, logger, "test-api-key");
+            using var aiService = new StartupMonitor.Service.Services.Ai.AiRatingService(cache, logger, string.Empty);
 
             // Проверка для StartupMonitor
             var smonVerdict = await aiService.EvaluateNetworkProcessAsync(
                 "StartupMonitor.Service.exe",
-                @"C:\Program Files\StartupMonitor\StartupMonitor.Service.exe",
+                Path.Combine(AppContext.BaseDirectory, "StartupMonitor.Service.exe"),
                 "1.1.1.1",
                 443);
 

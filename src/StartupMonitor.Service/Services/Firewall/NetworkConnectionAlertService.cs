@@ -31,6 +31,10 @@ public sealed class NetworkConnectionAlertService : IDisposable
     public static readonly HashSet<string> TrustedSystemProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
         "System",
+        "smss.exe",
+        "csrss.exe",
+        "wininit.exe",
+        "winlogon.exe",
         "svchost.exe",
         "lsass.exe",
         "services.exe",
@@ -58,6 +62,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
     private readonly ConcurrentQueue<NetworkConnectionHistoryItem> _historyQueue = new();
     private readonly ConcurrentDictionary<string, NetworkConnectionHistoryItem> _historyById = new();
     private readonly ConcurrentDictionary<string, DateTime> _historyDedup = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Связь отдельных записей журнала с группой, решение которой завершает все её наблюдения.</summary>
+    private readonly ConcurrentDictionary<string, string> _historyGroupById = new(StringComparer.Ordinal);
 
     private readonly ProcessNetworkTracker _tracker;
     private readonly WindowsFirewallService _firewall;
@@ -77,8 +83,17 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Переопределение резолва пути процесса по PID.</summary>
     public Func<int, string?>? ProcessPathResolver { get; set; }
 
+    /// <summary>Источник времени для детерминированной проверки сроков без изменения часов ОС.</summary>
+    public Func<DateTime> UtcNowProvider { get; set; } = () => DateTime.UtcNow;
+
+    /// <summary>Источник времени создания процесса; PID без этого значения не используется как долговечная идентичность.</summary>
+    public Func<int, long?>? ProcessInstanceResolver { get; set; }
+
     /// <summary>Переопределение проверки наличия правила Firewall для пути программы.</summary>
     public Func<string, bool>? HasFirewallRuleOverride { get; set; }
+
+    /// <summary>Изолированная проверка подтверждённой постоянной политики нужного действия.</summary>
+    public Func<string, FirewallAction, bool>? HasApplicationPolicyOverride { get; set; }
 
     /// <summary>Переопределение применения правила Firewall (по умолчанию — CreateOrUpdateRule).</summary>
     public Action<FirewallRuleDto>? ApplyFirewallRuleOverride { get; set; }
@@ -106,6 +121,27 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
     /// <summary>Ожидающие алерты по AlertId (для резолва и дедупликации выдачи).</summary>
     private readonly ConcurrentDictionary<string, NetworkConnectionAlertDto> _pendingById = new();
+
+    /// <summary>Единственный активный запрос полного приложения либо достоверного экземпляра неизвестного процесса.</summary>
+    private readonly Dictionary<string, string> _pendingByGroup = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Отложенные карточки остаются событиями, но не предлагаются повторно до явного срока.</summary>
+    private readonly Dictionary<string, DateTime> _deferredUntil = new(StringComparer.Ordinal);
+    /// <summary>Набор наблюдений группы исключает увеличение счётчика на каждом повторном снимке.</summary>
+    private readonly Dictionary<string, HashSet<string>> _observationsByAlert = new(StringComparer.Ordinal);
+    /// <summary>Устаревшие идентификаторы завершают уже показанное окно без выдуманного применения политики.</summary>
+    private readonly HashSet<string> _supersededAlerts = new(StringComparer.Ordinal);
+    /// <summary>Ограниченные результаты операций защищают повтор после потери подтверждения.</summary>
+    private readonly Dictionary<string, (string AlertId, NetworkAlertResolution Resolution, ResolveNetworkAlertResultPayload Result)> _operationResults = new(StringComparer.Ordinal);
+    private readonly Queue<string> _operationOrder = new();
+    /// <summary>Отмена фонового ИИ привязана к включённому поколению детектора.</summary>
+    private CancellationTokenSource _aiLifetime = new();
+    private long _policyRevision = -1;
+
+    /// <summary>Подтверждения полных постоянных правил с TTL/ревизией, чтобы каждый сокет не перечислял COM заново.</summary>
+    private readonly Dictionary<string, (long Revision, DateTime CheckedAt, HashSet<FirewallAction> Actions)> _persistentPolicyCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Изолируемый источник полных подтверждённых действий для проверки стоимости сканирования.</summary>
+    internal Func<string, HashSet<FirewallAction>>? PersistentPolicyActionsProvider { get; set; }
 
     /// <summary>Уже виденные связки "программа → локальный сокет → remote:port" с TTL (защита от спама).</summary>
     private readonly ConcurrentDictionary<string, DateTime> _seenKeys =
@@ -326,20 +362,29 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Отменяет и дожидается сборщика до освобождения используемого им шлюза активности.</summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        _autonomousPending.Clear();
+        lock (_scanLock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _aiLifetime.Cancel();
+            _autonomousPending.Clear();
+        }
         StopBackgroundScan();
         _sessionFirewall.Dispose();
+        _aiLifetime.Dispose();
         _wake.Dispose();
     }
 
     /// <summary>Включает/выключает детектор. Выключение сбрасывает очередь ожидающих алертов.</summary>
     public void SetAlertsEnabled(bool enabled)
     {
-        _alertsEnabled = enabled;
-        if (!enabled)
-            ClearPending();
+        lock (_scanLock)
+        {
+            if (_disposed) return;
+            _alertsEnabled = enabled;
+            if (!enabled)
+                ClearPending();
+        }
         _wake.Pulse();
     }
 
@@ -350,9 +395,21 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// </summary>
     public void ClearPending()
     {
-        _pendingById.Clear();
-        _seenKeys.Clear();
-        PruneQueue(force: true);
+        lock (_scanLock)
+        {
+            foreach (var alert in _pendingById.Values)
+                SupersedeAlert(alert);
+            _pendingById.Clear();
+            _pendingByGroup.Clear();
+            _deferredUntil.Clear();
+            _observationsByAlert.Clear();
+            _seenKeys.Clear();
+            _autonomousPending.Clear();
+            _aiLifetime.Cancel();
+            _aiLifetime.Dispose();
+            _aiLifetime = new CancellationTokenSource();
+            PruneQueue(force: true);
+        }
     }
 
     /// <summary>
@@ -386,6 +443,18 @@ public sealed class NetworkConnectionAlertService : IDisposable
             // Кэш настроек обновляется только при изменении ревизии хранилища:
             // больше нет глубокого клонирования всего конфига (включая историю) каждые 5 секунд.
             RefreshSettingsCache();
+            if (_policyRevision != _firewall.PolicyRevision)
+            {
+                _policyRevision = _firewall.PolicyRevision;
+                _cachedRulePaths = null;
+                foreach (var decision in _sessionDecisions.Where(pair => pair.Value is not (NetworkAlertResolution.AllowSession or NetworkAlertResolution.BlockSession)).ToArray())
+                {
+                    _sessionDecisions.TryRemove(decision.Key, out _);
+                    _sessionDecisionExpiry.TryRemove(decision.Key, out _);
+                }
+            }
+            foreach (var pending in _pendingById.Values)
+                pending.IsActive = false;
             var isSilentPid0 = _silentPid0;
             // Кэшированный набор путей разрешающих ИСХОДЯЩИХ правил Firewall с TTL 60с.
             var rulePaths = BuildFirewallRulePathSet();
@@ -424,9 +493,18 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 }
 
                 var sessionKey = BuildSessionKey(processPath, processName);
+                var groupKey = BuildPendingGroupKey(processPath, processName, socket.ProcessId);
+                foreach (var previous in _pendingById.Values.Where(candidate => candidate.ProcessId == socket.ProcessId && string.IsNullOrWhiteSpace(candidate.ProcessPath)).ToArray())
+                    if (!_pendingByGroup.TryGetValue(groupKey, out var currentUnknown) || currentUnknown != previous.AlertId)
+                        SupersedeAlert(previous);
+                // Полный путь не наследует решение по имени. Старый неизвестный PID лишь устаревает:
+                // это безопасно и при переиспользовании PID новым процессом.
+                if (!string.IsNullOrWhiteSpace(processPath))
+                    foreach (var unknown in _pendingById.Values.Where(candidate => candidate.ProcessId == socket.ProcessId && string.IsNullOrWhiteSpace(candidate.ProcessPath)).ToArray())
+                        SupersedeAlert(unknown);
 
                 // 1.1 Абсолютный приоритет: Пропускаем программы из чёрного списка (соединения заблокированы, алерты подавлены)
-                if (IsBlacklistedApp(processPath, processName))
+                if (IsBlacklistedApp(processPath, processName) && HasConfirmedListPolicy(processPath, FirewallAction.Block))
                 {
                     TryLogHistory(socket, processPath, processName, remote, NetworkConnectionVerdict.Blacklisted, "Заблокировано правилом чёрного списка");
                     continue;
@@ -441,7 +519,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 }
 
                 // 1.2 Пропускаем программы из белого списка (только если приложение отсутствует в чёрном списке)
-                if (IsWhitelistedApp(processPath, processName))
+                if (IsWhitelistedApp(processPath, processName) && HasConfirmedListPolicy(processPath, FirewallAction.Allow))
                 {
                     TryLogHistory(socket, processPath, processName, remote, NetworkConnectionVerdict.Whitelisted, "Разрешено белым списком");
                     continue;
@@ -468,15 +546,27 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     continue;
                 }
 
+                var seenKey = groupKey + "|" +
+                              (string.IsNullOrWhiteSpace(socket.Protocol) ? "TCP" : socket.Protocol) + "|" +
+                              (socket.LocalAddress ?? string.Empty) + ":" + socket.LocalPort + "|" +
+                              remote.ToLowerInvariant() + ":" + socket.RemotePort;
+                if (_pendingByGroup.TryGetValue(groupKey, out var existingId) && _pendingById.TryGetValue(existingId, out var existing))
+                {
+                    existing.LastSeenAt = UtcNowProvider();
+                    existing.IsActive = true;
+                    if (_observationsByAlert.TryGetValue(existingId, out var observations) && observations.Count < MaxHistoryItems && observations.Add(seenKey))
+                    {
+                        existing.ConnectionCount++;
+                        TryLogHistory(socket, processPath, processName, remote, NetworkConnectionVerdict.PendingAlert, "Дополнительное соединение ожидающей группы", existing.AlertId);
+                    }
+                    continue;
+                }
+
                 // 5. Дедупликация: ключ включает локальный endpoint, поэтому новое TCP-соединение
                 // (новый эфемерный порт) снова даст алерт даже после истечения TTL.
                 if (_pendingById.Count >= MaxPendingAlerts)
                     continue;
-                var seenKey = sessionKey + "|" +
-                              (string.IsNullOrWhiteSpace(socket.Protocol) ? "TCP" : socket.Protocol) + "|" +
-                              (socket.LocalAddress ?? string.Empty) + ":" + socket.LocalPort + "|" +
-                              remote.ToLowerInvariant() + ":" + socket.RemotePort;
-                if (!_seenKeys.TryAdd(seenKey, DateTime.UtcNow))
+                if (!_seenKeys.TryAdd(seenKey, UtcNowProvider()))
                     continue;
 
                 // 4.5. Автономные решения нейросети: применяются без всплывающего окна
@@ -498,7 +588,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
                         socket.Protocol ?? "TCP",
                         socket.ProcessId,
                         sessionKey,
-                        generation);
+                        generation,
+                        socket.Direction);
 
                     continue;
                 }
@@ -511,13 +602,19 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     CanAllowSession = !string.IsNullOrWhiteSpace(processPath) && (sessionAllowSupported ??= _sessionFirewall.CanAllowSession),
                     CanBlockSession = !string.IsNullOrWhiteSpace(processPath),
                     Protocol = string.IsNullOrWhiteSpace(socket.Protocol) ? "TCP" : socket.Protocol,
+                    Direction = socket.Direction,
                     RemoteAddress = remote,
                     RemotePort = socket.RemotePort,
-                    DetectedAt = DateTime.UtcNow,
+                    DetectedAt = UtcNowProvider(),
+                    LastSeenAt = UtcNowProvider(),
+                    ConnectionCount = 1,
+                    IsActive = true,
                 };
 
                 if (_pendingById.TryAdd(alert.AlertId, alert))
                 {
+                    _pendingByGroup[groupKey] = alert.AlertId;
+                    _observationsByAlert[alert.AlertId] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { seenKey };
                     _queue.Enqueue(alert);
                     added++;
 
@@ -536,9 +633,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
                         RemoteAddress = alert.RemoteAddress,
                         RemotePort = alert.RemotePort,
                         Verdict = NetworkConnectionVerdict.PendingAlert,
-                        Direction = "Outbound",
+                        Direction = socket.Direction,
                         Details = "Ожидает решения пользователя"
-                    });
+                    }, alert.AlertId);
                 }
             }
 
@@ -548,17 +645,23 @@ public sealed class NetworkConnectionAlertService : IDisposable
     }
 
     /// <summary>Добавляет запись в кольцевой журнал истории сетевых подключений.</summary>
-    public void RecordHistory(NetworkConnectionHistoryItem item)
+    public void RecordHistory(NetworkConnectionHistoryItem item, string? groupId = null)
     {
         if (item is null) return;
         _historyQueue.Enqueue(item);
         if (!string.IsNullOrEmpty(item.Id))
+        {
             _historyById[item.Id] = item;
+            if (groupId != null) _historyGroupById[item.Id] = groupId;
+        }
 
         while (_historyQueue.Count > MaxHistoryItems && _historyQueue.TryDequeue(out var old))
         {
             if (!string.IsNullOrEmpty(old.Id))
+            {
                 _historyById.TryRemove(old.Id, out _);
+                _historyGroupById.TryRemove(old.Id, out _);
+            }
         }
     }
 
@@ -572,21 +675,176 @@ public sealed class NetworkConnectionAlertService : IDisposable
     public void ClearConnectionHistory()
     {
         _historyById.Clear();
+        _historyGroupById.Clear();
         while (_historyQueue.TryDequeue(out _)) { }
     }
 
     /// <summary>Возвращает снимок ожидающих алертов (по времени обнаружения).</summary>
     public List<NetworkConnectionAlertDto> GetPendingAlerts()
     {
-        return _pendingById.Values.OrderBy(a => a.DetectedAt).ToList();
+        lock (_scanLock)
+        {
+            if (_disposed || !AlertsEnabled) return [];
+            RefreshSettingsCache();
+            bool? canAllow = null;
+            foreach (var alert in _pendingById.Values.ToArray())
+            {
+                if (!RetainUnallowedObservations(alert)) continue;
+                if (!alert.IsActive && UtcNowProvider() - alert.LastSeenAt > TimeSpan.FromMinutes(15))
+                {
+                    SupersedeAlert(alert);
+                    continue;
+                }
+                var key = BuildSessionKey(alert.ProcessPath, alert.ProcessName);
+                if (IsBlacklistedApp(alert.ProcessPath, alert.ProcessName) && HasConfirmedListPolicy(alert.ProcessPath, FirewallAction.Block) ||
+                    IsWhitelistedApp(alert.ProcessPath, alert.ProcessName) && HasConfirmedListPolicy(alert.ProcessPath, FirewallAction.Allow) ||
+                    HasActiveSessionDecision(key) ||
+                    HasExistingFirewallRuleCached(alert.ProcessPath, alert.ProcessName, BuildFirewallRulePathSet()))
+                {
+                    SupersedeAlert(alert);
+                    continue;
+                }
+                alert.CanBlockSession = !string.IsNullOrWhiteSpace(alert.ProcessPath);
+                alert.CanAllowSession = alert.CanBlockSession && (canAllow ??= _sessionFirewall.CanAllowSession);
+            }
+            var now = UtcNowProvider();
+            foreach (var expired in _deferredUntil.Where(pair => pair.Value <= now).Select(pair => pair.Key).ToArray())
+            {
+                _deferredUntil.Remove(expired);
+                UpdateGroupHistory(expired, NetworkConnectionVerdict.PendingAlert, "Срок откладывания истёк; ожидается решение пользователя");
+            }
+            return _pendingById.Values.Where(alert => !_deferredUntil.TryGetValue(alert.AlertId, out var until) || until <= now)
+                .OrderBy(a => a.DetectedAt).ToList();
+        }
     }
 
-    private void TryLogHistory(ProcessNetworkSocket socket, string? processPath, string processName, string remote, NetworkConnectionVerdict verdict, string details)
+    /// <summary>Строит ключ неизвестного процесса с временем старта, не создавая псевдоним по имени exe.</summary>
+    private string BuildPendingGroupKey(string? path, string name, int pid)
+    {
+        if (!string.IsNullOrWhiteSpace(path)) return BuildSessionKey(path, name);
+        long? started = null;
+        try
+        {
+            if (ProcessInstanceResolver != null) started = ProcessInstanceResolver(pid);
+            else if (pid > 0)
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(pid);
+                started = process.StartTime.ToUniversalTime().ToFileTimeUtc();
+            }
+        }
+        catch (Exception ex) { Log.Debug(ex, "NetworkAlerts: идентичность PID {Pid} недоступна", pid); }
+        return $"unknown:{pid}:{started?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unverified"}:{name.ToLowerInvariant()}";
+    }
+
+    /// <summary>Удаляет из смешанной группы только глобально разрешённые порты; оставшаяся область получает актуальную карточку.</summary>
+    private bool RetainUnallowedObservations(NetworkConnectionAlertDto alert)
+    {
+        if (!_observationsByAlert.TryGetValue(alert.AlertId, out var observations) || observations.Count == 0)
+        {
+            if (!IsPortAllowed(alert.RemotePort)) return true;
+            SupersedeAlert(alert);
+            return false;
+        }
+        var remaining = observations.Where(observation =>
+        {
+            var separator = observation.LastIndexOf(':');
+            return separator < 0 || !int.TryParse(observation[(separator + 1)..], out var port) || !IsPortAllowed(port);
+        }).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (remaining.Count == observations.Count) return true;
+        if (remaining.Count == 0)
+        {
+            SupersedeAlert(alert);
+            return false;
+        }
+        if (!IsPortAllowed(alert.RemotePort))
+        {
+            _observationsByAlert[alert.AlertId] = remaining;
+            alert.ConnectionCount = remaining.Count;
+            return true;
+        }
+        var endpoint = remaining.First().Split('|')[^1];
+        var split = endpoint.LastIndexOf(':');
+        if (split < 1 || !int.TryParse(endpoint[(split + 1)..], out var remotePort)) return true;
+        var replacement = new NetworkConnectionAlertDto
+        {
+            ProcessId = alert.ProcessId, ProcessName = alert.ProcessName, ProcessPath = alert.ProcessPath, Protocol = alert.Protocol,
+            Direction = alert.Direction, RemoteAddress = endpoint[..split], RemotePort = remotePort, DetectedAt = alert.DetectedAt,
+            LastSeenAt = alert.LastSeenAt, IsActive = alert.IsActive, ConnectionCount = remaining.Count,
+            CanAllowSession = alert.CanAllowSession, CanBlockSession = alert.CanBlockSession
+        };
+        foreach (var history in _historyQueue.Where(history => !IsPortAllowed(history.RemotePort) &&
+            _historyGroupById.TryGetValue(history.Id, out var group) && group == alert.AlertId).ToArray())
+            _historyGroupById[history.Id] = replacement.AlertId;
+        SupersedeAlert(alert);
+        _pendingById[replacement.AlertId] = replacement;
+        _pendingByGroup[BuildPendingGroupKey(replacement.ProcessPath, replacement.ProcessName, replacement.ProcessId)] = replacement.AlertId;
+        _observationsByAlert[replacement.AlertId] = remaining;
+        _queue.Enqueue(replacement);
+        _ = EnrichAlertWithAiAsync(replacement);
+        return false;
+    }
+
+    /// <summary>Согласует все исторические наблюдения одной группы с подтверждённым состоянием её запроса.</summary>
+    private void UpdateGroupHistory(string alertId, NetworkConnectionVerdict verdict, string details)
+    {
+        foreach (var item in _historyQueue.Where(item => item.Id == alertId ||
+            _historyGroupById.TryGetValue(item.Id, out var group) && group == alertId))
+        {
+            item.Verdict = verdict;
+            item.Details = details;
+        }
+    }
+
+    /// <summary>Завершает устаревшую карточку без утверждения о применении пользовательской политики.</summary>
+    private void SupersedeAlert(NetworkConnectionAlertDto alert)
+    {
+        UpdateGroupHistory(alert.AlertId, NetworkConnectionVerdict.RequestClosed, "Запрос завершён или заменён актуальной политикой; новое сетевое разрешение этим действием не создавалось");
+        _pendingById.TryRemove(alert.AlertId, out _);
+        foreach (var key in _pendingByGroup.Where(pair => pair.Value == alert.AlertId).Select(pair => pair.Key).ToArray())
+            _pendingByGroup.Remove(key);
+        _observationsByAlert.Remove(alert.AlertId);
+        _deferredUntil.Remove(alert.AlertId);
+        _supersededAlerts.Add(alert.AlertId);
+        if (_supersededAlerts.Count > MaxPendingAlerts * 2)
+            _supersededAlerts.Remove(_supersededAlerts.First());
+    }
+
+    /// <summary>Согласует запросы и проекции после внешнего изменения постоянной политики.</summary>
+    /// <param name="path">Полный путь изменённого приложения либо null для общей инвалидации кэша.</param>
+    public void NotifyPolicyChanged(string? path = null)
+    {
+        lock (_scanLock)
+        {
+            _persistentPolicyCache.Clear();
+            _cachedRulePaths = null;
+            _policyRevision = _firewall.PolicyRevision;
+            _settingsRevision = -1;
+            RefreshSettingsCache();
+            foreach (var pair in _sessionDecisions.Where(pair => pair.Value is not (NetworkAlertResolution.AllowSession or NetworkAlertResolution.BlockSession) &&
+                (path == null || string.Equals(pair.Key, BuildSessionKey(path, null), StringComparison.OrdinalIgnoreCase))).ToArray())
+            {
+                _sessionDecisions.TryRemove(pair.Key, out _);
+                _sessionDecisionExpiry.TryRemove(pair.Key, out _);
+            }
+            if (path != null)
+            {
+                var key = BuildSessionKey(path, null);
+                _autonomousPending.TryRemove(key, out _);
+                foreach (var alert in _pendingById.Values.Where(alert => string.Equals(BuildSessionKey(alert.ProcessPath, alert.ProcessName), key, StringComparison.OrdinalIgnoreCase)).ToArray())
+                    SupersedeAlert(alert);
+                foreach (var seen in _seenKeys.Keys.Where(seen => seen.StartsWith(key + "|", StringComparison.OrdinalIgnoreCase)))
+                    _seenKeys.TryRemove(seen, out _);
+            }
+            PruneQueue(force: true);
+        }
+    }
+
+    private void TryLogHistory(ProcessNetworkSocket socket, string? processPath, string processName, string remote, NetworkConnectionVerdict verdict, string details, string? groupId = null)
     {
         try
         {
-            var dedupKey = $"{processName}|{remote}:{socket.RemotePort}|{verdict}";
-            var now = DateTime.UtcNow;
+            var dedupKey = $"{BuildSessionKey(processPath, processName)}|{socket.Protocol}|{socket.LocalAddress}:{socket.LocalPort}|{remote}:{socket.RemotePort}|{verdict}";
+            var now = UtcNowProvider();
             if (_historyDedup.TryGetValue(dedupKey, out var lastTime) && (now - lastTime).TotalSeconds < 15)
                 return;
 
@@ -606,11 +864,11 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 RemoteAddress = remote,
                 RemotePort = socket.RemotePort,
                 Verdict = verdict,
-                Direction = "Outbound",
+                Direction = socket.Direction,
                 Details = details
-            });
+            }, groupId);
         }
-        catch { }
+        catch (Exception ex) { Log.Debug(ex, "NetworkAlerts: не удалось добавить событие в журнал соединений"); }
     }
 
     /// <summary>
@@ -619,7 +877,71 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// </summary>
     /// <param name="request">Идентификатор алерта и выбранное действие; идентичность берётся из алерта службы.</param>
     /// <returns>True только для применённого решения либо его идемпотентного повтора.</returns>
-    public bool ResolveAlert(ResolveNetworkAlertRequest request)
+    public bool ResolveAlert(ResolveNetworkAlertRequest request) => ResolveAlertDetailed(request).Success;
+
+    /// <summary>Применяет идемпотентный выбор и возвращает точную причину завершения карточки.</summary>
+    /// <param name="request">Идентификатор операции и авторитетной карточки.</param>
+    /// <returns>Подтверждённое состояние либо диагностируемый отказ без ложного ACK.</returns>
+    public ResolveNetworkAlertResultPayload ResolveAlertDetailed(ResolveNetworkAlertRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.AlertId) || !Enum.IsDefined(request.Resolution))
+            return new(false, "Некорректное действие или идентификатор запроса.", NetworkAlertResolutionStatus.Unsupported);
+        lock (_scanLock)
+        {
+            var operation = string.IsNullOrWhiteSpace(request.OperationId) ? request.AlertId + ":" + request.Resolution : request.OperationId;
+            if (_operationResults.TryGetValue(operation, out var recorded))
+                return recorded.AlertId == request.AlertId && recorded.Resolution == request.Resolution
+                    ? recorded.Result with { Status = recorded.Result.Success ? NetworkAlertResolutionStatus.AlreadyApplied : recorded.Result.Status }
+                    : new(false, "Идентификатор операции уже использован для другого выбора.", NetworkAlertResolutionStatus.Conflict, operation);
+            ResolveNetworkAlertResultPayload Result(bool success, string message, NetworkAlertResolutionStatus status, NetworkAlertResolution? applied = null)
+            {
+                var result = new ResolveNetworkAlertResultPayload(success, message, status, operation, applied);
+                // Отказы можно повторить с той же операцией после устранения причины; сохраняем подтверждения и неопределённые частичные исходы.
+                if (success || status == NetworkAlertResolutionStatus.PartialFailure)
+                {
+                    _operationResults[operation] = (request.AlertId, request.Resolution, result);
+                    _operationOrder.Enqueue(operation);
+                    while (_operationOrder.Count > MaxPendingAlerts * 2)
+                        _operationResults.Remove(_operationOrder.Dequeue());
+                }
+                return result;
+            }
+            if (_disposed || !AlertsEnabled)
+                return Result(false, "Запрос завершён: интерактивный детектор остановлен.", NetworkAlertResolutionStatus.Superseded);
+            if (_completedResolutions.TryGetValue(request.AlertId, out var previous))
+                return Result(previous == request.Resolution, "Запрос уже завершён другим подтверждённым решением.",
+                    previous == request.Resolution ? NetworkAlertResolutionStatus.AlreadyApplied : NetworkAlertResolutionStatus.Superseded, previous);
+            if (!_pendingById.TryGetValue(request.AlertId, out var alert))
+                return Result(false, "Запрос больше не актуален.", NetworkAlertResolutionStatus.Superseded);
+            RefreshSettingsCache();
+            if (request.Resolution == NetworkAlertResolution.Defer)
+            {
+                _deferredUntil[alert.AlertId] = UtcNowProvider().AddMinutes(5);
+                UpdateGroupHistory(alert.AlertId, NetworkConnectionVerdict.Deferred, "Показ отложен на пять минут без изменения сетевой политики");
+                _autonomousPending.TryRemove(BuildSessionKey(alert.ProcessPath, alert.ProcessName), out _);
+                return Result(true, "Показ отложен на пять минут; сетевые правила не изменены.", NetworkAlertResolutionStatus.Deferred);
+            }
+            if (request.Resolution == NetworkAlertResolution.CreateRule ||
+                (request.Resolution != NetworkAlertResolution.AllowPort && string.IsNullOrWhiteSpace(alert.ProcessPath)) ||
+                request.Resolution == NetworkAlertResolution.AllowSession && !_sessionFirewall.CanAllowSession)
+                return Result(false, "Действие недоступно для текущего пути или режима фильтрации.", NetworkAlertResolutionStatus.Unsupported);
+            if (request.Resolution == NetworkAlertResolution.AllowSession && IsBlacklistedApp(alert.ProcessPath, alert.ProcessName))
+                return Result(false, "Постоянный чёрный список запрещает временное разрешение.", NetworkAlertResolutionStatus.Conflict);
+            _lastApplyResult = null;
+            var applied = ResolveAlertCore(request);
+            if (applied)
+                return Result(true, "Выбор применён; область действия соответствует указанному правилу.", NetworkAlertResolutionStatus.Applied, request.Resolution);
+            var partial = _lastApplyResult?.Message?.StartsWith("PartialFailure", StringComparison.OrdinalIgnoreCase) == true;
+            return Result(false, _lastApplyResult?.Message ?? "Не удалось применить политику. Исходный запрос сохранён для повтора.",
+                partial ? NetworkAlertResolutionStatus.PartialFailure : NetworkAlertResolutionStatus.Failed);
+        }
+    }
+
+    /// <summary>Диагностика последнего применения; используется только внутри сериализованного резолва.</summary>
+    private FirewallOperationResult? _lastApplyResult;
+
+    /// <summary>Выполняет проверенный выбор под общей блокировкой сканирования.</summary>
+    private bool ResolveAlertCore(ResolveNetworkAlertRequest request)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.AlertId) || !Enum.IsDefined(request.Resolution))
             return false;
@@ -672,7 +994,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                             Profiles = FirewallProfile.All,
                             Grouping = WindowsFirewallService.RuleGroup,
                             IsManaged = true
-                        }))
+                        }, BuildPersistenceAction(alert, request.Resolution)))
                             return false;
                         break;
                     case NetworkAlertResolution.AllowSession:
@@ -682,6 +1004,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                             SessionDecisionTtl);
                         if (!temporary.Success)
                         {
+                            _lastApplyResult = temporary;
                             Log.Warning("NetworkAlerts: временное решение {Resolution} отклонено: {Message}",
                                 request.Resolution, temporary.Message);
                             return false;
@@ -689,36 +1012,16 @@ public sealed class NetworkConnectionAlertService : IDisposable
                         break;
                     case NetworkAlertResolution.WhitelistProgram:
                     case NetworkAlertResolution.AllowAlways:
-                        if (!ApplyRule(BuildAppRule(path, name, FirewallAction.Allow)))
+                        if (!ApplyRule(BuildAppRule(path, name, FirewallAction.Allow), BuildPersistenceAction(alert, request.Resolution)))
                             return false;
                         break;
                     case NetworkAlertResolution.BlacklistProgram:
                     case NetworkAlertResolution.BlockAlways:
-                        if (!ApplyRule(BuildAppRule(path, name, FirewallAction.Block)))
+                        if (!ApplyRule(BuildAppRule(path, name, FirewallAction.Block), BuildPersistenceAction(alert, request.Resolution)))
                             return false;
                         break;
                 }
 
-                if (_store != null && request.Resolution is NetworkAlertResolution.WhitelistProgram
-                    or NetworkAlertResolution.BlacklistProgram or NetworkAlertResolution.AllowPort)
-                {
-                    var cfg = _store.Load();
-                    if (request.Resolution == NetworkAlertResolution.AllowPort)
-                    {
-                        if (!cfg.Settings.FirewallAllowedPorts.Contains(alert.RemotePort))
-                            cfg.Settings.FirewallAllowedPorts.Add(alert.RemotePort);
-                    }
-                    else
-                    {
-                        var allowed = request.Resolution == NetworkAlertResolution.WhitelistProgram;
-                        var target = allowed ? cfg.Settings.FirewallWhitelistedApps : cfg.Settings.FirewallBlacklistedApps;
-                        var opposite = allowed ? cfg.Settings.FirewallBlacklistedApps : cfg.Settings.FirewallWhitelistedApps;
-                        opposite.RemoveAll(app => string.Equals(app, path, StringComparison.OrdinalIgnoreCase));
-                        if (!target.Contains(path, StringComparer.OrdinalIgnoreCase))
-                            target.Add(path);
-                    }
-                    _store.Save(cfg);
-                }
                 if (request.Resolution is NetworkAlertResolution.AllowAlways or NetworkAlertResolution.BlockAlways
                     or NetworkAlertResolution.WhitelistProgram or NetworkAlertResolution.BlacklistProgram)
                     _sessionFirewall.Remove(path);
@@ -749,14 +1052,53 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
             var affected = _pendingById.Values.Where(candidate =>
                 request.Resolution == NetworkAlertResolution.AllowPort
-                    ? candidate.RemotePort == alert.RemotePort
+                    ? candidate.RemotePort == alert.RemotePort || _observationsByAlert.TryGetValue(candidate.AlertId, out var keys) && keys.Any(seen => seen.EndsWith(":" + alert.RemotePort, StringComparison.Ordinal))
                     : string.Equals(BuildSessionKey(candidate.ProcessPath, candidate.ProcessName), key,
                         StringComparison.OrdinalIgnoreCase)).ToList();
             foreach (var candidate in affected)
             {
+                if (request.Resolution == NetworkAlertResolution.AllowPort && _observationsByAlert.TryGetValue(candidate.AlertId, out var observations))
+                {
+                    var remaining = observations.Where(seen => !seen.EndsWith(":" + alert.RemotePort, StringComparison.Ordinal)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    if (remaining.Count > 0)
+                    {
+                        if (candidate.RemotePort != alert.RemotePort)
+                        {
+                            _observationsByAlert[candidate.AlertId] = remaining;
+                            candidate.ConnectionCount = remaining.Count;
+                            continue;
+                        }
+                        var endpoint = remaining.First().Split('|')[^1];
+                        var separator = endpoint.LastIndexOf(':');
+                        if (separator > 0 && int.TryParse(endpoint[(separator + 1)..], out var port))
+                        {
+                            var replacement = new NetworkConnectionAlertDto
+                            {
+                                ProcessId = candidate.ProcessId, ProcessName = candidate.ProcessName, ProcessPath = candidate.ProcessPath,
+                                Protocol = candidate.Protocol, Direction = candidate.Direction, RemoteAddress = endpoint[..separator], RemotePort = port,
+                                DetectedAt = candidate.DetectedAt, LastSeenAt = candidate.LastSeenAt, IsActive = candidate.IsActive,
+                                ConnectionCount = remaining.Count, CanAllowSession = candidate.CanAllowSession, CanBlockSession = candidate.CanBlockSession
+                            };
+                            foreach (var observed in _historyQueue.Where(observed => observed.RemotePort != alert.RemotePort &&
+                                (_historyGroupById.TryGetValue(observed.Id, out var group) && group == candidate.AlertId)).ToArray())
+                                _historyGroupById[observed.Id] = replacement.AlertId;
+                            SupersedeAlert(candidate);
+                            _pendingById[replacement.AlertId] = replacement;
+                            _pendingByGroup[BuildPendingGroupKey(replacement.ProcessPath, replacement.ProcessName, replacement.ProcessId)] = replacement.AlertId;
+                            _observationsByAlert[replacement.AlertId] = remaining;
+                            _queue.Enqueue(replacement);
+                            _ = EnrichAlertWithAiAsync(replacement);
+                        }
+                    }
+                }
                 if (_historyById.TryGetValue(candidate.AlertId, out var item))
                     item.Verdict = ResolutionVerdict(request.Resolution);
+                UpdateGroupHistory(candidate.AlertId, ResolutionVerdict(request.Resolution), "Пользовательская политика применена к области группы");
                 _pendingById.TryRemove(candidate.AlertId, out _);
+                foreach (var group in _pendingByGroup.Where(group => group.Value == candidate.AlertId).Select(group => group.Key).ToArray())
+                    _pendingByGroup.Remove(group);
+                _observationsByAlert.Remove(candidate.AlertId);
+                _deferredUntil.Remove(candidate.AlertId);
                 RememberResolution(candidate.AlertId, request.Resolution);
             }
             PruneQueue(force: true);
@@ -764,12 +1106,37 @@ public sealed class NetworkConnectionAlertService : IDisposable
         }
     }
 
+    /// <summary>Создаёт сохраняемое намерение, выполняемое внутри компенсируемой записи постоянной политики.</summary>
+    private Action? BuildPersistenceAction(NetworkConnectionAlertDto alert, NetworkAlertResolution resolution)
+    {
+        if (_store == null || resolution is not (NetworkAlertResolution.WhitelistProgram or NetworkAlertResolution.BlacklistProgram or NetworkAlertResolution.AllowPort))
+            return null;
+        return () =>
+        {
+            var cfg = _store.Load();
+            if (resolution == NetworkAlertResolution.AllowPort)
+            {
+                if (!cfg.Settings.FirewallAllowedPorts.Contains(alert.RemotePort)) cfg.Settings.FirewallAllowedPorts.Add(alert.RemotePort);
+            }
+            else
+            {
+                var allowed = resolution == NetworkAlertResolution.WhitelistProgram;
+                var target = allowed ? cfg.Settings.FirewallWhitelistedApps : cfg.Settings.FirewallBlacklistedApps;
+                var opposite = allowed ? cfg.Settings.FirewallBlacklistedApps : cfg.Settings.FirewallWhitelistedApps;
+                opposite.RemoveAll(app => string.Equals(app, alert.ProcessPath, StringComparison.OrdinalIgnoreCase));
+                if (!target.Contains(alert.ProcessPath, StringComparer.OrdinalIgnoreCase)) target.Add(alert.ProcessPath);
+            }
+            _store.Save(cfg);
+        };
+    }
+
     /// <summary>Переводит подтверждённое действие в вердикт журнала без изменения исходных событий.</summary>
     /// <param name="resolution">Успешно применённое действие.</param>
     /// <returns>Вердикт, соответствующий области действия политики.</returns>
     private static NetworkConnectionVerdict ResolutionVerdict(NetworkAlertResolution resolution) => resolution switch
     {
-        NetworkAlertResolution.AllowSession or NetworkAlertResolution.AllowPort => NetworkConnectionVerdict.AllowSession,
+        NetworkAlertResolution.AllowSession => NetworkConnectionVerdict.AllowSession,
+        NetworkAlertResolution.AllowPort => NetworkConnectionVerdict.RuleCreated,
         NetworkAlertResolution.BlockSession => NetworkConnectionVerdict.BlockSession,
         NetworkAlertResolution.WhitelistProgram => NetworkConnectionVerdict.Whitelisted,
         NetworkAlertResolution.BlacklistProgram => NetworkConnectionVerdict.Blacklisted,
@@ -819,13 +1186,14 @@ public sealed class NetworkConnectionAlertService : IDisposable
             var key = BuildSessionKey(path, name);
             _autonomousPending.TryRemove(key, out _);
             SetSessionDecision(key, resolution);
-            _sessionDecisionExpiry[key] = DateTime.UtcNow + duration;
+            _sessionDecisionExpiry[key] = UtcNowProvider() + duration;
             foreach (var pending in _pendingById.Values.Where(pending =>
                 string.Equals(BuildSessionKey(pending.ProcessPath, pending.ProcessName), key, StringComparison.OrdinalIgnoreCase)).ToArray())
             {
-                _pendingById.TryRemove(pending.AlertId, out _);
+                SupersedeAlert(pending);
                 if (_historyById.TryGetValue(pending.AlertId, out var history))
                     history.Verdict = ResolutionVerdict(resolution);
+                UpdateGroupHistory(pending.AlertId, ResolutionVerdict(resolution), "Временная исходящая политика применена к приложению");
                 RememberResolution(pending.AlertId, resolution);
             }
             PruneQueue(force: true);
@@ -903,7 +1271,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Удаляет устаревшие записи дедупликации (не чаще раза в минуту).</summary>
     private void PruneSeenKeys()
     {
-        var now = DateTime.UtcNow;
+        var now = UtcNowProvider();
         if (now - _lastSeenPrune < TimeSpan.FromMinutes(1))
             return;
 
@@ -931,7 +1299,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
 
         _sessionDecisionExpiry[key] = ttl == TimeSpan.MaxValue
             ? DateTime.MaxValue
-            : DateTime.UtcNow + ttl;
+            : UtcNowProvider() + ttl;
     }
 
     /// <summary>
@@ -943,6 +1311,31 @@ public sealed class NetworkConnectionAlertService : IDisposable
         if (!_sessionDecisions.ContainsKey(key))
             return false;
 
+        // Постоянный выбор является проекцией действующей политики, а не вечным разрешением памяти.
+        if (_sessionDecisions.TryGetValue(key, out var persistent) && persistent is not (NetworkAlertResolution.AllowSession or NetworkAlertResolution.BlockSession) && key.StartsWith("path:", StringComparison.OrdinalIgnoreCase))
+        {
+            var path = key[5..];
+            bool exists;
+            if (persistent is NetworkAlertResolution.WhitelistProgram or NetworkAlertResolution.BlacklistProgram)
+                exists = persistent == NetworkAlertResolution.WhitelistProgram
+                    ? IsWhitelistedApp(path, null) && HasConfirmedListPolicy(path, FirewallAction.Allow)
+                    : IsBlacklistedApp(path, null) && HasConfirmedListPolicy(path, FirewallAction.Block);
+            else if (PersistentPolicyActionsProvider != null)
+                exists = HasConfirmedPersistentPolicy(path, persistent == NetworkAlertResolution.AllowAlways ? FirewallAction.Allow : FirewallAction.Block);
+            else if (HasApplicationPolicyOverride != null)
+                exists = HasApplicationPolicyOverride(path, persistent == NetworkAlertResolution.AllowAlways ? FirewallAction.Allow : FirewallAction.Block);
+            else if (HasFirewallRuleOverride != null)
+                exists = HasFirewallRuleOverride(path);
+            else
+                exists = HasConfirmedPersistentPolicy(path, persistent == NetworkAlertResolution.AllowAlways ? FirewallAction.Allow : FirewallAction.Block);
+            if (!exists)
+            {
+                _sessionDecisions.TryRemove(key, out _);
+                _sessionDecisionExpiry.TryRemove(key, out _);
+                return false;
+            }
+        }
+
         if (_sessionDecisions.TryGetValue(key, out var resolution) &&
             resolution is NetworkAlertResolution.AllowSession or NetworkAlertResolution.BlockSession &&
             key.StartsWith("path:", StringComparison.OrdinalIgnoreCase) && !_sessionFirewall.IsActive(key[5..]))
@@ -952,7 +1345,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             return false;
         }
 
-        if (_sessionDecisionExpiry.TryGetValue(key, out var expiresAt) && expiresAt <= DateTime.UtcNow)
+        if (_sessionDecisionExpiry.TryGetValue(key, out var expiresAt) && expiresAt <= UtcNowProvider())
         {
             _sessionDecisions.TryRemove(key, out _);
             _sessionDecisionExpiry.TryRemove(key, out _);
@@ -960,6 +1353,46 @@ public sealed class NetworkConnectionAlertService : IDisposable
         }
 
         return true;
+    }
+
+    /// <summary>Проверяет только полную собственную политику; TTL ограничивает устаревание после внешней правки Windows.</summary>
+    /// <param name="path">Канонический полный путь приложения.</param>
+    /// <param name="action">Подтверждаемое постоянное действие.</param>
+    /// <returns>Наличие действующего полного правила, а не узкого пользовательского исключения.</returns>
+    private bool HasConfirmedPersistentPolicy(string path, FirewallAction action)
+    {
+        var revision = _firewall.PolicyRevision;
+        var now = UtcNowProvider();
+        if (!_persistentPolicyCache.TryGetValue(path, out var cached) || cached.Revision != revision || now - cached.CheckedAt >= _ruleCacheTtl)
+        {
+            var actions = PersistentPolicyActionsProvider?.Invoke(path) ?? _firewall.GetApplicationPolicyActions(path);
+            if (_persistentPolicyCache.Count >= MaxPendingAlerts * 2) _persistentPolicyCache.Clear();
+            cached = (revision, now, actions);
+            _persistentPolicyCache[path] = cached;
+        }
+        return cached.Actions.Contains(action);
+    }
+
+    /// <summary>Отделяет сохранённое намерение списка от реально подтверждённого полного правила.</summary>
+    /// <param name="path">Достоверный путь программы; имя без пути не подтверждает системную политику.</param>
+    /// <param name="action">Действие сохранённого списка.</param>
+    /// <returns>False при внешнем удалении правила или недоступной проверке, чтобы запрос не скрывался навсегда.</returns>
+    private bool HasConfirmedListPolicy(string? path, FirewallAction action)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return false;
+        try
+        {
+            if (PersistentPolicyActionsProvider != null) return HasConfirmedPersistentPolicy(path, action);
+            if (HasApplicationPolicyOverride != null) return HasApplicationPolicyOverride(path, action);
+            // Управляемый адаптер применения в изолированных тестах является владельцем его записей.
+            if (ApplyFirewallRuleOverride != null) return true;
+            return HasConfirmedPersistentPolicy(path, action);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "NetworkAlerts: действующая политика сохранённого списка не подтверждена");
+            return false;
+        }
     }
 
     /// <summary>
@@ -984,6 +1417,17 @@ public sealed class NetworkConnectionAlertService : IDisposable
             try
             {
                 var settings = _store.GetSettings();
+                if (_aiAutonomousNetworkDecisionsEnabled != settings.AiAutonomousNetworkDecisionsEnabled ||
+                    !string.Equals(_aiAutonomousDecisionMode, settings.AiAutonomousDecisionMode, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var key in _autonomousPending.Keys)
+                        foreach (var seen in _seenKeys.Keys.Where(seen => seen.StartsWith(key + "|", StringComparison.OrdinalIgnoreCase)))
+                            _seenKeys.TryRemove(seen, out _);
+                    _autonomousPending.Clear();
+                    _aiLifetime.Cancel();
+                    _aiLifetime.Dispose();
+                    _aiLifetime = new CancellationTokenSource();
+                }
                 _silentPid0 = settings.FirewallSilentPid0;
                 _aiAutonomousNetworkDecisionsEnabled = settings.AiAutonomousNetworkDecisionsEnabled;
                 _aiAutonomousDecisionMode = string.IsNullOrWhiteSpace(settings.AiAutonomousDecisionMode) ? "AllowSession" : settings.AiAutonomousDecisionMode.Trim();
@@ -1020,29 +1464,25 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Проверяет, является ли процесс доверенным системным (алерты не создаются никогда).</summary>
     public static bool IsTrustedProcess(string? processName, string? processPath)
     {
-        string? fileName = null;
+        if (string.IsNullOrWhiteSpace(processPath) || !Path.IsPathFullyQualified(processPath)) return false;
         try
         {
-            if (!string.IsNullOrWhiteSpace(processPath))
-                fileName = Path.GetFileName(processPath);
+            var path = Path.GetFullPath(processPath.Trim().Trim('"'));
+            var fileName = Path.GetFileName(path);
+            var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            if (string.IsNullOrWhiteSpace(windows)) return false;
+            if (string.Equals(fileName, "StartupMonitor.Service.exe", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(fileName, "StartupMonitor.UI.exe", StringComparison.OrdinalIgnoreCase))
+                return string.Equals(path, Path.Combine(AppContext.BaseDirectory, fileName), StringComparison.OrdinalIgnoreCase);
+            if (string.Equals(fileName, "ntoskrnl.exe", StringComparison.OrdinalIgnoreCase))
+                return string.Equals(path, Path.Combine(windows, "System32", fileName), StringComparison.OrdinalIgnoreCase);
+            if (!TrustedSystemProcesses.Contains(fileName)) return false;
+            if (string.Equals(fileName, "explorer.exe", StringComparison.OrdinalIgnoreCase))
+                return string.Equals(path, Path.Combine(windows, fileName), StringComparison.OrdinalIgnoreCase);
+            return string.Equals(path, Path.Combine(windows, "System32", fileName), StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith(Path.Combine(windows, "SystemApps") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
         }
-        catch { }
-
-        foreach (var candidate in new[] { processName, fileName })
-        {
-            if (string.IsNullOrWhiteSpace(candidate))
-                continue;
-            var n = candidate.Trim();
-            if (TrustedSystemProcesses.Contains(n))
-                return true;
-            var withoutExt = n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-                ? n[..^4]
-                : n;
-            if (TrustedSystemProcesses.Contains(withoutExt) ||
-                TrustedSystemProcesses.Contains(withoutExt + ".exe"))
-                return true;
-        }
-
+        catch (Exception ex) { Log.Debug(ex, "NetworkAlerts: не удалось проверить расположение доверенного компонента"); }
         return false;
     }
 
@@ -1050,7 +1490,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     public static string BuildSessionKey(string? processPath, string? processName)
     {
         if (!string.IsNullOrWhiteSpace(processPath))
-            return "path:" + processPath.Trim().ToLowerInvariant();
+            return "path:" + NormalizeProcessPath(processPath);
         return "name:" + (processName ?? string.Empty).Trim().ToLowerInvariant();
     }
 
@@ -1097,13 +1537,18 @@ public sealed class NetworkConnectionAlertService : IDisposable
             return null;
 
         var now = DateTime.UtcNow;
+        if (_policyRevision != _firewall.PolicyRevision)
+        {
+            _policyRevision = _firewall.PolicyRevision;
+            _cachedRulePaths = null;
+        }
         if (_cachedRulePaths != null && (now - _cachedRulePathsTime) < _ruleCacheTtl)
             return _cachedRulePaths;
 
         try
         {
             // Читаем только разрешающие исходящие правила: входящие/блокирующие не подавляют алерт.
-            var set = _firewall.GetOutboundAllowApplicationRulePaths();
+            var set = _firewall.GetUnrestrictedOutboundAllowApplicationRulePaths();
             _cachedRulePaths = set;
             _cachedRulePathsTime = now;
             return set;
@@ -1143,13 +1588,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// </summary>
     private static string? NormalizeProcessPath(string? processPath)
     {
-        if (string.IsNullOrWhiteSpace(processPath))
-            return null;
-
-        var path = processPath.Trim().Trim('"');
-        try { path = Environment.ExpandEnvironmentVariables(path); } catch { }
-        path = path.Replace('/', '\\').TrimEnd('\\');
-        return path.Length == 0 ? null : path.ToLowerInvariant();
+        return WindowsFirewallService.NormalizeApplicationPath(processPath);
     }
 
     private bool HasExistingFirewallRule(string? processPath, string? processName)
@@ -1170,7 +1609,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Проверяет результат записи политики; отказ COM или тестового адаптера не превращается в ACK.</summary>
     /// <param name="rule">Полное правило приложения.</param>
     /// <returns>True после подтверждённой записи правила.</returns>
-    private bool ApplyRule(FirewallRuleDto rule)
+    private bool ApplyRule(FirewallRuleDto rule, Action? persist = null)
     {
         try
         {
@@ -1180,35 +1619,27 @@ public sealed class NetworkConnectionAlertService : IDisposable
             if (ApplyFirewallRuleOverride != null)
             {
                 ApplyFirewallRuleOverride(rule);
+                try { persist?.Invoke(); }
+                catch (Exception ex)
+                {
+                    _lastApplyResult = FirewallOperationResult.Fail("PartialFailure: тестовый адаптер уже принял правило, сохранение не выполнено; требуется сверка. " + ex.Message);
+                    return false;
+                }
                 return true;
             }
             else
             {
-                var result = _firewall.CreateOrUpdateRule(rule);
+                var result = _firewall.ApplyPolicyRule(rule, persist);
+                _lastApplyResult = result;
                 if (!result.Success)
                     Log.Warning("NetworkAlerts: правило {Rule} не применено: {Message}", rule.Name, result.Message);
-                if (!result.Success || string.IsNullOrWhiteSpace(rule.ApplicationPath))
-                    return result.Success;
-
-                // Новое разрешение не оставляет старый собственный запрет для того же файла.
-                // Чужие правила и программы с таким же именем в другом каталоге не затрагиваются.
-                if (!_firewall.GetStatus().Available)
-                    return false;
-                foreach (var opposite in _firewall.GetAllRules().Where(candidate =>
-                    IsManagedApplicationRule(candidate, rule.ApplicationPath) && candidate.Action != rule.Action))
-                {
-                    var removed = _firewall.DeleteRule(opposite.Name, opposite.Direction);
-                    if (!removed.Success)
-                    {
-                        Log.Warning("NetworkAlerts: конфликтующее правило {Rule} не удалено: {Message}", opposite.Name, removed.Message);
-                        return false;
-                    }
-                }
-                return true;
+                _policyRevision = _firewall.PolicyRevision;
+                return result.Success;
             }
         }
         catch (Exception ex)
         {
+            _lastApplyResult = FirewallOperationResult.Fail("Правило не применено: " + ex.Message);
             Log.Warning(ex, "NetworkAlerts: не удалось создать правило {Rule}", rule.Name);
             return false;
         }
@@ -1232,31 +1663,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <returns>Правило приложения для обоих направлений и всех профилей.</returns>
     private static FirewallRuleDto BuildAppRule(string processPath, string processName, FirewallAction action)
     {
-        var baseName = "app";
-        try
-        {
-            var fn = Path.GetFileNameWithoutExtension(processPath);
-            if (!string.IsNullOrWhiteSpace(fn))
-                baseName = fn;
-        }
-        catch { }
-
-        var verb = action == FirewallAction.Allow ? "Allow" : "Block";
-        return new FirewallRuleDto
-        {
-            Name = $"StartupMonitor_{verb}_{SanitizeRuleName(baseName)}_{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(NormalizeProcessPath(processPath) ?? processPath)))[..16]}_Auto",
-            Description = action == FirewallAction.Allow
-                ? $"Разрешено пользователем через алерты сети: {processName} ({processPath})"
-                : $"Заблокировано пользователем через алерты сети: {processName} ({processPath})",
-            Direction = FirewallDirection.Both,
-            Action = action,
-            Protocol = FirewallProtocol.Any,
-            ApplicationPath = processPath,
-            Enabled = true,
-            Profiles = FirewallProfile.All,
-            Grouping = WindowsFirewallService.RuleGroup,
-            IsManaged = true,
-        };
+        return WindowsFirewallService.BuildApplicationRule(processPath, processName, action);
     }
 
     private static string SanitizeRuleName(string name)
@@ -1292,8 +1699,10 @@ public sealed class NetworkConnectionAlertService : IDisposable
         string protocol,
         int processId,
         string sessionKey,
-        long generation)
+        long generation,
+        string direction = "Unknown")
     {
+        var cancellation = _aiLifetime.Token;
         try
         {
             (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
@@ -1302,7 +1711,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             {
                 try
                 {
-                    verdict = await AiEvaluatorOverride(processName, processPath ?? string.Empty, remoteAddress, remotePort).ConfigureAwait(false);
+                    verdict = await AiEvaluatorOverride(processName, processPath ?? string.Empty, remoteAddress, remotePort).WaitAsync(cancellation).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -1313,7 +1722,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             {
                 try
                 {
-                    verdict = await _aiRating.EvaluateNetworkProcessAsync(processName, processPath ?? string.Empty, remoteAddress, remotePort).ConfigureAwait(false);
+                    verdict = await _aiRating.EvaluateNetworkProcessAsync(processName, processPath ?? string.Empty, remoteAddress, remotePort, cancellation).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -1321,38 +1730,28 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 }
             }
 
-            // Выбираем финальное решение с учётом настроенного режима и рекомендации ИИ
-            var resolution = string.Equals(_aiAutonomousDecisionMode, "BlockSession", StringComparison.OrdinalIgnoreCase)
-                ? NetworkAlertResolution.BlockSession
-                : NetworkAlertResolution.AllowSession;
-
-            if (verdict.HasValue && !string.IsNullOrWhiteSpace(verdict.Value.RecommendedAction))
-            {
-                if (string.Equals(verdict.Value.RecommendedAction, "BlockSession", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(verdict.Value.RecommendedAction, "BlockAlways", StringComparison.OrdinalIgnoreCase))
-                {
-                    resolution = NetworkAlertResolution.BlockSession;
-                }
-                else if (string.Equals(verdict.Value.RecommendedAction, "AllowSession", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(verdict.Value.RecommendedAction, "AllowAlways", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!string.Equals(_aiAutonomousDecisionMode, "BlockSession", StringComparison.OrdinalIgnoreCase))
-                    {
-                        resolution = NetworkAlertResolution.AllowSession;
-                    }
-                }
-            }
-
+            NetworkAlertResolution resolution;
             lock (_scanLock)
             {
+                RefreshSettingsCache();
                 // Ручное решение или остановка службы отменяют право запоздалой AI-оценки менять политику.
-                if (_disposed || !_autonomousPending.TryGetValue(sessionKey, out var activeGeneration) || activeGeneration != generation)
+                if (_disposed || cancellation.IsCancellationRequested || !AlertsEnabled || !_aiAutonomousNetworkDecisionsEnabled ||
+                    !_autonomousPending.TryGetValue(sessionKey, out var activeGeneration) || activeGeneration != generation || _pendingByGroup.ContainsKey(sessionKey))
                     return;
+                var action = verdict?.RecommendedAction;
+                if (action is not ("AllowSession" or "AllowAlways" or "BlockSession" or "BlockAlways"))
+                {
+                    QueueAutonomousFailure(processId, processPath, processName, protocol, remoteAddress, remotePort, localAddress, localPort,
+                        "Нет подтверждённого допустимого заключения ИИ", direction);
+                    return;
+                }
+                resolution = string.Equals(_aiAutonomousDecisionMode, "BlockSession", StringComparison.OrdinalIgnoreCase) || action is "BlockSession" or "BlockAlways"
+                    ? NetworkAlertResolution.BlockSession : NetworkAlertResolution.AllowSession;
                 var result = ApplySessionAccess(processPath ?? string.Empty, processName, resolution);
                 if (!result.Success)
                 {
                     Log.Warning("NetworkAlerts: автономное решение {Resolution} не применено: {Message}", resolution, result.Message);
-                    QueueAutonomousFailure(processId, processPath, processName, protocol, remoteAddress, remotePort, localAddress, localPort, result.Message);
+                    QueueAutonomousFailure(processId, processPath, processName, protocol, remoteAddress, remotePort, localAddress, localPort, result.Message, direction);
                     return;
                 }
             }
@@ -1380,9 +1779,13 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 RemoteAddress = remoteAddress,
                 RemotePort = remotePort,
                 Verdict = resolution == NetworkAlertResolution.AllowSession ? NetworkConnectionVerdict.AllowSession : NetworkConnectionVerdict.BlockSession,
-                Direction = "Outbound",
+                Direction = direction,
                 Details = $"Автономное решение ИИ ({resolution}): {purposeDesc}. {recDesc}"
             });
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            Log.Debug("NetworkAlerts: устаревшая автономная оценка отменена");
         }
         catch (Exception ex)
         {
@@ -1390,7 +1793,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             lock (_scanLock)
             {
                 if (!_disposed && _autonomousPending.TryGetValue(sessionKey, out var activeGeneration) && activeGeneration == generation)
-                    QueueAutonomousFailure(processId, processPath, processName, protocol, remoteAddress, remotePort, localAddress, localPort, ex.Message);
+                    QueueAutonomousFailure(processId, processPath, processName, protocol, remoteAddress, remotePort, localAddress, localPort, ex.Message, direction);
             }
         }
         finally
@@ -1409,28 +1812,36 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <param name="local">Локальный адрес.</param>
     /// <param name="localPort">Локальный порт.</param>
     /// <param name="failure">Причина отказа для журнала службы.</param>
-    private void QueueAutonomousFailure(int processId, string? path, string name, string protocol, string remote, int remotePort, string local, int localPort, string failure)
+    private void QueueAutonomousFailure(int processId, string? path, string name, string protocol, string remote, int remotePort, string local, int localPort, string failure, string direction = "Unknown")
     {
-        if (_pendingById.Count >= MaxPendingAlerts)
+        var key = BuildPendingGroupKey(path, name, processId);
+        if (_disposed || !AlertsEnabled || _pendingById.Count >= MaxPendingAlerts || _pendingByGroup.ContainsKey(key))
             return;
         var alert = new NetworkConnectionAlertDto
         {
             ProcessId = processId, ProcessPath = path ?? string.Empty, ProcessName = name,
             Protocol = protocol, RemoteAddress = remote, RemotePort = remotePort,
+            Direction = direction, LastSeenAt = UtcNowProvider(), IsActive = true,
+            DetectedAt = UtcNowProvider(),
             CanAllowSession = !string.IsNullOrWhiteSpace(path) && _sessionFirewall.CanAllowSession,
             CanBlockSession = !string.IsNullOrWhiteSpace(path)
         };
         if (_pendingById.TryAdd(alert.AlertId, alert))
         {
+            _pendingByGroup[key] = alert.AlertId;
+            _observationsByAlert[alert.AlertId] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                key + "|" + protocol + "|" + local + ":" + localPort + "|" + remote.ToLowerInvariant() + ":" + remotePort
+            };
             _queue.Enqueue(alert);
             RecordHistory(new NetworkConnectionHistoryItem
             {
                 Id = alert.AlertId, Timestamp = alert.DetectedAt, ProcessId = processId,
                 ProcessPath = path ?? string.Empty, ProcessName = name, Protocol = protocol,
                 RemoteAddress = remote, RemotePort = remotePort, LocalAddress = local, LocalPort = localPort,
-                Verdict = NetworkConnectionVerdict.PendingAlert, Direction = "Outbound",
+                Verdict = NetworkConnectionVerdict.PendingAlert, Direction = direction,
                 Details = $"Автономное решение не применено: {failure}. Ожидается выбор пользователя."
-            });
+            }, alert.AlertId);
         }
     }
 
@@ -1439,20 +1850,21 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// </summary>
     private async Task EnrichAlertWithAiAsync(NetworkConnectionAlertDto alert)
     {
+        var cancellation = _aiLifetime.Token;
         try
         {
             (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
 
             if (AiEvaluatorOverride != null)
             {
-                verdict = await AiEvaluatorOverride(alert.ProcessName, alert.ProcessPath, alert.RemoteAddress, alert.RemotePort).ConfigureAwait(false);
+                verdict = await AiEvaluatorOverride(alert.ProcessName, alert.ProcessPath, alert.RemoteAddress, alert.RemotePort).WaitAsync(cancellation).ConfigureAwait(false);
             }
             else if (_aiRating != null)
             {
-                verdict = await _aiRating.EvaluateNetworkProcessAsync(alert.ProcessName, alert.ProcessPath, alert.RemoteAddress, alert.RemotePort).ConfigureAwait(false);
+                verdict = await _aiRating.EvaluateNetworkProcessAsync(alert.ProcessName, alert.ProcessPath, alert.RemoteAddress, alert.RemotePort, cancellation).ConfigureAwait(false);
             }
 
-            if (verdict != null)
+            if (verdict != null && !cancellation.IsCancellationRequested && _pendingById.ContainsKey(alert.AlertId))
             {
                 alert.AiPurpose = verdict.Value.Purpose;
                 alert.AiBlockingRisk = verdict.Value.BlockingRisk;
@@ -1460,6 +1872,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 alert.AiRecommendedAction = verdict.Value.RecommendedAction;
             }
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { Log.Debug("NetworkAlerts: обогащение устаревшей карточки отменено"); }
         catch (Exception ex)
         {
             Log.Warning(ex, "NetworkAlerts: сбой фонового обогащения алерта {AlertId}", alert.AlertId);
@@ -1470,17 +1883,26 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// Запрашивает оценку нейросети для сетевого алерта (вызывается через IPC PipeServer при открытии диалогового окна).
     /// </summary>
     public async Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?> EvaluateAlertAsync(
-        string alertId, string processName, string processPath, string remoteAddress, int remotePort)
+        string alertId, string processName, string processPath, string remoteAddress, int remotePort, CancellationToken cancellationToken = default)
     {
+        NetworkConnectionAlertDto authoritative;
+        lock (_scanLock)
+        {
+            if (_disposed || !AlertsEnabled || !_pendingById.TryGetValue(alertId, out authoritative!)) return null;
+            processName = authoritative.ProcessName;
+            processPath = authoritative.ProcessPath;
+            remoteAddress = authoritative.RemoteAddress;
+            remotePort = authoritative.RemotePort;
+        }
         (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
 
         if (AiEvaluatorOverride != null)
         {
-            verdict = await AiEvaluatorOverride(processName, processPath, remoteAddress, remotePort).ConfigureAwait(false);
+            verdict = await AiEvaluatorOverride(processName, processPath, remoteAddress, remotePort).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         else if (_aiRating != null)
         {
-            verdict = await _aiRating.EvaluateNetworkProcessAsync(processName, processPath, remoteAddress, remotePort).ConfigureAwait(false);
+            verdict = await _aiRating.EvaluateNetworkProcessAsync(processName, processPath, remoteAddress, remotePort, cancellationToken).ConfigureAwait(false);
         }
 
         if (verdict != null && !string.IsNullOrEmpty(alertId) && _pendingById.TryGetValue(alertId, out var alert))

@@ -10,9 +10,8 @@ namespace StartupMonitor.Service.Services.Firewall;
 
 /// <summary>
 /// Единый координатор матрицы контроля доступа сетевых приложений.
-/// Обеспечивает строгую атомарность: одновременное обновление JSON-хранилища,
-/// создание/удаление правил в Windows Firewall через COM и синхронизацию сессионных кэшей детектора алертов.
-/// Zero-Crash: все операции защищены, исключения логируются, отказоустойчивость 100%.
+/// Согласует JSON-хранилище, компенсируемое изменение COM-правил и проекцию детектора.
+/// Неполная компенсация явно возвращается вызывающему интерфейсу, а не подменяется успехом.
 /// </summary>
 public sealed class AccessMatrixCoordinatorService
 {
@@ -68,6 +67,10 @@ public sealed class AccessMatrixCoordinatorService
         if (string.IsNullOrWhiteSpace(name))
             return ProcessProtectionLevel.None;
 
+        // Имя не доказывает происхождение: копия svchost.exe в Temp не получает защиту системного файла.
+        if (!NetworkConnectionAlertService.IsTrustedProcess(name, processPath))
+            return ProcessProtectionLevel.None;
+
         if (CriticalCoreProcesses.Contains(name))
             return ProcessProtectionLevel.Critical;
 
@@ -91,7 +94,7 @@ public sealed class AccessMatrixCoordinatorService
             var blackList = new HashSet<string>(cfg.Settings.FirewallBlacklistedApps, StringComparer.OrdinalIgnoreCase);
 
             // 1. Читаем разрешающие исходящие правила брандмауэра
-            var fwAllowedPaths = _firewall.GetOutboundAllowApplicationRulePaths();
+            var fwAllowedPaths = _firewall.GetUnrestrictedOutboundAllowApplicationRulePaths();
 
             // 2. Добавляем программы из активных сокетов
             var activeSockets = _tracker.GetSockets();
@@ -143,6 +146,8 @@ public sealed class AccessMatrixCoordinatorService
 
                 if (kv.Value == NetworkAlertResolution.AllowSession)
                 {
+                    if (item.State == AccessControlState.Blocked && item.BlockSource == BlockSourceType.StartupMonitorBlacklist)
+                        continue;
                     item.State = AccessControlState.Allowed;
                     item.Scope = AccessRuleScope.UntilRestart;
                 }
@@ -196,7 +201,7 @@ public sealed class AccessMatrixCoordinatorService
         if (request == null)
             throw new ArgumentNullException(nameof(request));
 
-        var path = (request.ApplicationPath ?? string.Empty).Trim().Trim('"');
+        var path = WindowsFirewallService.NormalizeApplicationPath(request.ApplicationPath) ?? string.Empty;
         var name = (request.ProcessName ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(path) && string.IsNullOrWhiteSpace(name))
             return FirewallOperationResult.Fail("Не указан путь или имя приложения.");
@@ -231,51 +236,25 @@ public sealed class AccessMatrixCoordinatorService
                 // Полное приложение определяет имя правила: одинаковые exe из разных каталогов независимы.
                 if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path))
                     return FirewallOperationResult.Fail("Для изменения сетевого доступа необходим полный путь приложения.");
-                var safeBaseName = SanitizeRuleName(!string.IsNullOrWhiteSpace(name) ? Path.GetFileNameWithoutExtension(name) : "App");
-                var pathHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(path.ToLowerInvariant())))[..16];
-                var ruleName = $"StartupMonitor_Access_{safeBaseName}_{pathHash}_Managed";
-
+                FirewallOperationResult result;
                 if (request.TargetState != AccessControlState.Prompt)
                 {
                     var action = request.TargetState == AccessControlState.Allowed ? FirewallAction.Allow : FirewallAction.Block;
-                    var applied = _firewall.CreateOrUpdateRule(new FirewallRuleDto
-                    {
-                        Name = ruleName,
-                        Description = $"Матрица доступа StartupMonitor: {name} ({path})",
-                        Direction = FirewallDirection.Both,
-                        Action = action,
-                        Protocol = FirewallProtocol.Any,
-                        ApplicationPath = path,
-                        Enabled = true,
-                        Profiles = FirewallProfile.All,
-                        Grouping = WindowsFirewallService.RuleGroup,
-                        IsManaged = true
-                    });
-                    if (!applied.Success)
-                        return applied;
-
-                    // Старые Auto/Managed правила очищаются только для этого полного пути.
-                    var removed = RemoveManagedApplicationRules(path, oppositeTo: action);
-                    if (!removed.Success)
-                        return removed;
                     var target = action == FirewallAction.Allow ? cfg.Settings.FirewallWhitelistedApps : cfg.Settings.FirewallBlacklistedApps;
                     var opposite = action == FirewallAction.Allow ? cfg.Settings.FirewallBlacklistedApps : cfg.Settings.FirewallWhitelistedApps;
-                    opposite.RemoveAll(app => string.Equals(app, targetKey, StringComparison.OrdinalIgnoreCase));
-                    if (!target.Contains(targetKey, StringComparer.OrdinalIgnoreCase))
+                    opposite.RemoveAll(app => string.Equals(WindowsFirewallService.NormalizeApplicationPath(app), path, StringComparison.OrdinalIgnoreCase));
+                    if (!target.Any(app => string.Equals(WindowsFirewallService.NormalizeApplicationPath(app), path, StringComparison.OrdinalIgnoreCase)))
                         target.Add(targetKey);
+                    result = _firewall.ApplyPolicyRule(WindowsFirewallService.BuildApplicationRule(path, name, action), () => _store.Save(cfg));
                 }
                 else
                 {
-                    var removed = RemoveManagedApplicationRules(path);
-                    if (!removed.Success)
-                        return removed;
-                    cfg.Settings.FirewallWhitelistedApps.RemoveAll(app => string.Equals(app, targetKey, StringComparison.OrdinalIgnoreCase));
-                    cfg.Settings.FirewallBlacklistedApps.RemoveAll(app => string.Equals(app, targetKey, StringComparison.OrdinalIgnoreCase));
+                    cfg.Settings.FirewallWhitelistedApps.RemoveAll(app => string.Equals(WindowsFirewallService.NormalizeApplicationPath(app), path, StringComparison.OrdinalIgnoreCase));
+                    cfg.Settings.FirewallBlacklistedApps.RemoveAll(app => string.Equals(WindowsFirewallService.NormalizeApplicationPath(app), path, StringComparison.OrdinalIgnoreCase));
+                    result = _firewall.RemoveApplicationPolicy(path, () => _store.Save(cfg));
                 }
-
-                _store.Save(cfg);
-                _alertService.ClearSessionAccess(path, name);
+                if (!result.Success) return result;
+                _alertService.NotifyPolicyChanged(path);
 
                 Log.Information("Матрица доступа: для {Target} успешно установлено состояние {State} ({Scope})", targetKey, request.TargetState, request.Scope);
                 return FirewallOperationResult.Ok($"Состояние {request.TargetState} успешно сохранено.");
@@ -288,22 +267,33 @@ public sealed class AccessMatrixCoordinatorService
         }
     }
 
-    /// <summary>Удаляет только собственные правила указанного полного пути, включая прежние имена Auto/Managed.</summary>
-    /// <param name="path">Точный путь приложения, на которое распространяется выбор.</param>
-    /// <param name="oppositeTo">При заданном действии удаляются только противоречащие ему правила.</param>
-    /// <returns>Успех полной очистки либо первый диагностируемый отказ.</returns>
-    private FirewallOperationResult RemoveManagedApplicationRules(string path, FirewallAction? oppositeTo = null)
+    /// <summary>После ручного удаления/выключения общего правила снимает устаревшие записи глобальных списков.</summary>
+    /// <param name="path">Путь приложения, затронутого подтверждённой общей мутацией.</param>
+    /// <returns>Подтверждение строгой сверки и сохранения либо явный отказ.</returns>
+    public FirewallOperationResult ReconcileApplicationLists(string path)
     {
-        if (!_firewall.GetStatus().Available)
-            return FirewallOperationResult.Fail("Брандмауэр Windows недоступен: нельзя подтвердить очистку правил.");
-        foreach (var rule in _firewall.GetAllRules().Where(rule => NetworkConnectionAlertService.IsManagedApplicationRule(rule, path) &&
-            (!oppositeTo.HasValue || rule.Action != oppositeTo.Value)))
+        var normalized = WindowsFirewallService.NormalizeApplicationPath(path);
+        if (normalized == null) return FirewallOperationResult.Fail("Необходим полный путь приложения для сверки списков.");
+        lock (_syncLock)
         {
-            var result = _firewall.DeleteRule(rule.Name, rule.Direction);
-            if (!result.Success)
-                return result;
+            try
+            {
+                var actions = _firewall.GetApplicationPolicyActions(normalized);
+                var cfg = _store.Load();
+                if (!actions.Contains(FirewallAction.Allow))
+                    cfg.Settings.FirewallWhitelistedApps.RemoveAll(app => string.Equals(WindowsFirewallService.NormalizeApplicationPath(app), normalized, StringComparison.OrdinalIgnoreCase));
+                if (!actions.Contains(FirewallAction.Block))
+                    cfg.Settings.FirewallBlacklistedApps.RemoveAll(app => string.Equals(WindowsFirewallService.NormalizeApplicationPath(app), normalized, StringComparison.OrdinalIgnoreCase));
+                _store.Save(cfg);
+                _alertService.NotifyPolicyChanged(normalized);
+                return FirewallOperationResult.Ok("Списки доступа сверены с действующими полными правилами приложения.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Матрица доступа: сверка списков приложения не подтверждена");
+                return FirewallOperationResult.Fail($"Не удалось сверить списки доступа: {ex.Message}");
+            }
         }
-        return FirewallOperationResult.Ok("Правила указанного приложения синхронизированы.");
     }
 
     private static AppAccessMatrixItemDto CreateOrGetItem(Dictionary<string, AppAccessMatrixItemDto> dict, string rawPath)

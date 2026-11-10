@@ -8,6 +8,7 @@
     <RootNamespace>StartupMonitor.UI</RootNamespace>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <SupportedCultures>ru;en</SupportedCultures>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
