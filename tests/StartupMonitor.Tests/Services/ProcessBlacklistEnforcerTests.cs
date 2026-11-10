@@ -366,7 +366,9 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         {
             using var target = new ProcessBlacklistEnforcer.WindowsProcessBlacklistTarget(process.Id,
                 _ => Array.Empty<(int, int, DateTime, string)>());
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            // Холодный запуск PowerShell на CI может занять больше пяти секунд;
+            // этот бюджет относится к подготовке процесса, а не к скорости native Kill.
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
             Assert.Equal(259, process.ExitCode);
             Assert.True(target.HasExited);
         }
@@ -381,7 +383,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         using var parent = Process.Start(new ProcessStartInfo
         {
             FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"),
-            Arguments = "-NoProfile -NonInteractive -Command \"$child = Start-Process powershell.exe -ArgumentList '-NoProfile -NonInteractive -Command Start-Sleep -Seconds 30' -WindowStyle Hidden -PassThru; [Console]::WriteLine($child.Id); Start-Sleep -Seconds 30\"",
+            Arguments = "-NoProfile -NonInteractive -Command \"$child = Start-Process powershell.exe -ArgumentList '-NoProfile -NonInteractive -Command Start-Sleep -Seconds 120' -WindowStyle Hidden -PassThru; [Console]::WriteLine($child.Id); Start-Sleep -Seconds 120\"",
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true
@@ -389,7 +391,9 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Process? child = null;
         try
         {
-            var childIdText = await parent.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            // Ожидание готовности учитывает холодный запуск двух PowerShell на runner.
+            // Жизнь тестового дерева превышает этот бюджет; Kill по-прежнему проверяется за пять секунд.
+            var childIdText = await parent.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60));
             Assert.True(int.TryParse(childIdText, out var childId));
             child = Process.GetProcessById(childId);
             var parentTime = parent.StartTime.ToUniversalTime();

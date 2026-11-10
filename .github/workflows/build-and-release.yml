@@ -102,7 +102,8 @@ jobs:
         shell: pwsh
 
       - name: Upload Installer Artifacts
-        if: steps.release_assets.outcome == 'success'
+        # Опубликованный релиз уже хранит проверенные файлы; повторная копия в Actions не нужна.
+        if: steps.release_assets.outcome == 'success' && steps.release_assets.outputs.already_published != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: StartupMonitor-Installer-v${{ steps.release_assets.outputs.version }}
