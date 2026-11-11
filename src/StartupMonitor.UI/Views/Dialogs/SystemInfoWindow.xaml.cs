@@ -31,13 +31,27 @@ public partial class SystemInfoWindow : FluentWindow
         InitializeComponent();
     }
 
-    /// <summary>OnRefreshClick: Обрабатывает событие OnRefreshClick.</summary>
+    /// <summary>Обновляет сведения в фоновом потоке, чтобы опрос дисков не блокировал окно.</summary>
     /// <param name="sender">Входные данные: значение параметра sender (object).</param>
     /// <param name="e">Входные данные: значение параметра e (RoutedEventArgs).</param>
-    private void OnRefreshClick(object sender, RoutedEventArgs e)
+    private async void OnRefreshClick(object sender, RoutedEventArgs e)
     {
-        Info = SystemComputerInfo.Collect();
-        TxtStatus.Text = $"{LocalizationService.Instance.SysInfoTitle} обновлена ({DateTime.Now:HH:mm:ss})";
+        if (sender is not System.Windows.Controls.Control control) return;
+        control.IsEnabled = false;
+        try
+        {
+            Info = await Task.Run(SystemComputerInfo.Collect);
+            TxtStatus.Text = $"{LocalizationService.Instance.SysInfoTitle} обновлена ({DateTime.Now:HH:mm:ss})";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceError("Не удалось обновить сведения о компьютере: {0}", ex);
+            TxtStatus.Text = ex.Message;
+        }
+        finally
+        {
+            control.IsEnabled = true;
+        }
     }
 
     /// <summary>OnCopyClick: Обрабатывает событие OnCopyClick.</summary>

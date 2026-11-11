@@ -784,8 +784,12 @@ public partial class MainWindow
         var source = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         App.Log($"RestoreFromTray: after Visibility={Visibility}, IsVisible={IsVisible}, WindowState={WindowState}, PresentationSource={PresentationSource.FromVisual(this) is not null}, RootVisual={ReferenceEquals(source?.RootVisual, this)}, VisualChildren={VisualTreeHelper.GetChildrenCount(this)}");
         _viewModel.ResumeAllBackgroundActivity();
+        // Краткое поднятие в верхний слой помещает окно поверх остальных, не закрепляя его там постоянно.
+        var wasTopmost = Topmost;
+        Topmost = true;
         Activate();
         Focus();
+        Topmost = wasTopmost;
         if (_selectedNavIndex == 6 && _isStartupComplete)
         {
             _ = _viewModel.TaskManager.ActivateAsync();

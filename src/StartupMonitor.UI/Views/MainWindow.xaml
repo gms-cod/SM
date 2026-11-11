@@ -317,7 +317,9 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- Карточка 1: Всего записей с неоновым кантом и бейджем +3 -->
-                        <Border Grid.Column="0" Margin="0 0 6 0" Style="{StaticResource FluentGlassCard}">
+                        <Border Grid.Column="0" Margin="0 0 6 0" Cursor="Hand">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource FluentGlassCard}"><Style.Triggers><DataTrigger Binding="{Binding CurrentFilter}" Value="all"><Setter Property="BorderBrush" Value="{StaticResource CardNeonAccentBrush}" /><Setter Property="BorderThickness" Value="2" /></DataTrigger></Style.Triggers></Style></Border.Style>
+                            <Border.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding FilterMetricCommand}" CommandParameter="all" /></Border.InputBindings>
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -341,7 +343,9 @@
                         </Border>
 
                         <!-- Карточка 2: Активные программы с бейджем Стабильно -->
-                        <Border Grid.Column="1" Margin="6 0" Style="{StaticResource FluentGlassCard}">
+                        <Border Grid.Column="1" Margin="6 0" Cursor="Hand">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource FluentGlassCard}"><Style.Triggers><DataTrigger Binding="{Binding CurrentFilter}" Value="enabled"><Setter Property="BorderBrush" Value="{StaticResource CardNeonAccentBrush}" /><Setter Property="BorderThickness" Value="2" /></DataTrigger></Style.Triggers></Style></Border.Style>
+                            <Border.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding FilterMetricCommand}" CommandParameter="enabled" /></Border.InputBindings>
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -358,7 +362,9 @@
                         </Border>
 
                         <!-- Карточка 3: Заблокировано с бейджем +1 -->
-                        <Border Grid.Column="2" Margin="6 0" Style="{StaticResource FluentGlassCard}">
+                        <Border Grid.Column="2" Margin="6 0" Cursor="Hand">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource FluentGlassCard}"><Style.Triggers><DataTrigger Binding="{Binding CurrentFilter}" Value="blocked"><Setter Property="BorderBrush" Value="{StaticResource CardNeonAccentBrush}" /><Setter Property="BorderThickness" Value="2" /></DataTrigger></Style.Triggers></Style></Border.Style>
+                            <Border.InputBindings><MouseBinding MouseAction="LeftClick" Command="{Binding FilterMetricCommand}" CommandParameter="blocked" /></Border.InputBindings>
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -1201,20 +1207,26 @@
                                                  Content="{Binding AiAutonomousDecisionsToggle, Source={StaticResource Loc}}"
                                                  IsEnabled="{Binding AiEnabled}" />
                                 <TextBlock Text="{Binding AiAutonomousDecisionsHint, Source={StaticResource Loc}}"
-                                           FontSize="12"
+                                           FontSize="12" TextWrapping="Wrap"
+                                           Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
+                                <ui:ToggleSwitch Margin="0 12 0 0" IsChecked="{Binding IncomingTcpObservationsEnabled, Mode=TwoWay}"
+                                                 IsEnabled="{Binding IncomingTcpSettingAvailable}"
+                                                 Content="{Binding IncomingTcpToggle, Source={StaticResource Loc}}" />
+                                <TextBlock Text="{Binding IncomingTcpHint, Source={StaticResource Loc}}" FontSize="12" TextWrapping="Wrap"
                                            Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
                             <TextBlock Grid.Row="5" Grid.Column="0" Text="{Binding AiAutonomousDefaultActionLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 12 0 0" />
                             <StackPanel Grid.Row="5" Grid.Column="1" Margin="0 12 0 0">
-                                <ComboBox ItemsSource="{Binding AutonomousDecisionModeOptions}"
-                                          SelectedValuePath="Code"
-                                          DisplayMemberPath="Display"
+                                <ComboBox SelectedValuePath="Tag"
                                           SelectedValue="{Binding AiAutonomousDecisionMode, Mode=TwoWay}"
-                                          Width="280" HorizontalAlignment="Left"
-                                          IsEnabled="{Binding AiAutonomousNetworkDecisionsEnabled}" />
+                                          Width="320" HorizontalAlignment="Left"
+                                          IsEnabled="{Binding AiAutonomousNetworkDecisionsEnabled}">
+                                    <ComboBoxItem Tag="AllowSession" Content="{Binding AiAutonomousFollowAi, Source={StaticResource Loc}}" />
+                                    <ComboBoxItem Tag="BlockSession" Content="{Binding AiAutonomousBlockAll, Source={StaticResource Loc}}" />
+                                </ComboBox>
                                 <TextBlock Text="{Binding AiAutonomousDefaultActionHint, Source={StaticResource Loc}}"
-                                           FontSize="12"
+                                           FontSize="12" TextWrapping="Wrap"
                                            Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
 
@@ -1683,6 +1695,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock Grid.Column="0"
@@ -1702,7 +1715,15 @@
                                     </StackPanel>
                                     <TextBlock Text="{Binding EntryPath}" FontSize="11"
                                                Foreground="{DynamicResource SubtleTextBrush}" />
+                                    <TextBlock Text="{Binding Location}" FontSize="11"
+                                               Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Action}" FontSize="11"
+                                               Foreground="{DynamicResource SubtleTextBrush}" TextWrapping="Wrap" />
                                 </StackPanel>
+                                <ui:Button Grid.Column="2" Content="{Binding RemovedRestoreButton, Source={StaticResource Loc}}"
+                                           Visibility="{Binding CanRestore, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                           Command="{Binding RelativeSource={RelativeSource AncestorType={x:Type Window}}, Path=DataContext.RestoreEntryCommand}"
+                                           CommandParameter="{Binding RestoreBackupId}" VerticalAlignment="Center" />
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

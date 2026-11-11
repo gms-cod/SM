@@ -127,6 +127,12 @@
                                 </Border>
                             </StackPanel>
                         </Grid>
+                        <!-- Дополнительные данные устройства и установки Windows. -->
+                        <TextBlock TextWrapping="Wrap" Margin="0,6,0,0"><Run Text="{Binding SysInfoModel, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.ComputerModel, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
+                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"><Run Text="{Binding SysInfoMotherboard, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.Motherboard, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
+                        <TextBlock Text="{Binding Info.BiosVersion, RelativeSource={RelativeSource AncestorType=Window}, StringFormat='BIOS: {0}'}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"><Run Text="{Binding SysInfoBiosDate, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.BiosReleaseDate, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
+                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"><Run Text="{Binding SysInfoWindowsDirectory, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.WindowsDirectory, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
                     </StackPanel>
                 </Border>
 

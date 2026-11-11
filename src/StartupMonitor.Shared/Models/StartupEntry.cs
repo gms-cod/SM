@@ -134,6 +134,9 @@ public class StartupEntry : INotifyPropertyChanged
     /// <summary>AI-рейтинг (1 — безопасно, 10 — опасно).</summary>
     public int AiRating { get => _aiRating; set => Set(ref _aiRating, value); }
 
+    /// <summary>Отпечаток контекста, для которого получена автоматическая оценка; пустой означает неподтверждённый контекст.</summary>
+    public string AiContextFingerprint { get; set; } = string.Empty;
+
     /// <summary>Флаг: рейтинг установлен пользователем вручную (защита от перезаписи авто-оценкой AI).</summary>
     private bool _isUserRating;
     /// <summary>Указывает, был ли рейтинг задан пользователем вручную в окне свойств.</summary>

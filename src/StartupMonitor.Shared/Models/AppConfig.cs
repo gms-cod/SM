@@ -38,6 +38,10 @@ public class AppConfig
 /// <summary>Поведенческие настройки приложения.</summary>
 public class AppSettings
 {
+    /// <summary>Включает наблюдение принятых входящих TCP-соединений без изменения правил сети.</summary>
+    [JsonPropertyName("incoming_tcp_observations_enabled")]
+    public bool IncomingTcpObservationsEnabled { get; set; }
+
     /// <summary>Показывать уведомление при появлении новой записи.</summary>
     [JsonPropertyName("notify_on_new_entry")]
     public bool NotifyOnNewEntry { get; set; } = true;
@@ -289,6 +293,14 @@ public class HistoryEntry
     /// <summary>Выполненное действие (описание).</summary>
     [JsonPropertyName("action")]
     public string Action { get; set; } = string.Empty;
+
+    /// <summary>Идентификатор конкретной резервной копии удаления; отсутствует в старых событиях.</summary>
+    [JsonPropertyName("restore_backup_id")]
+    public string RestoreBackupId { get; set; } = string.Empty;
+
+    /// <summary>Наличие резервной копии на момент загрузки истории; служба повторно проверяет её при восстановлении.</summary>
+    [JsonIgnore]
+    public bool CanRestore { get; set; }
 
     /// <summary>Создает независимую копию записи истории.</summary>
     public HistoryEntry Clone() => (HistoryEntry)MemberwiseClone();

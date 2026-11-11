@@ -230,6 +230,8 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
 
     /// <summary>Флаг трассировки ядра: события жизненного цикла процессов (Process Start / Stop / DCStart).</summary>
     internal const uint EVENT_TRACE_FLAG_PROCESS = 0x00000001;
+    /// <summary>Флаг системного провайдера событий TCP/IP.</summary>
+    internal const uint EVENT_TRACE_FLAG_NETWORK_TCPIP = 0x00010000;
 
     /// <summary>Код управления ControlTraceW: опрос текущих параметров и статистики сессии.</summary>
     internal const uint EVENT_TRACE_CONTROL_QUERY = 0;
@@ -292,6 +294,10 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
 
     /// <summary>Имя машинного мьютекса для координации владения сессией между процессами службы.</summary>
     public const string MachineMutexName = @"Global\StartupMonitor.EtwSession.Mutex";
+    /// <summary>Имя независимой сессии входящих TCP-соединений.</summary>
+    public const string IncomingTcpSessionName = "StartupMonitor.IncomingTcp";
+    /// <summary>Мьютекс владения сетевой сессией, отделённый от мониторинга процессов.</summary>
+    public const string IncomingTcpMutexName = @"Global\StartupMonitor.IncomingTcp.EtwSession.Mutex";
 
     /// <summary>Размер общего буфера структуры и строковых параметров свойства ETW (в байтах).</summary>
     private const int PropertiesBufferSize = 4096;
@@ -382,7 +388,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         logger?.LogInformation("Инициализация запуска native ETW сессии '{SessionName}'...", sessionName);
 
         // 1. Захватываем машинный мьютекс для безопасного исключительного владения ресурсом
-        var mutex = AcquireMachineMutex(TimeSpan.FromSeconds(10), out var ownsMutex, logger);
+        var mutex = AcquireMachineMutex(TimeSpan.FromSeconds(10), out var ownsMutex, logger, sessionName);
         NativeProcessTraceSession? created = null;
         IntPtr propertiesBuffer = IntPtr.Zero;
 
@@ -705,16 +711,17 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// <summary>
     /// Захватывает машинный мьютекс с обработкой аварийного оставления мьютекса предыдущим процессом.
     /// </summary>
-    private static Mutex AcquireMachineMutex(TimeSpan timeout, out bool ownsMutex, ILogger? logger)
+    private static Mutex AcquireMachineMutex(TimeSpan timeout, out bool ownsMutex, ILogger? logger, string sessionName)
     {
+        var mutexName = sessionName == IncomingTcpSessionName ? IncomingTcpMutexName : MachineMutexName;
         Mutex mutex;
         try
         {
-            mutex = new Mutex(false, MachineMutexName);
+            mutex = new Mutex(false, mutexName);
         }
         catch (UnauthorizedAccessException)
         {
-            mutex = Mutex.OpenExisting(MachineMutexName);
+            mutex = Mutex.OpenExisting(mutexName);
         }
 
         try
@@ -730,7 +737,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         if (!ownsMutex)
         {
             mutex.Dispose();
-            throw new TimeoutException($"Не удалось захватить машинный мьютекс '{MachineMutexName}' за {timeout.TotalSeconds:F1} с.");
+            throw new TimeoutException($"Не удалось захватить машинный мьютекс '{mutexName}' за {timeout.TotalSeconds:F1} с.");
         }
 
         return mutex;
@@ -742,7 +749,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// </summary>
     private static void ReconcileOrphanSessionIfNeeded(string sessionName, ILogger? logger)
     {
-        var existingLease = ReadLease(logger);
+        var existingLease = ReadLease(sessionName, logger);
         if (existingLease == null)
         {
             logger?.LogDebug("Lease-файл ETW отсутствует, проверка orphan-сессий не требуется");
@@ -786,7 +793,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             if (status == ERROR_WMI_INSTANCE_NOT_FOUND)
             {
                 logger?.LogInformation("Нативная сессия '{SessionName}' уже отсутствует в ядре Windows. Удаление устаревшего lease-файла", sessionName);
-                DeleteLeaseFile(logger);
+                DeleteLeaseFile(sessionName, logger);
                 return;
             }
 
@@ -816,7 +823,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
                         if (stopStatus == ERROR_SUCCESS || stopStatus == ERROR_MORE_DATA || stopStatus == ERROR_WMI_INSTANCE_NOT_FOUND)
                         {
                             logger?.LogInformation("Собственная orphan-сессия ETW успешно остановлена (статус {Status})", stopStatus);
-                            DeleteLeaseFile(logger);
+                            DeleteLeaseFile(sessionName, logger);
                         }
                         else
                         {
@@ -890,7 +897,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// <summary>
     /// Возвращает путь к lease-файлу в %ProgramData%\StartupMonitor\etw_session.lease.
     /// </summary>
-    private static string GetLeaseFilePath()
+    private static string GetLeaseFilePath(string sessionName)
     {
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var directory = Path.Combine(programData, "StartupMonitor");
@@ -898,7 +905,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
         {
             Directory.CreateDirectory(directory);
         }
-        return Path.Combine(directory, "etw_session.lease");
+        return Path.Combine(directory, sessionName == IncomingTcpSessionName ? "etw_incoming_tcp.lease" : "etw_session.lease");
     }
 
     /// <summary>
@@ -906,7 +913,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// </summary>
     private static void WriteLeaseAtomic(EtwSessionLease lease, ILogger? logger)
     {
-        var filePath = GetLeaseFilePath();
+        var filePath = GetLeaseFilePath(lease.SessionName);
         var tempPath = filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
         try
@@ -932,9 +939,9 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// <summary>
     /// Читает текущий lease-файл с диска. Возвращает null при отсутствии или повреждении файла.
     /// </summary>
-    private static EtwSessionLease? ReadLease(ILogger? logger)
+    private static EtwSessionLease? ReadLease(string sessionName, ILogger? logger)
     {
-        var filePath = GetLeaseFilePath();
+        var filePath = GetLeaseFilePath(sessionName);
         if (!File.Exists(filePath))
         {
             return null;
@@ -972,9 +979,9 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
     /// <summary>
     /// Удаляет файл lease при подтвержденной очистке orphan-сессии.
     /// </summary>
-    private static void DeleteLeaseFile(ILogger? logger)
+    private static void DeleteLeaseFile(string sessionName, ILogger? logger)
     {
-        var filePath = GetLeaseFilePath();
+        var filePath = GetLeaseFilePath(sessionName);
         try
         {
             if (File.Exists(filePath))
@@ -1021,7 +1028,7 @@ public sealed class NativeProcessTraceSession : IOwnedProcessTraceSession
             MaximumFileSize = 0,
             LogFileMode = EVENT_TRACE_SYSTEM_LOGGER_MODE | EVENT_TRACE_REAL_TIME_MODE,
             FlushTimer = 1, // сброс буферов каждую секунду
-            EnableFlags = EVENT_TRACE_FLAG_PROCESS,
+            EnableFlags = sessionName == IncomingTcpSessionName ? EVENT_TRACE_FLAG_NETWORK_TCPIP : EVENT_TRACE_FLAG_PROCESS,
             AgeLimit = 0,
             LogFileNameOffset = 0, // Real-time режим без дискового файла
             LoggerNameOffset = (uint)headerSize

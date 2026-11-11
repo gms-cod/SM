@@ -279,7 +279,16 @@ public class PipeServer : BackgroundService
 
         _logger = logger;
 
-        _ratingsCache = new RatingsCache(_store);
+        _ratingsCache = new RatingsCache(_store, entry =>
+        {
+            // Дельта-протокол сообщит открытым клиентам об оценке без постоянного опроса ИИ.
+            NotifyExternalEntriesChanged();
+            notifications.Enqueue(new PipeMessage
+            {
+                Type = PipeMessageTypes.EntryModified,
+                Payload = JsonSerializer.Serialize(entry, JsonOptions)
+            });
+        });
 
         var cfg = _store.Load();
 
@@ -547,7 +556,7 @@ public class PipeServer : BackgroundService
         PipeMessageTypes.GetProcessNetworkConnections or PipeMessageTypes.GetProcessModules or
         PipeMessageTypes.GetUpdateStatus or PipeMessageTypes.GetFirewallStatus or PipeMessageTypes.GetPortDefenderConfig or
         PipeMessageTypes.GetActiveBans or PipeMessageTypes.GetAllFirewallRules or PipeMessageTypes.GetFirewallFilteringMode or
-        PipeMessageTypes.GetConnectionHistory or PipeMessageTypes.GetAlertsEnabled or
+        PipeMessageTypes.GetConnectionHistory or PipeMessageTypes.GetAlertsEnabled or PipeMessageTypes.GetIncomingTcpObservations or
         PipeMessageTypes.GetFirewallSilentPid0 or PipeMessageTypes.GetFirewallWhitelist or PipeMessageTypes.GetFirewallBlacklist or
         PipeMessageTypes.GetAppAccessMatrix or PipeMessageTypes.GetNetworkTrafficHistory or
         PipeMessageTypes.SubscribeProcessMetrics or PipeMessageTypes.UnsubscribeProcessMetrics;
@@ -726,8 +735,11 @@ public class PipeServer : BackgroundService
                     // при каждом 5-сек опросе UI не нужно (дисковый жор).
 
                     foreach (var e in config.Entries.ToList())
-
+                    {
+                        // Устаревший контекст скрывается в ответе без записи файла при опросе.
+                        RatingsCache.SanitizeForRead(e);
                         EntryOperations.ResolveAndEnrichEntry(e, computeHash: false);
+                    }
 
                     // _store.Save(config); — УДАЛЕНО: Чтение не должно перезаписывать файлы на диске (ликвидация паразитного I/O)
 
@@ -808,8 +820,11 @@ public class PipeServer : BackgroundService
                     var deltaConfig = _store.Load();
 
                     foreach (var e in deltaConfig.Entries.ToList())
-
+                    {
+                        // Дельта не должна отображать оценку для прежнего контекста записи.
+                        RatingsCache.SanitizeForRead(e);
                         EntryOperations.ResolveAndEnrichEntry(e, computeHash: false);
+                    }
 
                     // _store.Save(deltaConfig); — УДАЛЕНО: Чтение не должно перезаписывать файлы на диске (ликвидация паразитного I/O)
 
@@ -849,21 +864,22 @@ public class PipeServer : BackgroundService
 
                         {
 
-                            // Завершаем процесс (службу останавливаем), если запущен и включена настройка
-
-                            var killEnabled = cfg.Settings.KillOnDisable;
-
-                            if (killEnabled)
-
-                                EntryOperations.KillProcess(entry);
-
                             var (sysOk, sysErr) = EntryOperations.DisableFromSystem(entry);
 
-                            entry.Status = EntryStatus.Disabled;
-
-                            if (!sysOk && sysErr != null)
-
+                            if (!sysOk)
+                            {
                                 _logger.LogWarning("DisableFromSystem для {Type} ({Name}): {Error}", entry.Location, entry.Name, sysErr);
+                                response.Type = PipeMessageTypes.Error;
+                                response.Payload = sysErr ?? "Не удалось отключить запись в системе.";
+                                break;
+                            }
+
+                            // Процесс завершается только после подтверждённого отключения точки автозапуска.
+                            var killEnabled = cfg.Settings.KillOnDisable;
+                            if (killEnabled)
+                                EntryOperations.KillProcess(entry);
+
+                            entry.Status = EntryStatus.Disabled;
 
                             _store.UpdateEntry(entry);
 
@@ -902,7 +918,17 @@ public class PipeServer : BackgroundService
                             });
 
                         }
+                        else
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Запись автозапуска не найдена.";
+                        }
 
+                    }
+                    else
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = "Не указан идентификатор записи автозапуска.";
                     }
 
                     break;
@@ -1212,6 +1238,10 @@ public class PipeServer : BackgroundService
 
                                     EntryPath = entry.FilePath,
 
+                                    Location = entry.Location.ToString(),
+
+                                    RestoreBackupId = removed.Id,
+
                                     Action = "RemovedFromSystem"
 
                                 });
@@ -1320,7 +1350,17 @@ public class PipeServer : BackgroundService
                             }
 
                         }
+                        else
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Удалённая запись не найдена или уже восстановлена.";
+                        }
 
+                    }
+                    else
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = "Не указан идентификатор удалённой записи.";
                     }
 
                     break;
@@ -1499,7 +1539,7 @@ public class PipeServer : BackgroundService
 
                         // Немедленно запускаем оценку: не ждём следующий 10-мин цикл
 
-                        if (!string.IsNullOrWhiteSpace(aiPayload.ApiKey) && cfg.Entries.Count > 0)
+                        if (cfg.Entries.Count > 0 && AiRatingService.CanRequestRatings(cfg.Settings.AiApiKey, cfg.Settings.AiApiUrl))
 
                             _ = PrefetchAndLogAsync(cfg.Entries, _lifetime.ApplicationStopping);
 
@@ -4182,6 +4222,17 @@ public class PipeServer : BackgroundService
 
 
 
+                case PipeMessageTypes.GetIncomingTcpObservations:
+                    response.Payload = JsonSerializer.Serialize(_store.GetSettings().IncomingTcpObservationsEnabled, JsonOptions);
+                    break;
+
+                case PipeMessageTypes.SetIncomingTcpObservations:
+                    var incomingEnabled = JsonSerializer.Deserialize<bool>(message.Payload, JsonOptions);
+                    var incomingSettings = _store.Load();
+                    incomingSettings.Settings.IncomingTcpObservationsEnabled = incomingEnabled;
+                    _store.Save(incomingSettings);
+                    break;
+
                 case PipeMessageTypes.SetAiAutonomousDecisions:
 
                     try
@@ -4741,7 +4792,7 @@ public class PipeServer : BackgroundService
 
                     var cfg = _store.Load();
 
-                    if (cfg.Entries.Count > 0 && !string.IsNullOrWhiteSpace(cfg.Settings.AiApiKey))
+                    if (cfg.Entries.Count > 0 && AiRatingService.CanRequestRatings(cfg.Settings.AiApiKey, cfg.Settings.AiApiUrl))
 
                     {
 

@@ -64,16 +64,25 @@ public class AiRatingService : IDisposable
         if (!string.IsNullOrWhiteSpace(model)) _model = model.Trim();
     }
 
-    /// <summary>IsLocalUrl: Проверяет состояние IsLocalUrl.</summary>
-    /// <param name="url">Входные данные: значение параметра url (string?).</param>
-    /// <returns>Выходные данные: результирующее значение типа bool.</returns>
+    /// <summary>Определяет локальный HTTP(S)-эндпоинт по хосту, не доверяя пути, имени пользователя и похожим доменам.</summary>
+    /// <param name="url">Абсолютный адрес проверяемого провайдера.</param>
+    /// <returns>Признак localhost, loopback или точного адреса 0.0.0.0 для совместимости с существующей настройкой.</returns>
     private static bool IsLocalUrl(string? url)
     {
-        if (string.IsNullOrWhiteSpace(url)) return false;
-        return url.Contains("localhost", StringComparison.OrdinalIgnoreCase) ||
-               url.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
-               url.Contains("0.0.0.0", StringComparison.OrdinalIgnoreCase);
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)) return false;
+        var host = uri.Host.Trim('[', ']');
+        if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+        return System.Net.IPAddress.TryParse(host, out var address) &&
+               (System.Net.IPAddress.IsLoopback(address) || address.Equals(System.Net.IPAddress.Any));
     }
+
+    /// <summary>Проверяет возможность фонового запроса: локальному провайдеру ключ не требуется.</summary>
+    /// <param name="apiKey">Ключ удалённого провайдера, если задан.</param>
+    /// <param name="apiUrl">Адрес настроенного провайдера.</param>
+    /// <returns>Признак наличия ключа либо локального адреса.</returns>
+    internal static bool CanRequestRatings(string? apiKey, string? apiUrl) =>
+        !string.IsNullOrWhiteSpace(apiKey) || IsLocalUrl(apiUrl);
 
     /// <summary>GetCached: Возвращает Cached.</summary>
     /// <param name="entry)">Входные данные: значение параметра entry) (StartupEntry).</param>
@@ -87,14 +96,14 @@ public class AiRatingService : IDisposable
     {
         ArgumentNullException.ThrowIfNull(entry);
         cancellationToken.ThrowIfCancellationRequested();
-        if (entry.AiRating > 0) return;
         if (_cache.Get(entry) != null) return;
-        if (string.IsNullOrWhiteSpace(_apiKey) && !IsLocalUrl(_apiUrl)) return;
+        if (!CanRequestRatings(_apiKey, _apiUrl)) return;
 
+        var fingerprint = StartupRatingContext.Compute(entry);
         var rating = await FetchRatingAsync(entry, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (rating != null)
-            _cache.Set(entry, rating);
+            _cache.TrySetAutomatic(entry, rating, fingerprint);
     }
 
     /// <summary>
@@ -112,11 +121,12 @@ public class AiRatingService : IDisposable
         _consecutiveNetworkErrors = 0;
 
         _logger.LogInformation("ForceFetchRatingAsync: немедленный запрос к AI для {Name} ({Model})", entry.Name, _model);
+        var fingerprint = StartupRatingContext.Compute(entry);
         var rating = await FetchRatingAsync(entry, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (rating != null)
+        var applied = rating != null && _cache.TrySetAutomatic(entry, rating, fingerprint);
+        if (applied && rating is not null)
         {
-            _cache.Set(entry, rating);
             _logger.LogInformation("ForceFetchRatingAsync: успешно получен рейтинг {Score} для {Name}", rating.Score, entry.Name);
         }
         else
@@ -124,7 +134,7 @@ public class AiRatingService : IDisposable
             _logger.LogWarning("ForceFetchRatingAsync: AI не вернул рейтинг для {Name}", entry.Name);
         }
 
-        return rating;
+        return applied ? rating : null;
     }
 
     /// <summary>Проверяет провайдер с ограничением ожидания и сквозной отменой службы.</summary>
@@ -208,9 +218,9 @@ public class AiRatingService : IDisposable
 
         try
         {
-            // SHA256-кеш: копируем рейтинг на записи с таким же хешем
+            // Один хеш файла не определяет аргументы и точку запуска; объединяем только одинаковый контекст.
             var byHash = entries.Where(e => !string.IsNullOrEmpty(e.SHA256))
-                .GroupBy(e => e.SHA256, StringComparer.OrdinalIgnoreCase);
+                .GroupBy(RatingsCache.BuildKey, StringComparer.Ordinal);
             foreach (var grp in byHash)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -219,17 +229,17 @@ public class AiRatingService : IDisposable
                 var src = _cache.Get(rated);
                 if (src == null) continue;
                 foreach (var e in grp.Where(e => _cache.Get(e) == null))
-                    _cache.Set(e, new StartupRating
+                    _cache.TrySetAutomatic(e, new StartupRating
                     {
                         Score = src.Score,
                         Category = src.Category,
                         Risk = src.Risk,
                         Recommendation = src.Recommendation
-                    });
+                    }, StartupRatingContext.Compute(e));
             }
 
             // Рейтинг: если ключ не задан и эндпоинт не локальный — пропускаем
-            if (string.IsNullOrWhiteSpace(_apiKey) && !IsLocalUrl(_apiUrl))
+            if (!CanRequestRatings(_apiKey, _apiUrl))
             {
                 _logger.LogDebug("AI-рейтинг отключён: не задан API-ключ");
                 return;
@@ -258,11 +268,11 @@ public class AiRatingService : IDisposable
                     _logger.LogWarning("AI API: пауза из-за rate limit, жду {Wait}ms", wait);
                     await Task.Delay(wait, cancellationToken);
                 }
+                var fingerprint = StartupRatingContext.Compute(entry);
                 var rating = await FetchRatingAsync(entry, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (rating != null)
+                if (rating != null && _cache.TrySetAutomatic(entry, rating, fingerprint))
                 {
-                    _cache.Set(entry, rating);
                     processed++;
                 }
                 else
@@ -316,27 +326,10 @@ public class AiRatingService : IDisposable
         return false;
     }
 
-    /// <summary>FetchRatingAsync: Выполняет операцию FetchRatingAsync с поддержкой Circuit Breaker.</summary>
-    /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
-    /// <returns>Выходные данные: результирующее значение типа Task<StartupRating?>.</returns>
-    /// <summary>
-    /// Проверяет, является ли запись компонентом нашего собственного проекта StartupMonitor.
-    /// </summary>
-    private static bool IsSelfProjectEntry(StartupEntry entry)
-    {
-        var name = entry.Name ?? "";
-        var path = entry.FilePath ?? "";
-        var pub = entry.Publisher ?? "";
-        var cmd = entry.CommandLine ?? "";
-
-        return name.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase)
-            || name.Contains("Startup Monitor", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase)
-            || pub.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase)
-            || cmd.Contains("StartupMonitor", StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>Получает рейтинг с локальным timeout каждой попытки; остановка службы отменяет также backoff и не повторяется как сетевой сбой.</summary>
+    /// <summary>Получает рейтинг с сетевым предохранителем и ограничением каждой попытки; остановка отменяет запрос и ожидание повтора.</summary>
+    /// <param name="entry">Оцениваемая запись автозапуска.</param>
+    /// <param name="cancellationToken">Токен отмены оценки.</param>
+    /// <returns>Рейтинг провайдера либо null при отсутствии результата.</returns>
     private async Task<StartupRating?> FetchRatingAsync(StartupEntry entry, CancellationToken cancellationToken)
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _networkLifetime.Token);
@@ -344,23 +337,7 @@ public class AiRatingService : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
         using var _prof = ExecutionProfiler.Measure("Service.Ai.FetchRating");
 
-        // Собственные файлы проекта StartupMonitor всегда получают высшую оценку 5 звёзд (Score=1)
-        if (IsSelfProjectEntry(entry))
-        {
-            var isRu = _uiLang == "ru";
-            return new StartupRating
-            {
-                Score = 1,
-                Category = isRu ? "Безопасность и мониторинг" : "Security & Monitoring",
-                Risk = isRu
-                    ? "Абсолютно доверенное ПО: официальный компонент защитного комплекса Startup Monitor. Обеспечивает непрерывный мониторинг реестра, контроль автозагрузки, сетевой экран и защиту от вредоносных модулей."
-                    : "Fully trusted software: official Startup Monitor component. Provides continuous registry monitoring, startup security, firewall filtering, and protection against unauthorized persistence.",
-                Recommendation = isRu
-                    ? "Разрешить автозапуск. Критически важный компонент для мониторинга системы и предотвращения угроз."
-                    : "Allow startup. Vital component for system defense and persistence monitoring."
-            };
-        }
-
+        // Имя и командная строка не подтверждают подлинность продукта: все записи проходят одинаковую оценку.
         // Circuit Breaker: если сеть недоступна, не пытаемся слать запросы
         if (DateTime.UtcNow < _networkCooldownUntil)
         {

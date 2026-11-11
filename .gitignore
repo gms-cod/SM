@@ -44,6 +44,8 @@ mcp_config.json
 scripts/*.py
 docs/SWARM_*.md
 docs/AUDIT_*.md
+redisign/
+concept.html
 
 # Python caches
 __pycache__/

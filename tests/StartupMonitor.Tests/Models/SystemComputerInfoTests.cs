@@ -10,6 +10,25 @@ namespace StartupMonitor.Tests.Models;
 /// </summary>
 public class SystemComputerInfoTests
 {
+    /// <summary>Версия BIOS читается как из обычной строки, так и из многострочного значения реестра.</summary>
+    [Fact]
+    public void FormatBiosVersion_HandlesRegistryStringTypes()
+    {
+        Assert.Equal("1.2", SystemComputerInfo.FormatBiosVersion(" 1.2 "));
+        Assert.Equal("Vendor 1.2", SystemComputerInfo.FormatBiosVersion(new[] { "Vendor", " ", " 1.2 " }));
+        Assert.Equal(string.Empty, SystemComputerInfo.FormatBiosVersion(null));
+        Assert.Equal(string.Empty, SystemComputerInfo.FormatBiosVersion(42));
+    }
+    /// <summary>Клиентская Windows 11 определяется по сборке без переименования серверной системы.</summary>
+    [Theory]
+    [InlineData("Windows 10 Pro", "26300", "Windows 11 Pro")]
+    [InlineData("Windows 10 Pro", "19045", "Windows 10 Pro")]
+    [InlineData("Windows Server 2022", "20348", "Windows Server 2022")]
+    [InlineData("Windows 10 Home", null, "Windows 10 Home")]
+    public void NormalizeWindowsName_UsesBuildForClientWindows(string name, string? build, string expected)
+    {
+        Assert.Equal(expected, SystemComputerInfo.NormalizeWindowsName(name, build));
+    }
     [Fact]
     public void Collect_ReturnsValidSystemInfo()
     {

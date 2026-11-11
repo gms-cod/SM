@@ -2128,9 +2128,15 @@
   <data name="NetAlertAiUnavailable" xml:space="preserve"><value>Анализ нейросетью недоступен (проверьте настройки AI в параметрах).</value></data><data name="NetAlertAiStandardRisk" xml:space="preserve"><value>Стандартное сетевое подключение приложения.</value></data><data name="NetAlertAiStandardRecommendation" xml:space="preserve"><value>Применяйте стандартные правила брандмауэра.</value></data><data name="NetAlertBtnBlockSession" xml:space="preserve"><value>⛔ Блок на сеанс</value></data><data name="NetAlertBlockSessionTip" xml:space="preserve"><value>Блокировать исходящие подключения программы до перезапуска службы, максимум на 8 часов. Постоянное правило не создаётся.</value></data><data name="NetAlertRecAllowAlways" xml:space="preserve"><value>Рекомендация: Разрешить всегда</value></data><data name="NetAlertRecAllowSession" xml:space="preserve"><value>Рекомендация: Разрешить на сеанс</value></data><data name="NetAlertRecBlockAlways" xml:space="preserve"><value>Рекомендация: Заблокировать всегда</value></data><data name="NetAlertRecBlockSession" xml:space="preserve"><value>Рекомендация: Заблокировать на сеанс</value></data>  <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
   <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Автономные решения ИИ:</value></data>
   <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Автономные решения ИИ для сетевых подключений</value></data>
-  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>Автоматически анализировать новые исходящие подключения нейросетью и применять решение без показа всплывающего окна</value></data>
-  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>Действие ИИ по умолчанию:</value></data>
-  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>Действие, автоматически применяемое для соединений при автономном режиме работы ИИ</value></data>
+  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>При включённых предупреждениях о подключениях ИИ анализирует обнаруженные подключения подходящих приложений. Если ответ недоступен или решение не удалось применить, появится обычный запрос.</value></data>
+  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>Политика решений ИИ:</value></data>
+  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>«Следовать рекомендации»: разрешать или блокировать по ответу ИИ. «Всегда блокировать»: блокировать даже при рекомендации разрешить. Все решения временные, до 8 часов; постоянные рекомендации также становятся временными.</value></data>
+  <data name="AiAutonomousFollowAi" xml:space="preserve"><value>Следовать рекомендации ИИ</value></data>
+  <data name="AiAutonomousBlockAll" xml:space="preserve"><value>Всегда временно блокировать</value></data>
+  <data name="IncomingTcpToggle" xml:space="preserve"><value>Уведомлять о входящих TCP-подключениях</value></data>
+  <data name="IncomingTcpHint" xml:space="preserve"><value>Показывает внешние TCP-подключения после принятия. Не блокирует трафик; частота уведомлений ограничена, события могут быть пропущены.</value></data>
+  <data name="IncomingTcpTitle" xml:space="preserve"><value>Входящее TCP-подключение</value></data>
+  <data name="IncomingTcpSettingFailed" xml:space="preserve"><value>Не удалось подтвердить настройку. Проверьте подключение к службе и права администратора.</value></data>
   <data name="NetTabAclMatrix" xml:space="preserve"><value>Контроль приложений (ACL)</value></data>
   <data name="NetTabAclMatrixTip" xml:space="preserve"><value>Единая матрица контроля доступа к сети, белые и чёрные списки</value></data>
   <data name="NetAclFilterAll" xml:space="preserve"><value>Все программы</value></data>
@@ -2394,4 +2400,11 @@
   <data name="NetAlertAllowPortScopeFormat" xml:space="preserve"><value>Разрешить TCP {0} всем программам</value></data>
   <data name="NetHistoryRequestClosed" xml:space="preserve"><value>Запрос завершён</value></data>
   <data name="NetHistoryDeferred" xml:space="preserve"><value>Запрос отложен; правила не изменены</value></data>
+  <data name="SysInfoModel" xml:space="preserve"><value>Модель компьютера</value></data>
+  <data name="SysInfoMotherboard" xml:space="preserve"><value>Системная плата</value></data>
+  <data name="SysInfoBiosDate" xml:space="preserve"><value>Дата BIOS</value></data>
+  <data name="SysInfoWindowsDirectory" xml:space="preserve"><value>Каталог Windows</value></data>
+  <data name="UnblockRuleRemovedButEnableFailed" xml:space="preserve"><value>Правило чёрного списка удалено, но включить запись автозапуска не удалось.</value></data>
+  <data name="RestoreEntryResultUnknown" xml:space="preserve"><value>Служба не подтвердила результат. Перед повтором проверьте список записей.</value></data>
+  <data name="ActionAutoDisableConflict" xml:space="preserve"><value>{0}: автоматическое отключение не выполнено, поскольку запись автозапуска изменилась. Текущее значение и исходная резервная копия сохранены.</value></data>
 </root>

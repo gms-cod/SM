@@ -252,7 +252,38 @@ public static class WatcherHelper
         // или при ручном отключении пользователем через UI.
         else if (existing?.Status == EntryStatus.Disabled)
         {
-            EntryOperations.DisableFromSystem(existing);
+            var (disabled, error) = EntryOperations.DisableFromSystem(existing);
+            if (!disabled)
+            {
+                // Запись осталась активной: отказ нельзя представлять как успешное автоотключение.
+                Serilog.Log.Warning("Не удалось повторно отключить запись {Name}: {Error}", existing.Name, error);
+                if (error == EntryOperations.RegistryRepeatDisableConflict)
+                {
+                    // Конфликт подтверждает наличие активного значения; первый снимок оставляем доступным.
+                    existing.Status = EntryStatus.Enabled;
+                    store.UpdateEntry(existing);
+                    Pipe.PipeServer.NotifyExternalEntriesChanged();
+                    notifications.Enqueue(new PipeMessage
+                    {
+                        Type = PipeMessageTypes.ActionNotice,
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new ActionNoticePayload(existing.Name ?? "", "autoDisableConflict"))
+                    });
+                    notifications.Enqueue(new PipeMessage
+                    {
+                        Type = PipeMessageTypes.EntryModified,
+                        Payload = System.Text.Json.JsonSerializer.Serialize(existing)
+                    });
+                    store.AddHistory(new HistoryEntry
+                    {
+                        ChangeType = "AutomaticDisableFailed",
+                        EntryName = existing.Name ?? string.Empty,
+                        EntryPath = existing.FilePath,
+                        Location = existing.Location.ToString(),
+                        Action = EntryOperations.RegistryRepeatDisableConflict
+                    });
+                }
+                return false;
+            }
             notifications.Enqueue(new PipeMessage
             {
                 Type = PipeMessageTypes.ActionNotice,

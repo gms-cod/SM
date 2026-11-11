@@ -383,24 +383,30 @@ public class PipeClient : IDisposable
         return [];
     }
 
-    /// <summary>Отключает (помечает Disabled) запись автозапуска.</summary>
-    public async Task DisableEntryAsync(string entryId)
+    /// <summary>Запрашивает отключение записи и возвращает подтверждение службы либо причину отказа.</summary>
+    /// <param name="entryId">Идентификатор записи автозапуска.</param>
+    /// <returns>Успех и сообщение об ошибке службы, если оно получено.</returns>
+    public async Task<(bool Success, string? Error)> DisableEntryAsync(string entryId)
     {
-        await SendAsync(new PipeMessage
+        var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.DisableEntry,
             Payload = JsonSerializer.Serialize(entryId, JsonOptions)
         });
+        return (response?.Type == PipeMessageTypes.Success, response?.Payload);
     }
 
-    /// <summary>Включает (помечает Enabled) запись автозапуска.</summary>
-    public async Task EnableEntryAsync(string entryId)
+    /// <summary>Запрашивает включение записи и возвращает подтверждение службы либо причину отказа.</summary>
+    /// <param name="entryId">Идентификатор записи автозапуска.</param>
+    /// <returns>Успех и сообщение об ошибке службы, если оно получено.</returns>
+    public async Task<(bool Success, string? Error)> EnableEntryAsync(string entryId)
     {
-        await SendAsync(new PipeMessage
+        var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.EnableEntry,
             Payload = JsonSerializer.Serialize(entryId, JsonOptions)
         });
+        return (response?.Type == PipeMessageTypes.Success, response?.Payload);
     }
 
     /// <summary>Добавляет правило в чёрный список на стороне службы.</summary>
@@ -413,14 +419,17 @@ public class PipeClient : IDisposable
         });
     }
 
-    /// <summary>Удаляет правило из чёрного списка по его идентификатору.</summary>
-    public async Task RemoveFromBlacklistAsync(string ruleId)
+    /// <summary>Запрашивает удаление правила и возвращает подтверждение службы.</summary>
+    /// <param name="ruleId">Идентификатор правила чёрного списка.</param>
+    /// <returns>Успех и сообщение об ошибке службы, если оно получено.</returns>
+    public async Task<(bool Success, string? Error)> RemoveFromBlacklistAsync(string ruleId)
     {
-        await SendAsync(new PipeMessage
+        var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.RemoveFromBlacklist,
             Payload = JsonSerializer.Serialize(ruleId, JsonOptions)
         });
+        return (response?.Type == PipeMessageTypes.Success, response?.Payload);
     }
 
     /// <summary>Запрашивает текстовый статус службы.</summary>
@@ -765,15 +774,17 @@ public class PipeClient : IDisposable
         return null;
     }
 
-    /// <summary>Восстанавливает удалённую запись в системе.</summary>
-    public async Task<bool> RestoreEntryAsync(string removedId)
+    /// <summary>Запрашивает восстановление удалённой записи и возвращает ответ службы.</summary>
+    /// <param name="removedId">Идентификатор удалённой записи.</param>
+    /// <returns>Подтверждение и сообщение об ошибке; при отсутствии ответа результат операции неизвестен.</returns>
+    public async Task<(bool Success, string? Error)> RestoreEntryAsync(string removedId)
     {
         var response = await SendAsync(new PipeMessage
         {
             Type = PipeMessageTypes.RestoreEntry,
             Payload = JsonSerializer.Serialize(removedId, JsonOptions)
         });
-        return response?.Type == PipeMessageTypes.Success;
+        return (response?.Type == PipeMessageTypes.Success, response?.Payload);
     }
 
     /// <summary>Подписывается на регулярный поток метрик процессов (для вкладки Диспетчера задач).</summary>
@@ -1858,6 +1869,25 @@ public class PipeClient : IDisposable
             }, ct);
         }
         catch (Exception ex) { LogResponseFailure(ex); }
+    }
+
+    /// <summary>Читает настройку входящих TCP-уведомлений из службы.</summary>
+    /// <param name="ct">Токен отмены запроса.</param>
+    /// <returns>Состояние или null, если служба недоступна.</returns>
+    public async Task<bool?> GetIncomingTcpObservationsAsync(CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.GetIncomingTcpObservations }, ct);
+        return response?.Type == PipeMessageTypes.Success && bool.TryParse(response.Payload, out var enabled) ? enabled : null;
+    }
+
+    /// <summary>Передаёт изменение настройки входящих TCP-уведомлений в службу.</summary>
+    /// <param name="enabled">Новое состояние наблюдения.</param>
+    /// <param name="ct">Токен отмены запроса.</param>
+    /// <returns>Признак подтверждённого изменения.</returns>
+    public async Task<bool> SetIncomingTcpObservationsAsync(bool enabled, CancellationToken ct = default)
+    {
+        var response = await SendAsync(new PipeMessage { Type = PipeMessageTypes.SetIncomingTcpObservations, Payload = JsonSerializer.Serialize(enabled) }, ct);
+        return response?.Type == PipeMessageTypes.Success;
     }
 
     /// <summary>Включает/выключает детектор новых сетевых подключений на стороне службы.</summary>

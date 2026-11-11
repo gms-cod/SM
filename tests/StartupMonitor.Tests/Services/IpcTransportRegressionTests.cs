@@ -12,6 +12,24 @@ namespace StartupMonitor.Tests.Services;
 /// <summary>Проверяет настоящие каналы IPC, отмену обмена, границы кадров и завершение event-сервера.</summary>
 public sealed class IpcTransportRegressionTests
 {
+    /// <summary>Клиент не считает отказ службы успешным отключением и сохраняет причину для интерфейса.</summary>
+    [Fact]
+    public async Task DisableEntry_ServiceRefusal_IsReturnedToCaller()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var client = new PipeClient();
+        await using var server = await AttachTransportAsync(client, timeout.Token);
+        using var reader = new StreamReader(server, leaveOpen: true);
+        using var writer = new StreamWriter(server, leaveOpen: true) { AutoFlush = true };
+        var pending = client.DisableEntryAsync("entry-id");
+        Assert.NotNull(await reader.ReadLineAsync(timeout.Token));
+        var response = new PipeMessage { Type = PipeMessageTypes.Error, Payload = "Отказ системы" };
+        await writer.WriteLineAsync(JsonSerializer.Serialize(response).AsMemory(), timeout.Token);
+        var result = await pending.WaitAsync(timeout.Token);
+        Assert.False(result.Success);
+        Assert.Equal("Отказ системы", result.Error);
+    }
+
     /// <summary>Отмена принятого сервером запроса закрывает канал и исключает чтение старого ответа следующим запросом.</summary>
     [Fact]
     public async Task CancellationAfterRequestWasRead_ClosesTransportBeforeNextRequest()

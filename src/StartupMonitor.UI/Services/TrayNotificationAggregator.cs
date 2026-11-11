@@ -72,7 +72,8 @@ public sealed class TrayNotificationAggregator : IDisposable
         }
 
         var now = DateTime.UtcNow;
-        var dedupKey = $"{title}:{entryId ?? text}";
+        // Пустой идентификатор обозначает отсутствие записи, поэтому различаем уведомления по тексту.
+        var dedupKey = $"{title}:{(string.IsNullOrEmpty(entryId) ? text : entryId)}";
 
         lock (_lock)
         {

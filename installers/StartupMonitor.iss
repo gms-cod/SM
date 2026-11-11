@@ -4,7 +4,12 @@
 
 #ifndef MyAppVersion
   ; Версия по умолчанию совпадает с проверяемой сборкой и новым релизным тегом.
-  #define MyAppVersion "2.1.3"
+  #define MyAppVersion "2.2.0"
+#endif
+
+; Каталог исходных бинарников можно задать для изолированной сборки установщика.
+#ifndef MySourceDirectory
+  #define MySourceDirectory "..\SMon2"
 #endif
 
 #define MyAppName "Startup Monitor"
@@ -77,10 +82,10 @@ Name: "autostart"; Description: "{cm:AutoStartTask}"; GroupDescription: "{cm:Aut
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\SMon2\StartupMonitor.Service.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
-Source: "..\SMon2\StartupMonitor.UI.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
-Source: "..\SMon2\app.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\SMon2\icon.svg"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MySourceDirectory}\StartupMonitor.Service.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "{#MySourceDirectory}\StartupMonitor.UI.exe"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "{#MySourceDirectory}\app.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#MySourceDirectory}\icon.svg"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\app.ico"

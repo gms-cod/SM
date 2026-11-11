@@ -10,6 +10,69 @@ namespace StartupMonitor.Tests.Services;
 /// <summary>Проверяет прекращение реальной AI-задачи при остановке, включая незавершённый HTTP и минутный Retry-After, без сетевых запросов.</summary>
 public sealed class AiShutdownCancellationTests
 {
+    /// <summary>Поддельное имя или аргумент с названием продукта не дают автоматического доверенного рейтинга.</summary>
+    /// <param name="name">Имя проверяемой записи.</param>
+    /// <param name="command">Командная строка проверяемой записи.</param>
+    [Theory]
+    [InlineData("StartupMonitor fake", "malware.exe")]
+    [InlineData("Unrelated", "malware.exe --StartupMonitor")]
+    public async Task ProductNameSpoofing_IsSentToConfiguredProvider(string name, string command)
+    {
+        using var fixture = new Fixture(_ => Task.FromResult(Rating()));
+        var entry = new StartupEntry { Id = "spoof", Name = name, CommandLine = command, FilePath = @"C:\Apps\malware.exe" };
+        fixture.Persist(entry);
+
+        var result = await fixture.Service.ForceFetchRatingAsync(entry);
+
+        Assert.Equal(1, fixture.Handler.Calls);
+        Assert.Equal(3, result?.Score);
+    }
+
+    /// <summary>Ответ на старый контекст не меняет запись после редактирования или установки ручной оценки.</summary>
+    /// <param name="operation">Путь фонового или ручного обращения к поставщику.</param>
+    /// <param name="manual">Признак установки ручной оценки во время HTTP.</param>
+    [Theory]
+    [InlineData("single", false)]
+    [InlineData("batch", false)]
+    [InlineData("force", false)]
+    [InlineData("single", true)]
+    [InlineData("batch", true)]
+    [InlineData("force", true)]
+    public async Task InFlightRating_DoesNotOverwriteChangedEntry(string operation, bool manual)
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var fixture = new Fixture(_ => { started.TrySetResult(); return finish.Task; });
+        var entry = Entry();
+        fixture.Persist(entry);
+        if (operation == "force" && manual)
+            fixture.Cache.Set(entry, new StartupRating { Score = 2, Recommendation = "old" });
+        var request = operation switch
+        {
+            "single" => fixture.Service.PrefetchAsync(entry),
+            "batch" => fixture.Service.PrefetchAllAsync([entry]),
+            _ => (Task)fixture.Service.ForceFetchRatingAsync(entry)
+        };
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var current = Assert.Single(fixture.Store.Load().Entries);
+        if (manual)
+        {
+            current.IsUserRating = true;
+            current.AiRating = 8;
+            current.AiRecommendation = "manual";
+        }
+        else current.CommandLine = "changed --argument";
+        fixture.Store.UpdateEntry(current);
+        finish.SetResult(Rating());
+        await request.WaitAsync(TimeSpan.FromSeconds(5));
+        if (operation == "force") Assert.Null(await (Task<StartupRating?>)request);
+        var saved = Assert.Single(fixture.Store.Load().Entries);
+        Assert.Equal(manual ? 8 : 0, saved.AiRating);
+        Assert.Equal(manual, saved.IsUserRating);
+        if (manual) Assert.Equal("manual", saved.AiRecommendation);
+        else Assert.Equal("changed --argument", saved.CommandLine);
+    }
+
     /// <summary>Формирует неоценённую пользовательскую запись, которая не попадает в системные shortcut.</summary>
     private static StartupEntry Entry() => new()
     {
@@ -61,6 +124,7 @@ public sealed class AiShutdownCancellationTests
         using var fixture = new Fixture(_ => Task.FromResult(Interlocked.Increment(ref calls) == 1 ? RateLimited() : Rating()));
         using var stopping = new CancellationTokenSource();
         var entry = Entry();
+        fixture.Persist(entry);
         var operation = fixture.Service.PrefetchAllAsync([entry], stopping.Token);
         Assert.Equal(1, calls);
         Assert.False(operation.IsCompleted);
@@ -122,6 +186,8 @@ public sealed class AiShutdownCancellationTests
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "sm-ai-shutdown-" + Guid.NewGuid().ToString("N"));
         internal Handler Handler { get; }
         internal RecordingLogger Logger { get; } = new();
+        private readonly JsonDataStore _store;
+        internal JsonDataStore Store => _store;
         internal RatingsCache Cache { get; }
         internal AiRatingService Service { get; }
 
@@ -129,9 +195,14 @@ public sealed class AiShutdownCancellationTests
         internal Fixture(Func<CancellationToken, Task<HttpResponseMessage>> send)
         {
             Handler = new Handler(send);
-            Cache = new RatingsCache(new JsonDataStore(_directory));
+            _store = new JsonDataStore(_directory);
+            Cache = new RatingsCache(_store);
             Service = new AiRatingService(Cache, Logger, "unit-test", apiUrl: "https://unit.test/chat", httpHandler: Handler);
         }
+
+        /// <summary>Добавляет реальную запись в тестовое хранилище до проверки условной записи ответа.</summary>
+        /// <param name="entry">Проверяемая запись автозапуска.</param>
+        internal void Persist(StartupEntry entry) => _store.AddEntry(entry);
 
         /// <summary>Отменяет оценщик и удаляет только собственные временные данные теста.</summary>
         public void Dispose()

@@ -22,6 +22,12 @@ public class PipeMessage
 /// <summary>Константы типов сообщений для обмена через именованный канал.</summary>
 public static class PipeMessageTypes
 {
+    /// <summary>Наблюдательное событие входящего TCP, без действия брандмауэра.</summary>
+    public const string IncomingTcpObserved = "IncomingTcpObserved";
+    /// <summary>Чтение настройки наблюдения входящих TCP.</summary>
+    public const string GetIncomingTcpObservations = "GetIncomingTcpObservations";
+    /// <summary>Изменение настройки наблюдения входящих TCP.</summary>
+    public const string SetIncomingTcpObservations = "SetIncomingTcpObservations";
     /// <summary>Запрос всех записей автозапуска.</summary>
     public const string GetAllEntries = "GetAllEntries";
     /// <summary>Ответ со списком всех записей.</summary>

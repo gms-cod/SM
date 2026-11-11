@@ -8,6 +8,22 @@ namespace StartupMonitor.Tests.Services;
 /// </summary>
 public class TrayNotificationAggregatorTests
 {
+    /// <summary>Различные сетевые события без идентификатора записи не подавляют друг друга; повторы подавляются.</summary>
+    [Fact]
+    public void Enqueue_EmptyEntryId_DeduplicatesByText()
+    {
+        var shown = new List<string>();
+        using var aggregator = new TrayNotificationAggregator(System.Windows.Threading.Dispatcher.CurrentDispatcher,
+            (_, text, _) => shown.Add(text));
+        aggregator.Enqueue("Incoming TCP", "8.8.8.8:1", string.Empty, TrayNotificationKind.Info);
+        aggregator.Flush();
+        aggregator.Enqueue("Incoming TCP", "1.1.1.1:2", string.Empty, TrayNotificationKind.Info);
+        aggregator.Flush();
+        aggregator.Enqueue("Incoming TCP", "1.1.1.1:2", string.Empty, TrayNotificationKind.Info);
+        aggregator.Flush();
+        Assert.Equal(new[] { "8.8.8.8:1", "1.1.1.1:2" }, shown);
+    }
+
     [Fact]
     public void Coalesce_SingleNotification_ReturnsOriginalTextAndId()
     {

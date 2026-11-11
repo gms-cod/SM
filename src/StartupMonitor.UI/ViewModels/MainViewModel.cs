@@ -457,6 +457,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Освобождает ресурсы: таймеры, токены, pipe-клиент.</summary>
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _computerInfoDisposed, 1) == 0)
+        {
+            _computerInfoLifetime.Cancel();
+            _computerInfoLifetime.Dispose();
+        }
         // Статический издатель не должен удерживать завершившую работу модель и её коллекции.
         AppIconService.IconLoaded -= OnIconLoaded;
         _pipeClient.Connected -= OnPipeClientConnected;
@@ -807,6 +812,58 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ = _pipeClient.SetAiAutonomousDecisionsAsync(value, AiAutonomousDecisionMode);
     }
 
+    /// <summary>Состояние наблюдения входящих TCP, полученное от службы.</summary>
+    [ObservableProperty]
+    private bool _incomingTcpObservationsEnabled;
+    /// <summary>Разрешает изменение только после подтверждения состояния службой.</summary>
+    [ObservableProperty]
+    private bool _incomingTcpSettingAvailable;
+    private bool _updatingIncomingTcpFromService;
+
+    /// <summary>Передаёт пользовательское изменение, не записывая состояние при загрузке.</summary>
+    /// <param name="value">Запрошенное состояние.</param>
+    partial void OnIncomingTcpObservationsEnabledChanged(bool value)
+    {
+        if (!_updatingIncomingTcpFromService) _ = SyncIncomingTcpAsync(value);
+    }
+
+    /// <summary>Сохраняет настройку и при неопределённом результате повторно читает её из службы.</summary>
+    /// <param name="value">Новое состояние.</param>
+    /// <returns>Задача обмена со службой.</returns>
+    private async Task SyncIncomingTcpAsync(bool value)
+    {
+        IncomingTcpSettingAvailable = false;
+        try
+        {
+            if (!await _pipeClient.SetIncomingTcpObservationsAsync(value))
+                throw new InvalidOperationException("Служба не подтвердила настройку входящих соединений.");
+            IncomingTcpSettingAvailable = IsConnected;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"IncomingTCP: настройка не подтверждена: {ex.Message}");
+            await LoadIncomingTcpAsync();
+            System.Windows.MessageBox.Show(LocalizationService.Instance["IncomingTcpSettingFailed"], LocalizationService.Instance.AppName);
+        }
+    }
+
+    /// <summary>Загружает подтверждённую настройку службы, не изменяя её при подключении UI.</summary>
+    /// <returns>Задача загрузки настройки.</returns>
+    private async Task LoadIncomingTcpAsync()
+    {
+        IncomingTcpSettingAvailable = false;
+        try
+        {
+            var value = await _pipeClient.GetIncomingTcpObservationsAsync();
+            if (value is null) { App.Log("IncomingTCP: настройка службы недоступна"); return; }
+            _updatingIncomingTcpFromService = true;
+            try { IncomingTcpObservationsEnabled = value.Value; }
+            finally { _updatingIncomingTcpFromService = false; }
+            IncomingTcpSettingAvailable = IsConnected;
+        }
+        catch (Exception ex) { App.Log($"IncomingTCP: ошибка чтения настройки: {ex.Message}"); }
+    }
+
     /// <summary>Режим автономных решений ИИ по умолчанию ("AllowSession" или "BlockSession").</summary>
     [ObservableProperty]
     private string _aiAutonomousDecisionMode = "AllowSession";
@@ -816,13 +873,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SaveSetting("aiAutonomousDecisionMode", value);
         _ = _pipeClient.SetAiAutonomousDecisionsAsync(AiAutonomousNetworkDecisionsEnabled, value);
     }
-
-    /// <summary>Список доступных режимов автономных решений ИИ.</summary>
-    public List<AutonomousDecisionModeOption> AutonomousDecisionModeOptions { get; } =
-    [
-        new("AllowSession", "Временно разрешать соединение"),
-        new("BlockSession", "Временно блокировать соединение")
-    ];
 
     /// <summary>Выполняется ли тестирование подключения к AI.</summary>
     [ObservableProperty]
@@ -1527,6 +1577,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Func<string, CancellationToken, Task<NetworkAlertStatusPayload?>> statusProvider,
         Func<NetworkConnectionAlertDto, NetworkConnectionAlertWindow> windowFactory)
     {
+        _computerInfoToken = _computerInfoLifetime.Token;
         _pipeClient = pipeClient ?? throw new ArgumentNullException(nameof(pipeClient));
         _networkAlertsProvider = alertsProvider ?? throw new ArgumentNullException(nameof(alertsProvider));
         _networkAlertStatusProvider = statusProvider ?? throw new ArgumentNullException(nameof(statusProvider));
@@ -1537,6 +1588,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Создаёт MainViewModel, инициализирует опции и подписывается на события PipeClient.</summary>
     public MainViewModel(PipeClient pipeClient)
     {
+        _computerInfoToken = _computerInfoLifetime.Token;
         _pipeClient = pipeClient;
         InitOptions();
         _newRuleMatchType = LocalizationService.Instance.MatchTypePath;
@@ -1634,6 +1686,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.EventsReceived += OnPipeClientEventsReceived;
         _pipeClient.Disconnected += OnPipeClientDisconnected;
         AppIconService.IconLoaded += OnIconLoaded;
+        _ = RefreshComputerInfoAsync(_computerInfoToken);
     }
 
     /// <summary>
@@ -1694,6 +1747,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _pollingTimer = new Timer(async _ => await LoadDataIfChanged(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
         }
         StartNetworkAlertPoller();
+        if (System.Windows.Application.Current?.Dispatcher is { } incomingDispatcher)
+            _ = incomingDispatcher.InvokeAsync(async () => await LoadIncomingTcpAsync());
         // Автообновление счётчика сохранённых снимков при подключении к службе
         _ = RefreshSavedSnapshotsCountAsync();
         App.Log("MainViewModel: Connected handler завершён");
@@ -1743,6 +1798,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         // Предупреждение об авто-блокировке записи из чёрного списка (удалил процесс/запись)
         if (SilentMode) return;
+        foreach (var m in batch.Where(m => m.Type == PipeMessageTypes.IncomingTcpObserved))
+        {
+            try
+            {
+                var observed = System.Text.Json.JsonSerializer.Deserialize<StartupMonitor.Shared.Models.Firewall.IncomingTcpObservation>(m.Payload);
+                if (observed is null) continue;
+                var text = $"{observed.RemoteAddress}:{observed.RemotePort} → {observed.LocalAddress}:{observed.LocalPort} (PID {observed.ProcessId})";
+                _ = System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => NotificationRequested?.Invoke(
+                    LocalizationService.Instance["IncomingTcpTitle"], text, string.Empty));
+            }
+            catch (Exception ex) { App.Log($"IncomingTCP: ошибка уведомления: {ex.Message}"); }
+        }
         foreach (var m in batch.Where(m => m.Type == PipeMessageTypes.BlacklistMatch))
         {
             try
@@ -1807,6 +1874,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         App.Log("MainViewModel: Disconnected event");
         IsConnected = false;
+        if (System.Windows.Application.Current?.Dispatcher is { } incomingDispatcher)
+            _ = incomingDispatcher.InvokeAsync(() => IncomingTcpSettingAvailable = false);
         _networkAlertPollerTimer?.Dispose();
         _networkAlertPollerTimer = null;
         _pollingTimer?.Dispose();
@@ -2105,18 +2174,86 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Аппаратные и системные характеристики компьютера.</summary>
     [ObservableProperty]
-    private SystemComputerInfo _computerInfo = SystemComputerInfo.Collect();
+    private SystemComputerInfo _computerInfo = new();
+
+    /// <summary>Отменяет ожидание сбора сведений при завершении модели; системный вызов может закончиться позднее.</summary>
+    private readonly CancellationTokenSource _computerInfoLifetime = new();
+
+    /// <summary>Сохранённый токен остаётся доступным после освобождения источника отмены.</summary>
+    private readonly CancellationToken _computerInfoToken;
+
+    /// <summary>Гарантирует однократное завершение источника отмены.</summary>
+    private int _computerInfoDisposed;
+
+    /// <summary>Не позволяет более раннему сбору перезаписать новый снимок характеристик.</summary>
+    private int _computerInfoGeneration;
+
+    /// <summary>Источник сведений, заменяемый в тестах для проверки отмены долгого сбора.</summary>
+    internal Func<SystemComputerInfo> ComputerInfoCollector { get; set; } = SystemComputerInfo.Collect;
 
     /// <summary>Событие запроса открытия окна системной информации о компьютере.</summary>
     public event Action? OpenSystemInfoRequested;
 
     /// <summary>Открывает диалоговое окно полной системной информации о компьютере.</summary>
     [RelayCommand]
-    public void OpenSystemInfo()
+    public async Task OpenSystemInfoAsync()
     {
-        // При открытии моментально обновляем динамические параметры (RAM, аптайм, диски)
-        ComputerInfo = SystemComputerInfo.Collect();
-        OpenSystemInfoRequested?.Invoke();
+        var cancellationToken = _computerInfoToken;
+        if (cancellationToken.IsCancellationRequested) return;
+        await RefreshComputerInfoAsync(cancellationToken);
+        try
+        {
+            if (!cancellationToken.IsCancellationRequested)
+                await RunComputerInfoOnUiAsync(() => OpenSystemInfoRequested?.Invoke(), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Закрытая модель не должна открывать окно после отмены диспетчерской операции.
+        }
+    }
+
+    /// <summary>Собирает сведения вне UI-потока и публикует только актуальный результат до завершения модели.</summary>
+    /// <param name="cancellationToken">Токен завершения модели представления.</param>
+    /// <returns>Признак успешного получения актуального снимка.</returns>
+    private async Task<bool> RefreshComputerInfoAsync(CancellationToken cancellationToken)
+    {
+        var generation = Interlocked.Increment(ref _computerInfoGeneration);
+        try
+        {
+            var info = await Task.Run(ComputerInfoCollector, cancellationToken).WaitAsync(cancellationToken);
+            if (cancellationToken.IsCancellationRequested || generation != Volatile.Read(ref _computerInfoGeneration))
+                return false;
+            await RunComputerInfoOnUiAsync(() =>
+            {
+                if (!cancellationToken.IsCancellationRequested && generation == Volatile.Read(ref _computerInfoGeneration))
+                    ComputerInfo = info;
+            }, cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceError("Не удалось собрать сведения о компьютере: {0}", ex);
+            return false;
+        }
+    }
+
+    /// <summary>Выполняет публикацию в диспетчере интерфейса, даже если контекст синхронизации не был установлен.</summary>
+    /// <param name="action">Действие обновления интерфейса.</param>
+    /// <param name="cancellationToken">Отмена публикации при завершении модели.</param>
+    private static async Task RunComputerInfoOnUiAsync(Action action, CancellationToken cancellationToken)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            if (!cancellationToken.IsCancellationRequested) action();
+            return;
+        }
+        if (!dispatcher.HasShutdownStarted && !dispatcher.HasShutdownFinished)
+            await dispatcher.InvokeAsync(action, System.Windows.Threading.DispatcherPriority.Normal, cancellationToken).Task;
     }
 
     /// <summary>Событие запроса открытия окна контрольных снимков системы.</summary>
@@ -2225,6 +2362,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         else
         {
+            if (CurrentFilter == "enabled")
+                filtered = filtered.Where(e => e.Status == EntryStatus.Enabled);
+            else if (CurrentFilter == "blocked")
+                filtered = filtered.Where(e => e.Status == EntryStatus.Blocked);
             if (CurrentFilter == "registry")
                 filtered = filtered.Where(e => e.Location is
                     EntryLocation.RegistryRun or
@@ -2479,6 +2620,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void FilterAll() => SetFilter("all");
 
+    /// <summary>Применяет фильтр карточки ко всему списку, сбрасывая поиск и сравнение снимков.</summary>
+    /// <param name="filter">Категория карточки: все, включённые или заблокированные.</param>
+    [RelayCommand]
+    private void FilterMetric(string filter)
+    {
+        if (filter is not ("all" or "enabled" or "blocked")) return;
+        if (IsSnapshotComparisonActive) ResetSnapshotComparison();
+        SearchText = string.Empty;
+        SetFilter(filter);
+    }
+
     /// <summary>Фильтр: только записи из реестра.</summary>
     [RelayCommand]
     private void FilterRegistry() => SetFilter("registry");
@@ -2624,7 +2776,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task DisableEntryAsync(string entryId)
     {
-        await _pipeClient.DisableEntryAsync(entryId);
+        var result = await _pipeClient.DisableEntryAsync(entryId);
+        if (!result.Success)
+        {
+            var loc = LocalizationService.Instance;
+            var error = string.IsNullOrWhiteSpace(result.Error) ? loc["StatusConnectionFailed"] : result.Error;
+            System.Windows.MessageBox.Show(error, loc.AppName, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            return;
+        }
         var entry = _allEntries.FirstOrDefault(e => e.Id == entryId);
         if (entry != null) entry.Status = EntryStatus.Disabled;
         RefreshStats();
@@ -2635,7 +2794,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task EnableEntryAsync(string entryId)
     {
-        await _pipeClient.EnableEntryAsync(entryId);
+        var result = await _pipeClient.EnableEntryAsync(entryId);
+        if (!result.Success)
+        {
+            ShowEntryEnableError(result.Error);
+            return;
+        }
         var entry = _allEntries.FirstOrDefault(e => e.Id == entryId);
         if (entry != null) entry.Status = EntryStatus.Enabled;
         RefreshStats();
@@ -2914,12 +3078,27 @@ public partial class MainViewModel : ObservableObject, IDisposable
         RemovedEntries = new ObservableCollection<RemovedEntry>(list);
     }
 
-    /// <summary>Загружает историю изменений из службы (с сортировкой от новых к старым).</summary>
+    /// <summary>Загружает историю и показывает восстановление только для существующих конкретных резервных копий.</summary>
+    /// <returns>Задача обновления списка истории.</returns>
     public async Task LoadHistoryAsync()
     {
         var list = await _pipeClient.GetHistoryAsync();
+        var backups = await _pipeClient.GetRemovedEntriesAsync();
+        UpdateHistoryRestoreAvailability(list, backups);
         var sorted = list.OrderByDescending(h => h.Timestamp).ToList();
         HistoryEntries = new ObservableCollection<HistoryEntry>(sorted);
+    }
+
+    /// <summary>Сопоставляет события только с точными идентификаторами существующих резервных копий.</summary>
+    /// <param name="history">Загруженные события истории.</param>
+    /// <param name="backups">Актуальные на момент запроса резервные копии.</param>
+    internal static void UpdateHistoryRestoreAvailability(IEnumerable<HistoryEntry> history, IEnumerable<RemovedEntry> backups)
+    {
+        ArgumentNullException.ThrowIfNull(history);
+        ArgumentNullException.ThrowIfNull(backups);
+        var backupIds = backups.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+        foreach (var item in history)
+            item.CanRestore = !string.IsNullOrEmpty(item.RestoreBackupId) && backupIds.Contains(item.RestoreBackupId);
     }
 
     /// <summary>Загружает логи (служба + UI) и отображает их на странице логов.</summary>
@@ -3047,13 +3226,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch { }
     }
 
-    /// <summary>Восстанавливает удалённую запись в системе.</summary>
+    /// <summary>Запрашивает восстановление и показывает ошибку вместо ложного подтверждения.</summary>
+    /// <param name="removedId">Идентификатор удалённой записи.</param>
+    /// <returns>Задача выполнения запроса и обновления списка.</returns>
     [RelayCommand]
     private async Task RestoreEntryAsync(string removedId)
     {
-        var success = await _pipeClient.RestoreEntryAsync(removedId);
-        if (success)
+        var result = await _pipeClient.RestoreEntryAsync(removedId);
+        if (result.Success)
+        {
             await LoadRemovedEntriesAsync();
+            await LoadHistoryAsync();
+        }
+        else
+        {
+            var loc = LocalizationService.Instance;
+            var message = string.IsNullOrWhiteSpace(result.Error) ? loc["RestoreEntryResultUnknown"] : result.Error;
+            System.Windows.MessageBox.Show(message, loc.AppName, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+        }
     }
 
     /// <summary>Запускает очистку устаревших записей на стороне службы.</summary>
@@ -3064,6 +3254,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         await LoadDataIfChanged();
     }
 
+    /// <summary>Позволяет проверить отказ удаления правила без обращения к службе.</summary>
+    internal Func<string, Task<(bool Success, string? Error)>>? RemoveBlacklistForUnblockOverride { get; set; }
+
+    /// <summary>Позволяет проверить частичный отказ включения после удаления правила.</summary>
+    internal Func<string, Task<(bool Success, string? Error)>>? EnableForUnblockOverride { get; set; }
+
     /// <summary>Снимает блокировку с записи: удаляет из чёрного списка и включает обратно.</summary>
     [RelayCommand]
     private async Task UnblockEntryAsync(StartupEntry entry)
@@ -3073,15 +3269,41 @@ public partial class MainViewModel : ObservableObject, IDisposable
             r.MatchType == BlacklistMatchType.Path);
         if (matchingRule != null)
         {
-            await _pipeClient.RemoveFromBlacklistAsync(matchingRule.Id);
+            var removal = await (RemoveBlacklistForUnblockOverride?.Invoke(matchingRule.Id) ?? _pipeClient.RemoveFromBlacklistAsync(matchingRule.Id));
+            if (!removal.Success)
+            {
+                ShowEntryEnableError(removal.Error);
+                return;
+            }
             Blacklist.Remove(matchingRule);
         }
         // Сервер тоже должен снять Blocked — иначе следующий poll вернёт его версию записи
-        await _pipeClient.EnableEntryAsync(entry.Id);
+        var result = await (EnableForUnblockOverride?.Invoke(entry.Id) ?? _pipeClient.EnableEntryAsync(entry.Id));
+        if (!result.Success)
+        {
+            var reason = string.IsNullOrWhiteSpace(result.Error) ? LocalizationService.Instance["StatusConnectionFailed"] : result.Error;
+            ShowEntryEnableError(matchingRule is null ? reason : $"{LocalizationService.Instance["UnblockRuleRemovedButEnableFailed"]} {reason}");
+            return;
+        }
         entry.Status = EntryStatus.Enabled;
         entry.FromBlacklist = false;
         RefreshStats();
         ApplyFilter();
+    }
+
+    /// <summary>Позволяет проверить представление ошибки включения без модального диалога.</summary>
+    internal Action<string>? EntryEnableErrorHandler { get; set; }
+
+    /// <summary>Показывает причину отказа службы, не изменяя состояние записи в интерфейсе.</summary>
+    /// <param name="error">Причина отказа службы или пустое значение при потере соединения.</param>
+    private void ShowEntryEnableError(string? error)
+    {
+        var loc = LocalizationService.Instance;
+        var message = string.IsNullOrWhiteSpace(error) ? loc["StatusConnectionFailed"] : error;
+        if (EntryEnableErrorHandler is not null)
+            EntryEnableErrorHandler(message);
+        else
+            System.Windows.MessageBox.Show(message, loc.AppName, System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
     }
 
     /// <summary>Снимает блокировку с записи по идентификатору.</summary>
@@ -3105,7 +3327,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task RemoveFromBlacklistAsync(string ruleId)
     {
-        await _pipeClient.RemoveFromBlacklistAsync(ruleId);
+        var result = await _pipeClient.RemoveFromBlacklistAsync(ruleId);
+        if (!result.Success)
+        {
+            ShowEntryEnableError(result.Error);
+            return;
+        }
         var ruleToRemove = Blacklist.FirstOrDefault(r => r.Id == ruleId);
         if (ruleToRemove != null) Blacklist.Remove(ruleToRemove);
     }
@@ -3405,6 +3632,3 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 }
-
-/// <summary>Вариант режима автономных решений ИИ.</summary>
-public record AutonomousDecisionModeOption(string Code, string Display);

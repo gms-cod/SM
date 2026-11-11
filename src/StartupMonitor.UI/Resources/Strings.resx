@@ -2129,9 +2129,15 @@ Import with overwrite of existing rules?</value>
   <data name="NetAlertPidFormat" xml:space="preserve"><value>PID: {0}</value></data>
   <data name="AiAutonomousDecisionsLabel" xml:space="preserve"><value>Autonomous AI Decisions:</value></data>
   <data name="AiAutonomousDecisionsToggle" xml:space="preserve"><value>Autonomous AI decisions for network connections</value></data>
-  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>Automatically analyze new outgoing connections with neural network and apply decisions without showing popup alerts</value></data>
-  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>Default AI Action:</value></data>
-  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>Action automatically applied to connections when autonomous AI mode is enabled</value></data>
+  <data name="AiAutonomousDecisionsHint" xml:space="preserve"><value>When connection alerts are enabled, AI analyzes detected connections from eligible applications. If no valid response is available or applying the decision fails, a normal prompt appears.</value></data>
+  <data name="AiAutonomousDefaultActionLabel" xml:space="preserve"><value>AI decision policy:</value></data>
+  <data name="AiAutonomousDefaultActionHint" xml:space="preserve"><value>“Follow AI”: allow or block according to the recommendation. “Always block”: block even when AI recommends allowing. All decisions are temporary, up to 8 hours; permanent recommendations also become temporary.</value></data>
+  <data name="AiAutonomousFollowAi" xml:space="preserve"><value>Follow AI recommendation</value></data>
+  <data name="AiAutonomousBlockAll" xml:space="preserve"><value>Always block temporarily</value></data>
+  <data name="IncomingTcpToggle" xml:space="preserve"><value>Notify about incoming TCP connections</value></data>
+  <data name="IncomingTcpHint" xml:space="preserve"><value>Reports observed external TCP connections after acceptance. It does not block traffic; notifications are rate limited and events may be missed.</value></data>
+  <data name="IncomingTcpTitle" xml:space="preserve"><value>Incoming TCP connection</value></data>
+  <data name="IncomingTcpSettingFailed" xml:space="preserve"><value>Could not confirm the setting. Check the service connection and administrator permissions.</value></data>
   <data name="NetTabAclMatrix" xml:space="preserve"><value>App Control (ACL)</value></data>
   <data name="NetTabAclMatrixTip" xml:space="preserve"><value>Unified network access control matrix, whitelists and blacklists</value></data>
   <data name="NetAclFilterAll" xml:space="preserve"><value>All Applications</value></data>
@@ -2395,4 +2401,11 @@ Import with overwrite of existing rules?</value>
   <data name="NetAlertAllowPortScopeFormat" xml:space="preserve"><value>Allow TCP {0} for all programs</value></data>
   <data name="NetHistoryRequestClosed" xml:space="preserve"><value>Request closed</value></data>
   <data name="NetHistoryDeferred" xml:space="preserve"><value>Request deferred; rules unchanged</value></data>
+  <data name="SysInfoModel" xml:space="preserve"><value>Computer model</value></data>
+  <data name="SysInfoMotherboard" xml:space="preserve"><value>Motherboard</value></data>
+  <data name="SysInfoBiosDate" xml:space="preserve"><value>BIOS date</value></data>
+  <data name="SysInfoWindowsDirectory" xml:space="preserve"><value>Windows directory</value></data>
+  <data name="UnblockRuleRemovedButEnableFailed" xml:space="preserve"><value>The blacklist rule was removed, but the startup entry could not be enabled.</value></data>
+  <data name="RestoreEntryResultUnknown" xml:space="preserve"><value>The service did not confirm the result. Check the entry list before retrying.</value></data>
+  <data name="ActionAutoDisableConflict" xml:space="preserve"><value>{0}: automatic disabling was not applied because the startup value changed. The current value and original backup were preserved.</value></data>
 </root>

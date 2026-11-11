@@ -164,6 +164,116 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Equal(payload, entry.DisablePayload);
     }
 
+    /// <summary>Включение не заменяет новое значение реестра и сохраняет исходный снимок для ручного разрешения конфликта.</summary>
+    [Fact]
+    public void EnableRegistry_RejectsConflictingValueAndPreservesBackup()
+    {
+        var nonce = "StartupMonitorConflict_" + Guid.NewGuid().ToString("N");
+        var relativeKey = @"Software\Microsoft\Windows\CurrentVersion\Run\" + nonce;
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(relativeKey, writable: true)
+                ?? throw new InvalidOperationException("Не удалось создать изолированный тестовый ключ реестра.");
+            key.SetValue("Probe", "original", RegistryValueKind.String);
+            var entry = new StartupEntry { Name = nonce + @"\Probe", Location = EntryLocation.RegistryRun };
+            Assert.True(EntryOperations.DisableRegistry(entry).success);
+            var originalPayload = entry.DisablePayload;
+            key.SetValue("Probe", "new value", RegistryValueKind.String);
+
+            var result = EntryOperations.EnableRegistry(entry);
+
+            Assert.False(result.success);
+            Assert.Equal("new value", key.GetValue("Probe"));
+            Assert.Equal(originalPayload, entry.DisablePayload);
+            using var backup = key.OpenSubKey("StartupMonitorDisabled");
+            Assert.NotNull(backup);
+            Assert.Equal(originalPayload, backup.GetValue("Probe"));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(relativeKey, throwOnMissingSubKey: false);
+        }
+    }
+
+    /// <summary>Повторное отключение удаляет только совпадающее значение, сохраняя изменённые данные и первый снимок.</summary>
+    /// <param name="sameValue">Указывает, совпадает ли новое значение с первоначальным.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RepeatedDisableRegistry_PreservesChangedValue(bool sameValue)
+    {
+        var nonce = "StartupMonitorRepeat_" + Guid.NewGuid().ToString("N");
+        var relativeKey = @"Software\Microsoft\Windows\CurrentVersion\Run\" + nonce;
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(relativeKey, writable: true)
+                ?? throw new InvalidOperationException("Не удалось создать изолированный тестовый ключ реестра.");
+            key.SetValue("Probe", "original", RegistryValueKind.String);
+            var entry = new StartupEntry { Name = nonce + @"\Probe", Location = EntryLocation.RegistryRun };
+            Assert.True(EntryOperations.DisableRegistry(entry).success);
+            var payload = entry.DisablePayload;
+            key.SetValue("Probe", sameValue ? "original" : "new data", RegistryValueKind.String);
+
+            var result = EntryOperations.DisableRegistry(entry);
+
+            Assert.Equal(sameValue, result.success);
+            Assert.Equal(sameValue ? null : "new data", key.GetValue("Probe"));
+            Assert.Equal(payload, entry.DisablePayload);
+            using var backup = key.OpenSubKey("StartupMonitorDisabled");
+            Assert.NotNull(backup);
+            Assert.Equal(payload, backup.GetValue("Probe"));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(relativeKey, throwOnMissingSubKey: false);
+        }
+    }
+
+    /// <summary>Watcher сообщает конфликт один раз, показывает активное значение и сохраняет первый снимок при повторном ручном отключении.</summary>
+    /// <returns>Задача ожидания уведомления о конфликте.</returns>
+    [Fact]
+    public async Task Watcher_ChangedRegistryValue_ReportsEnabledAndKeepsBackup()
+    {
+        var nonce = "UserAutostart_" + Guid.NewGuid().ToString("N");
+        var relativeKey = @"Software\Microsoft\Windows\CurrentVersion\Run\" + nonce;
+        var received = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var notifications = new NotificationService(new InitialScanTracker(0));
+        notifications.MessagesBatchReady += (_, messages) =>
+        {
+            if (messages.Any(message => message.Type == PipeMessageTypes.ActionNotice && message.Payload.Contains("autoDisableConflict")))
+                received.TrySetResult(true);
+        };
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(relativeKey, writable: true)
+                ?? throw new InvalidOperationException("Не удалось создать изолированный тестовый ключ реестра.");
+            key.SetValue("Probe", "original", RegistryValueKind.String);
+            var entry = new StartupEntry { Name = nonce + @"\Probe", Location = EntryLocation.RegistryRun, FilePath = @"C:\Example\app.exe", CommandLine = "original" };
+            Assert.True(EntryOperations.DisableRegistry(entry).success);
+            entry.Status = EntryStatus.Disabled;
+            var payload = entry.DisablePayload;
+            Assert.True(_store.AddEntry(entry));
+            key.SetValue("Probe", "new data", RegistryValueKind.String);
+            var observed = new StartupEntry { Id = entry.Id, Name = entry.Name, Location = entry.Location, FilePath = entry.FilePath, CommandLine = entry.CommandLine };
+
+            Assert.False(WatcherHelper.AddOrUpdate(_store, notifications, observed));
+            Assert.True(await received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            var current = Assert.Single(_store.Load().Entries);
+            Assert.Equal(EntryStatus.Enabled, current.Status);
+            Assert.Equal(payload, current.DisablePayload);
+            Assert.Equal("new data", key.GetValue("Probe"));
+            Assert.False(EntryOperations.DisableRegistry(current).success);
+            Assert.Equal(payload, current.DisablePayload);
+            Assert.Equal("new data", key.GetValue("Probe"));
+            Assert.False(WatcherHelper.AddOrUpdate(_store, notifications, observed));
+            Assert.Single(_store.Load().History.Where(h => h.ChangeType == "AutomaticDisableFailed"));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(relativeKey, throwOnMissingSubKey: false);
+        }
+    }
+
     /// <summary>Ручное восстановление Antigravity не считается новой подозрительной записью watcher.</summary>
     [Fact]
     public void RestoreAntigravity_RegistersKnownIdentityBeforeWatcherAndRemovesBackupAfterSuccess()
@@ -185,6 +295,23 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Equal(EntryStatus.Enabled, Assert.Single(_store.Load().Entries).Status);
         Assert.False(EntryOperations.IsRestoreInProgress(_store, entry.Id));
         Assert.False(File.Exists(entry.FilePath + ".disabled"));
+    }
+
+    /// <summary>Устаревший снимок уже удалённой резервной копии не вызывает повторное восстановление ОС.</summary>
+    [Fact]
+    public void RestoreStaleBackup_DoesNotInvokeOperatingSystem()
+    {
+        var removed = Removed(Entry());
+        _store.AddRemovedEntry(removed);
+        _store.RemoveRemovedEntry(removed.Id);
+        var called = false;
+
+        var result = EntryOperations.RestoreRemovedEntry(_store, removed, _ => { called = true; return (true, null); });
+
+        Assert.False(result.success);
+        Assert.False(called);
+        Assert.Empty(_store.Load().Entries);
+        Assert.False(EntryOperations.IsRestoreInProgress(_store, removed.OriginalEntryId));
     }
 
     /// <summary>Отказ ОС сохраняет резервную копию и удаляет только созданную текущим запросом предварительную запись.</summary>

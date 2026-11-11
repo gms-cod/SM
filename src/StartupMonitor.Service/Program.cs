@@ -104,6 +104,7 @@ try
             services.AddSingleton<NetworkTrafficHistoryService>();
             services.AddHostedService(sp => sp.GetRequiredService<NetworkTrafficHistoryService>());
             services.AddSingleton<StartupMonitor.Service.Services.Firewall.NetworkConnectionAlertService>();
+            services.AddHostedService<StartupMonitor.Service.Services.Firewall.IncomingTcpObserver>();
             services.AddSingleton<StartupMonitor.Service.Services.Firewall.AccessMatrixCoordinatorService>();
             services.AddSingleton<ProcessPortDefenderService>();
             services.AddHostedService<AutoUnbanWorker>();

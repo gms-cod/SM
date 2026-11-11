@@ -34,6 +34,16 @@ public sealed class SystemComputerInfo
     public string OsBuild { get; set; } = string.Empty;
     public string Architecture { get; set; } = string.Empty;
     public string CpuName { get; set; } = string.Empty;
+    /// <summary>Производитель и модель компьютера, если они доступны в реестре.</summary>
+    public string ComputerModel { get; set; } = string.Empty;
+    /// <summary>Версия системной прошивки.</summary>
+    public string BiosVersion { get; set; } = string.Empty;
+    /// <summary>Производитель и модель системной платы.</summary>
+    public string Motherboard { get; set; } = string.Empty;
+    /// <summary>Дата выпуска системной прошивки в формате производителя.</summary>
+    public string BiosReleaseDate { get; set; } = string.Empty;
+    /// <summary>Каталог установленной Windows.</summary>
+    public string WindowsDirectory { get; set; } = string.Empty;
     public int LogicalCores { get; set; }
     public double RamTotalGb { get; set; }
     public double RamAvailableGb { get; set; }
@@ -67,6 +77,8 @@ public sealed class SystemComputerInfo
         sb.AppendLine($"Оперативная память: {RamUsedGb:F1} / {RamTotalGb:F1} ГБ ({RamUsedPercent}% занято, свободно {RamAvailableGb:F1} ГБ)");
         sb.AppendLine($"ОС: {OsName} {OsDisplayVersion} (Сборка {OsBuild}, {Architecture})");
         sb.AppendLine($"Компьютер: {MachineName} (пользователь: {UserName})");
+        sb.AppendLine($"Модель: {ComputerModel}; BIOS: {BiosVersion}; Windows: {WindowsDirectory}");
+        sb.AppendLine($"Системная плата: {Motherboard}; дата BIOS: {BiosReleaseDate}");
         sb.AppendLine($"Время работы: {UptimeDisplay}");
         sb.AppendLine("--- НАКОПИТЕЛИ И ДИСКИ ---");
         foreach (var d in Disks)
@@ -91,6 +103,30 @@ public sealed class SystemComputerInfo
         double tb = gb / 1024.0;
         return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{tb:F1} ТБ");
     }
+
+    /// <summary>Уточняет название клиентской Windows по номеру сборки, сохраняя редакцию и серверные названия.</summary>
+    /// <param name="productName">Название продукта из реестра.</param>
+    /// <param name="build">Номер сборки Windows.</param>
+    /// <returns>Название с исправленной версией Windows.</returns>
+    public static string NormalizeWindowsName(string productName, string? build)
+    {
+        ArgumentNullException.ThrowIfNull(productName);
+        return int.TryParse(build, out var number) && number >= 22000 &&
+               (productName.Equals("Windows 10", StringComparison.OrdinalIgnoreCase) ||
+                productName.StartsWith("Windows 10 ", StringComparison.OrdinalIgnoreCase))
+            ? "Windows 11" + productName["Windows 10".Length..]
+            : productName;
+    }
+
+    /// <summary>Преобразует строковое или многострочное значение версии прошивки из реестра.</summary>
+    /// <param name="value">Значение реестра, которое может отсутствовать или иметь неподдерживаемый тип.</param>
+    /// <returns>Непустые строки версии, соединённые пробелами, либо пустую строку.</returns>
+    public static string FormatBiosVersion(object? value) => value switch
+    {
+        string text => text.Trim(),
+        string[] lines => string.Join(" ", lines.Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim())),
+        _ => string.Empty
+    };
 
     #region Win32 Native Memory Helper
 
@@ -130,8 +166,20 @@ public sealed class SystemComputerInfo
             info.MachineName = Environment.MachineName;
             info.UserName = Environment.UserName;
             info.LogicalCores = Environment.ProcessorCount;
-            info.Architecture = Environment.Is64BitOperatingSystem ? "x64 (64-бит)" : "x86 (32-бит)";
+            info.Architecture = RuntimeInformation.OSArchitecture.ToString();
             info.SystemUptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
+            info.WindowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+
+            // Реестр прошивки предоставляет модель и версию BIOS без тяжёлого синхронного WMI-запроса.
+            try
+            {
+                using var bios = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+                info.ComputerModel = string.Join(" ", new[] { bios?.GetValue("SystemManufacturer") as string, bios?.GetValue("SystemProductName") as string }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                info.BiosVersion = FormatBiosVersion(bios?.GetValue("BIOSVersion"));
+                info.Motherboard = string.Join(" ", new[] { bios?.GetValue("BaseBoardManufacturer") as string, bios?.GetValue("BaseBoardProduct") as string }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                info.BiosReleaseDate = bios?.GetValue("BIOSReleaseDate") as string ?? string.Empty;
+            }
+            catch (Exception ex) { System.Diagnostics.Trace.TraceWarning("Не удалось прочитать сведения BIOS: {0}", ex); }
 
             // 1. Процессор из аппаратного реестра
             try
@@ -161,7 +209,7 @@ public sealed class SystemComputerInfo
                     var currentBuild = osKey.GetValue("CurrentBuild") as string ?? osKey.GetValue("CurrentBuildNumber") as string;
                     var ubr = osKey.GetValue("UBR")?.ToString();
 
-                    info.OsName = prodName ?? Environment.OSVersion.VersionString;
+                    info.OsName = NormalizeWindowsName(prodName ?? Environment.OSVersion.VersionString, currentBuild);
                     info.OsDisplayVersion = displayVer ?? string.Empty;
                     info.OsBuild = !string.IsNullOrEmpty(ubr) ? $"{currentBuild}.{ubr}" : (currentBuild ?? string.Empty);
                 }

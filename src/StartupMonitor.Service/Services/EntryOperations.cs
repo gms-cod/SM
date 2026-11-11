@@ -13,6 +13,9 @@ namespace StartupMonitor.Service.Services;
 /// <summary>Статические операции над записями автозапуска: реестр, файлы, службы, планировщик, kill-процессов.</summary>
 public static class EntryOperations
 {
+    /// <summary>Причина отказа при повторном обнаружении отличающегося значения реестра.</summary>
+    internal const string RegistryRepeatDisableConflict = "Значение реестра изменилось после отключения; текущие данные и резервная копия сохранены.";
+
     /// <summary>Настройки сериализации JSON: snake_case, с отступами.</summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -233,11 +236,23 @@ public static class EntryOperations
                 return !string.IsNullOrEmpty(entry.DisablePayload)
                     ? (true, null) : (false, $"Значение реестра '{valueName}' и его резервная копия отсутствуют.");
             }
-            using var disabled = key.CreateSubKey("StartupMonitorDisabled", writable: true)
-                ?? throw new InvalidOperationException("Не удалось сохранить отключённое значение реестра.");
             // Повторная автоматическая блокировка не затирает первый сохранённый снимок.
             if (string.IsNullOrEmpty(entry.DisablePayload))
                 entry.DisablePayload = JsonSerializer.Serialize(CaptureRegistryValue(key, BuildPayloadPath(entry, subKey), valueName), JsonOptions);
+            else
+            {
+                var previous = JsonSerializer.Deserialize<RegistryPayload>(entry.DisablePayload, JsonOptions)
+                    ?? throw new InvalidOperationException("Сохранённый снимок реестра повреждён.");
+                var current = CaptureRegistryValue(key, BuildPayloadPath(entry, subKey), valueName);
+                var expectedKind = previous.ValueKind ?? RegistryValueKind.String;
+                var expectedJson = previous.TypedValueJson ?? JsonSerializer.Serialize(previous.ValueData);
+                if (!string.Equals(previous.Key, current.Key, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(previous.ValueName, current.ValueName, StringComparison.OrdinalIgnoreCase) ||
+                    current.ValueKind != expectedKind || current.TypedValueJson != expectedJson)
+                    return (false, RegistryRepeatDisableConflict);
+            }
+            using var disabled = key.CreateSubKey("StartupMonitorDisabled", writable: true)
+                ?? throw new InvalidOperationException("Не удалось сохранить отключённое значение реестра.");
             disabled.SetValue(valueName, entry.DisablePayload, RegistryValueKind.String);
             disabled.Flush();
             key.DeleteValue(valueName, throwOnMissingValue: false);
@@ -268,7 +283,19 @@ public static class EntryOperations
             if (!ok || key == null) return (false, err ?? "Failed to open registry key");
             using (key)
             {
-                WriteRegistryValue(key, rp);
+                // Не перезаписываем значение, созданное после отключения другой программой.
+                if (key.GetValueNames().Contains(rp.ValueName, StringComparer.OrdinalIgnoreCase))
+                {
+                    var current = CaptureRegistryValue(key, rp.Key, rp.ValueName);
+                    var expectedKind = rp.ValueKind ?? RegistryValueKind.String;
+                    var expectedJson = rp.TypedValueJson ?? JsonSerializer.Serialize(rp.ValueData);
+                    if (current.ValueKind != expectedKind || current.TypedValueJson != expectedJson)
+                        return (false, "Значение реестра уже занято другими данными; включение ничего не перезаписало.");
+                }
+                else
+                {
+                    WriteRegistryValue(key, rp);
+                }
                 using var disabled = key.OpenSubKey("StartupMonitorDisabled", writable: true);
                 disabled?.DeleteValue(rp.ValueName, throwOnMissingValue: false);
                 // После восстановления очищаем payload
@@ -1590,6 +1617,10 @@ public static class EntryOperations
         var published = false;
         try
         {
+            // Повторно проверяем конкретную копию после получения intent: другой запрос мог завершить её восстановление.
+            var currentBackup = store.GetRemovedEntries().FirstOrDefault(candidate => candidate.Id == removed.Id);
+            if (currentBackup is null || JsonSerializer.Serialize(currentBackup, JsonOptions) != JsonSerializer.Serialize(removed, JsonOptions))
+                return (false, "Резервная копия изменилась или уже восстановлена. Обновите список.");
             if (previous == null)
             {
                 if (!store.AddEntry(entry)) return (false, "Совпадающая запись уже существует в хранилище.");

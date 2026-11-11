@@ -523,6 +523,7 @@ public class LocalizationService : INotifyPropertyChanged
             "disabledKilled" => "ActionDisabledKilled",
             "disabledKillSkipped" => "ActionDisabledKillSkipped",
             "autoDisabled" => "ActionAutoDisabled",
+            "autoDisableConflict" => "ActionAutoDisableConflict",
             "autoDisabledKilled" => "ActionAutoDisabledKilled",
             "autoDisabledKillSkipped" => "ActionAutoDisabledKillSkipped",
             "removed" => "ActionRemoved",
@@ -869,6 +870,14 @@ public class LocalizationService : INotifyPropertyChanged
     public string SysInfoMachine => this["SysInfoMachine"];
     public string SysInfoUser => this["SysInfoUser"];
     public string SysInfoUptime => this["SysInfoUptime"];
+    /// <summary>Подпись модели компьютера.</summary>
+    public string SysInfoModel => this["SysInfoModel"];
+    /// <summary>Локализованная подпись модели системной платы.</summary>
+    public string SysInfoMotherboard => this["SysInfoMotherboard"];
+    /// <summary>Локализованная подпись даты прошивки.</summary>
+    public string SysInfoBiosDate => this["SysInfoBiosDate"];
+    /// <summary>Подпись каталога Windows.</summary>
+    public string SysInfoWindowsDirectory => this["SysInfoWindowsDirectory"];
     public string SysInfoCopyBtn => this["SysInfoCopyBtn"];
     public string SysInfoCopiedToast => this["SysInfoCopiedToast"];
     public string SysInfoRefreshBtn => this["SysInfoRefreshBtn"];
@@ -1448,6 +1457,17 @@ public class LocalizationService : INotifyPropertyChanged
     public string AiAutonomousDefaultActionLabel => this["AiAutonomousDefaultActionLabel"];
     /// <summary>Локализованная строка «Действие, автоматически применяемое для соединений при автономном режиме работы ИИ».</summary>
     public string AiAutonomousDefaultActionHint => this["AiAutonomousDefaultActionHint"];
+
+    /// <summary>Название режима применения рекомендации ИИ.</summary>
+    public string AiAutonomousFollowAi => this["AiAutonomousFollowAi"];
+
+    /// <summary>Название режима временной блокировки независимо от рекомендации ИИ.</summary>
+    public string AiAutonomousBlockAll => this["AiAutonomousBlockAll"];
+    /// <summary>Название переключателя входящих TCP-уведомлений.</summary>
+    public string IncomingTcpToggle => this["IncomingTcpToggle"];
+    /// <summary>Ограничения наблюдения входящих соединений.</summary>
+    public string IncomingTcpHint => this["IncomingTcpHint"];
+
     /// <summary>Локализованная строка «Контроль приложений (ACL)».</summary>
     public string NetTabAclMatrix => this["NetTabAclMatrix"];
     /// <summary>Локализованная строка «Единая матрица контроля доступа к сети, белые и чёрные списки».</summary>

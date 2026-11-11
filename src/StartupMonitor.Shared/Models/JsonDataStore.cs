@@ -872,6 +872,38 @@ public class JsonDataStore
         }
     }
 
+    /// <summary>Сохраняет автоматический вердикт только при неизменном контексте и отсутствии ручной оценки.</summary>
+    /// <param name="entryId">Идентификатор исходной записи.</param>
+    /// <param name="expectedFingerprint">Отпечаток контекста до отправки запроса.</param>
+    /// <param name="rating">Полученный вердикт ИИ.</param>
+    /// <returns>Признак успешной условной записи.</returns>
+    public bool TrySetAutomaticRating(string entryId, string expectedFingerprint, StartupRating rating)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entryId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedFingerprint);
+        ArgumentNullException.ThrowIfNull(rating);
+        lock (_lock)
+        {
+            EnsureLoadedLocked();
+            var index = _cache?.Entries.FindIndex(e => e.Id == entryId) ?? -1;
+            if (index < 0 || _cache is null) return false;
+            var current = _cache.Entries[index];
+            if (current.IsUserRating || StartupRatingContext.Compute(current) != expectedFingerprint) return false;
+            var updated = current.Clone();
+            updated.AiRating = rating.Score;
+            updated.AiCategory = rating.Category;
+            updated.AiRisk = rating.Risk;
+            updated.AiRecommendation = rating.Recommendation;
+            updated.AiContextFingerprint = expectedFingerprint;
+            ForkCache();
+            var config = _cache ?? throw new InvalidOperationException("Конфигурация не загружена после копирования.");
+            config.Entries = [.. config.Entries];
+            config.Entries[index] = updated;
+            SaveEntries();
+            return true;
+        }
+    }
+
     /// <summary>Сохраняет репутационные поля пачки записей одной записью файла, не меняя их актуальные статусы.</summary>
     /// <param name="entries">Завершённые результаты репутационного сканирования.</param>
     public void UpdateEntryReputations(IEnumerable<StartupEntry> entries)

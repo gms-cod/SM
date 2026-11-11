@@ -1,16 +1,16 @@
-п»ї<#
+<#
 .SYNOPSIS
-РЎРєСЂРёРїС‚ РґРІСѓС…РїРѕС‚РѕС‡РЅРѕР№ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё СЂРµРїРѕР·РёС‚РѕСЂРёРµРІ Startup Monitor.
-РћР±РµСЃРїРµС‡РёРІР°РµС‚ СЃС‚СЂРѕРіРѕРµ СЂР°Р·РґРµР»РµРЅРёРµ РєРѕРґРѕРІРѕР№ Р±Р°Р·С‹:
-1. РџСѓР±Р»РёС‡РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ (origin: gms-cod/SM) вЂ” С‡РёСЃС‚Р°СЏ РІРёС‚СЂРёРЅР°, СЂРµР»РёР·С‹ Рё РѕС‚РєСЂС‹С‚Р°СЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёСЏ.
-2. РџСЂРёРІР°С‚РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ (startup-monitor: gms-cod/Startup-Monitor) вЂ” 100% РїРѕР»РЅС‹Р№ СЃРЅРёРјРѕРє (РІРєР»СЋС‡Р°СЏ РїСЂР°РІРёР»Р° РР, СЃРєСЂРёРїС‚С‹ СЂРѕСЏ Рё РїСЂРёРІР°С‚РЅС‹Рµ Р°СѓРґРёС‚С‹).
+Скрипт двухпоточной синхронизации репозиториев Startup Monitor.
+Обеспечивает строгое разделение кодовой базы:
+1. Публичный репозиторий (origin: gms-cod/SM) — чистая витрина, релизы и открытая документация.
+2. Приватный репозиторий (startup-monitor: gms-cod/Startup-Monitor) — 100% полный снимок (включая правила ИИ, скрипты роя и приватные аудиты).
 #>
 param(
     [switch]$SkipPublic,
     [switch]$SkipPrivate,
     [switch]$NoForcePrivate,
     [switch]$Force,
-    # РЎРѕР·РґР°С‘С‚ РЅРѕРІС‹Р№ СЂРµР»РёР· РёР· СѓР¶Рµ РїСЂРѕРІРµСЂРµРЅРЅРѕРіРѕ СѓСЃС‚Р°РЅРѕРІС‰РёРєР°; СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёРµ СЂРµР»РёР·С‹ РЅРµ РїРµСЂРµР·Р°РїРёСЃС‹РІР°СЋС‚СЃСЏ.
+    # Создаёт новый релиз из уже проверенного установщика; существующие релизы не перезаписываются.
     [switch]$PublishRelease
 )
 
@@ -19,75 +19,75 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $repoRoot
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "   Р”РІСѓС…РїРѕС‚РѕС‡РЅР°СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ СЂРµРїРѕР·РёС‚РѕСЂРёРµРІ Startup Monitor" -ForegroundColor Cyan
+Write-Host "   Двухпоточная синхронизация репозиториев Startup Monitor" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 
-# 1. РџСЂРѕРІРµСЂРєР° С‚РµРєСѓС‰РµР№ РІРµС‚РєРё
+# 1. Проверка текущей ветки
 $currentBranch = (git branch --show-current).Trim()
 if ($currentBranch -ne 'main') {
-    throw "РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ СЂР°Р·СЂРµС€РµРЅР° С‚РѕР»СЊРєРѕ РёР· РІРµС‚РєРё 'main'. РўРµРєСѓС‰Р°СЏ РІРµС‚РєР°: '$currentBranch'."
+    throw "Синхронизация разрешена только из ветки 'main'. Текущая ветка: '$currentBranch'."
 }
 
-# 2. РџСЂРѕРІРµСЂРєР° С‡РёСЃС‚РѕС‚С‹ СЂР°Р±РѕС‡РµР№ РґРёСЂРµРєС‚РѕСЂРёРё
+# 2. Проверка чистоты рабочей директории
 $status = (git status --porcelain)
 if ($status) {
-    Write-Warning "РћР±РЅР°СЂСѓР¶РµРЅС‹ РЅРµР·Р°С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рµ Р»РѕРєР°Р»СЊРЅС‹Рµ РёР·РјРµРЅРµРЅРёСЏ:`n$status"
+    Write-Warning "Обнаружены незафиксированные локальные изменения:`n$status"
     if (-not $Force) {
-        throw "Р Р°Р±РѕС‡Р°СЏ РґРёСЂРµРєС‚РѕСЂРёСЏ СЃРѕРґРµСЂР¶РёС‚ РЅРµР·Р°С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рµ РёР·РјРµРЅРµРЅРёСЏ. Р—Р°С„РёРєСЃРёСЂСѓР№С‚Рµ РёС… РёР»Рё СѓРєР°Р¶РёС‚Рµ РєР»СЋС‡ -Force."
+        throw "Рабочая директория содержит незафиксированные изменения. Зафиксируйте их или укажите ключ -Force."
     }
 }
 
-# 3. РџРѕР»СѓС‡РµРЅРёРµ С‚РµРєСѓС‰РµР№ РІРµСЂСЃРёРё РїСЂРѕРґСѓРєС‚Р°
+# 3. Получение текущей версии продукта
 [xml]$propsXml = Get-Content (Join-Path $repoRoot "Directory.Build.props")
 $version = $propsXml.Project.PropertyGroup.Version
 if (-not $version) { $version = "2.1.2" }
 $headCommit = (git rev-parse HEAD).Trim()
 
-Write-Host "РўРµРєСѓС‰РёР№ РєРѕРјРјРёС‚: $headCommit" -ForegroundColor DarkGray
-Write-Host "Р’РµСЂСЃРёСЏ РїСЂРѕРґСѓРєС‚Р°: v$version" -ForegroundColor DarkGray
+Write-Host "Текущий коммит: $headCommit" -ForegroundColor DarkGray
+Write-Host "Версия продукта: v$version" -ForegroundColor DarkGray
 Write-Host ""
 
-# Р”Рѕ РїРµСЂРІРѕРіРѕ push РїСЂРѕРІРµСЂСЏСЋС‚СЃСЏ РІРµСЂСЃРёСЏ, РїРѕРґРїРёСЃСЊ, checksum Рё РѕС‚СЃСѓС‚СЃС‚РІРёРµ СѓР¶Рµ РІС‹РїСѓС‰РµРЅРЅРѕРіРѕ С‚РµРіР°.
+# До первого push проверяются версия, подпись, checksum и отсутствие уже выпущенного тега.
 if ($PublishRelease) {
-    if ($Force) { throw 'Р’С‹РїСѓСЃРє СЂРµР»РёР·Р° С‚СЂРµР±СѓРµС‚ С‡РёСЃС‚РѕРіРѕ Р·Р°С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕРіРѕ РґРµСЂРµРІР°; -Force РЅРµРґРѕРїСѓСЃС‚РёРј.' }
+    if ($Force) { throw 'Выпуск релиза требует чистого зафиксированного дерева; -Force недопустим.' }
     $installer = Join-Path $repoRoot "installers\StartupMonitorSetup-$version.exe"
     $releaseNotes = Join-Path $repoRoot "docs\releases\v$version.md"
     foreach ($path in @($installer, "$installer.sha256", $releaseNotes)) {
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "РќРµ РЅР°Р№РґРµРЅ Р°СЂС‚РµС„Р°РєС‚ РІС‹РїСѓСЃРєР°: $path" }
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Не найден артефакт выпуска: $path" }
     }
-    if ((Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') { throw 'РџРѕРґРїРёСЃСЊ СѓСЃС‚Р°РЅРѕРІС‰РёРєР° РЅРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅР°.' }
+    if ((Get-AuthenticodeSignature -LiteralPath $installer).Status -ne 'Valid') { throw 'Подпись установщика не подтверждена.' }
     $releaseRepos = @()
     if (-not $SkipPublic) { $releaseRepos += 'gms-cod/SM' }
     if (-not $SkipPrivate) { $releaseRepos += 'gms-cod/Startup-Monitor' }
-    if ($releaseRepos.Count -eq 0) { throw 'РќРµ РІС‹Р±СЂР°РЅ СЂРµРїРѕР·РёС‚РѕСЂРёР№ РґР»СЏ РІС‹РїСѓСЃРєР°.' }
+    if ($releaseRepos.Count -eq 0) { throw 'Не выбран репозиторий для выпуска.' }
     & python (Join-Path $PSScriptRoot 'publish_github_release.py') --version $version --repos @releaseRepos --check-only
-    if ($LASTEXITCODE -ne 0) { throw 'РџСЂРµРґРІР°СЂРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР° РІС‹РїСѓСЃРєР° РЅРµ РїСЂРѕР№РґРµРЅР°.' }
+    if ($LASTEXITCODE -ne 0) { throw 'Предварительная проверка выпуска не пройдена.' }
 }
 
 # ============================================================
-# РЁРђР“ 1: РџСѓР±Р»РёРєР°С†РёСЏ РІ РѕС‚РєСЂС‹С‚С‹Р№ РїСѓР±Р»РёС‡РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ (gms-cod/SM)
+# ШАГ 1: Публикация в открытый публичный репозиторий (gms-cod/SM)
 # ============================================================
 if (-not $SkipPublic) {
-    Write-Host "--> [1/2] РћС‚РїСЂР°РІРєР° РІ РїСѓР±Р»РёС‡РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№: origin (gms-cod/SM)..." -ForegroundColor Yellow
+    Write-Host "--> [1/2] Отправка в публичный репозиторий: origin (gms-cod/SM)..." -ForegroundColor Yellow
     
     git push origin main
     if ($LASTEXITCODE -ne 0) {
-        throw "РЎР±РѕР№ РѕС‚РїСЂР°РІРєРё РІРµС‚РєРё main РІ РїСѓР±Р»РёС‡РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ origin."
+        throw "Сбой отправки ветки main в публичный репозиторий origin."
     }
 
-    Write-Host "[РЈРЎРџР•РҐ] РџСѓР±Р»РёС‡РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ origin/main СЃРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°РЅ (С‡РёСЃС‚С‹Р№ РѕС‚РєСЂС‹С‚С‹Р№ РєРѕРґ)." -ForegroundColor Green
+    Write-Host "[УСПЕХ] Публичный репозиторий origin/main синхронизирован (чистый открытый код)." -ForegroundColor Green
 }
 else {
-    Write-Host "--> [1/2] РџСЂРѕРїСѓСЃРє РѕС‚РїСЂР°РІРєРё РІ РїСѓР±Р»РёС‡РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ (SkipPublic)." -ForegroundColor DarkGray
+    Write-Host "--> [1/2] Пропуск отправки в публичный репозиторий (SkipPublic)." -ForegroundColor DarkGray
 }
 
 Write-Host ""
 
 # ============================================================
-# РЁРђР“ 2: РџСѓР±Р»РёРєР°С†РёСЏ РІ Р·Р°РєСЂС‹С‚С‹Р№ РїСЂРёРІР°С‚РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ (gms-cod/Startup-Monitor)
+# ШАГ 2: Публикация в закрытый приватный репозиторий (gms-cod/Startup-Monitor)
 # ============================================================
 if (-not $SkipPrivate) {
-    Write-Host "--> [2/2] Р¤РѕСЂРјРёСЂРѕРІР°РЅРёРµ РїРѕР»РЅРѕРіРѕ СЃРЅРёРјРєР° РґР»СЏ РїСЂРёРІР°С‚РЅРѕРіРѕ СЂРµРїРѕР·РёС‚РѕСЂРёСЏ: startup-monitor..." -ForegroundColor Yellow
+    Write-Host "--> [2/2] Формирование полного снимка для приватного репозитория: startup-monitor..." -ForegroundColor Yellow
 
     $gitDir = (git rev-parse --git-dir).Trim()
     $tempIndexFile = Join-Path $gitDir "temp_private_index"
@@ -98,13 +98,13 @@ if (-not $SkipPrivate) {
     try {
         $env:GIT_INDEX_FILE = $tempIndexFile
 
-        # РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РІСЂРµРјРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ С‚РµРєСѓС‰РёРј РєРѕРјРјРёС‚РѕРј HEAD
+        # Инициализируем временный индекс текущим коммитом HEAD
         git read-tree HEAD
         if ($LASTEXITCODE -ne 0) {
-            throw "РћС€РёР±РєР° С‡С‚РµРЅРёСЏ РґРµСЂРµРІР° HEAD РІРѕ РІСЂРµРјРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ."
+            throw "Ошибка чтения дерева HEAD во временный индекс."
         }
 
-        # РЎРїРёСЃРѕРє РІРЅСѓС‚СЂРµРЅРЅРёС… С„Р°Р№Р»РѕРІ Рё РєР°С‚Р°Р»РѕРіРѕРІ РґР»СЏ РІРєР»СЋС‡РµРЅРёСЏ РІ РїСЂРёРІР°С‚РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№
+        # Список внутренних файлов и каталогов для включения в приватный репозиторий
         $privateItems = @(
             "AGENTS.md",
             "GEMINI.md",
@@ -122,23 +122,23 @@ if (-not $SkipPrivate) {
             if (Test-Path $fullPath) {
                 git add -f $item
                 if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "РџСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ: РЅРµ СѓРґР°Р»РѕСЃСЊ РґРѕР±Р°РІРёС‚СЊ '$item' РІРѕ РІСЂРµРјРµРЅРЅС‹Р№ РёРЅРґРµРєСЃ."
+                    Write-Warning "Предупреждение: не удалось добавить '$item' во временный индекс."
                 }
             }
         }
 
         $treeHash = (git write-tree).Trim()
         if (-not $treeHash -or $LASTEXITCODE -ne 0) {
-            throw "РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РґРµСЂРµРІР° Git (git write-tree)."
+            throw "Ошибка создания дерева Git (git write-tree)."
         }
 
         $commitMessage = "v${version}: sync(private): full repository snapshot with internal swarm assets"
         $privateCommit = (git commit-tree $treeHash -p $headCommit -m $commitMessage).Trim()
         if (-not $privateCommit) {
-            throw "РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РєРѕРјРјРёС‚Р° РїРѕР»РЅРѕРіРѕ СЃРЅРёРјРєР° (git commit-tree)."
+            throw "Ошибка создания коммита полного снимка (git commit-tree)."
         }
 
-        Write-Host "РЎС„РѕСЂРјРёСЂРѕРІР°РЅ РєРѕРјРјРёС‚ РїРѕР»РЅРѕРіРѕ СЃРЅРёРјРєР°: $privateCommit" -ForegroundColor DarkCyan
+        Write-Host "Сформирован коммит полного снимка: $privateCommit" -ForegroundColor DarkCyan
 
         $pushTarget = "$privateCommit" + ":refs/heads/main"
         $pushArgs = @("push", "startup-monitor", $pushTarget)
@@ -148,10 +148,10 @@ if (-not $SkipPrivate) {
 
         & git $pushArgs
         if ($LASTEXITCODE -ne 0) {
-            throw "РЎР±РѕР№ РѕС‚РїСЂР°РІРєРё РїРѕР»РЅРѕРіРѕ СЃРЅРёРјРєР° РІ РїСЂРёРІР°С‚РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ startup-monitor."
+            throw "Сбой отправки полного снимка в приватный репозиторий startup-monitor."
         }
 
-        Write-Host "[РЈРЎРџР•РҐ] РџСЂРёРІР°С‚РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ startup-monitor/main РѕР±РЅРѕРІР»РµРЅ СЃРѕ РІСЃРµРјРё РІРЅСѓС‚СЂРµРЅРЅРёРјРё С„Р°Р№Р»Р°РјРё!" -ForegroundColor Green
+        Write-Host "[УСПЕХ] Приватный репозиторий startup-monitor/main обновлен со всеми внутренними файлами!" -ForegroundColor Green
     }
     finally {
         Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue
@@ -161,25 +161,25 @@ if (-not $SkipPrivate) {
     }
 }
 else {
-    Write-Host "--> [2/2] РџСЂРѕРїСѓСЃРє РѕС‚РїСЂР°РІРєРё РІ РїСЂРёРІР°С‚РЅС‹Р№ СЂРµРїРѕР·РёС‚РѕСЂРёР№ (SkipPrivate)." -ForegroundColor DarkGray
+    Write-Host "--> [2/2] Пропуск отправки в приватный репозиторий (SkipPrivate)." -ForegroundColor DarkGray
 }
 
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
 
-# Р’С‹РїСѓСЃРє РїСЂРѕС…РѕРґРёС‚ С‚РµРј Р¶Рµ РєР°РЅРѕРЅРёС‡РµСЃРєРёРј РјР°СЂС€СЂСѓС‚РѕРј, РїРѕСЃР»Рµ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РѕР±РµРёС… РёСЃС…РѕРґРЅС‹С… РІРµС‚РѕРє.
+# Выпуск проходит тем же каноническим маршрутом, после синхронизации обеих исходных веток.
 if ($PublishRelease) {
     $publisher = Join-Path $PSScriptRoot 'publish_github_release.py'
-    $releaseName = "Startup Monitor v$version вЂ” Firewall reliability and security"
+    $releaseName = "Startup Monitor v$version — Extended System Diagnostics, Hardware Metrics & Telemetry"
     if (-not $SkipPublic) {
         & python $publisher --version $version --repos gms-cod/SM --target-commitish $headCommit --body-file $releaseNotes --release-name $releaseName --create-only
-        if ($LASTEXITCODE -ne 0) { throw 'РџСѓР±Р»РёРєР°С†РёСЏ РЅРѕРІРѕРіРѕ РїСѓР±Р»РёС‡РЅРѕРіРѕ СЂРµР»РёР·Р° РЅРµ Р·Р°РІРµСЂС€РµРЅР°.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Публикация нового публичного релиза не завершена.' }
     }
     if (-not $SkipPrivate) {
         & python $publisher --version $version --repos gms-cod/Startup-Monitor --target-commitish $privateCommit --body-file $releaseNotes --release-name $releaseName --create-only --skip-verify
-        if ($LASTEXITCODE -ne 0) { throw 'РџСѓР±Р»РёРєР°С†РёСЏ РЅРѕРІРѕРіРѕ РїСЂРёРІР°С‚РЅРѕРіРѕ СЂРµР»РёР·Р° РЅРµ Р·Р°РІРµСЂС€РµРЅР°.' }
+        if ($LASTEXITCODE -ne 0) { throw 'Публикация нового приватного релиза не завершена.' }
     }
 }
 
-Write-Host "         РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ РѕР±РѕРёС… СЂРµРїРѕР·РёС‚РѕСЂРёРµРІ Р·Р°РІРµСЂС€РµРЅР°!        " -ForegroundColor Green
+Write-Host "         Синхронизация обоих репозиториев завершена!        " -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Cyan

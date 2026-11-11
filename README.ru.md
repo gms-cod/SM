@@ -11,10 +11,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/версия-v2.1.3-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Версия v2.1.3"></a>
+  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/версия-v2.2.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Версия v2.2.0"></a>
   <img src="https://img.shields.io/badge/платформа-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Платформа Windows">
   <img src="https://img.shields.io/badge/стек-.NET%208%20%7C%20C%23%20%7C%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Технологический стек">
-  <img src="https://img.shields.io/badge/тесты-1%2C755%20пройдены%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Тесты 100% Passing">
+  <img src="https://img.shields.io/badge/тесты-1%2C809%20пройдены%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Тесты 100% Passing">
   <img src="https://img.shields.io/badge/подпись-SHA256%20Authenticode-06B6D4?style=for-the-badge&logo=hackthebox&logoColor=white" alt="Authenticode">
   <a href="LICENSE"><img src="https://img.shields.io/badge/лицензия-MIT-3B82F6?style=for-the-badge" alt="Лицензия MIT"></a>
 </p>
@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.ru.md"><strong>Руководство пользователя</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Архитектура</strong></a> •
-  <a href="docs/releases/v2.1.3.md"><strong>История изменений</strong></a> •
+  <a href="docs/releases/v2.2.0.md"><strong>История изменений</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Скачать инсталлятор</strong></a>
 </p>
 
