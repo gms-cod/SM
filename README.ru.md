@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.ru.md"><strong>Руководство пользователя</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Архитектура</strong></a> •
-  <a href="docs/releases/v2.2.3.md"><strong>История изменений</strong></a> •
+  <a href="docs/releases/v2.2.4.md"><strong>История изменений</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Скачать инсталлятор</strong></a>
 </p>
 

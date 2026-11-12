@@ -173,6 +173,14 @@ public partial class App : Application
             mainWindow.WindowState = WindowState.Minimized;
         }
 
+        if (e.Args.Contains("--system-info"))
+        {
+            mainWindow.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                (mainWindow.DataContext as ViewModels.MainViewModel)?.OpenSystemInfoCommand.Execute(null);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
         Log("OnStartup: создаю иконку трея");
         _trayIcon = new TaskbarIcon
         {

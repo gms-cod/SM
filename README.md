@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.md"><strong>User Guide</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Architecture</strong></a> •
-  <a href="docs/releases/v2.2.3.md"><strong>Release Notes</strong></a> •
+  <a href="docs/releases/v2.2.4.md"><strong>Release Notes</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Download Setup</strong></a>
 </p>
 

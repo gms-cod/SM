@@ -127,12 +127,70 @@
                                 </Border>
                             </StackPanel>
                         </Grid>
-                        <!-- Дополнительные данные устройства и установки Windows. -->
-                        <TextBlock TextWrapping="Wrap" Margin="0,6,0,0"><Run Text="{Binding SysInfoModel, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.ComputerModel, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
-                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"><Run Text="{Binding SysInfoMotherboard, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.Motherboard, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
-                        <TextBlock Text="{Binding Info.BiosVersion, RelativeSource={RelativeSource AncestorType=Window}, StringFormat='BIOS: {0}'}" TextWrapping="Wrap" Margin="0,4,0,0" />
-                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"><Run Text="{Binding SysInfoBiosDate, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.BiosReleaseDate, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
-                        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0"><Run Text="{Binding SysInfoWindowsDirectory, Source={x:Static services:LocalizationService.Instance}}"/><Run Text=": "/><Run Text="{Binding Info.WindowsDirectory, RelativeSource={RelativeSource AncestorType=Window}}"/></TextBlock>
+                        <!-- Модель компьютера -->
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoModel, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.ComputerModel, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Материнская плата -->
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoMotherboard, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.Motherboard, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- BIOS -->
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="BIOS"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.BiosVersion, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Дата выпуска BIOS -->
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoBiosDate, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.BiosReleaseDate, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Каталог Windows -->
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding SysInfoWindowsDirectory, Source={x:Static services:LocalizationService.Instance}}"
+                                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Info.WindowsDirectory, RelativeSource={RelativeSource AncestorType=Window}}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
