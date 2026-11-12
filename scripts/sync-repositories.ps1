@@ -9,6 +9,11 @@ param(
     [switch]$SkipPublic,
     [switch]$SkipPrivate,
     [switch]$NoForcePrivate,
+    # ќжидаемые SHA защищают обе опубликованные ветки от перезаписи чужих изменений.
+    [ValidatePattern('^[0-9a-fA-F]{40}$')]
+    [string]$PublicExpectedHead,
+    [ValidatePattern('^[0-9a-fA-F]{40}$')]
+    [string]$PrivateExpectedHead,
     [switch]$Force,
     # —оздаЄт новый релиз из уже проверенного установщика; существующие релизы не перезаписываютс€.
     [switch]$PublishRelease
@@ -70,7 +75,12 @@ if ($PublishRelease) {
 if (-not $SkipPublic) {
     Write-Host "--> [1/2] ќтправка в публичный репозиторий: origin (gms-cod/SM)..." -ForegroundColor Yellow
     
-    git push origin main
+    if ($PublicExpectedHead) {
+        git push "--force-with-lease=refs/heads/main:$PublicExpectedHead" origin main
+    }
+    else {
+        git push origin main
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "—бой отправки ветки main в публичный репозиторий origin."
     }
@@ -142,7 +152,10 @@ if (-not $SkipPrivate) {
 
         $pushTarget = "$privateCommit" + ":refs/heads/main"
         $pushArgs = @("push", "startup-monitor", $pushTarget)
-        if (-not $NoForcePrivate) {
+        if ($PrivateExpectedHead -and -not $NoForcePrivate) {
+            $pushArgs += "--force-with-lease=refs/heads/main:$PrivateExpectedHead"
+        }
+        elseif (-not $NoForcePrivate) {
             $pushArgs += "--force"
         }
 
