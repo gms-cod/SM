@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:controls="clr-namespace:Wpf.Ui.Controls;assembly=Wpf.Ui"
     xmlns:converters="clr-namespace:StartupMonitor.UI.Converters"
     xmlns:services="clr-namespace:StartupMonitor.UI.Services"
     ShutdownMode="OnMainWindowClose">
@@ -19,6 +20,30 @@
                 <ResourceDictionary Source="Styles/DataGridStyles.xaml" />
                 <ResourceDictionary Source="Styles/VectorIcons.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Контраст вычисляется по фактическим кистям WPF-UI и обновляется вместе с системным акцентом. -->
+            <converters:AccentButtonContrastConverter x:Key="AccentButtonContrastConverter" />
+            <Style TargetType="{x:Type controls:Button}" BasedOn="{StaticResource DefaultUiButtonStyle}">
+                <Style.Triggers>
+                    <Trigger Property="Appearance" Value="Primary">
+                        <Setter Property="Foreground">
+                            <Setter.Value>
+                                <MultiBinding Converter="{StaticResource AccentButtonContrastConverter}">
+                                    <Binding Path="Background" RelativeSource="{RelativeSource Self}" />
+                                    <Binding Path="MouseOverBackground" RelativeSource="{RelativeSource Self}" />
+                                </MultiBinding>
+                            </Setter.Value>
+                        </Setter>
+                        <Setter Property="PressedForeground">
+                            <Setter.Value>
+                                <MultiBinding Converter="{StaticResource AccentButtonContrastConverter}">
+                                    <Binding Path="PressedBackground" RelativeSource="{RelativeSource Self}" />
+                                </MultiBinding>
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
 
             <!-- Стиль навигационных элементов боковой панели -->
             <Style x:Key="NavItemStyle" TargetType="Border">

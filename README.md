@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/version-v2.2.2-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Version v2.2.2"></a>
+  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/version-v2.2.3-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Version v2.2.3"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Platform Windows">
   <img src="https://img.shields.io/badge/stack-.NET%208%20%7C%20C%23%20%7C%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Tech Stack">
   <img src="https://img.shields.io/badge/tests-1%2C809%20passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests 100% Passing">
@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.md"><strong>User Guide</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Architecture</strong></a> •
-  <a href="docs/releases/v2.2.2.md"><strong>Release Notes</strong></a> •
+  <a href="docs/releases/v2.2.3.md"><strong>Release Notes</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Download Setup</strong></a>
 </p>
 
