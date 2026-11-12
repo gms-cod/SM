@@ -1352,6 +1352,16 @@ public static class EntryOperations
                 continue;
             }
 
+            // Устаревший собственный ярлык без файла и снимка нельзя восстановить; другие отключённые записи сохраняем.
+            if (entry.DetectedAt <= scanTime && !IsRestoreInProgress(store, entry.Id) &&
+                IsStaleOwnedStartupShortcut(entry, Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup)))
+            {
+                store.RemoveEntry(entry.Id);
+                entries.RemoveAll(candidate => candidate.Id == entry.Id);
+                logger?.LogInformation("CleanupStaleEntries: удалена отсутствующая запись старого ярлыка Startup Monitor");
+                continue;
+            }
+
             // Отключённые/заблокированные нами записи физически отсутствуют в системе
             // (значение реестра удалено, файл переименован, служба disabled) — это НЕ stale
             if (entry.Status != EntryStatus.Enabled)
@@ -1470,6 +1480,34 @@ public static class EntryOperations
             return false;
         }
         catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Подтверждает отсутствие собственного устаревшего ярлыка и резервного файла в общесистемной папке.</summary>
+    /// <param name="entry">Снимок записи автозапуска.</param>
+    /// <param name="startupDirectory">Проверяемая общесистемная папка автозапуска.</param>
+    /// <returns>Признак отсутствующего собственного ярлыка без данных восстановления.</returns>
+    internal static bool IsStaleOwnedStartupShortcut(StartupEntry entry, string startupDirectory)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry.Location != EntryLocation.StartupFolder || entry.Status != EntryStatus.Disabled ||
+            !string.IsNullOrEmpty(entry.DisablePayload) || !string.Equals(entry.Name, "Startup Monitor.lnk", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(startupDirectory) || !Path.IsPathFullyQualified(startupDirectory) ||
+            string.IsNullOrWhiteSpace(entry.FilePath) || !Path.IsPathFullyQualified(entry.FilePath) ||
+            string.IsNullOrWhiteSpace(entry.LocationDetail) || !Path.IsPathFullyQualified(entry.LocationDetail)) return false;
+        try
+        {
+            var folder = Path.GetFullPath(startupDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!string.Equals(Path.GetFullPath(entry.LocationDetail).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), folder, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(Path.GetFullPath(entry.FilePath), Path.Combine(folder, "Startup Monitor.lnk"), StringComparison.OrdinalIgnoreCase)) return false;
+            // Перечисление каталога отличает отсутствие файлов от отказа доступа; имена ссылок и reparse points также видны.
+            return !Directory.EnumerateFileSystemEntries(folder).Any(path =>
+                string.Equals(Path.GetFileName(path), "Startup Monitor.lnk", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Path.GetFileName(path), "Startup Monitor.lnk.disabled", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or System.Security.SecurityException)
         {
             return false;
         }

@@ -291,6 +291,39 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
+    /// <summary>Во время ожидающего ACK повтора принудительные нажатия не запускают третью или противоположную операцию.</summary>
+    [Fact]
+    public void UnknownOutcome_PendingRetryRejectsAdditionalClicks()
+        => _host.Run(() =>
+        {
+            using var client = new PipeClient();
+            var requests = new List<ResolveNetworkAlertRequest>();
+            var retry = new TaskCompletionSource<ResolveNetworkAlertResultPayload>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var window = CreateWindow(client, (_, _) => Task.FromResult(false), detailedSender: (request, _) =>
+            {
+                requests.Add(request);
+                return requests.Count == 1
+                    ? Task.FromResult(new ResolveNetworkAlertResultPayload(false, "", NetworkAlertResolutionStatus.UnknownOutcome, request.OperationId))
+                    : retry.Task;
+            });
+            try
+            {
+                window.Show();
+                Button(window, "BtnWhitelist").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                PumpUntil(() => Button(window, "BtnRetry").IsEnabled);
+                Button(window, "BtnRetry").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Button(window, "BtnRetry").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Button(window, "BtnBlockAlways").RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Assert.Equal(2, requests.Count);
+                Assert.Equal(requests[0].OperationId, requests[1].OperationId);
+                Assert.All(requests, request => Assert.Equal(NetworkAlertResolution.WhitelistProgram, request.Resolution));
+                retry.SetResult(new(true, "", NetworkAlertResolutionStatus.Applied, requests[1].OperationId, requests[1].Resolution));
+                PumpUntil(() => !window.IsVisible);
+                Assert.Equal(NetworkAlertResolution.WhitelistProgram, window.Resolution);
+            }
+            finally { Cleanup(window); }
+        });
+
     /// <summary>Состояние Closing резервируется до анимации и блокирует второй клик даже при принудительном RaiseEvent.</summary>
     [Fact]
     public void ClosingAnimation_RejectsAdditionalPolicyAction()

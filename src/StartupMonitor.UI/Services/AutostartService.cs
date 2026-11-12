@@ -79,6 +79,10 @@ public static class AutostartService
                 return !backend.HasScheduledTask(taskName) && !backend.GetRunEntries().Any(pair => IsStartupMonitorUiEntry(pair.Key, pair.Value));
             }
 
+            // Служебные учётные записи не имеют интерактивного входа пользователя: задача UI для них лишняя.
+            if (IsServiceAccountSid(backend.UserSid))
+                throw new InvalidOperationException("Автозапуск интерфейса нельзя регистрировать для служебной учётной записи.");
+
             var currentExe = targetExePath ?? backend.ExecutablePath;
             if (string.IsNullOrWhiteSpace(currentExe) || !System.IO.Path.IsPathFullyQualified(currentExe) ||
                 !string.Equals(System.IO.Path.GetFileName(currentExe), "StartupMonitor.UI.exe", StringComparison.OrdinalIgnoreCase))
@@ -106,6 +110,8 @@ public static class AutostartService
                 RemoveOwnedRunEntries(backend, preserveCanonical: true);
             }
             backend.CleanLegacyMachineRunEntries();
+            // Удаляем только ошибочную системную задачу после подтверждения пользовательского автозапуска.
+            if (backend.IsElevated) backend.CleanLegacySystemTask(currentExe);
             return true;
         }
         catch (Exception ex)
@@ -122,6 +128,17 @@ public static class AutostartService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sid);
         return ValueName + "." + sid;
+    }
+
+    /// <summary>Определяет встроенные служебные учётные записи, для которых интерактивный запуск UI недопустим.</summary>
+    /// <param name="sid">SID проверяемого токена.</param>
+    /// <returns>Признак LocalSystem, LocalService или NetworkService.</returns>
+    internal static bool IsServiceAccountSid(string sid)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sid);
+        return sid.Equals("S-1-5-18", StringComparison.OrdinalIgnoreCase) ||
+               sid.Equals("S-1-5-19", StringComparison.OrdinalIgnoreCase) ||
+               sid.Equals("S-1-5-20", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Относит команду к UI только по точному имени запускаемого файла, а не по произвольной подстроке.</summary>

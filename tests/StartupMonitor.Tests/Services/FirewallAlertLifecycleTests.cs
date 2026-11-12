@@ -1,6 +1,9 @@
 using System.Net;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using StartupMonitor.Service.Pipe;
 using StartupMonitor.Service.Services;
 using StartupMonitor.Service.Services.Ai;
 using StartupMonitor.Service.Services.Firewall;
@@ -13,6 +16,129 @@ namespace StartupMonitor.Tests.Services;
 public sealed class FirewallAlertLifecycleTests
 {
     private const string AppPath = @"C:\Apps\lifecycle.exe";
+
+    /// <summary>Зависший обход правил не задерживает IPC-сверку уже выданной карточки и не занимает командный канал.</summary>
+    /// <returns>Задача управляемого конкурентного воспроизведения.</returns>
+    [Fact]
+    public async Task AlertStatus_DoesNotWaitForBlockedFirewallScan()
+    {
+        using var rig = new Rig();
+        rig.Sockets.Add(Socket());
+        rig.Service.ScanNewConnections();
+        var alert = Assert.Single(rig.Service.GetPendingAlerts());
+        var server = (PipeServer)RuntimeHelpers.GetUninitializedObject(typeof(PipeServer));
+        typeof(PipeServer).GetField("_alertService", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(server, rig.Service);
+        typeof(PipeServer).GetField("_alertClaims", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(server, new NetworkAlertClaimRegistry());
+        var process = typeof(PipeServer).GetMethod("ProcessMessage", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var scanLock = typeof(NetworkConnectionAlertService).GetField("_scanLock", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(rig.Service)!;
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var held = Task.Run(() => { lock (scanLock) { entered.SetResult(); release.Wait(TimeSpan.FromSeconds(10)); } });
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            var command = new PipeMessage { Type = PipeMessageTypes.GetNetworkAlertStatus, Payload = JsonSerializer.Serialize(alert.AlertId) };
+            var reply = Task.Run(async () => await (Task<PipeMessage>)process.Invoke(server, [command, CancellationToken.None, "client"])!);
+            var result = await reply.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Equal(PipeMessageTypes.GetNetworkAlertStatusResponse, result.Type);
+            var status = JsonSerializer.Deserialize<NetworkAlertStatusPayload>(result.Payload);
+            Assert.NotNull(status);
+            Assert.Equal(alert.AlertId, status.Alert?.AlertId);
+        }
+        finally { release.Set(); await held.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    /// <summary>Решение ожидает занятую блокировку сканирования, а повтор операции после успешного применения идемпотентен.</summary>
+    /// <returns>Задача проверки последовательности операций.</returns>
+    [Fact]
+    public async Task Resolve_WaitsForScanAndSameOperationIsAppliedOnlyOnce()
+    {
+        using var rig = new Rig();
+        rig.Sockets.Add(Socket());
+        rig.Service.ScanNewConnections();
+        var request = Request(Assert.Single(rig.Service.GetPendingAlerts()), NetworkAlertResolution.BlockSession);
+        var scanLock = typeof(NetworkConnectionAlertService).GetField("_scanLock", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(rig.Service)!;
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var held = Task.Run(() => { lock (scanLock) { entered.SetResult(); release.Wait(TimeSpan.FromSeconds(10)); } });
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            var resolving = Task.Run(() => rig.Service.ResolveAlertDetailed(request));
+            Assert.NotSame(resolving, await Task.WhenAny(resolving, Task.Delay(150)));
+            release.Set();
+            var first = await resolving.WaitAsync(TimeSpan.FromSeconds(3));
+            var retry = rig.Service.ResolveAlertDetailed(request);
+            Assert.Equal(NetworkAlertResolutionStatus.Applied, first.Status);
+            Assert.Equal(NetworkAlertResolutionStatus.AlreadyApplied, retry.Status);
+            Assert.Equal(1, rig.Policy.ApplyCalls);
+            Assert.Null(rig.Service.GetPendingAlertForStatus(request.AlertId));
+        }
+        finally { release.Set(); await held.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    /// <summary>Истечение ожидания замка не меняет политику и позволяет безопасно повторить тот же запрос.</summary>
+    /// <returns>Задача управляемой проверки отказа и повтора.</returns>
+    [Fact]
+    public async Task Resolve_WhenScanLockIsBusy_RefusesBeforeChangesAndCanRetry()
+    {
+        using var rig = new Rig();
+        rig.Sockets.Add(Socket());
+        rig.Service.ScanNewConnections();
+        var request = Request(Assert.Single(rig.Service.GetPendingAlerts()), NetworkAlertResolution.BlockSession);
+        rig.Service.ResolutionLockTimeout = TimeSpan.FromMilliseconds(150);
+        var scanLock = typeof(NetworkConnectionAlertService).GetField("_scanLock", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(rig.Service)!;
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var held = Task.Run(() => { lock (scanLock) { entered.SetResult(); release.Wait(TimeSpan.FromSeconds(10)); } });
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            var failed = await Task.Run(() => rig.Service.ResolveAlertDetailed(request)).WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Equal(NetworkAlertResolutionStatus.Failed, failed.Status);
+            Assert.Contains("Эта операция не применена", failed.Message);
+            Assert.Equal(0, rig.Policy.ApplyCalls);
+            Assert.NotNull(rig.Service.GetPendingAlertForStatus(request.AlertId));
+            release.Set();
+            await held.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Equal(NetworkAlertResolutionStatus.Applied, rig.Service.ResolveAlertDetailed(request).Status);
+            Assert.Equal(NetworkAlertResolutionStatus.AlreadyApplied, rig.Service.ResolveAlertDetailed(request).Status);
+            Assert.Equal(1, rig.Policy.ApplyCalls);
+        }
+        finally { release.Set(); await held.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
+
+    /// <summary>Одновременный повтор выполняющейся операции не выдаёт ложный подтверждённый отказ.</summary>
+    /// <returns>Задача проверки единственного применения политики.</returns>
+    [Fact]
+    public async Task Resolve_ConcurrentRetry_RemainsUnknownUntilOriginalFinishes()
+    {
+        using var rig = new Rig();
+        rig.Sockets.Add(Socket());
+        rig.Service.ScanNewConnections();
+        var request = Request(Assert.Single(rig.Service.GetPendingAlerts()), NetworkAlertResolution.BlockAlways);
+        rig.Service.ResolutionLockTimeout = TimeSpan.FromMilliseconds(150);
+        using var release = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        rig.Service.ApplyFirewallRuleOverride = _ => { Interlocked.Increment(ref calls); entered.SetResult(); release.Wait(TimeSpan.FromSeconds(10)); };
+        var original = Task.Run(() => rig.Service.ResolveAlertDetailed(request));
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            var pending = rig.Service.ResolveAlertDetailed(request);
+            Assert.Equal(NetworkAlertResolutionStatus.UnknownOutcome, pending.Status);
+            // Неуспешный второй TryAdd не должен снять защиту первого вызова.
+            var third = rig.Service.ResolveAlertDetailed(request);
+            Assert.Equal(NetworkAlertResolutionStatus.UnknownOutcome, third.Status);
+            Assert.Equal(1, calls);
+            release.Set();
+            Assert.Equal(NetworkAlertResolutionStatus.Applied, (await original.WaitAsync(TimeSpan.FromSeconds(3))).Status);
+            Assert.Equal(NetworkAlertResolutionStatus.AlreadyApplied, rig.Service.ResolveAlertDetailed(request).Status);
+            Assert.Equal(1, calls);
+        }
+        finally { release.Set(); await original.WaitAsync(TimeSpan.FromSeconds(3)); }
+    }
 
     /// <summary>Массовые TCP-сокеты образуют одну группу и не увеличивают счётчик при повторном снимке.</summary>
     [Fact]
@@ -60,6 +186,7 @@ public sealed class FirewallAlertLifecycleTests
         var alert = Assert.Single(rig.Service.GetPendingAlerts());
         var result = rig.Service.ResolveAlertDetailed(Request(alert, NetworkAlertResolution.Defer));
         Assert.Equal(NetworkAlertResolutionStatus.Deferred, result.Status);
+        Assert.Null(rig.Service.GetPendingAlertForStatus(alert.AlertId));
         Assert.Empty(rig.Service.GetPendingAlerts());
         rig.Sockets.Add(Socket(50001));
         Assert.Equal(0, rig.Service.ScanNewConnections());
@@ -67,6 +194,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(0, rig.Policy.ApplyCalls);
         Assert.Empty(rig.Rules);
         rig.Now = rig.Now.AddMinutes(6);
+        Assert.Equal(alert.AlertId, rig.Service.GetPendingAlertForStatus(alert.AlertId)?.AlertId);
         Assert.Equal(alert.AlertId, Assert.Single(rig.Service.GetPendingAlerts()).AlertId);
     }
 

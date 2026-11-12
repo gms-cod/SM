@@ -89,7 +89,7 @@ public static class EtwProcessReader
         source.Kernel.ProcessStop += onStop;
         source.Kernel.ProcessDCStart += onRundown;
 
-        // Регистрация отмены: остановка сессии ETW надежно разблокирует вызов source.Process()
+        // Подтверждённая остановка сессии разблокирует Process; при отказе просим reader остановиться на следующем событии.
         using var registration = ct.Register(() =>
         {
             try
@@ -99,6 +99,15 @@ public static class EtwProcessReader
             catch (Exception ex)
             {
                 logger.LogError(ex, "Не удалось остановить собственную ETW-сессию {SessionName}", session.Name);
+                try
+                {
+                    // Не освобождаем source параллельно Process: StopProcessing действует при следующем событии.
+                    source.StopProcessing();
+                }
+                catch (Exception stopError)
+                {
+                    logger.LogError(stopError, "Не удалось запросить остановку читателя ETW {SessionName}", session.Name);
+                }
             }
         });
 

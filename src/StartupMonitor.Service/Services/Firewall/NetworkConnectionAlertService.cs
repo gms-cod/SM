@@ -125,13 +125,17 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Единственный активный запрос полного приложения либо достоверного экземпляра неизвестного процесса.</summary>
     private readonly Dictionary<string, string> _pendingByGroup = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Отложенные карточки остаются событиями, но не предлагаются повторно до явного срока.</summary>
-    private readonly Dictionary<string, DateTime> _deferredUntil = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, DateTime> _deferredUntil = new(StringComparer.Ordinal);
     /// <summary>Набор наблюдений группы исключает увеличение счётчика на каждом повторном снимке.</summary>
     private readonly Dictionary<string, HashSet<string>> _observationsByAlert = new(StringComparer.Ordinal);
     /// <summary>Устаревшие идентификаторы завершают уже показанное окно без выдуманного применения политики.</summary>
     private readonly HashSet<string> _supersededAlerts = new(StringComparer.Ordinal);
     /// <summary>Ограниченные результаты операций защищают повтор после потери подтверждения.</summary>
-    private readonly Dictionary<string, (string AlertId, NetworkAlertResolution Resolution, ResolveNetworkAlertResultPayload Result)> _operationResults = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (string AlertId, NetworkAlertResolution Resolution, ResolveNetworkAlertResultPayload Result)> _operationResults = new(StringComparer.Ordinal);
+    /// <summary>Не допускает ложного отказа, пока другая попытка той же карточки может изменять политику.</summary>
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _resolutionInFlight = new(StringComparer.Ordinal);
+    /// <summary>Ограничение ожидания до начала системной операции; доступно тестам с управляемым замком.</summary>
+    internal TimeSpan ResolutionLockTimeout { get; set; } = TimeSpan.FromSeconds(5);
     private readonly Queue<string> _operationOrder = new();
     /// <summary>Отмена фонового ИИ привязана к включённому поколению детектора.</summary>
     private CancellationTokenSource _aiLifetime = new();
@@ -170,7 +174,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
     /// <summary>Порядок вытеснения подтверждений без неограниченного накопления идентификаторов.</summary>
     private readonly Queue<string> _completedResolutionOrder = new();
     private readonly object _settingsLock = new();
-    private bool _disposed;
+    private volatile bool _disposed;
 
     // ── Кэш правил брандмауэра для обеспечения 0% CPU ──
     private HashSet<string>? _cachedRulePaths;
@@ -640,6 +644,9 @@ public sealed class NetworkConnectionAlertService : IDisposable
             }
 
             PruneQueue();
+            // Фоновый сборщик по-прежнему сверяет внешние изменения правил и удаляет устаревшие карточки.
+            // Проверка открытого окна остаётся быстрой и не повторяет COM-обход в командном канале.
+            if (!_pendingById.IsEmpty) _ = GetPendingAlerts();
             return added;
         }
     }
@@ -710,12 +717,22 @@ public sealed class NetworkConnectionAlertService : IDisposable
             var now = UtcNowProvider();
             foreach (var expired in _deferredUntil.Where(pair => pair.Value <= now).Select(pair => pair.Key).ToArray())
             {
-                _deferredUntil.Remove(expired);
+                _deferredUntil.TryRemove(expired, out _);
                 UpdateGroupHistory(expired, NetworkConnectionVerdict.PendingAlert, "Срок откладывания истёк; ожидается решение пользователя");
             }
             return _pendingById.Values.Where(alert => !_deferredUntil.TryGetValue(alert.AlertId, out var until) || until <= now)
                 .OrderBy(a => a.DetectedAt).ToList();
         }
+    }
+
+    /// <summary>Быстро читает уже опубликованную карточку для проверки открытого окна без обхода правил и ожидания сетевого сканирования.</summary>
+    /// <param name="alertId">Идентификатор ранее выданной карточки.</param>
+    /// <returns>Карточка, ожидающая решения, либо null после завершения или откладывания.</returns>
+    internal NetworkConnectionAlertDto? GetPendingAlertForStatus(string alertId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(alertId);
+        if (_disposed || !AlertsEnabled || !_pendingById.TryGetValue(alertId, out var alert)) return null;
+        return _deferredUntil.TryGetValue(alertId, out var until) && until > UtcNowProvider() ? null : alert;
     }
 
     /// <summary>Строит ключ неизвестного процесса с временем старта, не создавая псевдоним по имени exe.</summary>
@@ -803,7 +820,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
         foreach (var key in _pendingByGroup.Where(pair => pair.Value == alert.AlertId).Select(pair => pair.Key).ToArray())
             _pendingByGroup.Remove(key);
         _observationsByAlert.Remove(alert.AlertId);
-        _deferredUntil.Remove(alert.AlertId);
+        _deferredUntil.TryRemove(alert.AlertId, out _);
         _supersededAlerts.Add(alert.AlertId);
         if (_supersededAlerts.Count > MaxPendingAlerts * 2)
             _supersededAlerts.Remove(_supersededAlerts.First());
@@ -886,13 +903,37 @@ public sealed class NetworkConnectionAlertService : IDisposable
     {
         if (request == null || string.IsNullOrWhiteSpace(request.AlertId) || !Enum.IsDefined(request.Resolution))
             return new(false, "Некорректное действие или идентификатор запроса.", NetworkAlertResolutionStatus.Unsupported);
-        lock (_scanLock)
+        var operation = string.IsNullOrWhiteSpace(request.OperationId) ? request.AlertId + ":" + request.Resolution : request.OperationId;
+        var budget = System.Diagnostics.Stopwatch.StartNew();
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        while (!_resolutionInFlight.TryAdd(request.AlertId, completed))
         {
-            var operation = string.IsNullOrWhiteSpace(request.OperationId) ? request.AlertId + ":" + request.Resolution : request.OperationId;
-            if (_operationResults.TryGetValue(operation, out var recorded))
+            if (!_resolutionInFlight.TryGetValue(request.AlertId, out var previous)) continue;
+            var remaining = ResolutionLockTimeout - budget.Elapsed;
+            if (remaining <= TimeSpan.Zero || !previous.Task.Wait(remaining))
+                return new(false, "Другая попытка для этой карточки ещё выполняется; её исход пока неизвестен.", NetworkAlertResolutionStatus.UnknownOutcome, operation);
+        }
+        try
+        {
+            ResolveNetworkAlertResultPayload? RecordedResult()
+            {
+                if (!_operationResults.TryGetValue(operation, out var recorded)) return null;
                 return recorded.AlertId == request.AlertId && recorded.Resolution == request.Resolution
                     ? recorded.Result with { Status = recorded.Result.Success ? NetworkAlertResolutionStatus.AlreadyApplied : recorded.Result.Status }
                     : new(false, "Идентификатор операции уже использован для другого выбора.", NetworkAlertResolutionStatus.Conflict, operation);
+            }
+            var cached = RecordedResult();
+            if (cached != null) return cached;
+            var remaining = ResolutionLockTimeout - budget.Elapsed;
+            if (!Monitor.TryEnter(_scanLock, remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero))
+            {
+                // Данный вызов ещё не менял политику; при подтверждённом результате старой попытки возвращаем именно его.
+                return RecordedResult() ?? new(false, "Служба занята сетевым сканированием. Эта операция не применена; повторите действие.", NetworkAlertResolutionStatus.Failed, operation);
+            }
+            try
+            {
+            cached = RecordedResult();
+            if (cached != null) return cached;
             ResolveNetworkAlertResultPayload Result(bool success, string message, NetworkAlertResolutionStatus status, NetworkAlertResolution? applied = null)
             {
                 var result = new ResolveNetworkAlertResultPayload(success, message, status, operation, applied);
@@ -902,7 +943,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     _operationResults[operation] = (request.AlertId, request.Resolution, result);
                     _operationOrder.Enqueue(operation);
                     while (_operationOrder.Count > MaxPendingAlerts * 2)
-                        _operationResults.Remove(_operationOrder.Dequeue());
+                        _operationResults.TryRemove(_operationOrder.Dequeue(), out _);
                 }
                 return result;
             }
@@ -934,6 +975,13 @@ public sealed class NetworkConnectionAlertService : IDisposable
             var partial = _lastApplyResult?.Message?.StartsWith("PartialFailure", StringComparison.OrdinalIgnoreCase) == true;
             return Result(false, _lastApplyResult?.Message ?? "Не удалось применить политику. Исходный запрос сохранён для повтора.",
                 partial ? NetworkAlertResolutionStatus.PartialFailure : NetworkAlertResolutionStatus.Failed);
+            }
+            finally { Monitor.Exit(_scanLock); }
+        }
+        finally
+        {
+            ((ICollection<KeyValuePair<string, TaskCompletionSource>>)_resolutionInFlight).Remove(new(request.AlertId, completed));
+            completed.TrySetResult();
         }
     }
 
@@ -1098,7 +1146,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 foreach (var group in _pendingByGroup.Where(group => group.Value == candidate.AlertId).Select(group => group.Key).ToArray())
                     _pendingByGroup.Remove(group);
                 _observationsByAlert.Remove(candidate.AlertId);
-                _deferredUntil.Remove(candidate.AlertId);
+                _deferredUntil.TryRemove(candidate.AlertId, out _);
                 RememberResolution(candidate.AlertId, request.Resolution);
             }
             PruneQueue(force: true);

@@ -4117,7 +4117,8 @@ public class PipeServer : BackgroundService
                             response.Payload = "Не указан действующий запрос сетевого доступа.";
                             break;
                         }
-                        var current = _alertService.GetPendingAlerts().FirstOrDefault(a => a.AlertId == alertId);
+                        // Открытая карточка уже прошла проверку при выдаче: её статус не должен ждать повторного COM-обхода.
+                        var current = _alertService.GetPendingAlertForStatus(alertId);
                         var client = alertClientId ?? "internal";
                         var owns = current != null && _alertClaims.TryAcquire(client, alertId);
                         response.Type = PipeMessageTypes.GetNetworkAlertStatusResponse;

@@ -110,6 +110,65 @@ public class AutostartServiceTests
         Assert.Equal(original, _backend.Run[AutostartService.ValueName]);
     }
 
+    /// <summary>Служебный токен не создаёт задачу или запись реестра и не затрагивает ранее сохранённые записи.</summary>
+    /// <param name="sid">Одна из встроенных служебных учётных записей Windows.</param>
+    [Theory]
+    [InlineData("S-1-5-18")]
+    [InlineData("S-1-5-19")]
+    [InlineData("S-1-5-20")]
+    public void ServiceAccount_DoesNotCreateUiAutostart(string sid)
+    {
+        _backend.UserSid = sid;
+        _backend.IsElevated = true;
+        _backend.SetRunValue("Other", "other.exe");
+        Assert.False(AutostartService.EnsureSingleAutostartEntry(true, null, _backend));
+        Assert.Empty(_backend.Tasks);
+        Assert.Equal("Other", Assert.Single(_backend.Run).Key);
+        Assert.Equal(0, _backend.LegacyCleanCalls);
+    }
+
+    /// <summary>После регистрации интерактивной задачи удаляется только точная устаревшая задача LocalSystem.</summary>
+    [Fact]
+    public void ElevatedStartup_RemovesOnlyVerifiedSystemTask()
+    {
+        _backend.IsElevated = true;
+        const string systemName = "StartupMonitor.UI.S-1-5-18";
+        _backend.Tasks[systemName] = WindowsAutostartBackend.BuildTaskXml(_backend.ExecutablePath, "S-1-5-18");
+        Assert.True(AutostartService.EnsureSingleAutostartEntry(true, null, _backend));
+        Assert.False(_backend.Tasks.ContainsKey(systemName));
+        Assert.True(_backend.Tasks.ContainsKey(AutostartService.GetTaskName(_backend.UserSid)));
+    }
+
+    /// <summary>Несовпадение marker, владельца, пути, аргументов или состава действий не разрешает удаление.</summary>
+    /// <param name="alteration">Элемент описания задачи, отличающийся от ожидаемого.</param>
+    [Theory]
+    [InlineData("marker")]
+    [InlineData("principal")]
+    [InlineData("path")]
+    [InlineData("argument")]
+    [InlineData("extra-action")]
+    [InlineData("malformed")]
+    public void ElevatedStartup_PreservesUnverifiedSystemTask(string alteration)
+    {
+        _backend.IsElevated = true;
+        const string systemName = "StartupMonitor.UI.S-1-5-18";
+        var doc = System.Xml.Linq.XDocument.Parse(WindowsAutostartBackend.BuildTaskXml(_backend.ExecutablePath, "S-1-5-18"));
+        System.Xml.Linq.XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+        switch (alteration)
+        {
+            case "marker": doc.Descendants(ns + "Source").Single().Value = "foreign"; break;
+            case "principal": doc.Descendants(ns + "Principal").Single().Element(ns + "UserId")!.Value = "S-1-5-19"; break;
+            case "path": doc.Descendants(ns + "Command").Single().Value = @"C:\Other\StartupMonitor.UI.exe"; break;
+            case "argument": doc.Descendants(ns + "Arguments").Single().Value = "--minimized --other"; break;
+            case "extra-action": doc.Descendants(ns + "Actions").Single().Add(new System.Xml.Linq.XElement(ns + "Exec")); break;
+        }
+        var xml = alteration == "malformed" ? "<task" : doc.ToString();
+        _backend.Tasks[systemName] = xml;
+        Assert.True(AutostartService.EnsureSingleAutostartEntry(true, null, _backend));
+        Assert.Equal(xml, _backend.Tasks[systemName]);
+        Assert.True(_backend.Tasks.ContainsKey(AutostartService.GetTaskName(_backend.UserSid)));
+    }
+
     /// <summary>Отключение удаляет только собственную задачу/Run, сохраняя сторонние приложения.</summary>
     [Fact]
     public void Disable_PreservesForeignStartupEntries()
@@ -163,7 +222,7 @@ public class AutostartServiceTests
         public Dictionary<string, string> Run { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> Tasks { get; } = new(StringComparer.OrdinalIgnoreCase);
         public string ExecutablePath => @"C:\Program Files\StartupMonitor\StartupMonitor.UI.exe";
-        public string UserSid => "S-1-5-21-1-2-3-1001";
+        public string UserSid { get; set; } = "S-1-5-21-1-2-3-1001";
         public bool IsElevated { get; set; }
         public bool RefuseTaskRegistration { get; set; }
         public int LegacyCleanCalls { get; private set; }
@@ -177,6 +236,12 @@ public class AutostartServiceTests
         }
         public bool HasScheduledTask(string name) => Tasks.ContainsKey(name);
         public void DeleteScheduledTask(string name) => Tasks.Remove(name);
+        public void CleanLegacySystemTask(string executable)
+        {
+            const string name = "StartupMonitor.UI.S-1-5-18";
+            if (Tasks.TryGetValue(name, out var xml) && WindowsAutostartBackend.IsLegacySystemTask(xml, executable))
+                Tasks.Remove(name);
+        }
         public void CleanLegacyMachineRunEntries() => LegacyCleanCalls++;
     }
 }

@@ -1804,7 +1804,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 var observed = System.Text.Json.JsonSerializer.Deserialize<StartupMonitor.Shared.Models.Firewall.IncomingTcpObservation>(m.Payload);
                 if (observed is null) continue;
-                var text = $"{observed.RemoteAddress}:{observed.RemotePort} → {observed.LocalAddress}:{observed.LocalPort} (PID {observed.ProcessId})";
+                var text = $"{FormatTcpEndpoint(observed.RemoteAddress, observed.RemotePort)} → {FormatTcpEndpoint(observed.LocalAddress, observed.LocalPort)} (PID {observed.ProcessId})";
                 _ = System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => NotificationRequested?.Invoke(
                     LocalizationService.Instance["IncomingTcpTitle"], text, string.Empty));
             }
@@ -1865,6 +1865,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
             }
             catch { }
         }
+    }
+
+    /// <summary>Форматирует адрес и порт TCP, выделяя IPv6-адрес квадратными скобками.</summary>
+    /// <param name="address">Строковое представление адреса соединения.</param>
+    /// <param name="port">Порт соединения.</param>
+    /// <returns>Адрес и порт в однозначном виде для уведомления.</returns>
+    private static string FormatTcpEndpoint(string? address, int port)
+    {
+        var text = address ?? string.Empty;
+        return text.Contains(':') ? $"[{text}]:{port}" : $"{text}:{port}";
     }
 
     /// <summary>OnPipeClientDisconnected: Обрабатывает событие OnPipeClientDisconnected.</summary>
