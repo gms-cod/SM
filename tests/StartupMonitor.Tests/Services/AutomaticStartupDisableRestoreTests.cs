@@ -60,6 +60,35 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.True(File.Exists(entry.FilePath));
     }
 
+    /// <summary>Отказ системного отключения показывает ошибку вместо сообщения об успешной блокировке.</summary>
+    /// <param name="strict">Выбирает строгий режим или политику AutoGuard.</param>
+    /// <returns>Задача получения уведомления и проверки состояния записи.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AutomaticPolicy_WhenDisableFails_SendsFailureNotice(bool strict)
+    {
+        var config = _store.Load();
+        config.Settings.StrictMode = strict;
+        _store.Save(config);
+        var entry = Entry();
+        entry.Location = EntryLocation.BrowserPlugin;
+        var received = new TaskCompletionSource<List<PipeMessage>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var notifications = new NotificationService(new InitialScanTracker(0));
+        notifications.MessagesBatchReady += (_, messages) => received.TrySetResult(messages);
+
+        Assert.False(WatcherHelper.AddOrUpdate(_store, notifications, entry));
+
+        var messages = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var notice = Assert.Single(messages.Where(message => message.Type == PipeMessageTypes.ActionNotice));
+        var payload = JsonSerializer.Deserialize<ActionNoticePayload>(notice.Payload);
+        Assert.NotNull(payload);
+        Assert.Equal("autoDisableFailed", payload.Action);
+        Assert.Equal(EntryStatus.Enabled, Assert.Single(_store.Load().Entries).Status);
+        Assert.Single(_store.Load().History.Where(history => history.ChangeType == "AutomaticDisableFailed"));
+        Assert.True(File.Exists(entry.FilePath));
+    }
+
     /// <summary>
     /// Реальное Enforce-завершение сохраняется для собственного обычного EXE, но общий
     /// интерпретатор остаётся работать. В обоих случаях отключается только значение

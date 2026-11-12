@@ -864,6 +864,7 @@ public class PipeServer : BackgroundService
 
                         {
 
+                            var wasEnabled = entry.Status == EntryStatus.Enabled;
                             var (sysOk, sysErr) = EntryOperations.DisableFromSystem(entry);
 
                             if (!sysOk)
@@ -874,14 +875,24 @@ public class PipeServer : BackgroundService
                                 break;
                             }
 
-                            // Процесс завершается только после подтверждённого отключения точки автозапуска.
+                            entry.Status = EntryStatus.Disabled;
+                            try { _store.UpdateEntry(entry); }
+                            catch (Exception saveError)
+                            {
+                                // Откатываем только переход из включённого состояния, чтобы не включить уже отключённую запись.
+                                var rollback = wasEnabled ? EntryOperations.EnableFromSystem(entry) : (true, (string?)null);
+                                _logger.LogError(saveError, "Не удалось сохранить отключение {Name}; откат: {Rollback}", entry.Name, rollback.Item1);
+                                response.Type = PipeMessageTypes.Error;
+                                response.Payload = rollback.Item1
+                                    ? "Не удалось сохранить отключение; прежнее состояние восстановлено."
+                                    : $"Не удалось сохранить отключение и восстановить состояние: {rollback.Item2}. Проверьте запись в Windows.";
+                                break;
+                            }
+
+                            // Процесс завершается только после сохранения подтверждённого отключения.
                             var killEnabled = cfg.Settings.KillOnDisable;
                             if (killEnabled)
                                 EntryOperations.KillProcess(entry);
-
-                            entry.Status = EntryStatus.Disabled;
-
-                            _store.UpdateEntry(entry);
 
                             NotifyExternalEntriesChanged();
 
@@ -963,6 +974,7 @@ public class PipeServer : BackgroundService
                                 break;
                             }
 
+                            var enabledFromSystem = false;
                             if (entry.Status == EntryStatus.Disabled ||
                                 (entry.Status == EntryStatus.Blocked && !string.IsNullOrEmpty(entry.DisablePayload)))
 
@@ -977,6 +989,8 @@ public class PipeServer : BackgroundService
                                     response.Payload = sysErr ?? "Не удалось включить запись в системе.";
                                     break;
                                 }
+
+                                enabledFromSystem = true;
 
                             }
 
@@ -1016,7 +1030,17 @@ public class PipeServer : BackgroundService
 
                             entry.FromBlacklist = false;
 
-                            _store.UpdateEntry(entry);
+                            try { _store.UpdateEntry(entry); }
+                            catch (Exception saveError) when (enabledFromSystem)
+                            {
+                                var rollback = EntryOperations.DisableFromSystem(entry);
+                                _logger.LogError(saveError, "Не удалось сохранить включение {Name}; откат: {Rollback}", entry.Name, rollback.success);
+                                response.Type = PipeMessageTypes.Error;
+                                response.Payload = rollback.success
+                                    ? "Не удалось сохранить включение; прежнее состояние восстановлено."
+                                    : $"Не удалось сохранить включение и восстановить состояние: {rollback.error}. Проверьте запись в Windows.";
+                                break;
+                            }
 
                             NotifyExternalEntriesChanged();
 

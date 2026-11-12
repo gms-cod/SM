@@ -100,17 +100,6 @@ public static class EtwProcessReader
             {
                 logger.LogError(ex, "Не удалось остановить собственную ETW-сессию {SessionName}", session.Name);
             }
-            finally
-            {
-                try
-                {
-                    source.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Не удалось освободить ресурсы ETW consumer для сессии {SessionName}", session.Name);
-                }
-            }
         });
 
         try

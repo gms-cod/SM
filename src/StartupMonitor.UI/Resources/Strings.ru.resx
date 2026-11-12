@@ -2407,4 +2407,5 @@
   <data name="UnblockRuleRemovedButEnableFailed" xml:space="preserve"><value>Правило чёрного списка удалено, но включить запись автозапуска не удалось.</value></data>
   <data name="RestoreEntryResultUnknown" xml:space="preserve"><value>Служба не подтвердила результат. Перед повтором проверьте список записей.</value></data>
   <data name="ActionAutoDisableConflict" xml:space="preserve"><value>{0}: автоматическое отключение не выполнено, поскольку запись автозапуска изменилась. Текущее значение и исходная резервная копия сохранены.</value></data>
+  <data name="ActionAutoDisableFailed" xml:space="preserve"><value>{0}: не удалось подтвердить автоматическое отключение. Проверьте состояние записи и журнал событий.</value></data>
 </root>

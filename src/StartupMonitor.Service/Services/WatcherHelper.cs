@@ -119,7 +119,15 @@ public static class WatcherHelper
                             new ActionNoticePayload(entry.Name ?? "", "autoDisabled"))
                     });
                 }
-                else Serilog.Log.Warning("Не удалось повторно отключить удалённую запись {Name}: {Error}", entry.Name, error);
+                else
+                {
+                    Serilog.Log.Warning("Не удалось повторно отключить удалённую запись {Name}: {Error}", entry.Name, error);
+                    notifications.Enqueue(new PipeMessage
+                    {
+                        Type = PipeMessageTypes.ActionNotice,
+                        Payload = System.Text.Json.JsonSerializer.Serialize(new ActionNoticePayload(entry.Name ?? "", "autoDisableFailed"))
+                    });
+                }
                 Pipe.PipeServer.NotifyExternalEntriesChanged();
                 return false;
             }
@@ -149,7 +157,7 @@ public static class WatcherHelper
             notifications.Enqueue(new PipeMessage
             {
                 Type = PipeMessageTypes.ActionNotice,
-                Payload = System.Text.Json.JsonSerializer.Serialize(new ActionNoticePayload(entry.Name ?? "", "lockdownBlocked"))
+                Payload = System.Text.Json.JsonSerializer.Serialize(new ActionNoticePayload(entry.Name ?? "", disabled ? "lockdownBlocked" : "autoDisableFailed"))
             });
             Pipe.PipeServer.NotifyExternalEntriesChanged();
 
@@ -177,7 +185,7 @@ public static class WatcherHelper
                     {
                         Type = PipeMessageTypes.ActionNotice,
                         Payload = System.Text.Json.JsonSerializer.Serialize(
-                            new ActionNoticePayload(entry.Name ?? "", $"policyBlocked:{policyMatch.PolicyKey}"))
+                            new ActionNoticePayload(entry.Name ?? "", disabled ? $"policyBlocked:{policyMatch.PolicyKey}" : "autoDisableFailed"))
                     });
                     Pipe.PipeServer.NotifyExternalEntriesChanged();
 

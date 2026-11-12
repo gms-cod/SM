@@ -2408,4 +2408,5 @@ Import with overwrite of existing rules?</value>
   <data name="UnblockRuleRemovedButEnableFailed" xml:space="preserve"><value>The blacklist rule was removed, but the startup entry could not be enabled.</value></data>
   <data name="RestoreEntryResultUnknown" xml:space="preserve"><value>The service did not confirm the result. Check the entry list before retrying.</value></data>
   <data name="ActionAutoDisableConflict" xml:space="preserve"><value>{0}: automatic disabling was not applied because the startup value changed. The current value and original backup were preserved.</value></data>
+  <data name="ActionAutoDisableFailed" xml:space="preserve"><value>{0}: automatic disabling could not be confirmed. Check the entry status and event history.</value></data>
 </root>

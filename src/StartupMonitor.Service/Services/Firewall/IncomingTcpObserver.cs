@@ -68,7 +68,7 @@ public sealed class IncomingTcpObserver : BackgroundService
     private async Task RunSessionAsync(CancellationToken ct)
     {
         using var session = NativeProcessTraceSession.Start(NativeProcessTraceSession.IncomingTcpSessionName, _logger);
-        using var source = new ETWTraceEventSource(session.Name, TraceEventSourceType.Session);
+        var source = new ETWTraceEventSource(session.Name, TraceEventSourceType.Session);
         // Разбор payload находится внутри защиты: повреждённое событие не завершает reader.
         Action<TcpIpConnectTraceData> onV4 = e =>
         {
@@ -98,6 +98,8 @@ public sealed class IncomingTcpObserver : BackgroundService
         }
         finally
         {
+            // После начала остановки новые события не должны поступать в очередь UI.
+            _enabled = false;
             try
             {
                 var stats = session.QueryStatistics();
@@ -105,8 +107,6 @@ public sealed class IncomingTcpObserver : BackgroundService
                     _logger.LogWarning("IncomingTCP: ETW потерял {Events} событий и {Buffers} буферов", stats.EventsLost, stats.RealTimeBuffersLost);
             }
             catch (Exception ex) { _logger.LogWarning(ex, "IncomingTCP: статистика потерь ETW недоступна"); }
-            source.Kernel.TcpIpAccept -= onV4;
-            source.Kernel.TcpIpAcceptIPV6 -= onV6;
             try { source.StopProcessing(); }
             catch (Exception ex) { _logger.LogWarning(ex, "IncomingTCP: ошибка остановки чтения ETW"); }
             try { session.Stop(); }
@@ -115,8 +115,22 @@ public sealed class IncomingTcpObserver : BackgroundService
             catch (TimeoutException)
             {
                 _logger.LogWarning("IncomingTCP: читатель ETW не завершился за 5 секунд");
-                _ = reader.ContinueWith(t => _logger.LogWarning(t.Exception, "IncomingTCP: поздняя ошибка читателя ETW"),
-                    CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            }
+            finally
+            {
+                // Ресурсы consumer освобождаются только после выхода из source.Process().
+                _ = reader.ContinueWith(t =>
+                {
+                    if (t.IsFaulted) _logger.LogWarning(t.Exception, "IncomingTCP: ошибка читателя ETW");
+                    try
+                    {
+                        // Отписка, как и освобождение, выполняется после завершения обработки событий.
+                        source.Kernel.TcpIpAccept -= onV4;
+                        source.Kernel.TcpIpAcceptIPV6 -= onV6;
+                        source.Dispose();
+                    }
+                    catch (Exception ex) { _logger.LogWarning(ex, "IncomingTCP: ошибка освобождения читателя ETW"); }
+                }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
             var suppressed = Interlocked.Exchange(ref _suppressed, 0);
             if (suppressed > 0) _logger.LogInformation("IncomingTCP: ограничение частоты скрыло {Count} событий", suppressed);

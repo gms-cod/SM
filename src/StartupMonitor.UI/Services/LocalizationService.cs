@@ -524,6 +524,7 @@ public class LocalizationService : INotifyPropertyChanged
             "disabledKillSkipped" => "ActionDisabledKillSkipped",
             "autoDisabled" => "ActionAutoDisabled",
             "autoDisableConflict" => "ActionAutoDisableConflict",
+            "autoDisableFailed" => "ActionAutoDisableFailed",
             "autoDisabledKilled" => "ActionAutoDisabledKilled",
             "autoDisabledKillSkipped" => "ActionAutoDisabledKillSkipped",
             "removed" => "ActionRemoved",

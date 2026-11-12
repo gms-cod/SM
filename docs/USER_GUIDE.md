@@ -108,6 +108,10 @@ Monitors over 29 persistence locations across Windows:
 ### Tab 10: Settings & Customization
 
 Closing a connection prompt defers it without changing network policy. The countdown performs the displayed temporary outgoing block when an application path is available. Temporary policies last until service restart, for at most eight hours. Permanent application decisions cover both directions, all protocols and profiles. Allowing a TCP port for all applications is explicitly system-wide. A lost reply is shown as an unknown outcome and retried using the same operation identity. External blocks retain priority; UDP/QUIC detection is outside this TCP prompt mechanism.
+
+The **Notify about incoming TCP connections** switch is disabled by default. When enabled, the service observes accepted external TCP connections and the interface can show a notification with the addresses, ports and PID. Local and private addresses are filtered; notifications are globally limited to one every three seconds and are also suppressed in Silent Mode. Events can be missed, including when ETW or the interface is unavailable. This feature does not block a connection, create a complete connection history or cover UDP/QUIC.
+
+The computer name in the status bar opens the system information window. It shows a locally collected snapshot of the available CPU, memory, fixed drives, operating system, device model and BIOS details. Use **Refresh** to collect a new snapshot; unavailable information can be empty.
 - Seamless UI theme switching (Dark, Light, Mica / Acrylic).
 - Realtime UI language hot-swapping (English / Russian).
 - Credentials vault for external API tokens and push channels.

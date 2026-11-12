@@ -31,6 +31,18 @@ foreach ($tag in $versionTags) {
     }
 }
 
+# Локальные теги могут не содержать уже опубликованные версии обоих репозиториев.
+# Ошибка чтения удалённых тегов останавливает сборку до обновления рабочих EXE.
+foreach ($remote in @('origin', 'startup-monitor')) {
+    $remoteTags = @(& git -C $repoRoot ls-remote --tags $remote 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw "Не удалось проверить удалённые теги репозитория $remote." }
+    foreach ($line in $remoteTags) {
+        if ($line -match '\srefs/tags/(v(\d+\.\d+\.\d+))$' -and [version]$version -le [version]$Matches[2]) {
+            throw "Версия $version должна быть строго выше удалённого тега $($Matches[1]) в $remote."
+        }
+    }
+}
+
 # 2. Публикация Release бинарников (если не пропущена)
 if (-not $SkipPublish) {
     Write-Host "`n--> Выполняется публикация проектов..." -ForegroundColor Yellow

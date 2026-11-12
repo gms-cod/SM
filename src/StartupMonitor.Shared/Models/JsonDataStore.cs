@@ -862,10 +862,17 @@ public class JsonDataStore
                 var replacement = _entryOrigins.TryGetValue(entry, out var original) && !ReferenceEquals(original, current)
                     ? ConfigurationMerge.Merge(original, entry, current, _options)
                     : entry.Clone();
+                var previousCache = _cache;
                 ForkCache();
                 _cache!.Entries = [.. _cache.Entries];
                 _cache.Entries[idx] = replacement;
-                SaveEntries();
+                try { SaveEntries(); }
+                catch
+                {
+                    // Не публикуем состояние, которое не удалось записать в хранилище.
+                    _cache = previousCache;
+                    throw;
+                }
                 _entryOrigins.Remove(entry);
                 _entryOrigins.Add(entry, entry.Clone());
             }
@@ -895,11 +902,17 @@ public class JsonDataStore
             updated.AiRisk = rating.Risk;
             updated.AiRecommendation = rating.Recommendation;
             updated.AiContextFingerprint = expectedFingerprint;
+            var previousCache = _cache;
             ForkCache();
             var config = _cache ?? throw new InvalidOperationException("Конфигурация не загружена после копирования.");
             config.Entries = [.. config.Entries];
             config.Entries[index] = updated;
-            SaveEntries();
+            try { SaveEntries(); }
+            catch
+            {
+                _cache = previousCache;
+                throw;
+            }
             return true;
         }
     }
