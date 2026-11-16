@@ -70,6 +70,10 @@ public sealed class NetworkConnectionAlertService : IDisposable
     private readonly JsonDataStore? _store;
     /// <summary>Единый владелец временных исходящих правил; подменяется в изолированных тестах.</summary>
     private readonly ISessionFirewallPolicy _sessionFirewall;
+    /// <summary>Поведенческий анализатор трафика для выявления C2-маяков и аномалий тайминга.</summary>
+    private readonly TrafficBehavioralScorer _trafficScorer = new();
+    /// <summary>Внутренний доступ к поведенческому скореру для тестов и модульной диагностики.</summary>
+    internal TrafficBehavioralScorer TrafficScorer => _trafficScorer;
     // Потокобезопасные коллекции (ConcurrentDictionary) для исключения гонок потоков и сбоев итерации
     private readonly ConcurrentDictionary<string, byte> _whitelistedApps = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, byte> _blacklistedApps = new(StringComparer.OrdinalIgnoreCase);
@@ -442,6 +446,7 @@ public sealed class NetworkConnectionAlertService : IDisposable
             // Один PID может иметь сотни соединений: путь запрашивается один раз в пределах снимка.
             // Кэш не переживает снимок и потому не подменяет путь при переиспользовании PID другой программой.
             var pathsByPid = new Dictionary<int, string?>();
+            var startTimesByPid = new Dictionary<int, long?>();
             // Режим читается не чаще одного раза на снимок, когда действительно нужен новый алерт.
             bool? sessionAllowSupported = null;
             // Кэш настроек обновляется только при изменении ревизии хранилища:
@@ -494,6 +499,27 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 {
                     processPath = ResolveProcessPath(socket.ProcessId, processName);
                     pathsByPid[socket.ProcessId] = processPath;
+                }
+
+                if (!startTimesByPid.TryGetValue(socket.ProcessId, out var processStart))
+                {
+                    processStart = ResolveProcessStartTime(socket.ProcessId);
+                    startTimesByPid[socket.ProcessId] = processStart;
+                }
+
+                TrafficAnomalyObservation? anomaly = null;
+                try
+                {
+                    anomaly = _trafficScorer.Observe(socket, processStart, UtcNowProvider());
+                    if (anomaly != null)
+                    {
+                        Log.Warning("TrafficAnomaly detected: {ProcessName} (PID {Pid}) -> {Remote}:{Port} | RiskScore={Score}, Jitter={Jitter:F1}%, Type={Type}",
+                            processName, socket.ProcessId, remote, socket.RemotePort, anomaly.RiskScore, anomaly.JitterPercent, anomaly.AnomalyType);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "TrafficBehavioralScorer.Observe crashed for PID {Pid}", socket.ProcessId);
                 }
 
                 var sessionKey = BuildSessionKey(processPath, processName);
@@ -558,6 +584,11 @@ public sealed class NetworkConnectionAlertService : IDisposable
                 {
                     existing.LastSeenAt = UtcNowProvider();
                     existing.IsActive = true;
+                    if (anomaly != null)
+                    {
+                        existing.IsAnomaly = true;
+                        existing.AnomalyDetails = anomaly;
+                    }
                     if (_observationsByAlert.TryGetValue(existingId, out var observations) && observations.Count < MaxHistoryItems && observations.Add(seenKey))
                     {
                         existing.ConnectionCount++;
@@ -613,6 +644,8 @@ public sealed class NetworkConnectionAlertService : IDisposable
                     LastSeenAt = UtcNowProvider(),
                     ConnectionCount = 1,
                     IsActive = true,
+                    IsAnomaly = anomaly != null,
+                    AnomalyDetails = anomaly,
                 };
 
                 if (_pendingById.TryAdd(alert.AlertId, alert))
@@ -735,21 +768,27 @@ public sealed class NetworkConnectionAlertService : IDisposable
         return _deferredUntil.TryGetValue(alertId, out var until) && until > UtcNowProvider() ? null : alert;
     }
 
+    /// <summary>Разрешает время запуска процесса (в FileTimeUtc) для защиты от повторного использования PID.</summary>
+    private long? ResolveProcessStartTime(int pid)
+    {
+        try
+        {
+            if (ProcessInstanceResolver != null) return ProcessInstanceResolver(pid);
+            if (pid > 0)
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(pid);
+                return process.StartTime.ToUniversalTime().ToFileTimeUtc();
+            }
+        }
+        catch (Exception ex) { Log.Debug(ex, "NetworkAlerts: идентичность PID {Pid} недоступна", pid); }
+        return null;
+    }
+
     /// <summary>Строит ключ неизвестного процесса с временем старта, не создавая псевдоним по имени exe.</summary>
     private string BuildPendingGroupKey(string? path, string name, int pid)
     {
         if (!string.IsNullOrWhiteSpace(path)) return BuildSessionKey(path, name);
-        long? started = null;
-        try
-        {
-            if (ProcessInstanceResolver != null) started = ProcessInstanceResolver(pid);
-            else if (pid > 0)
-            {
-                using var process = System.Diagnostics.Process.GetProcessById(pid);
-                started = process.StartTime.ToUniversalTime().ToFileTimeUtc();
-            }
-        }
-        catch (Exception ex) { Log.Debug(ex, "NetworkAlerts: идентичность PID {Pid} недоступна", pid); }
+        long? started = ResolveProcessStartTime(pid);
         return $"unknown:{pid}:{started?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "unverified"}:{name.ToLowerInvariant()}";
     }
 
@@ -1901,6 +1940,22 @@ public sealed class NetworkConnectionAlertService : IDisposable
         var cancellation = _aiLifetime.Token;
         try
         {
+            if (alert.IsAnomaly && alert.AnomalyDetails != null && _aiRating != null)
+            {
+                var incident = IncidentTelemetryBuilder.Build(alert.AnomalyDetails, alert.ProcessPath);
+
+                var anomalyVerdict = await _aiRating.RateTrafficAnomalyAsync(incident, cancellation).ConfigureAwait(false);
+                if (anomalyVerdict != null && !cancellation.IsCancellationRequested && _pendingById.ContainsKey(alert.AlertId))
+                {
+                    alert.AiVerdict = anomalyVerdict;
+                    alert.AiPurpose = anomalyVerdict.UserExplanation;
+                    alert.AiBlockingRisk = anomalyVerdict.RiskLabel;
+                    alert.AiRecommendation = anomalyVerdict.ActionReason;
+                    alert.AiRecommendedAction = anomalyVerdict.RecommendedAction;
+                    return;
+                }
+            }
+
             (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
 
             if (AiEvaluatorOverride != null)
@@ -1942,6 +1997,26 @@ public sealed class NetworkConnectionAlertService : IDisposable
             remoteAddress = authoritative.RemoteAddress;
             remotePort = authoritative.RemotePort;
         }
+
+        if (authoritative.IsAnomaly && authoritative.AnomalyDetails != null && _aiRating != null)
+        {
+            var incident = IncidentTelemetryBuilder.Build(authoritative.AnomalyDetails, processPath);
+
+            var anomalyVerdict = await _aiRating.RateTrafficAnomalyAsync(incident, cancellationToken).ConfigureAwait(false);
+            if (anomalyVerdict != null)
+            {
+                if (!string.IsNullOrEmpty(alertId) && _pendingById.TryGetValue(alertId, out var anomalyAlert))
+                {
+                    anomalyAlert.AiVerdict = anomalyVerdict;
+                    anomalyAlert.AiPurpose = anomalyVerdict.UserExplanation;
+                    anomalyAlert.AiBlockingRisk = anomalyVerdict.RiskLabel;
+                    anomalyAlert.AiRecommendation = anomalyVerdict.ActionReason;
+                    anomalyAlert.AiRecommendedAction = anomalyVerdict.RecommendedAction;
+                }
+                return (anomalyVerdict.UserExplanation, anomalyVerdict.RiskLabel, anomalyVerdict.ActionReason, anomalyVerdict.RecommendedAction);
+            }
+        }
+
         (string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)? verdict = null;
 
         if (AiEvaluatorOverride != null)

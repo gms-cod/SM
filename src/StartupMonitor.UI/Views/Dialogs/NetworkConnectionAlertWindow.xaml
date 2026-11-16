@@ -201,8 +201,8 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Background="#0284C7" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
-                                    <TextBlock Text="{Binding NetAlertAiVerdictBadge, Source={StaticResource Loc}}"
+                                <Border x:Name="AiRiskBadgeBorder" Grid.Column="0" Background="#0284C7" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                                    <TextBlock x:Name="TxtAiVerdictBadge" Text="{Binding NetAlertAiVerdictBadge, Source={StaticResource Loc}}"
                                                FontSize="11" FontWeight="Bold" Foreground="White" />
                                 </Border>
                                 <TextBlock x:Name="TxtAiRecommendedAction" Grid.Column="1"

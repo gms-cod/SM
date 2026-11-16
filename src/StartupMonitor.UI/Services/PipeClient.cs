@@ -1857,6 +1857,20 @@ public class PipeClient : IDisposable
     }
 
     /// <summary>
+    /// Запрашивает у службы детальный анализ сетевой аномалии ИИ на основе наблюдения.
+    /// </summary>
+    /// <param name="observation">Наблюдение о сетевой аномалии.</param>
+    /// <param name="processPath">Путь к процессу.</param>
+    /// <param name="ct">Токен отмены запроса.</param>
+    /// <returns>Вердикт ИИ или оффлайн-движка <see cref="AnomalyAiVerdictDto"/> либо null при сбое.</returns>
+    public Task<AnomalyAiVerdictDto?> RequestAnomalyAiExplanationAsync(
+        TrafficAnomalyObservation observation, string? processPath = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        return RequestAnomalyAiExplanationAsync(IncidentTelemetryDto.FromObservation(observation, processPath), ct);
+    }
+
+    /// <summary>
     /// Запрашивает у службы детальный анализ сетевой аномалии ИИ (справка, уровень риска, рекомендация).
     /// </summary>
     /// <param name="incident">Данные инцидента сетевой активности.</param>

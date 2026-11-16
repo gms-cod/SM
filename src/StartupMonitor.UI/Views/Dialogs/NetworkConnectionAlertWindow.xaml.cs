@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using StartupMonitor.Shared.Models;
@@ -901,6 +902,28 @@ public partial class NetworkConnectionAlertWindow : Window
     {
         try
         {
+            if (_alert.AiVerdict != null)
+            {
+                DisplayAiAnomalyVerdict(_alert.AiVerdict);
+                return;
+            }
+
+            if (_alert.IsAnomaly && _alert.AnomalyDetails != null)
+            {
+                var anomalyVerdict = await _pipeClient.RequestAnomalyAiExplanationAsync(
+                    _alert.AnomalyDetails, _alert.ProcessPath, ct).ConfigureAwait(true);
+
+                if (ct.IsCancellationRequested || Volatile.Read(ref _isClosed) != 0)
+                    return;
+
+                if (anomalyVerdict != null)
+                {
+                    _alert.AiVerdict = anomalyVerdict;
+                    DisplayAiAnomalyVerdict(anomalyVerdict);
+                    return;
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(_alert.AiPurpose))
             {
                 DisplayAiVerdict(_alert.AiPurpose, _alert.AiBlockingRisk, _alert.AiRecommendation, _alert.AiRecommendedAction);
@@ -952,6 +975,54 @@ public partial class NetworkConnectionAlertWindow : Window
             try { _aiCts.Dispose(); }
             catch (ObjectDisposedException) { }
         }
+    }
+
+    /// <summary>
+    /// Отображает структурированный вердикт нейросети по сетевой аномалии (C2-маяк / регулярный трафик).
+    /// </summary>
+    /// <param name="verdict">Структурированный вердикт ИИ.</param>
+    private void DisplayAiAnomalyVerdict(AnomalyAiVerdictDto verdict)
+    {
+        if (Volatile.Read(ref _isClosed) != 0 || verdict is null)
+            return;
+
+        var loc = LocalizationService.Instance;
+
+        AiLoadingPanel.Visibility = Visibility.Collapsed;
+        AiScrollViewer.Visibility = Visibility.Visible;
+        AiContentPanel.Visibility = Visibility.Visible;
+
+        TxtAiPurpose.Text = !string.IsNullOrWhiteSpace(verdict.UserExplanation) ? verdict.UserExplanation : loc.NetAlertAiPurposeFallback;
+        TxtAiBlockingRisk.Text = !string.IsNullOrWhiteSpace(verdict.TechnicalSummary) ? verdict.TechnicalSummary : loc.NetAlertAiRiskFallback;
+        TxtAiRecommendation.Text = !string.IsNullOrWhiteSpace(verdict.ActionReason) ? verdict.ActionReason : loc.NetAlertAiRecommendationFallback;
+
+        TxtAiRecommendedAction.Text = verdict.RecommendedAction switch
+        {
+            "AllowAlways" => loc.NetAlertRecAllowAlways,
+            "AllowSession" => loc.NetAlertRecAllowSession,
+            "BlockAlways" => loc.NetAlertRecBlockAlways,
+            "BlockSession" => loc.NetAlertRecBlockSession,
+            _ when !string.IsNullOrWhiteSpace(verdict.RecommendedAction) => verdict.RecommendedAction,
+            _ => string.Empty
+        };
+
+        // Цветовая градация бейджа по уровню риска (1 - Безопасно, 5 - Критический)
+        var badgeColor = verdict.RiskLevel switch
+        {
+            1 => Color.FromRgb(16, 185, 129),  // #10B981 Зеленый
+            2 => Color.FromRgb(6, 182, 212),   // #06B6D4 Голубой
+            3 => Color.FromRgb(245, 158, 11),  // #F59E0B Янтарный
+            4 => Color.FromRgb(249, 115, 22),  // #F97316 Оранжевый
+            5 => Color.FromRgb(239, 68, 68),   // #EF4444 Красный
+            _ => Color.FromRgb(2, 132, 199)    // #0284C7 По умолчанию
+        };
+        AiRiskBadgeBorder.Background = new SolidColorBrush(badgeColor);
+
+        var riskText = !string.IsNullOrWhiteSpace(verdict.RiskLabel) ? verdict.RiskLabel : $"Риск {verdict.RiskLevel}/5";
+        TxtAiVerdictBadge.Text = _alert.IsAnomaly ? $"АНОМАЛИЯ ({riskText})" : riskText;
+
+        UpdateLayout();
+        RepositionWindow(animate: false);
     }
 
     /// <summary>

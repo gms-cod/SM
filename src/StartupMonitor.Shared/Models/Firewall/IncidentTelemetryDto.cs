@@ -99,4 +99,50 @@ public sealed class IncidentTelemetryDto
         /// <summary>Предварительный скор риска (0-100).</summary>
         public int PreliminaryRiskScore { get; set; }
     }
+
+    /// <summary>
+    /// Создает экземпляр <see cref="IncidentTelemetryDto"/> на основе наблюдения об аномалии.
+    /// </summary>
+    /// <param name="observation">Наблюдение об аномалии трафика.</param>
+    /// <param name="processPath">Полный путь к процессу.</param>
+    /// <returns>Заполненный объект телеметрии инцидента.</returns>
+    public static IncidentTelemetryDto FromObservation(TrafficAnomalyObservation observation, string? processPath = null)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        return new IncidentTelemetryDto
+        {
+            IncidentId = Guid.NewGuid().ToString("N"),
+            TimestampUtc = DateTime.UtcNow,
+            Process = new ProcessTelemetry
+            {
+                Pid = observation.ProcessId,
+                StartTimeUtc = observation.DetectedAt,
+                Name = observation.ProcessName,
+                Path = processPath ?? string.Empty
+            },
+            Traffic = new TrafficTelemetry
+            {
+                RemoteAddress = observation.RemoteAddress,
+                RemotePort = observation.RemotePort,
+                Protocol = observation.Protocol,
+                Direction = "Outbound",
+                ObservationCount = observation.ObservationCount,
+                AverageIntervalSeconds = observation.AverageIntervalSeconds,
+                JitterPercent = observation.JitterPercent,
+                AnomalyType = observation.AnomalyType,
+                RiskScore = observation.RiskScore
+            },
+            Heuristics = new HeuristicsTelemetry
+            {
+                IsUserWritablePath = !string.IsNullOrWhiteSpace(processPath) &&
+                    (processPath.Contains(@"\Temp\", StringComparison.OrdinalIgnoreCase) ||
+                     processPath.Contains(@"\AppData\", StringComparison.OrdinalIgnoreCase) ||
+                     processPath.Contains(@"\Downloads\", StringComparison.OrdinalIgnoreCase) ||
+                     processPath.Contains(@"\Desktop\", StringComparison.OrdinalIgnoreCase)),
+                IsBeaconing = string.Equals(observation.AnomalyType, "Beaconing", StringComparison.OrdinalIgnoreCase) || observation.JitterPercent <= 25.0,
+                IsNonStandardPort = observation.RemotePort != 80 && observation.RemotePort != 443 && observation.RemotePort != 53,
+                PreliminaryRiskScore = observation.RiskScore
+            }
+        };
+    }
 }
