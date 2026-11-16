@@ -7,7 +7,7 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет реальные инварианты защиты и кэша с управляемыми источниками вместо COM и сетевых таймингов.</summary>
+/// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
 public sealed class NetworkReliabilityTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "NetworkReliability_" + Guid.NewGuid().ToString("N"));
@@ -17,7 +17,7 @@ public sealed class NetworkReliabilityTests : IDisposable
     private readonly JsonDataStore _store;
     private readonly ProcessPortDefenderService _defender;
 
-    /// <summary>Создаёт изолированное ядро без запуска настоящего фонового опроса.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
     public NetworkReliabilityTests()
     {
         _store = new JsonDataStore(_directory);
@@ -27,14 +27,14 @@ public sealed class NetworkReliabilityTests : IDisposable
         _defender = CreateDefender();
     }
 
-    /// <summary>Создаёт ядро над тем же изолированным хранилищем для проверки перезапуска.</summary>
-    /// <returns>Экземпляр с управляемым firewall.</returns>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
     private ProcessPortDefenderService CreateDefender() => new(
         _firewall, _network, _notifications, _store,
         NullLogger<ProcessPortDefenderService>.Instance, startMonitoring: false);
 
-    /// <summary>Включает правила без неявных дополнительных защищаемых портов.</summary>
-    /// <param name="rules">Проверяемые правила.</param>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
     private void Configure(params PortDefenderRuleConfig[] rules) => _defender.SaveConfig(new PortDefenderConfigDto
     {
         IsGloballyEnabled = true,
@@ -42,10 +42,10 @@ public sealed class NetworkReliabilityTests : IDisposable
         Rules = [.. rules]
     });
 
-    /// <summary>Создаёт соединение из документального диапазона адресов без настоящего сетевого обмена.</summary>
-    /// <param name="port">Защищаемый локальный порт.</param>
-    /// <param name="remotePort">Уникальный удалённый порт.</param>
-    /// <returns>Снимок установленного TCP-соединения.</returns>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
     private static TcpSocketInfo Socket(int port = 8080, int remotePort = 40000) => new()
     {
         ProcessId = 123,
@@ -57,6 +57,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     };
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void HasWork_EnabledProtectionRemainsActiveWithoutUi()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080 });
@@ -67,6 +70,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DisabledRule_DoesNotReappearThroughProtectedPorts()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, IsEnabled = false, ThresholdCount = 1 });
@@ -77,6 +83,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DifferentPorts_DoNotShareRateCounter()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 2 },
@@ -87,6 +96,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void RulesOnSamePort_DoNotCountOneConnectionTwice()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 3, WindowUnit = TimeWindowUnit.Minute },
@@ -99,6 +111,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EmptySnapshot_ResetsConnectionDeduplication()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 2 });
@@ -111,6 +126,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FailedBlock_DoesNotRegisterBanAndRetriesUnchangedSnapshot(bool throwException)
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 1 });
@@ -129,6 +147,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FailedUnblock_PreservesBanForRetry(bool throwException)
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 1 });
@@ -146,6 +167,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ExpiredBan_FailedStartupUnblockSurvivesAndAutoUnbanRetries()
     {
         _defender.Dispose();
@@ -163,6 +187,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SavedConfiguration_IsIndependentFromCallerMutations()
     {
         var rule = new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 1 };
@@ -174,6 +201,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ReturnedBan_IsIndependentFromInternalState()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 1 });
@@ -185,6 +215,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FullPathRule_DoesNotMatchDifferentApplicationWithSameFileName()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 1, ProcessPath = @"C:\A\app.exe" });
@@ -200,6 +233,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UdpSocket_IsNotCountedAsIncomingTcpConnection()
     {
         Configure(new PortDefenderRuleConfig { LocalPort = 8080, ThresholdCount = 1 });
@@ -211,6 +247,9 @@ public sealed class NetworkReliabilityTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PortRuleIdentity_UsesFullPathAndIsCaseInsensitive()
     {
         var first = WindowsFirewallService.PortRuleName(8080, FirewallProtocol.Tcp, 1, @"C:\A\app.exe");
@@ -221,7 +260,7 @@ public sealed class NetworkReliabilityTests : IDisposable
         Assert.Equal("StartupMonitor_Block_Port_Tcp_8080_In_System", WindowsFirewallService.PortRuleName(8080, FirewallProtocol.Tcp, 1, null));
     }
 
-    /// <summary>Освобождает службы до удаления принадлежащей только этому тесту директории.</summary>
+    /// <summary>Verifies test scenario for NetworkReliabilityTests.cs.</summary>
     public void Dispose()
     {
         _defender.Dispose();

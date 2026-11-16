@@ -5,10 +5,10 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет ограниченную стоимость подтверждения постоянной политики и её истечение при внешнем отзыве.</summary>
+/// <summary>Verifies test scenario for FirewallPersistentPolicyCacheTests.cs.</summary>
 public sealed class FirewallPersistentPolicyCacheTests
 {
-    /// <summary>Тысяча сокетов не вызывает тысячу чтений правил; после TTL внешнее удаление возвращает запрос.</summary>
+    /// <summary>Verifies test scenario for FirewallPersistentPolicyCacheTests.cs.</summary>
     [Fact]
     public void PersistentDecision_UsesBoundedRuleReadsAndRechecksExternalDeletion()
     {
@@ -39,7 +39,7 @@ public sealed class FirewallPersistentPolicyCacheTests
         Assert.Single(service.GetPendingAlerts());
     }
 
-    /// <summary>Создаёт независимую строку снимка с одним путём приложения и различимым локальным портом.</summary>
+    /// <summary>Verifies test scenario for FirewallPersistentPolicyCacheTests.cs.</summary>
     private static ProcessNetworkSocket Socket(int port) => new()
     {
         ProcessId = 12345, ProcessName = "cache-check.exe", Protocol = "TCP", State = "ESTABLISHED",

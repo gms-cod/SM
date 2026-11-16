@@ -6,7 +6,7 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Модульные тесты экспорта/импорта правил брандмауэра и пресетов безопасности.</summary>
+/// <summary>Verifies test scenario for FirewallBackupAndPresetsTests.cs.</summary>
 public sealed class FirewallBackupAndPresetsTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -14,7 +14,7 @@ public sealed class FirewallBackupAndPresetsTests
         PropertyNameCaseInsensitive = true,
     };
 
-    // --- FirewallBackupDto: сериализация ------------------------------------
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void BackupDto_HasExpectedDefaults()
@@ -29,6 +29,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BackupDto_SerializationRoundtrip_PreservesAllFields()
     {
         var dto = new FirewallBackupDto
@@ -70,6 +73,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BackupDto_EmptyRules_SerializesToEmptyArray()
     {
         var dto = new FirewallBackupDto { Description = "пусто" };
@@ -81,7 +87,7 @@ public sealed class FirewallBackupAndPresetsTests
         Assert.Empty(restored!.Rules);
     }
 
-    // --- Пресеты: валидация правил ------------------------------------------
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void BuildPresetRules_MaxPrivacy_BlocksTelemetryCortanaDiagnostics()
@@ -104,6 +110,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildPresetRules_Gaming_OpensSteamBattleNetEpicPorts()
     {
         var rules = WindowsFirewallService.BuildPresetRules(SecurityPresetType.Gaming);
@@ -128,6 +137,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildPresetRules_PublicWifi_BlocksNetbiosSmbRdpRpc()
     {
         var rules = WindowsFirewallService.BuildPresetRules(SecurityPresetType.PublicWifi);
@@ -148,6 +160,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildPresetRules_ResetToDefaults_ReturnsEmpty()
     {
         var rules = WindowsFirewallService.BuildPresetRules(SecurityPresetType.ResetToDefaults);
@@ -156,6 +171,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildPresetRules_UnknownPreset_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
@@ -163,6 +181,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildPresetRules_AllRules_ManagedAndGrouped()
     {
         foreach (var preset in new[] { SecurityPresetType.MaxPrivacy, SecurityPresetType.Gaming, SecurityPresetType.PublicWifi })
@@ -177,7 +198,7 @@ public sealed class FirewallBackupAndPresetsTests
         }
     }
 
-    // --- PlanImport: подсчёт импортированных правил --------------------------
+    // Verifies component behavior and assertions.
 
     private static FirewallBackupDto MakeBackup(params string[] names) => new()
     {
@@ -195,6 +216,9 @@ public sealed class FirewallBackupAndPresetsTests
     };
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PlanImport_NoExisting_AllImported()
     {
         var backup = MakeBackup("A", "B", "C");
@@ -206,6 +230,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PlanImport_ExistingSkipped_WithoutOverwrite()
     {
         var backup = MakeBackup("A", "B", "C");
@@ -218,6 +245,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PlanImport_ExistingReimported_WithOverwrite()
     {
         var backup = MakeBackup("A", "B");
@@ -230,6 +260,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PlanImport_InvalidNames_AreSkipped()
     {
         var backup = MakeBackup("Valid", "", "   ");
@@ -241,6 +274,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PlanImport_EmptyBackup_ReturnsZeroZero()
     {
         var (imported, skipped) = WindowsFirewallService.PlanImport(
@@ -251,6 +287,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PlanImport_NullBackup_Throws()
     {
         Assert.Throws<ArgumentNullException>(
@@ -258,13 +297,16 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ImportRulesBackup_NullBackup_Throws()
     {
         var svc = new WindowsFirewallService();
         Assert.Throws<ArgumentNullException>(() => svc.ImportRulesBackup(null!));
     }
 
-    // --- Pipe-контракт -------------------------------------------------------
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void PipeMessageTypes_ContainBackupAndPresetMessages()
@@ -278,6 +320,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ImportRequest_SerializationRoundtrip()
     {
         var req = new ImportFirewallRulesRequest(MakeBackup("A"), overwriteExisting: true);
@@ -290,6 +335,9 @@ public sealed class FirewallBackupAndPresetsTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ApplyPresetRequest_SerializationRoundtrip()
     {
         var req = new ApplySecurityPresetRequest(SecurityPresetType.Gaming);

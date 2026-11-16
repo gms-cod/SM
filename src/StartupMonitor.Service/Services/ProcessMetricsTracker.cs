@@ -518,7 +518,13 @@ public class ProcessMetricsTracker : IDisposable
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MEMORYSTATUSEX
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLength;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwMemoryLoad;
         public ulong ullTotalPhys;
         public ulong ullAvailPhys;

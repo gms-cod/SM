@@ -3,7 +3,7 @@ using StartupMonitor.Shared.Audit.Models;
 namespace StartupMonitor.Shared.Audit.Exporters;
 
 /// <summary>
-/// Интерфейс для генераторов различных форматов отчета аудита (HTML, CSV, JSON).
+/// Interface for audit report generators supporting multiple formats (HTML, CSV, JSON).
 /// </summary>
 public interface IAuditReportExporter
 {

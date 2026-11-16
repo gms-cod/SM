@@ -5,9 +5,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class ProcessStartupLinkerTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Match_ByExecutablePath_ReturnsLinkedEntry()
     {
         var linker = new ProcessStartupLinker();
@@ -32,6 +38,9 @@ public class ProcessStartupLinkerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Match_CaseInsensitiveAndPathVariants_Matches()
     {
         var linker = new ProcessStartupLinker();
@@ -55,6 +64,9 @@ public class ProcessStartupLinkerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Match_ByServiceName_ReturnsLinkedEntry()
     {
         var linker = new ProcessStartupLinker();
@@ -79,6 +91,9 @@ public class ProcessStartupLinkerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Match_NonStartupProcess_ReturnsFalse()
     {
         var linker = new ProcessStartupLinker();

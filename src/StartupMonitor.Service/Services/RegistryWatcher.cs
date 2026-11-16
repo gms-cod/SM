@@ -248,11 +248,17 @@ public class RegistryWatcher : BackgroundService
     private sealed class WatchedKeySubscription : IDisposable
     {
         public SafeHandle RegHandle { get; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string KeyPath { get; }
         public RegistryHive Hive { get; }
         public AutoResetEvent NotifyEvent { get; } = new(false);
         public RegisteredWaitHandle? WaitHandle { get; set; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public WatchedKeySubscription(SafeHandle regHandle, string keyPath, RegistryHive hive)
         {
             RegHandle = regHandle;
@@ -260,6 +266,9 @@ public class RegistryWatcher : BackgroundService
             Hive = hive;
         }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void Dispose()
         {
             try { WaitHandle?.Unregister(null); } catch { }

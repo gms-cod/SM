@@ -4,19 +4,17 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для PipeMessage, BlacklistRule и типов сообщений протокола обмена между UI и службой.
-/// </summary>
+/// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
 public class PipeServerTests
 {
-    /// <summary>Настройки JSON-сериализации: регистронезависимые имена свойств.</summary>
+    /// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
     /// <summary>
-    /// Проверяет полный цикл сериализации/десериализации PipeMessage.
+    /// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void PipeMessage_SerializeDeserialize_RoundTrip()
@@ -37,7 +35,7 @@ public class PipeServerTests
     }
 
     /// <summary>
-    /// Проверяет, что десериализация JSON с lowercase-ключами работает корректно.
+    /// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void PipeMessage_CaseInsensitive_Deserialization()
@@ -51,7 +49,7 @@ public class PipeServerTests
     }
 
     /// <summary>
-    /// Проверяет сериализацию списка StartupEntry как ответа на GetAllEntries.
+    /// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void GetAllEntriesResponse_Serializes_StartupEntryList()
@@ -71,7 +69,7 @@ public class PipeServerTests
     }
 
     /// <summary>
-    /// Проверяет полный цикл сериализации/десериализации BlacklistRule.
+    /// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void BlacklistRule_SerializeDeserialize_RoundTrip()
@@ -94,7 +92,7 @@ public class PipeServerTests
     }
 
     /// <summary>
-    /// Проверяет, что все константы типов сообщений PipeMessageTypes непустые.
+    /// <summary>Verifies test scenario for PipeServerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void PipeMessageTypes_AllDefined_AreNotEmpty()

@@ -11,10 +11,10 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет обновление производственной привязки Boot Impact без изменения самой записи автозапуска.</summary>
+/// <summary>Verifies test scenario for BootImpactLocalizationTests.cs.</summary>
 public sealed partial class NetworkRenderingRegressionTests
 {
-    /// <summary>Настоящие TextBlock и заголовок из XAML переводятся RU→EN→RU при неизменных Driver/Service/RegistryRun.</summary>
+    /// <summary>Verifies test scenario for BootImpactLocalizationTests.cs.</summary>
     [Fact]
     public void BootImpactLanguageSwitch_UpdatesExistingBadgesAndHeaderWithoutLocationChange()
         => _host.Run(() =>
@@ -64,7 +64,7 @@ public sealed partial class NetworkRenderingRegressionTests
             }
         });
 
-    /// <summary>Неполный MultiBinding безопасен, а связанные подписи имеют приоритет над устаревшей культурой привязки.</summary>
+    /// <summary>Verifies test scenario for BootImpactLocalizationTests.cs.</summary>
     [Fact]
     public void BootImpactMultiBinding_HandlesIncompleteValuesAndUsesBoundTranslations()
         => _host.Run(() =>

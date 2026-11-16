@@ -8,12 +8,12 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет отказ системного отключения через настоящий обработчик IPC.</summary>
+/// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
 public sealed class DisableEntryFailureTests
 {
-    /// <summary>Отказ записи хранилища возвращает файл и снимок к прежнему состоянию при отключении и включении.</summary>
-    /// <param name="enable">Проверяет включение ранее отключённого файла.</param>
-    /// <returns>Задача проверки ответа IPC и состояния файла.</returns>
+    /// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -54,8 +54,8 @@ public sealed class DisableEntryFailureTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
     }
 
-    /// <summary>Удалённая или уже восстановленная запись не должна приводить к ложному успешному ответу.</summary>
-    /// <returns>Задача проверки ответа обработчика восстановления.</returns>
+    /// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
     [Fact]
     public async Task RestoreMissingEntry_ReturnsError()
     {
@@ -88,7 +88,7 @@ public sealed class DisableEntryFailureTests
         }
     }
 
-    /// <summary>Отказ операции не меняет запись и историю, даже если включено завершение процесса.</summary>
+    /// <summary>Verifies test scenario for DisableEntryFailureTests.cs.</summary>
     [Fact]
     public async Task RefusedDisable_PreservesStatusAndHistoryAndReturnsReason()
     {
@@ -105,7 +105,7 @@ public sealed class DisableEntryFailureTests
             });
             store.Save(config);
 
-            // Не создаём полноценный сервер с системными зависимостями: проверяем его настоящий диспетчер.
+            // Verifies component behavior and assertions.
             var server = (PipeServer)RuntimeHelpers.GetUninitializedObject(typeof(PipeServer));
             var storeField = typeof(PipeServer).GetField("_store", BindingFlags.NonPublic | BindingFlags.Instance);
             var loggerField = typeof(PipeServer).GetField("_logger", BindingFlags.NonPublic | BindingFlags.Instance);

@@ -3,12 +3,12 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>Проверяет диагностику восстановления файлов без потери корректной конфигурации и истории.</summary>
+/// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
 public sealed class JsonDataStoreDiagnosticsRegressionTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitorDiagnostics_" + Guid.NewGuid().ToString("N"));
 
-    /// <summary>Отказ резервного копирования не скрывается и не препятствует атомарному сохранению основной секции.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
     [Fact]
     public void LockedBackup_IsReportedAndCurrentSettingsRemainPersisted()
     {
@@ -27,7 +27,7 @@ public sealed class JsonDataStoreDiagnosticsRegressionTests : IDisposable
         Assert.Equal("dark", new JsonDataStore(_directory).Load().Theme);
     }
 
-    /// <summary>Повторное сохранение допускает возврат к исходному значению без удаления неизвестных параллельных данных.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
     [Fact]
     public void ReusedSnapshot_RevertsFieldWithoutDeletingConcurrentEntry()
     {
@@ -43,7 +43,7 @@ public sealed class JsonDataStoreDiagnosticsRegressionTests : IDisposable
         Assert.Equal("concurrent", Assert.Single(store.Load().Entries).Id);
     }
 
-    /// <summary>Повторная запись того же DTO может отменить свой рейтинг, сохраняя чужое изменение статуса.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
     [Fact]
     public void ReusedEntrySnapshot_RevertsRatingWithoutRevertingConcurrentStatus()
     {
@@ -62,7 +62,7 @@ public sealed class JsonDataStoreDiagnosticsRegressionTests : IDisposable
         Assert.Equal(EntryStatus.Disabled, actual.Status);
     }
 
-    /// <summary>Повреждённые фрагменты не удаляют соседние корректные события и оставляют содержательную диагностику.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
     [Fact]
     public void CorruptHistoryFragments_AreReportedWithoutDiscardingValidEvents()
     {
@@ -78,7 +78,7 @@ public sealed class JsonDataStoreDiagnosticsRegressionTests : IDisposable
         Assert.Contains(warnings, message => message.Contains("незавершённой записью", StringComparison.Ordinal));
     }
 
-    /// <summary>Первое добавление после срока компактации удаляет просроченные строки с диска без перезапуска.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
     [Fact]
     public void CompactionDuringRuntime_RemovesExpiredDiskRowsAndKeepsNewEventOnce()
     {
@@ -97,7 +97,7 @@ public sealed class JsonDataStoreDiagnosticsRegressionTests : IDisposable
         Assert.Equal(1, rows.Count(row => row.Contains("after", StringComparison.Ordinal)));
     }
 
-    /// <summary>Удаляет только выделенный этому тесту каталог после освобождения файлов.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreDiagnosticsRegressionTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);

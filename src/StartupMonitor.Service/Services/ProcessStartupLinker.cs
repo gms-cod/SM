@@ -228,16 +228,43 @@ public class ProcessStartupLinker
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct PROCESSENTRY32
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwSize;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint cntUsage;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint th32ProcessID;
         public IntPtr th23DefaultHeapID;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint th32ModuleID;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint cntThreads;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint th32ParentProcessID;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int pcPriClassBase;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwFlags;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string szExeFile;
     }
 

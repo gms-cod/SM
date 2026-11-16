@@ -4,13 +4,11 @@ using StartupMonitor.Service.Services;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Проверяет настоящий read-only снимок NtQuerySystemInformation для ETW baseline.
-/// Сессии ETW, подписки UI, сетевые правила и внешние процессы не создаются.
-/// </summary>
+/// <summary>Verifies test scenario for ProcessLifecycleSnapshotTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessLifecycleSnapshotTests.cs.</summary>
 public sealed class ProcessLifecycleSnapshotTests
 {
-    /// <summary>Проверяет точный FILETIME собственного процесса без включения метрик и обогащения метаданных.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSnapshotTests.cs.</summary>
     [Fact]
     public void CaptureLifecycleSnapshot_ReturnsCurrentProcessWithoutStartingSamplingOrMetadata()
     {
@@ -35,7 +33,7 @@ public sealed class ProcessLifecycleSnapshotTests
         Assert.Empty(cache);
     }
 
-    /// <summary>Проверяет отмену до нативного запроса без включения периодического сбора.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSnapshotTests.cs.</summary>
     [Fact]
     public void CaptureLifecycleSnapshot_PreCanceled_ThrowsCancellation()
     {
@@ -49,7 +47,7 @@ public sealed class ProcessLifecycleSnapshotTests
         Assert.Equal(0, tracker.SubscriberCount);
     }
 
-    /// <summary>Проверяет явный отказ после освобождения буфера вместо обращения к освобождённой памяти.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSnapshotTests.cs.</summary>
     [Fact]
     public void CaptureLifecycleSnapshot_Disposed_ThrowsObjectDisposedException()
     {

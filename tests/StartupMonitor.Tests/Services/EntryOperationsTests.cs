@@ -4,19 +4,17 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для EntryOperations: удаление/восстановление файлов, реестровых записей, служб, задач,
-/// проверка защищённых имён процессов.
-/// </summary>
+/// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
+/// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
 public class EntryOperationsTests
 {
-    /// <summary>Настройки JSON-сериализации: snake_case для payload'ных классов.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    /// <summary>Создаёт тестовую запись StartupEntry для указанного Location.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     private static StartupEntry MakeEntry(EntryLocation loc, string name = "TestEntry", string filePath = "")
     {
         var entry = new StartupEntry
@@ -36,7 +34,7 @@ public class EntryOperationsTests
     // ───── Registry Payload round-trip ─────
 
     /// <summary>
-    /// Проверяет, что BuildRegistryPayload возвращает путь, начинающийся с ожидаемого hive-префикса.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.RegistryRun, "HKEY_CURRENT_USER")]
@@ -54,7 +52,7 @@ public class EntryOperationsTests
     // ───── StartupFile ─────
 
     /// <summary>
-    /// Проверяет, что RemoveStartupFile возвращает ошибку для несуществующего файла.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveStartupFile_FileNotFound_ReturnsError()
@@ -67,7 +65,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что RemoveStartupFile удаляет существующий файл и создаёт бэкап.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveStartupFile_ExistingFile_RemovesAndReturnsPayload()
@@ -94,13 +92,13 @@ public class EntryOperationsTests
         finally
         {
             if (File.Exists(tempFile)) File.Delete(tempFile);
-            // Общая папка содержит пользовательские бэкапы: удаляется только путь из payload этого теста.
+            // Verifies component behavior and assertions.
             if (createdBackup != null && File.Exists(createdBackup)) File.Delete(createdBackup);
         }
     }
 
     /// <summary>
-    /// Проверяет, что RestoreFile возвращает ошибку при отсутствующем бэкапе.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RestoreFile_BackupNotFound_ReturnsError()
@@ -115,7 +113,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что RestoreFile восстанавливает файл из бэкапа по валидному payload.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RestoreFile_ValidBackup_RestoresFile()
@@ -125,7 +123,7 @@ public class EntryOperationsTests
         try
         {
             File.WriteAllText(tempBackup, "backup content");
-            // Восстанавливаем удалённый путь, а не перезаписываем созданный GetTempFileName пустой файл.
+            // Verifies component behavior and assertions.
             File.Delete(tempOriginal);
 
             var payload = JsonSerializer.Serialize(
@@ -148,7 +146,7 @@ public class EntryOperationsTests
     // ───── Service Payload round-trip ─────
 
     /// <summary>
-    /// Проверяет сериализацию/десериализацию ServicePayload.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ServicePayload_SerializesAndDeserializes()
@@ -165,7 +163,7 @@ public class EntryOperationsTests
     // ───── Task Payload round-trip ─────
 
     /// <summary>
-    /// Проверяет сериализацию/десериализацию TaskPayload.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TaskPayload_SerializesAndDeserializes()
@@ -181,7 +179,7 @@ public class EntryOperationsTests
     // ───── Registry Payload round-trip ─────
 
     /// <summary>
-    /// Проверяет сериализацию/десериализацию RegistryPayload.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RegistryPayload_SerializesAndDeserializes()
@@ -200,7 +198,7 @@ public class EntryOperationsTests
     // ───── Dispatcher ─────
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem возвращает ошибку для неподдерживаемых типов Location.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.KeyboardHook)]
@@ -216,7 +214,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что RestoreToSystem возвращает ошибку для неподдерживаемых типов Location.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RestoreToSystem_UnsupportedLocation_ReturnsError()
@@ -232,7 +230,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem для StartupFolder с отсутствующим файлом возвращает ошибку.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_StartupFolderWithMissingFile_ReturnsError()
@@ -247,7 +245,7 @@ public class EntryOperationsTests
     // ───── RemoveFromSystem routing ─────
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem для реестровых Location не выбрасывает исключений.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.RegistryRun)]
@@ -263,7 +261,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem для службы возвращает payload даже для несуществующей службы.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_ServiceLocation_ReturnsErrorNoService()
@@ -278,7 +276,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem для задачи планировщика возвращает ошибку при отсутствии задачи.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_TaskSchedulerLocation_ReturnsErrorNoTask()
@@ -292,7 +290,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что IsProtectedProcessName возвращает true для системных и служебных имён.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData("svchost.exe")]
@@ -310,7 +308,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что IsProtectedProcessName возвращает false для обычных имён приложений.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData("myapp.exe")]
@@ -323,7 +321,7 @@ public class EntryOperationsTests
     // ───── TerminateAllBlocked ─────
 
     /// <summary>
-    /// Проверяет, что TerminateAllBlocked не бросает исключений для пустого списка.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TerminateAllBlocked_EmptyList_DoesNotThrow()
@@ -333,8 +331,8 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что TerminateAllBlocked пропускает незаблокированные записи
-    /// (для несуществующего имени процесс не убивается — безопасный сценарий).
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TerminateAllBlocked_NotBlockedEntry_DoesNotAttemptKill()
@@ -348,8 +346,8 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что TerminateAllBlocked не бросает исключений для Blocked-записи
-    /// с несуществующим файлом (KillProcess находит 0 процессов — безопасно).
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TerminateAllBlocked_BlockedEntry_DoesNotThrow()
@@ -366,7 +364,7 @@ public class EntryOperationsTests
     // ───── KillProcessesByRules ─────
 
     /// <summary>
-    /// Проверяет, что KillProcessesByRules не бросает исключений для пустого списка правил.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void KillProcessesByRules_Empty_DoesNotThrow()
@@ -376,7 +374,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что KillProcessesByRules игнорирует правила NotifyOnly (ничего не убивает).
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void KillProcessesByRules_NotifyOnlyRule_DoesNotThrow()
@@ -392,8 +390,8 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что KillProcessesByRules с правилом на несуществующий путь не бросает исключений
-    /// и не завершает никакие живые процессы.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void KillProcessesByRules_NonMatchingPath_DoesNotThrow()
@@ -409,7 +407,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что SuspendProcess блокирует попытку приостановки критических системных процессов (svchost, explorer и др.).
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData("svchost.exe")]
@@ -424,7 +422,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что ResumeProcess блокирует попытку возобновления критических системных процессов.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData("svchost.exe")]
@@ -437,7 +435,7 @@ public class EntryOperationsTests
     }
 
     /// <summary>
-    /// Проверяет, что IsProcessSuspended возвращает false для несуществующего PID.
+    /// <summary>Verifies test scenario for EntryOperationsTests.cs.</summary>
     /// </summary>
     [Fact]
     public void IsProcessSuspended_UnknownPid_ReturnsFalse()

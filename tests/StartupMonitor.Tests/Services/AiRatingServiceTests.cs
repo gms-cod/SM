@@ -5,15 +5,13 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для AiRatingService: парсинг ответа от Groq API, обработка markdown-обёртки, мусора,
-/// выход за границы score, неверный формат.
-/// </summary>
+/// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
+/// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
 public class AiRatingServiceTests : IDisposable
 {
-    /// <summary>Временная директория для хранилища.</summary>
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"sm-{Guid.NewGuid():N}");
-    /// <summary>Сервис AI-рейтинга с тестовым ключом.</summary>
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     private readonly AiRatingService _service;
 
     public AiRatingServiceTests()
@@ -23,12 +21,12 @@ public class AiRatingServiceTests : IDisposable
         _service = new AiRatingService(cache, NullLogger<AiRatingService>.Instance, "test-key");
     }
 
-    /// <summary>Оборачивает JSON-контент в структуру OpenAI-ответа.</summary>
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     private static string Wrap(string content) =>
         "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":" + content + "}}]}";
 
     /// <summary>
-    /// Проверяет парсинг валидного JSON-ответа от API.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_ValidJson_ReturnsRating()
@@ -44,7 +42,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет парсинг ответа, обёрнутого в markdown-код (```json ... ```).
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_MarkdownWrapped_Parses()
@@ -58,7 +56,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что при мусорном ответе (не JSON) возвращается null.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_Garbage_ReturnsNull()
@@ -69,7 +67,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что ответ не в OpenAI-формате (без choices) возвращает null.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_NotOpenAiFormat_ReturnsNull()
@@ -78,7 +76,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что score зажимается в диапазон 1-10.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(0, 1)]
@@ -95,7 +93,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет парсинг ответа с неэкранированными путями Windows (C:\Windows\system32\... и \Users).
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_WindowsPathsWithBackslashes_ParsesCorrectly()
@@ -112,7 +110,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что уже корректно экранированные пути (C:\\Program Files\\OpenVPN) не портятся.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_AlreadyEscapedWindowsPaths_DoesNotBreak()
@@ -129,7 +127,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что BuildPrompt для русской локали включает всю информацию об элементе автозапуска и инструкции на русском.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void BuildPrompt_Russian_IncludesFullMetadataAndRussianInstructions()
@@ -170,7 +168,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что BuildPrompt для английской локали включает всю информацию и инструкции на английском.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void BuildPrompt_English_IncludesFullMetadataAndEnglishInstructions()
@@ -201,7 +199,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет динамическое переключение языка формирования запроса к AI.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void UpdateUiLang_SwitchesPromptLanguage()
@@ -218,7 +216,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет извлечение JSON из поля reasoning, если content пустой (для reasoning-моделей gpt-oss-120b, DeepSeek-R1).
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_WhenContentEmpty_ExtractsFromReasoning()
@@ -252,7 +250,7 @@ public class AiRatingServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет извлечение JSON из поля thought, если content пустой.
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseResponse_WhenContentEmpty_ExtractsFromThought()
@@ -284,7 +282,7 @@ public class AiRatingServiceTests : IDisposable
         Assert.Equal("system", rating.Category);
     }
 
-    /// <summary>Удаляет временные файлы тестов.</summary>
+    /// <summary>Verifies test scenario for AiRatingServiceTests.cs.</summary>
     public void Dispose()
     {
         _service.Dispose();

@@ -3,10 +3,10 @@ using StartupMonitor.UI.Views;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет настоящий алгоритм CRUD портов без создания окна или обращения к установленной службе.</summary>
+/// <summary>Verifies test scenario for DefenderPortConfigurationTests.cs.</summary>
 public sealed class DefenderPortConfigurationTests
 {
-    /// <summary>Удаление убирает общие и процессные правила порта, не меняя соседние порты.</summary>
+    /// <summary>Verifies test scenario for DefenderPortConfigurationTests.cs.</summary>
     [Fact]
     public void DeletePort_RemovesAllMatchingRules()
     {
@@ -20,7 +20,7 @@ public sealed class DefenderPortConfigurationTests
         Assert.Equal(9090, Assert.Single(config.Rules).LocalPort);
     }
 
-    /// <summary>Перенос сохраняет выключение, индивидуальные пороги, процесс и белый список каждого правила.</summary>
+    /// <summary>Verifies test scenario for DefenderPortConfigurationTests.cs.</summary>
     [Fact]
     public void EditPort_PreservesEveryRuleSetting()
     {
@@ -41,7 +41,7 @@ public sealed class DefenderPortConfigurationTests
         Assert.Equal(31, second.ThresholdCount);
     }
 
-    /// <summary>Существующий целевой порт нельзя молча объединить с другими правилами.</summary>
+    /// <summary>Verifies test scenario for DefenderPortConfigurationTests.cs.</summary>
     [Fact]
     public void EditPort_ExistingTargetIsRejectedWithoutMutatingRules()
     {

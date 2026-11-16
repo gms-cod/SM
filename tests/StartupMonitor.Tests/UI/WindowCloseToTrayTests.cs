@@ -5,18 +5,18 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет настоящий FluentWindow: штатное закрытие скрывает окно, сохраняя его содержимое и исходное состояние.</summary>
+/// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class WindowCloseToTrayTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Использует общий STA-host без production startup, IPC и пользовательских настроек.</summary>
-    /// <param name="host">Диспетчер настоящих окон тестовой коллекции.</param>
+    /// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
     public WindowCloseToTrayTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Повторные нажатия штатного Close не уничтожают HWND; восстановление сохраняет Normal/Maximized и WPF-дерево.</summary>
-    /// <param name="state">Оконное состояние до закрытия крестиком.</param>
+    /// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
     [Theory]
     [InlineData(WindowState.Normal)]
     [InlineData(WindowState.Maximized)]
@@ -46,7 +46,7 @@ public sealed class WindowCloseToTrayTests
                 Assert.Same(text, window.Content);
                 Assert.Equal(state, window.WindowState);
             }
-            // Владелец может явно прекратить поведение; настоящее закрытие после этого сохраняется.
+            // Verifies component behavior and assertions.
             detach();
             window.Close();
             Assert.True(closed);
@@ -54,15 +54,15 @@ public sealed class WindowCloseToTrayTests
         finally { detach(); if (!closed) window.Close(); }
     });
 
-    /// <summary>API отклоняет отсутствующее окно, не создавая повреждённый оконный жизненный цикл.</summary>
+    /// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
     [Fact]
     public void Attach_NullWindow_Throws() => _host.Run(() =>
     {
-        // Намеренный null! проверяет валидацию границы; production всегда передаёт созданное окно.
+        // Verifies component behavior and assertions.
         Assert.Throws<ArgumentNullException>(() => WindowCloseToTrayBehavior.Attach(null!));
     });
 
-    /// <summary>Обрабатывает нативную команду закрытия и последующий WPF-layout до проверки видимости.</summary>
+    /// <summary>Verifies test scenario for WindowCloseToTrayTests.cs.</summary>
     private static void Pump()
     {
         var frame = new DispatcherFrame();

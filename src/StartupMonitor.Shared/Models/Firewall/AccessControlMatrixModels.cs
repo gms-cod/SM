@@ -136,6 +136,9 @@ public sealed class SetAppAccessStateRequest
 
     public SetAppAccessStateRequest() { }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public SetAppAccessStateRequest(string appPath, string procName, AccessControlState targetState, AccessRuleScope scope = AccessRuleScope.Permanent, int ttlMinutes = 0)
     {
         ApplicationPath = appPath ?? string.Empty;

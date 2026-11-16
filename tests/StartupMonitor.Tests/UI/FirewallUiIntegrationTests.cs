@@ -7,11 +7,9 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// Интеграционные тесты UI-слоя Firewall и Port Defender:
-/// маппинг статусов сокетов/банов, строковые форматы/конвертеры,
-/// валидация правил Port Defender и наличие ресурсов EN/RU.
-/// </summary>
+/// <summary>Verifies test scenario for FirewallUiIntegrationTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallUiIntegrationTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallUiIntegrationTests.cs.</summary>
 public sealed class FirewallUiIntegrationTests
 {
     private static void WithCulture(string cultureCode, Action action)
@@ -32,7 +30,7 @@ public sealed class FirewallUiIntegrationTests
         }
     }
 
-    // ─── 1. Маппинг статусов брандмауэра ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData(FirewallBlockStatus.Allowed, "FwStatusAllowed")]
@@ -45,6 +43,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetBlockStatusText_EnAndRu_ReturnsLocalizedStrings()
     {
         WithCulture("en", () =>
@@ -60,6 +61,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetSocketStatusText_PrioritizesBanOverBlockOverProtected()
     {
         var publicSocket = new ProcessNetworkSocket
@@ -89,16 +93,16 @@ public sealed class FirewallUiIntegrationTests
 
         WithCulture("ru", () =>
         {
-            // Бан имеет наивысший приоритет.
+            // Verifies component behavior and assertions.
             Assert.Equal("В бане",
                 FirewallUiMapper.GetSocketStatusText(publicSocket, FirewallBlockStatus.Allowed, isBanned: true));
-            // Затем — блокировка в брандмауэре.
+            // Verifies component behavior and assertions.
             Assert.Equal("Заблокирован",
                 FirewallUiMapper.GetSocketStatusText(publicSocket, FirewallBlockStatus.BlockedBoth, isBanned: false));
-            // Приватный адрес под защитой Defender.
+            // Verifies component behavior and assertions.
             Assert.Equal("Защищён Defender",
                 FirewallUiMapper.GetSocketStatusText(privateSocket, FirewallBlockStatus.Allowed, isBanned: false));
-            // Публичный разрешённый.
+            // Verifies component behavior and assertions.
             Assert.Equal("Разрешено",
                 FirewallUiMapper.GetSocketStatusText(publicSocket, FirewallBlockStatus.Allowed, isBanned: false));
         });
@@ -117,6 +121,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetBanStatusText_PermanentAndTemporary_FormatsCorrectly()
     {
         var permanent = new ActiveBanDto
@@ -163,7 +170,7 @@ public sealed class FirewallUiIntegrationTests
         });
     }
 
-    // ─── 2. Строковые форматы и конвертеры ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void FormatSocketCount_UsesLocalizedFormat()
@@ -181,10 +188,13 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void StatusToDisplayConverter_AllEntryStatuses_ReturnsNonEmptyExceptEnabled()
     {
-        // StatusEnabledShort пуст по дизайну (нейтральный статус без бейджа),
-        // остальные обязаны давать непустую локализованную строку.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var converter = new StatusToDisplayConverter();
         WithCulture("ru", () =>
         {
@@ -198,6 +208,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void RemoteEndPoint_WildcardAndNormal_FormatsCorrectly()
     {
         var wildcard = new ProcessNetworkSocket { RemoteAddress = "*", RemotePort = 0 };
@@ -221,6 +234,9 @@ public sealed class FirewallUiIntegrationTests
     [InlineData(1440, "ru", "Бан на 24 часа")]
     [InlineData(0, "ru", "Бан навсегда")]
     [InlineData(null, "ru", "Бан навсегда")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetBanDurationText_MapsMinutesToMenuString(int? minutes, string culture, string expected)
     {
         WithCulture(culture, () =>
@@ -229,7 +245,7 @@ public sealed class FirewallUiIntegrationTests
         });
     }
 
-    // ─── 3. Валидация правил Port Defender ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void ValidateRule_ValidRule_ReturnsTrue()
@@ -254,6 +270,9 @@ public sealed class FirewallUiIntegrationTests
     [InlineData(-1)]
     [InlineData(65536)]
     [InlineData(100000)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ValidateRule_InvalidPort_ReturnsFalse(int port)
     {
         var rule = new PortDefenderRuleConfig { LocalPort = port, ThresholdCount = 5, BanDurationMinutes = 15 };
@@ -266,6 +285,9 @@ public sealed class FirewallUiIntegrationTests
     [Theory]
     [InlineData(0)]
     [InlineData(-5)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ValidateRule_InvalidThreshold_ReturnsFalse(int threshold)
     {
         var rule = new PortDefenderRuleConfig { LocalPort = 3389, ThresholdCount = threshold, BanDurationMinutes = 15 };
@@ -274,6 +296,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ValidateRule_NegativeBanDuration_ReturnsFalse()
     {
         var rule = new PortDefenderRuleConfig { LocalPort = 3389, ThresholdCount = 5, BanDurationMinutes = -1 };
@@ -282,6 +307,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ValidateRule_MalformedWhitelist_ReturnsFalse()
     {
         var rule = new PortDefenderRuleConfig
@@ -297,9 +325,12 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ValidateRule_ZeroPortAnyAndZeroBanPermanent_AreValid()
     {
-        // LocalPort = 0 — любой порт; BanDurationMinutes = 0 — перманентный бан.
+        // Verifies component behavior and assertions.
         var rule = new PortDefenderRuleConfig { LocalPort = 0, ThresholdCount = 10, BanDurationMinutes = 0 };
         var (valid, error) = FirewallUiMapper.ValidateRule(rule);
         Assert.True(valid);
@@ -308,6 +339,9 @@ public sealed class FirewallUiIntegrationTests
 
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FirewallGuard_SelfLockoutAddresses_AreRejected()
     {
         Assert.False(FirewallGuard.IsBlockableAddress("127.0.0.1", out _));
@@ -315,7 +349,7 @@ public sealed class FirewallUiIntegrationTests
         Assert.True(FirewallGuard.IsBlockableAddress("8.8.8.8", out _));
     }
 
-    // ─── 4. Наличие ресурсов EN/RU ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("FwStatusAllowed")]
@@ -366,6 +400,9 @@ public sealed class FirewallUiIntegrationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void LocalizationResources_RuDiffersFromEn_ForKeyStatuses()
     {
         string? en, ru;

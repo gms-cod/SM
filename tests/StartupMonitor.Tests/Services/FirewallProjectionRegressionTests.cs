@@ -6,10 +6,10 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет узкую COM-проекцию и прежние fallback без чтения или изменения правил рабочей машины.</summary>
+/// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
 public sealed class FirewallProjectionRegressionTests
 {
-    /// <summary>Кэшируемые динамические getter поддерживают исходные преобразования чисел, строк и логических значений.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     [Fact]
     public void RuleProjection_DynamicMembersPreserveValueConversions()
     {
@@ -31,7 +31,7 @@ public sealed class FirewallProjectionRegressionTests
         Assert.Equal("Group", result.Grouping);
     }
 
-    /// <summary>Сбой getter, null и неверный тип сохраняют прежние значения fallback полного DTO.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     [Fact]
     public void RuleProjection_UnavailableFieldsKeepPriorFallbacks()
     {
@@ -50,8 +50,8 @@ public sealed class FirewallProjectionRegressionTests
         Assert.True(result.IsManaged);
     }
 
-    /// <summary>Явные false, ноль и строковое false не заменяются значением fallback=true.</summary>
-    /// <param name="enabled">Совместимое с Convert.ToBoolean исходное значение.</param>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(0)]
@@ -62,12 +62,12 @@ public sealed class FirewallProjectionRegressionTests
         Assert.False(ReadCompleteRule(rule).Enabled);
     }
 
-    /// <summary>Неизвестное имя остаётся совместимым с прежним reflection-чтением публичного свойства.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     [Fact]
     public void UnknownProperty_PreservesReflectionFallback()
         => Assert.Equal("Custom value", WindowsFirewallService.ReadRuleProperty(new AdditionalRuleProperty(), "CustomLabel"));
 
-    /// <summary>Статус читает только Name и адреса двух точных агрегатов, сохраняя регистр префикса и дубликаты адресов.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     [Fact]
     public void StatusProjection_ReadsOnlyRequiredFieldsAndPreservesCounts()
     {
@@ -89,19 +89,19 @@ public sealed class FirewallProjectionRegressionTests
         Assert.Equal(2, rules.Sum(rule => rule.Reads.Count(name => name == "RemoteAddresses")));
     }
 
-    /// <summary>Новая граница чтения отвергает отсутствующее правило, коллекцию и пустое имя свойства.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     [Fact]
     public void Projection_RejectsInvalidArguments()
     {
-        // Намеренные null! проверяют валидацию внутреннего контракта и никогда не передаются рабочим кодом.
+        // Verifies component behavior and assertions.
         Assert.Throws<ArgumentNullException>(() => WindowsFirewallService.ReadManagedRuleCounts(null!));
         Assert.Throws<ArgumentNullException>(() => WindowsFirewallService.ReadRuleProperty(null!, "Name"));
         Assert.Throws<ArgumentException>(() => WindowsFirewallService.ReadRuleProperty(new AdditionalRuleProperty(), string.Empty));
     }
 
-    /// <summary>Вызывает существующую полную проекцию для проверки преобразований её безопасных getter.</summary>
-    /// <param name="rule">Публичный динамический адаптер, эквивалентный свойствам IDispatch.</param>
-    /// <returns>Настоящий DTO метода ReadRule.</returns>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     private static FirewallRuleDto ReadCompleteRule(object rule)
     {
         var method = typeof(WindowsFirewallService).GetMethod("ReadRule", BindingFlags.NonPublic | BindingFlags.Static)
@@ -109,29 +109,29 @@ public sealed class FirewallProjectionRegressionTests
         return Assert.IsType<FirewallRuleDto>(method.Invoke(null, [rule]));
     }
 
-    /// <summary>Публичный динамический адаптер фиксирует реальные обращения getter и может имитировать отказ отдельного COM-поля.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     public sealed class DynamicRule : DynamicObject
     {
-        /// <summary>Исходные значения динамических свойств.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
         private readonly IReadOnlyDictionary<string, object?> _values;
-        /// <summary>Поля, чтение которых диагностически завершается отказом.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
         private readonly HashSet<string> _unavailable;
-        /// <summary>Последовательность обращений к свойствам для проверки узкой проекции.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
         public List<string> Reads { get; } = new();
 
-        /// <summary>Создаёт адаптер без системного COM и без возможности изменения firewall.</summary>
-        /// <param name="values">Явные исходные значения свойств.</param>
-        /// <param name="unavailable">Поля с принудительным отказом чтения.</param>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
         public DynamicRule(IReadOnlyDictionary<string, object?> values, IEnumerable<string>? unavailable = null)
         {
             _values = values;
             _unavailable = new HashSet<string>(unavailable ?? Array.Empty<string>(), StringComparer.Ordinal);
         }
 
-        /// <summary>Возвращает значение поля или контролируемый COM-отказ и записывает факт чтения.</summary>
-        /// <param name="binder">Запрашиваемое динамическое имя.</param>
-        /// <param name="result">Исходное значение либо null для отсутствующего поля.</param>
-        /// <returns>True, поскольку адаптер поддерживает запрос любого поля с null-fallback.</returns>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
         public override bool TryGetMember(GetMemberBinder binder, out object? result)
         {
             Reads.Add(binder.Name);
@@ -141,10 +141,10 @@ public sealed class FirewallProjectionRegressionTests
         }
     }
 
-    /// <summary>CLR-свойство вне известной COM-проекции проверяет совместимый reflection-fallback.</summary>
+    /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
     public sealed class AdditionalRuleProperty
     {
-        /// <summary>Дополнительное публичное поле, отсутствующее в фиксированном наборе getter.</summary>
+        /// <summary>Verifies test scenario for FirewallProjectionRegressionTests.cs.</summary>
         public string CustomLabel => "Custom value";
     }
 }

@@ -490,6 +490,9 @@ internal record DiscordPayload(
     [property: JsonPropertyName("embeds")] List<DiscordEmbed> Embeds
 );
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 internal record DiscordEmbed(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
@@ -499,12 +502,18 @@ internal record DiscordEmbed(
     [property: JsonPropertyName("timestamp")] string Timestamp
 );
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 internal record DiscordField(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("value")] string Value,
     [property: JsonPropertyName("inline")] bool Inline = false
 );
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 internal record DiscordFooter(
     [property: JsonPropertyName("text")] string Text
 );

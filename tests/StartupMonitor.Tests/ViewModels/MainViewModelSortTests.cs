@@ -6,6 +6,9 @@ using Xunit;
 namespace StartupMonitor.Tests.ViewModels;
 
 [Collection("MainViewModelConfig")]
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class MainViewModelSortTests : IDisposable
 {
     private readonly string _tempConfigFile;
@@ -16,6 +19,9 @@ public class MainViewModelSortTests : IDisposable
         MainViewModel.CustomConfigPath = _tempConfigFile;
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         MainViewModel.CustomConfigPath = null;
@@ -23,6 +29,9 @@ public class MainViewModelSortTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SortByPublisher_Ascending_NamedPublishersFirstAlphabetically()
     {
         var vm = new MainViewModel(new PipeClient());
@@ -39,13 +48,16 @@ public class MainViewModelSortTests : IDisposable
 
         Assert.Equal("Google LLC", vm.FilteredEntries[0].Publisher);
         Assert.Equal("Microsoft Corporation", vm.FilteredEntries[1].Publisher);
-        // Записи без издателя в конце
+        // Verifies component behavior and assertions.
         Assert.True(string.IsNullOrWhiteSpace(vm.FilteredEntries[2].Publisher));
         Assert.True(string.IsNullOrWhiteSpace(vm.FilteredEntries[3].Publisher));
         Assert.Equal("\u25B2", vm.SortPublisherIndicator);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SortByPublisher_Descending_ReversesOrder()
     {
         var vm = new MainViewModel(new PipeClient());
@@ -67,6 +79,9 @@ public class MainViewModelSortTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SortByImpact_AscendingAndDescending_OrdersCorrectly()
     {
         var vm = new MainViewModel(new PipeClient());
@@ -94,6 +109,9 @@ public class MainViewModelSortTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SortByStatus_AscendingAndDescending_OrdersCorrectly()
     {
         var vm = new MainViewModel(new PipeClient());

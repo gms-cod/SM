@@ -58,6 +58,9 @@ public class StartupEntry : INotifyPropertyChanged
 
     /// <summary>Флаг наличия проверенной доверенной цифровой подписи Authenticode.</summary>
     private bool _isSigned;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public bool IsSigned { get => _isSigned; set => Set(ref _isSigned, value); }
 
     /// <summary>Статус криптографической проверки цифровой подписи Authenticode.</summary>

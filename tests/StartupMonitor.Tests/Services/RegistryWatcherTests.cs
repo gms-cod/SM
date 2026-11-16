@@ -4,6 +4,9 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class RegistryWatcherTests : IDisposable
 {
     private readonly string _tempDir;
@@ -26,6 +29,9 @@ public class RegistryWatcherTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose_ClearsWatchedKeys_WithoutThrowing()
     {
         var watcher = new RegistryWatcher(
@@ -38,6 +44,9 @@ public class RegistryWatcherTests : IDisposable
         Assert.Null(exception);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         _notifications?.Dispose();
@@ -45,10 +54,16 @@ public class RegistryWatcherTests : IDisposable
     }
 }
 
-/// <summary>Минимальная заглушка ILogger для тестов.</summary>
+/// <summary>Verifies test scenario for RegistryWatcherTests.cs.</summary>
 internal class SilentLogger<T> : ILogger<T>
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public bool IsEnabled(LogLevel logLevel) => false;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
 }

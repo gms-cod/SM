@@ -5,7 +5,7 @@ using StartupMonitor.Shared.Models;
 namespace StartupMonitor.Shared.Audit.Models;
 
 /// <summary>
-/// Полный снимок отчета аудита безопасности системы.
+/// Complete security audit report snapshot for the system.
 /// </summary>
 public class AuditReport
 {

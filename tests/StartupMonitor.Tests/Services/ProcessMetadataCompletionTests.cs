@@ -6,12 +6,12 @@ using StartupMonitor.Service.Services.ProcessLifecycle;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет завершение проверки подписи после попадания базовых данных в кэш без изменения опубликованного DTO.</summary>
+/// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
 public sealed class ProcessMetadataCompletionTests
 {
-    /// <summary>Возвращает кэш конкретного worker для контролируемого воспроизведения состояния частичного обогащения.</summary>
-    /// <param name="enricher">Изолированный worker текущего теста.</param>
-    /// <returns>Потокобезопасный кэш с точным ключом экземпляра процесса.</returns>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
     private static ConcurrentDictionary<(int Pid, long StartTimeTicks), CachedProcessMetadata> Cache(ProcessMetadataEnricher enricher)
     {
         var field = typeof(ProcessMetadataEnricher).GetField("_cache", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -20,10 +20,10 @@ public sealed class ProcessMetadataCompletionTests
     }
 
     /// <summary>
-    /// Воспроизводит cache-hit на базовых данных до проверки подписи. Проверка должна завершиться,
-    /// а подписчики уже опубликованного снимка не должны получать изменения с фонового потока.
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
     /// </summary>
-    /// <returns>Задача завершения локальной проверки подписи тестового файла.</returns>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
     [Fact]
     public async Task EnrichOrQueue_BasicCacheHit_CompletesSignatureWithoutMutatingPublishedSnapshot()
     {
@@ -67,8 +67,8 @@ public sealed class ProcessMetadataCompletionTests
         finally { File.Delete(file); }
     }
 
-    /// <summary>Проверяет запрет устойчивого кэширования PID с неизвестным временем создания.</summary>
-    /// <returns>Задача завершения worker, чтобы проверить отсутствие поздней записи в кэш.</returns>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
     [Fact]
     public async Task EnrichOrQueue_UnknownCreationTime_DoesNotCreatePidZeroIdentityCache()
     {
@@ -87,8 +87,8 @@ public sealed class ProcessMetadataCompletionTests
         Assert.Empty(Cache(enricher));
     }
 
-    /// <summary>Проверяет вытеснение старого поколения кэша, хотя тот же PID продолжает существовать.</summary>
-    /// <returns>Задача детерминированного освобождения неактивного worker.</returns>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
     [Fact]
     public async Task PruneDeadProcesses_ExactInstances_RemovesOldGenerationOfStillActivePid()
     {
@@ -105,8 +105,8 @@ public sealed class ProcessMetadataCompletionTests
         Assert.False(cache.ContainsKey(first));
     }
 
-    /// <summary>Проверяет повторную доставку готовой подписи после baseline без повторной работы Authenticode.</summary>
-    /// <returns>Задача завершения единственной проверки подписи локального изолированного файла.</returns>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessMetadataCompletionTests.cs.</summary>
     [Fact]
     public async Task MetadataReady_SignatureBeforeBaseline_IsDeliveredOnNextCacheHit()
     {

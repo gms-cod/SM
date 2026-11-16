@@ -5,10 +5,10 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет изоляцию AI-рекомендаций по контексту автозапуска.</summary>
+/// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
 public sealed class StartupRatingContextTests
 {
-    /// <summary>Уведомление о готовой оценке отправляется лишь после подтверждённого сохранения; отклонённый ответ его не создаёт.</summary>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
     [Fact]
     public void AutomaticRatingChange_NotifiesOnlyAfterSuccessfulConditionalSave()
     {
@@ -41,7 +41,7 @@ public sealed class StartupRatingContextTests
         }
     }
 
-    /// <summary>Временное обогащение пути не делает вердикт, проверенный до обогащения, несовместимым со снимком хранилища.</summary>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
     [Fact]
     public void SnapshotRating_IsValidatedBeforeTransientPathEnrichment()
     {
@@ -69,7 +69,7 @@ public sealed class StartupRatingContextTests
         }
     }
 
-    /// <summary>После перезапуска изменённая команда скрывает старый вердикт без удаления оценки с диска.</summary>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
     [Fact]
     public void Restart_ChangedCommand_HidesStaleAutomaticRating()
     {
@@ -97,8 +97,8 @@ public sealed class StartupRatingContextTests
         }
     }
 
-    /// <summary>Скрывает неподтверждённые старые автоматические оценки без записи на диск и сохраняет ручные.</summary>
-    /// <param name="english">Проверяет английский вариант старого текста.</param>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -144,7 +144,7 @@ public sealed class StartupRatingContextTests
         }
     }
 
-    /// <summary>Один файл с разными параметрами и местоположением не наследует чужую рекомендацию.</summary>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
     [Fact]
     public async Task SameHash_DifferentCommandOrLocation_DoesNotReuseVerdict()
     {
@@ -183,7 +183,7 @@ public sealed class StartupRatingContextTests
         }
     }
 
-    /// <summary>Ручная оценка принадлежит конкретной записи и не переносится на другую.</summary>
+    /// <summary>Verifies test scenario for StartupRatingContextTests.cs.</summary>
     [Fact]
     public void ManualRating_DoesNotApplyToAnotherEntry()
     {

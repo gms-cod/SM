@@ -5,6 +5,9 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class DeltaIpcTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -14,6 +17,9 @@ public class DeltaIpcTests
     };
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntriesRevisionRequest_Serialization_PreservesClientRevision()
     {
         var req = new EntriesRevisionRequest(42);
@@ -25,6 +31,9 @@ public class DeltaIpcTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntriesDeltaResponse_WhenNotModified_SerializesCorrectly()
     {
         var resp = new EntriesDeltaResponse(42, isModified: false, null);
@@ -38,6 +47,9 @@ public class DeltaIpcTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntriesDeltaResponse_WhenModified_ContainsEntries()
     {
         var entries = new List<StartupEntry>

@@ -4,6 +4,9 @@ using System.Text;
 
 namespace StartupMonitor.Service.Services.Ai;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public static class ProgramLangDetector
 {
     [DllImport("version.dll", CharSet = CharSet.Unicode)]

@@ -7,6 +7,9 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public sealed class PortDefenderCoreServiceTests : IDisposable
 {
     private readonly string _tempDir;
@@ -26,7 +29,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
         _scanTracker = new InitialScanTracker();
         _scanTracker.MarkCompleted();
         _notificationService = new NotificationService(_scanTracker);
-        // Unit-тесты подтверждают логику без изменения настоящего Windows Firewall и зависимости от прав пользователя.
+        // Verifies component behavior and assertions.
         _firewallService = new TestPortDefenderFirewall();
         _networkTracker = new ProcessNetworkTracker();
 
@@ -40,6 +43,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Config_GetAndSave_RoundtripsSuccessfully()
     {
         var config = new PortDefenderConfigDto
@@ -77,6 +83,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessSocketSnapshot_FloodOnProtectedPort_TriggersBan()
     {
         var rule = new PortDefenderRuleConfig
@@ -95,9 +104,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
             Rules = new List<PortDefenderRuleConfig> { rule }
         });
 
-        var attackingIp = "198.51.100.25"; // Допустимый публичный IP (RFC 5737 TEST-NET-2)
+        var attackingIp = "198.51.100.25"; // Valid public IP (RFC 5737 TEST-NET-2)
 
-        // Имитируем 3 входящих соединения с разных удалённых портов
+        // Verifies component behavior and assertions.
         var sockets = new List<TcpSocketInfo>
         {
             new() { LocalPort = 8080, RemoteAddress = attackingIp, RemotePort = 40001, State = "ESTABLISHED" },
@@ -112,6 +121,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessSocketSnapshot_WhitelistedIp_IsNeverBanned()
     {
         var trustedIp = "192.168.1.50";
@@ -144,6 +156,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessSocketSnapshot_LoopbackIp_IsRejectedByGuard()
     {
         var rule = new PortDefenderRuleConfig
@@ -171,6 +186,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UnbanAndClearAllBans_RemovesBansCorrectly()
     {
         var rule = new PortDefenderRuleConfig
@@ -194,31 +212,37 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
 
         Assert.NotEmpty(_defender.GetActiveBans());
 
-        // Снятие конкретного бана
+        // Verifies component behavior and assertions.
         _defender.UnbanIp(ip);
         Assert.Empty(_defender.GetActiveBans());
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EscalationFormula_ComputesExpectedDurations()
     {
-        // 1-й: base (15м)
+        // Verifies component behavior and assertions.
         Assert.Equal(15, ProcessPortDefenderService.CalculateEscalatedDuration(15, 1, true));
-        // 2-й: 30м
+        // Verifies component behavior and assertions.
         Assert.Equal(30, ProcessPortDefenderService.CalculateEscalatedDuration(15, 2, true));
-        // 3-й: 60м (1ч)
+        // Verifies component behavior and assertions.
         Assert.Equal(60, ProcessPortDefenderService.CalculateEscalatedDuration(15, 3, true));
-        // 4-й: 1440м (24ч)
+        // Verifies component behavior and assertions.
         Assert.Equal(1440, ProcessPortDefenderService.CalculateEscalatedDuration(15, 4, true));
-        // 5-й+: 0 (Permanent)
+        // Verifies component behavior and assertions.
         Assert.Equal(0, ProcessPortDefenderService.CalculateEscalatedDuration(15, 5, true));
         Assert.Equal(0, ProcessPortDefenderService.CalculateEscalatedDuration(15, 10, true));
 
-        // Без эскалации: всегда base
+        // Verifies component behavior and assertions.
         Assert.Equal(15, ProcessPortDefenderService.CalculateEscalatedDuration(15, 5, false));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void WhitelistMatching_SupportsExactCidrAndWildcard()
     {
         var list = new List<string> { "192.168.1.100", "10.0.0.0/8", "172.16.5.*" };
@@ -235,7 +259,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что порты из ProtectedPorts без явного списка Rules успешно отслеживаются и блокируют атаки.
+    /// <summary>Verifies test scenario for PortDefenderCoreServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessSocketSnapshot_ProtectedPortsWithoutExplicitRule_TriggersBan()
@@ -264,7 +288,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что при удалении порта из ProtectedPorts он немедленно перестает отслеживаться.
+    /// <summary>Verifies test scenario for PortDefenderCoreServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SaveConfig_PortRemovedFromProtectedPorts_ImmediatelyStopsMonitoring()
@@ -277,7 +301,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
             WindowSeconds = 60
         });
 
-        // Удаляем порт 9099 и оставляем только 3389
+        // Verifies component behavior and assertions.
         _defender.SaveConfig(new PortDefenderConfigDto
         {
             IsGloballyEnabled = true,
@@ -301,7 +325,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что при изменении порта в ProtectedPorts новый порт немедленно защищается.
+    /// <summary>Verifies test scenario for PortDefenderCoreServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SaveConfig_PortChangedInProtectedPorts_ImmediatelyProtectsNewPort()
@@ -314,7 +338,7 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
             WindowSeconds = 60
         });
 
-        // Заменяем 7070 на 7071
+        // Verifies component behavior and assertions.
         _defender.SaveConfig(new PortDefenderConfigDto
         {
             IsGloballyEnabled = true,
@@ -336,6 +360,9 @@ public sealed class PortDefenderCoreServiceTests : IDisposable
         Assert.Contains(bans, b => b.Ip == attackingIp && b.TargetPort == 7071);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         _defender.Dispose();

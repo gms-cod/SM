@@ -5,11 +5,11 @@ using Xunit;
 
 namespace StartupMonitor.Tests.ViewModels;
 
-/// <summary>Проверяет соответствие фильтров карточек счётчикам автозапуска.</summary>
+/// <summary>Verifies test scenario for MainViewModelMetricFilterTests.cs.</summary>
 [Collection("MainViewModelConfig")]
 public class MainViewModelMetricFilterTests
 {
-    /// <summary>Карточки показывают записи нужного статуса и сбрасывают поиск.</summary>
+    /// <summary>Verifies test scenario for MainViewModelMetricFilterTests.cs.</summary>
     [Fact]
     public void MetricCards_FilterEntriesAndResetSearch()
     {
@@ -40,8 +40,8 @@ public class MainViewModelMetricFilterTests
         }
     }
 
-    /// <summary>Удаляет временный файл с повтором при кратковременной блокировке другим процессом.</summary>
-    /// <param name="path">Путь к файлу настроек теста.</param>
+    /// <summary>Verifies test scenario for MainViewModelMetricFilterTests.cs.</summary>
+    /// <summary>Verifies test scenario for MainViewModelMetricFilterTests.cs.</summary>
     private static void DeleteTemporaryFile(string path)
     {
         for (var attempt = 0; ; attempt++)

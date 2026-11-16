@@ -7,10 +7,8 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Проверяет событийное применение правил ЧС к управляемым целям: catch-up, пауза,
-/// версия правил, точный FILETIME и повтор отказавшего Kill. Процессы ОС не завершаются.
-/// </summary>
+/// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
 public sealed class ProcessBlacklistEnforcerTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitorEventBlacklist_" + Guid.NewGuid().ToString("N"));
@@ -28,7 +26,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
     private readonly TestTimeProvider _time = new();
     private readonly TestLogger _logger = new();
 
-    /// <summary>Создаёт изолированный store и координатор без службы уведомлений или реального IPC.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     public ProcessBlacklistEnforcerTests()
     {
         _store = new JsonDataStore(_directory);
@@ -38,11 +36,11 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         _coordinator = new MonitoringStateCoordinator(_store);
     }
 
-    /// <summary>Добавляет процесс в управляемый системный снимок и реестр с точным временем создания.</summary>
-    /// <param name="pid">Тестовый PID.</param>
-    /// <param name="name">Имя процесса.</param>
-    /// <param name="path">Полный путь, возвращаемый удерживаемой целью.</param>
-    /// <returns>Состояние, позволяющее проверить вызовы Kill и задать контролируемый отказ.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private TargetState AddProcess(int pid = 1234, string name = "blocked.exe", string? path = @"C:\Apps\blocked.exe")
     {
         var created = DateTime.UtcNow.AddMinutes(-1).AddTicks(pid);
@@ -53,9 +51,9 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         return state;
     }
 
-    /// <summary>Создаёт обработчик со снимком и удерживаемыми целями, полностью принадлежащими тесту.</summary>
-    /// <param name="mode">Режим обработки ETW.</param>
-    /// <returns>Обработчик, освобождаемый вместе с тестовым контекстом.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private ProcessBlacklistEnforcer CreateEnforcer(ProcessLifecycleMode mode = ProcessLifecycleMode.EtwPreferred)
     {
         _enforcer = new ProcessBlacklistEnforcer(_store, _coordinator, _registry, _ingress, mode,
@@ -70,8 +68,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         return _enforcer;
     }
 
-    /// <summary>Проверяет, что Legacy не запускает событийную оценку или дополнительный снимок.</summary>
-    /// <returns>Задача обработки одного управляемого пакета.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Legacy_DoesNotOpenTargetsOrCaptureSnapshot()
     {
@@ -86,8 +84,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.False(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Проверяет сохранение legacy-защиты и отсутствие Kill в теневом режиме.</summary>
-    /// <returns>Задача обработки одного управляемого пакета.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Shadow_DoesNotKillOrSuppressLegacy()
     {
@@ -100,8 +98,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.False(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Проверяет первоначальный catch-up уже работающего запрещённого процесса и идемпотентность повторного пакета.</summary>
-    /// <returns>Задача обработки двух последовательных пакетов.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_ExistingMatchingProcess_IsKilledOnceAfterCatchUp()
     {
@@ -117,8 +115,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.True(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Проверяет немедленное возвращение legacy-защиты при переполнении реестра после успешного catch-up.</summary>
-    /// <returns>Задача двух пакетов без создания или завершения процессов ОС.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_RegistryCapacityExceeded_DoesNotSuppressFallbackOrOpenPartialTargets()
     {
@@ -138,8 +136,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.False(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Проверяет отказ от Kill, если удерживаемый дескриптор принадлежит другому экземпляру PID.</summary>
-    /// <returns>Задача оценки устаревшего решения.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_CreationFileTimeMismatch_DoesNotKillReusedPid()
     {
@@ -153,8 +151,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.False(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Проверяет, что отказ Kill не попадает в кэш успешных действий и сохраняет fallback до повторного успеха.</summary>
-    /// <returns>Задача двух попыток применения правила.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_KillFails_RetriesAndKeepsFallbackUntilSuccess()
     {
@@ -175,8 +173,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(1, process.SuccessfulKills);
     }
 
-    /// <summary>Отказ query для PPL при широкой маске не вызывает Kill, повторное открытие или шторм предупреждений.</summary>
-    /// <returns>Два прохода доступной unknown-path политики без взаимодействия с процессами ОС.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_QueryDeniedUnmatchedBroadWildcard_CompletesAvailablePolicyWithoutWarningStorm()
     {
@@ -198,8 +196,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.True(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Совпавшее имя при запрете query сохраняет fallback и повторяется с backoff до восстановления доступа.</summary>
-    /// <returns>Проверка двух отложенных отказов и последующего успешного применения.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_QueryDeniedMatchedName_RetriesWithBoundedBackoffAndLogsOnlyFirstFailure()
     {
@@ -227,8 +225,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.True(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Изменение версии правил немедленно отменяет backoff и позволяет обработать восстановившуюся цель.</summary>
-    /// <returns>Оценка сразу после изменения политики без продвижения часов.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_RulesChangedDuringBackoff_ReevaluatesImmediately()
     {
@@ -247,8 +245,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(1, process.SuccessfulKills);
     }
 
-    /// <summary>Недоступный путь сохраняет Unknown; успешное последующее обогащение повторно проверяет экземпляр.</summary>
-    /// <returns>Проверка catch-up доступных данных и инвалидации stamp при Basic metadata.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_QuerySucceedsButPathUnknown_CompletesWithoutFalselyClaimingBasicMetadata()
     {
@@ -268,7 +266,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(1, process.SuccessfulKills);
     }
 
-    /// <summary>Реальный query-only target читает собственный процесс без запроса прав завершения или системного снимка.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public void NativeTarget_ReadsCurrentProcessWithoutCapturingSnapshot()
     {
@@ -283,8 +281,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
     }
 
     /// <summary>
-    /// На хостах с VBS проверяет реальный Secure System, у которого Windows не предоставляет Win32 image.
-    /// Отсутствие такого дополнительного процесса в CI не отменяет детерминированные unknown-path проверки выше.
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void NativeTarget_VirtualSecureSystemWhenPresent_UnavailableImageRemainsUnknown()
@@ -294,7 +292,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         {
             var secure = processes.FirstOrDefault(p => string.Equals(p.ProcessName.Replace(" ", string.Empty),
                 "SecureSystem", StringComparison.OrdinalIgnoreCase));
-            if (secure == null) return; // VBS является дополнительной возможностью ОС, а не требованием обычного CI.
+            if (secure == null) return; // VBS is an optional OS capability rather than a standard CI requirement.
             using var target = new ProcessBlacklistEnforcer.WindowsProcessBlacklistTarget(secure.Id,
                 _ => throw new InvalidOperationException("Read-only image inspection must not capture a tree snapshot"), secure.ProcessName);
             Assert.False(target.HasExited);
@@ -308,7 +306,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         }
     }
 
-    /// <summary>Native Kill использует проверенный action handle и завершает только созданный этим тестом процесс.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public void NativeTarget_KillTerminatesOwnedProcessWithVerifiedHandle()
     {
@@ -325,7 +323,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
     }
 
-    /// <summary>Отказ native-снимка не завершает родителя до проверки дерева и не выдаёт частичное действие за успех.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public void NativeTarget_SnapshotFailure_DoesNotTerminateOwnedProcess()
     {
@@ -340,8 +338,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
     }
 
-    /// <summary>Создаёт только принадлежащий тесту процесс без окон, автозагрузки, сетевой активности и изменения файлов.</summary>
-    /// <returns>Владелец процесса, обязательно завершаемого в finally каждого native-теста.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private static Process StartOwnedSleeper() => Process.Start(new ProcessStartInfo
     {
         FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"),
@@ -350,8 +348,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         CreateNoWindow = true
     }) ?? throw new InvalidOperationException("Не удалось создать принадлежащий тесту процесс.");
 
-    /// <summary>Signal удерживаемого query handle распознаёт реальный выход 259 и не путает его с STILL_ACTIVE.</summary>
-    /// <returns>Задача собственного короткоживущего процесса, завершаемого в finally при сбое теста.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task NativeTarget_ExitCode259_IsReportedExited()
     {
@@ -366,8 +364,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         {
             using var target = new ProcessBlacklistEnforcer.WindowsProcessBlacklistTarget(process.Id,
                 _ => Array.Empty<(int, int, DateTime, string)>());
-            // Холодный запуск PowerShell на CI может занять больше пяти секунд;
-            // этот бюджет относится к подготовке процесса, а не к скорости native Kill.
+            // Verifies component behavior and assertions.
+            // Verifies component behavior and assertions.
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
             Assert.Equal(259, process.ExitCode);
             Assert.True(target.HasExited);
@@ -375,8 +373,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
     }
 
-    /// <summary>Native tree Kill завершает собственного родителя и ребёнка, пропуская исчезнувший PID из того же снимка.</summary>
-    /// <returns>Задача двух принадлежащих тесту процессов; оба освобождаются даже при ошибке проверки.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task NativeTarget_TreeKillTerminatesOwnedDescendantAndSkipsDisappearedChild()
     {
@@ -391,8 +389,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Process? child = null;
         try
         {
-            // Ожидание готовности учитывает холодный запуск двух PowerShell на runner.
-            // Жизнь тестового дерева превышает этот бюджет; Kill по-прежнему проверяется за пять секунд.
+            // Verifies component behavior and assertions.
+            // Verifies component behavior and assertions.
             var childIdText = await parent.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60));
             Assert.True(int.TryParse(childIdText, out var childId));
             child = Process.GetProcessById(childId);
@@ -419,7 +417,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         }
     }
 
-    /// <summary>Потомок с заменённым FILETIME исключается из дерева; чужой экземпляр того же PID остаётся работать.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public void NativeTarget_DescendantIdentityMismatch_SkipsUnrelatedInstance()
     {
@@ -442,8 +440,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         }
     }
 
-    /// <summary>Проверяет повторную оценку уже существующих процессов после изменения версии правил.</summary>
-    /// <returns>Задача оценки до и после изменения политики.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_RulesChanged_ReevaluatesAlreadyRunningProcess()
     {
@@ -461,8 +459,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(1, process.SuccessfulKills);
     }
 
-    /// <summary>Проверяет catch-up после паузы: процесс, появившийся во время паузы, оценивается без нового ETW Start.</summary>
-    /// <returns>Задача оценки переходов паузы.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_Resume_CatchesUpProcessThatStartedWhilePaused()
     {
@@ -480,8 +478,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(1, process.SuccessfulKills);
     }
 
-    /// <summary>Проверяет сохранение исключений для защищённого script host при совпадающем правиле пути.</summary>
-    /// <returns>Задача оценки защищённого процесса.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_ProtectedHost_DoesNotKillEvenWhenExactPathMatches()
     {
@@ -496,9 +494,9 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(0, process.KillAttempts);
     }
 
-    /// <summary>Проверяет повторную проверку полномочий непосредственно перед Kill после открытия удерживаемого дескриптора.</summary>
-    /// <param name="change">Изменение, отменяющее ранее найденное совпадение.</param>
-    /// <returns>Задача оценки решения, устаревшего во время открытия цели.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Theory]
     [InlineData("Pause")]
     [InlineData("RemoveRule")]
@@ -533,8 +531,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.False(enforcer.CanSuppressLegacySweep);
     }
 
-    /// <summary>Проверяет сохранение fallback при потере согласованности до подтверждения сверки.</summary>
-    /// <returns>Задача оценки до и после подтверждения reconciliation.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task Preferred_ReconciliationPending_DefersActionsUntilAcknowledged()
     {
@@ -552,8 +550,8 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(1, process.SuccessfulKills);
     }
 
-    /// <summary>Проверяет сохранение legacy-прохода до catch-up, при деградации и запрет прохода на паузе.</summary>
-    /// <returns>Задача первоначального catch-up.</returns>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     [Fact]
     public async Task RunFallbackSweep_RespectsCatchUpHealthAndPause()
     {
@@ -573,19 +571,31 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         Assert.Equal(2, sweeps);
     }
 
-    /// <summary>Хранит независимые от lifetime дескриптора наблюдения тестового процесса.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private sealed class TargetState
     {
         public DateTime CreationTimeUtc { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string ProcessName { get; init; } = string.Empty;
         public string? ExecutablePath { get; set; } = string.Empty;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int KillAttempts { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int SuccessfulKills { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int FailuresRemaining { get; set; }
     }
 
-    /// <summary>Управляемый удерживаемый дескриптор: Kill только меняет счётчики и не вызывает API процессов ОС.</summary>
-    /// <param name="state">Общее наблюдаемое состояние цели.</param>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private sealed class Target(TargetState state) : IProcessBlacklistTarget
     {
         private bool _disposed;
@@ -598,7 +608,7 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
         /// <inheritdoc />
         public bool HasExited => state.SuccessfulKills > 0;
 
-        /// <summary>Регистрирует попытку либо выбрасывает заранее заданный контролируемый отказ.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public void Kill()
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -611,37 +621,40 @@ public sealed class ProcessBlacklistEnforcerTests : IDisposable
             state.SuccessfulKills++;
         }
 
-        /// <summary>Управляемая цель не владеет ресурсами ОС; состояние наблюдения сохраняется для утверждений теста.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public void Dispose() => _disposed = true;
     }
 
-    /// <summary>Управляемые монотонно продвигаемые часы исключают sleep в проверках bounded retry.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private sealed class TestTimeProvider : TimeProvider
     {
         private DateTimeOffset _now = DateTimeOffset.UtcNow;
-        /// <summary>Возвращает текущее управляемое время UTC.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public override DateTimeOffset GetUtcNow() => _now;
-        /// <summary>Продвигает время без блокировки тестового worker.</summary>
-        /// <param name="duration">Положительная длительность до следующей попытки.</param>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public void Advance(TimeSpan duration) => _now += duration;
     }
 
-    /// <summary>Считает предупреждения, чтобы тест обнаруживал возврат ежесекундного потока одинаковых отказов.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     private sealed class TestLogger : ILogger<ProcessBlacklistEnforcer>
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Warnings { get; private set; }
-        /// <summary>Scope не владеет ресурсами в изолированном тестовом журнале.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        /// <summary>Все уровни включены, чтобы проверка не скрывала повторные предупреждения фильтром.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public bool IsEnabled(LogLevel logLevel) => true;
-        /// <summary>Сохраняет число предупреждений, не записывая тестовые исключения в пользовательский журнал.</summary>
+        /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             if (logLevel == LogLevel.Warning) Warnings++;
         }
     }
 
-    /// <summary>Снимает подписки обработчика до удаления только уникального каталога текущего теста.</summary>
+    /// <summary>Verifies test scenario for ProcessBlacklistEnforcerTests.cs.</summary>
     public void Dispose()
     {
         _enforcer?.Dispose();

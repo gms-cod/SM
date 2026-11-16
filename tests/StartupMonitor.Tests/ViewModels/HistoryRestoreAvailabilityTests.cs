@@ -5,10 +5,10 @@ using Xunit;
 
 namespace StartupMonitor.Tests.ViewModels;
 
-/// <summary>Проверяет привязку восстановления к конкретной резервной копии события.</summary>
+/// <summary>Verifies test scenario for HistoryRestoreAvailabilityTests.cs.</summary>
 public sealed class HistoryRestoreAvailabilityTests
 {
-    /// <summary>Повторное удаление той же записи не разрешает откат старого события по новой копии.</summary>
+    /// <summary>Verifies test scenario for HistoryRestoreAvailabilityTests.cs.</summary>
     [Fact]
     public void RestoreRequiresExactBackupIdAndSurvivesSerialization()
     {

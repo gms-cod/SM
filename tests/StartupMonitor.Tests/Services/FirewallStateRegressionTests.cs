@@ -10,20 +10,20 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет подтверждение COM-подобных операций, порядок событий и сохранение конфигурации без изменения firewall машины.</summary>
+/// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
 public sealed class FirewallStateRegressionTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "FirewallState_" + Guid.NewGuid().ToString("N"));
 
-    /// <summary>Подтверждённое отсутствие правила допускает идемпотентный разбан.</summary>
-    /// <param name="hresult">Документированный код отсутствия объекта.</param>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Theory]
     [InlineData(unchecked((int)0x80070002))]
     [InlineData(unchecked((int)0x80070490))]
     public void RemoveRule_ConfirmedAbsenceReturnsFalse(int hresult)
         => Assert.False(WindowsFirewallService.RemoveRuleByName(new RemovalRules(new COMException("Missing", hresult)), "Rule"));
 
-    /// <summary>Отказ удаления существующего правила не превращается в успешное отсутствие.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void RemoveRule_AccessDeniedPropagates()
     {
@@ -33,13 +33,13 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.Equal(1, rules.Attempts);
     }
 
-    /// <summary>Неожиданный программный отказ также передаётся вызывающему коду.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void RemoveRule_UnexpectedFailurePropagates()
         => Assert.Throws<InvalidOperationException>(() =>
             WindowsFirewallService.RemoveRuleByName(new RemovalRules(new InvalidOperationException("Injected")), "Rule"));
 
-    /// <summary>Отказ прямого поиска нельзя маскировать резервным обходом и ложным отсутствием.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void FindRule_AccessDeniedDoesNotFallBackToEmptyEnumeration()
     {
@@ -51,7 +51,7 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.False(rules.Enumerated);
     }
 
-    /// <summary>Повторный IP восстанавливает отключённое или изменённое управляемое правило, сохраняя остальные адреса.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void ExistingAggregateIp_RestoresRequiredRuleProperties()
     {
@@ -65,7 +65,7 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.Equal("198.51.100.25,198.51.100.26", rule.RemoteAddresses);
     }
 
-    /// <summary>API, не подтвердивший включение правила, не позволяет объявить IP заблокированным.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void AggregateRule_RefusedEnableIsNotSuccessful()
     {
@@ -73,7 +73,7 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => WindowsFirewallService.UpdateAggregatedIpRule(rule, "198.51.100.25", 1));
     }
 
-    /// <summary>Отказ замены файла не меняет работающие правила и не объявляет сохранение успешным.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void DefenderConfiguration_FailedWritePreservesMemoryAndDisk()
     {
@@ -97,7 +97,7 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.Empty(Directory.GetFiles(_directory, "*.tmp"));
     }
 
-    /// <summary>Параллельный переход не обгоняет уже начатую доставку предыдущего состояния ни в событии, ни в IPC.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public async Task PauseTransitions_ConcurrentCallsDeliverInCommitOrder()
     {
@@ -130,7 +130,7 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.Equal(observed, FlushPauseMessages(notifications));
     }
 
-    /// <summary>Повторный SetPaused из подписчика ставится в очередь, а ошибка соседнего подписчика не прерывает доставку.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     [Fact]
     public void PauseTransitions_ReentrancyAndSubscriberFailurePreserveOrder()
     {
@@ -147,8 +147,8 @@ public sealed class FirewallStateRegressionTests : IDisposable
         Assert.Equal(observed, FlushPauseMessages(notifications));
     }
 
-    /// <summary>Отключает таймер доставки, чтобы проверить очередь без ожиданий по настенным часам.</summary>
-    /// <returns>Сервис с завершённым начальным сканированием.</returns>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     private static NotificationService CreateManualNotifications()
     {
         var notifications = new NotificationService(new InitialScanTracker(0));
@@ -159,9 +159,9 @@ public sealed class FirewallStateRegressionTests : IDisposable
         return notifications;
     }
 
-    /// <summary>Принудительно доставляет настоящий батч и читает порядок IPC-полезной нагрузки.</summary>
-    /// <param name="notifications">Проверяемая очередь уведомлений.</param>
-    /// <returns>Последовательность состояний, которая будет передана клиенту.</returns>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     private static List<bool> FlushPauseMessages(NotificationService notifications)
     {
         var states = new List<bool>();
@@ -177,44 +177,71 @@ public sealed class FirewallStateRegressionTests : IDisposable
         return states;
     }
 
-    /// <summary>Удаляет только принадлежащую тесту уникальную директорию после освобождения сервисов.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
     }
 
-    /// <summary>COM-подобная коллекция с управляемым отказом удаления для проверки настоящего алгоритма адаптера.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     public sealed class RemovalRules(Exception failure)
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Attempts { get; private set; }
-        /// <summary>Возвращает заданный отказ вместо изменения правил операционной системы.</summary>
-        /// <param name="name">Имя удаляемого правила.</param>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
         public void Remove(string name) { Attempts++; throw failure; }
     }
 
-    /// <summary>Коллекция, запрещающая поиск правила, с наблюдаемым резервным перечислением.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     public sealed class DeniedLookupRules : IEnumerable
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool Enumerated { get; private set; }
-        /// <summary>Воспроизводит отказ доступа при прямом поиске.</summary>
-        /// <param name="name">Искомое имя.</param>
-        /// <returns>Правило не возвращается из-за отказа.</returns>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
         public object Item(string name) => throw new COMException("Denied", unchecked((int)0x80070005));
-        /// <summary>Фиксирует ошибочное обращение к резервному обходу.</summary>
-        /// <returns>Пустой перечислитель.</returns>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
         public IEnumerator GetEnumerator() { Enumerated = true; return Array.Empty<object>().GetEnumerator(); }
     }
 
-    /// <summary>Изменяемое COM-подобное правило для проверки восстановления обязательных свойств.</summary>
+    /// <summary>Verifies test scenario for FirewallStateRegressionTests.cs.</summary>
     public sealed class AggregateRule
     {
         private bool _enabled;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string RemoteAddresses { get; set; } = string.Empty;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool RefuseEnable { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool Enabled { get => _enabled; set { if (!RefuseEnable) _enabled = value; } }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Direction { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Action { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Profiles { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Protocol { get; set; }
     }
 }

@@ -3,19 +3,17 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для ApplyBlacklistAction: проверка двух режимов — NotifyAndRemove (обратимое отключение файла)
-/// и NotifyOnly (только пометка блокировки).
-/// </summary>
+/// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
+/// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
 public class ApplyBlacklistActionTests : IDisposable
 {
-    /// <summary>Временная директория для тестовых файлов.</summary>
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"sm-{Guid.NewGuid():N}");
-    /// <summary>Хранилище данных для тестов.</summary>
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     private readonly JsonDataStore _store;
-    /// <summary>Менеджер чёрного списка.</summary>
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     private readonly BlacklistManager _manager;
-    /// <summary>Сервис уведомлений (не используется, но требуется конструктором).</summary>
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     private readonly NotificationService _notifications;
 
     public ApplyBlacklistActionTests()
@@ -26,12 +24,12 @@ public class ApplyBlacklistActionTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что старое имя NotifyAndRemove означает отключение с сохранением исходного файла и записи.
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void NotifyAndRemove_DisablesFileAndKeepsEntryBlocked()
     {
-        // Файл в "папке автозапуска"
+        // Verifies component behavior and assertions.
         Directory.CreateDirectory(_dir);
         var appFile = Path.Combine(_dir, "badapp.exe");
         File.WriteAllText(appFile, "MZ fake");
@@ -51,9 +49,9 @@ public class ApplyBlacklistActionTests : IDisposable
 
         _manager.ApplyBlacklistAction(entry, rule, _store, _notifications);
 
-        // Файл удалён из системы
+        // Verifies component behavior and assertions.
         Assert.False(File.Exists(appFile));
-        // Запись ОСТАЛАСЬ в списке как Blocked
+        // Verifies component behavior and assertions.
         var stored = _store.FindEntry(e => e.Id == entry.Id);
         Assert.NotNull(stored);
         Assert.Equal(EntryStatus.Blocked, stored.Status);
@@ -65,7 +63,7 @@ public class ApplyBlacklistActionTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что NotifyOnly только помечает запись как Blocked, не трогая файл.
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void NotifyOnly_JustMarksBlocked()
@@ -89,13 +87,13 @@ public class ApplyBlacklistActionTests : IDisposable
 
         _manager.ApplyBlacklistAction(entry, rule, _store, _notifications);
 
-        // Файл НЕ тронут, запись помечена
+        // Verifies component behavior and assertions.
         Assert.True(File.Exists(appFile));
         Assert.Equal(EntryStatus.Blocked, entry.Status);
         Assert.Empty(_store.GetRemovedEntries());
     }
 
-    /// <summary>Удаляет временные файлы тестов.</summary>
+    /// <summary>Verifies test scenario for ApplyBlacklistActionTests.cs.</summary>
     public void Dispose()
     {
         _notifications.Dispose();

@@ -1,14 +1,14 @@
 namespace StartupMonitor.Shared.Models;
 
-/// <summary>Способ сопоставления правила чёрного списка с записью.</summary>
+/// <summary>Matching method for blacklist rules against startup entries.</summary>
 public enum BlacklistMatchType
 {
-    /// <summary>Точное совпадение пути к файлу.</summary>
+    /// <summary>Exact file path match.</summary>
     Path,
-    /// <summary>Совпадение пути по маске (wildcard).</summary>
+    /// <summary>Wildcard file path match.</summary>
     PathWildcard,
-    /// <summary>Совпадение по издателю (Publisher).</summary>
+    /// <summary>Publisher name match.</summary>
     Publisher,
-    /// <summary>Совпадение по SHA256-хешу.</summary>
+    /// <summary>SHA-256 hash match.</summary>
     SHA256
 }

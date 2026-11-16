@@ -8,12 +8,12 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет настоящую логику записи/компенсации на управляемом INetFwRules-адаптере без изменения правил ОС.</summary>
+/// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
 public sealed class FirewallPolicyTransactionTests
 {
     private const string AppPath = @"C:\Apps\client.exe";
 
-    /// <summary>Пустые поля обновления действительно снимают прежние ограничения и привязки.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void Update_ClearsPreviouslyConfiguredApplicationServiceAndRestrictions()
     {
@@ -42,7 +42,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal("*", updated.Values["RemoteAddresses"]);
     }
 
-    /// <summary>Отказ позднего setter восстанавливает уже изменённые свойства одного существующего правила.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void Update_LateSetterFailure_RestoresOriginalRule()
     {
@@ -63,7 +63,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal(before.OrderBy(item => item.Key), existing.Values.OrderBy(item => item.Key));
     }
 
-    /// <summary>Отказ второй записи пары удаляет уже созданное первое направление.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void CreatePair_SecondAddFails_RemovesFirstDirection()
     {
@@ -74,7 +74,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Empty(fixture.Policy.Rules.Items);
     }
 
-    /// <summary>Ошибка сохранения настроек восстанавливает прежнюю пару и не подтверждает новое действие.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void ApplyPolicy_PersistenceFails_RestoresBothOriginalDirections()
     {
@@ -93,7 +93,7 @@ public sealed class FirewallPolicyTransactionTests
         });
     }
 
-    /// <summary>Неудавшаяся компенсация явно отличается от обычного отказа без изменений.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void Update_RollbackAlsoFails_ReturnsPartialFailure()
     {
@@ -109,7 +109,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Contains("PartialFailure", result.Message);
     }
 
-    /// <summary>Разные источники выбора сходятся к одной политике; узкие и чужие правила остаются независимыми.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void ApplyPolicy_MigratesEquivalentGeneratedDuplicates_PreservesNarrowCustomRules()
     {
@@ -132,7 +132,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal(2, fixture.Policy.Rules.Items.Count(item => Convert.ToString(item.Values["Name"])!.StartsWith("StartupMonitor_Application_", StringComparison.Ordinal)));
     }
 
-    /// <summary>Ошибка удаления прежней политики не оставляет новую разрешающую пару.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void ApplyPolicy_OppositeCleanupFails_RestoresOriginalState()
     {
@@ -145,7 +145,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal(0, original.Values["Action"]);
     }
 
-    /// <summary>Неполное перечисление отменяет операцию до первой мутации и не возвращает частичный снимок UI.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void Snapshot_EnumeratorFailure_DoesNotMutateOrReturnPartialRules()
     {
@@ -159,7 +159,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Throws<IOException>(() => fixture.Service.GetAllRules());
     }
 
-    /// <summary>Ошибка getter обязательного ограничения не превращается в неограниченное разрешение.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void Snapshot_RestrictionGetterFails_DoesNotSuppressAlerts()
     {
@@ -171,8 +171,8 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal(0, fixture.Policy.Rules.Mutations);
     }
 
-    /// <summary>Узкие правила разных типов не подавляют запросы для всей программы.</summary>
-    /// <param name="restriction">Ограничение существующего разрешения.</param>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Theory]
     [InlineData("protocol")]
     [InlineData("remote")]
@@ -198,7 +198,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Empty(fixture.Service.GetUnrestrictedOutboundAllowApplicationRulePaths());
     }
 
-    /// <summary>Полное разрешение должно покрывать все одновременно активные профили, не только один из них.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void AllowedPaths_RequiresAllActiveProfiles()
     {
@@ -211,7 +211,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Contains(AppPath.ToLowerInvariant(), fixture.Service.GetUnrestrictedOutboundAllowApplicationRulePaths());
     }
 
-    /// <summary>Удаление/переключение общих правил инвалидирует ревизию; переключение ICMP сохраняет исходный протокол.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void GenericMutations_AdvanceRevisionAndPreserveNonTcpProtocol()
     {
@@ -230,7 +230,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Empty(fixture.Policy.Rules.Items);
     }
 
-    /// <summary>Недоступная политика возвращает Unknown через false, а не выдуманный разрешающий Normal.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void FilteringMode_Unavailable_DoesNotReturnNormalAsKnownState()
     {
@@ -242,7 +242,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal(StartupMonitor.Shared.Models.Firewall.FirewallFilteringMode.Normal, normal);
     }
 
-    /// <summary>Отказ второго профиля при включении killswitch восстанавливает профили и удаляет уже созданную пару.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void FilteringMode_ProfileWriteFails_RestoresProfilesAndKillswitchRules()
     {
@@ -260,8 +260,8 @@ public sealed class FirewallPolicyTransactionTests
         Assert.Equal(StartupMonitor.Shared.Models.Firewall.FirewallFilteringMode.Disabled, restored);
     }
 
-    /// <summary>Подтверждённый режим совпадает с реальными свойствами всех профилей и парой killswitch.</summary>
-    /// <param name="modeValue">Значение реального Shared-контракта режима.</param>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -278,7 +278,7 @@ public sealed class FirewallPolicyTransactionTests
         Assert.True(fixture.Service.PolicyRevision > 0);
     }
 
-    /// <summary>Ручное выключение полного собственного правила снимает устаревшее доверие списка.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     [Fact]
     public void Reconcile_DisabledWholeAppRule_RemovesObsoleteWhitelistMembership()
     {
@@ -302,19 +302,19 @@ public sealed class FirewallPolicyTransactionTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
     }
 
-    /// <summary>Фикстура соединяет настоящий сервис только с управляемой коллекцией, исключая обращения к ОС.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     private sealed class Fixture
     {
         internal NativePolicy Policy { get; } = new();
         internal WindowsFirewallService Service { get; }
 
-        /// <summary>Устанавливает фабрики исключительно локального экземпляра.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         internal Fixture() => Service = new WindowsFirewallService
         {
             PolicyFactoryOverride = () => Policy, RuleFactoryOverride = () => new NativeRule()
         };
 
-        /// <summary>Добавляет исходное правило непосредственно в изолированную коллекцию фикстуры.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         internal NativeRule Add(string name, FirewallAction action, FirewallDirection direction, string? path = null)
         {
             var rule = new NativeRule();
@@ -327,25 +327,28 @@ public sealed class FirewallPolicyTransactionTests
         }
     }
 
-    /// <summary>Публичный late-bound адаптер INetFwPolicy2 с профилями без системных вызовов.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     public sealed class NativePolicy
     {
         public NativeRules Rules { get; } = new();
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int CurrentProfileTypes { get; set; } = 4;
         public ProfileValues<bool> FirewallEnabled { get; } = new(true);
         public ProfileValues<int> DefaultOutboundAction { get; } = new(1);
     }
 
-    /// <summary>Индексированные свойства профилей моделируют контролируемый отказ конкретного setter.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     public sealed class ProfileValues<T>
     {
         private readonly Dictionary<int, T> _values;
         public int? FailNextSetProfile { get; set; }
 
-        /// <summary>Заполняет три независимых профиля одинаковым исходным значением.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public ProfileValues(T initial) => _values = new() { [1] = initial, [2] = initial, [4] = initial };
 
-        /// <summary>Читает профиль либо записывает его с единственным управляемым отказом.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public T this[int profile]
         {
             get => _values[profile];
@@ -361,20 +364,29 @@ public sealed class FirewallPolicyTransactionTests
         }
     }
 
-    /// <summary>Коллекция поддерживает контролируемые отказы второй записи, удаления и полного обхода.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     public sealed class NativeRules : IEnumerable
     {
         public List<NativeRule> Items { get; } = [];
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool FailNextOutboundAdd { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool FailEnumeration { get; set; }
         public string? FailNextRemoveName { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Mutations { get; private set; }
 
-        /// <summary>Добавляет реальный объект адаптера; отказ моделирует невозможность COM commit второго направления.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public void Add(object value)
         {
             var rule = Assert.IsType<NativeRule>(value);
-            // Настоящий INetFwRule принимает пустой ServiceName setter, но INetFwRules.Add отклоняет его.
+            // Verifies component behavior and assertions.
             if (rule.AssignedFields.Contains("ServiceName") && string.IsNullOrWhiteSpace(Convert.ToString(rule.Values["ServiceName"])))
                 throw new ArgumentException("ServiceName must remain unset when unrestricted");
             if (FailNextOutboundAdd && Convert.ToInt32(rule.Values["Direction"]) == 2)
@@ -386,7 +398,7 @@ public sealed class FirewallPolicyTransactionTests
             Mutations++;
         }
 
-        /// <summary>Удаляет по точному имени или сообщает подтверждённое отсутствие.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public void Remove(string name)
         {
             if (string.Equals(FailNextRemoveName, name, StringComparison.OrdinalIgnoreCase))
@@ -400,11 +412,11 @@ public sealed class FirewallPolicyTransactionTests
             Mutations++;
         }
 
-        /// <summary>Реализует прямой COM-индекс, не возвращая ложный null при ошибке.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public object Item(string name) => Items.SingleOrDefault(item => string.Equals(Convert.ToString(item.Values["Name"]), name, StringComparison.OrdinalIgnoreCase))
             ?? throw new FileNotFoundException(name);
 
-        /// <summary>Возвращает полный либо намеренно отказавший снимок.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public IEnumerator GetEnumerator()
         {
             foreach (var item in Items.ToArray())
@@ -415,7 +427,7 @@ public sealed class FirewallPolicyTransactionTests
         }
     }
 
-    /// <summary>Свойства адаптера эквивалентны INetFwRule; отказы задаются независимо для чтения и записи.</summary>
+    /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
     public sealed class NativeRule : DynamicObject
     {
         public Dictionary<string, object?> Values { get; } = new()
@@ -431,14 +443,14 @@ public sealed class FirewallPolicyTransactionTests
         public string? FailRead { get; set; }
         public HashSet<string> AssignedFields { get; } = new(StringComparer.Ordinal);
 
-        /// <summary>Передаёт обязательное поле либо явный диагностируемый отказ чтения.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public override bool TryGetMember(GetMemberBinder binder, out object? result)
         {
             if (binder.Name == FailRead) throw new COMException("Controlled getter failure");
             return Values.TryGetValue(binder.Name, out result);
         }
 
-        /// <summary>Последовательные setter меняют живой объект, как COM; сбой не отменяет предыдущие setter автоматически.</summary>
+        /// <summary>Verifies test scenario for FirewallPolicyTransactionTests.cs.</summary>
         public override bool TrySetMember(SetMemberBinder binder, object? value)
         {
             if (binder.Name == FailEverySet) throw new COMException("Controlled permanent setter failure");

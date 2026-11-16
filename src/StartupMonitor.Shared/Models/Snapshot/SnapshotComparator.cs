@@ -93,7 +93,7 @@ public static class SnapshotComparator
     /// <param name="location">Входные данные: значение параметра location (EntryLocation).</param>
     /// <param name="detail">Входные данные: значение параметра detail (string?).</param>
     /// <param name="name">Входные данные: значение параметра name (string?).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string MakeCompositeKey(EntryLocation location, string? detail, string? name)
     {
         var normDetail = JsonDataStore.NormalizeLocationDetail(detail ?? string.Empty);

@@ -9,7 +9,7 @@ using StartupMonitor.Shared.Diagnostics;
 namespace StartupMonitor.Shared.Helpers;
 
 /// <summary>
-/// Результат верификации цифровой подписи Authenticode.
+/// Verification result of an Authenticode digital signature.
 /// </summary>
 public record SignatureVerificationResult(
     DigitalSignatureStatus Status,
@@ -20,7 +20,7 @@ public record SignatureVerificationResult(
 );
 
 /// <summary>
-/// Высокопроизводительный валидатор цифровых подписей Authenticode (PE-файлов) через WinVerifyTrust API.
+/// High-performance validator for Authenticode digital signatures of PE files via the WinVerifyTrust API.
 /// </summary>
 public static class AuthenticodeVerifier
 {
@@ -28,10 +28,10 @@ public static class AuthenticodeVerifier
         new("{00AAC56B-CD44-11d0-8CC2-00C04FC295EE}");
 
     private const uint WTD_UI_NONE = 2;
-    private const uint WTD_REVOKE_NONE = 0; // Быстрая локальная проверка без блокирующих сетевых запросов CRL
+    private const uint WTD_REVOKE_NONE = 0; // Fast local check without blocking CRL network requests
     private const uint WTD_CHOICE_FILE = 1;
     private const uint WTD_STATEACTION_IGNORE = 0;
-    private const uint WTD_CACHE_ONLY_URL_RETRIEVAL = 0x00001000; // Только локальный кэш CRL/AIA
+    private const uint WTD_CACHE_ONLY_URL_RETRIEVAL = 0x00001000; // Local CRL/AIA cache only
 
     // Win32 HRESULT
     private const uint ERROR_SUCCESS = 0;
@@ -42,15 +42,15 @@ public static class AuthenticodeVerifier
     private const uint CERT_E_REVOKED = 0x800B0108;
     private const uint TRUST_E_EXPLICIT_DISTRUST = 0x800B0111;
 
-    // Кэш проверок подписей: (нормализованный путь + LastWriteTimeUtc) -> Lazy<результат>.
-    // Lazy в режиме ExecutionAndPublication устраняет эффект «стада» (Stampede):
-    // при одновременном запросе одного и того же файла WinVerifyTrust выполняется
-    // ровно один раз, а остальные потоки получают тот же результат без повторного kernel-вызова.
+    // Signature verification cache: (normalized path + LastWriteTimeUtc) -> Lazy<result>.
+    // Lazy in ExecutionAndPublication mode eliminates the stampede effect:
+    // when the same file is requested concurrently, WinVerifyTrust executes
+    // exactly once, and the remaining threads receive the same result without a repeated kernel call.
     private static readonly ConcurrentDictionary<string, Lazy<SignatureVerificationResult>> Cache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // Очередь ключей в порядке вставки (FIFO) для O(1)-амортизированного вытеснения
-    // вместо грубого Cache.Clear(), который сбрасывал весь тёплый кэш под конкурентной нагрузкой.
+    // FIFO queue of keys in insertion order for O(1) amortized eviction
+    // instead of a crude Cache.Clear(), which flushed the entire warm cache under concurrent load.
     private static readonly ConcurrentQueue<string> CacheEvictionQueue = new();
 
     // Мягкий лимит кэша: при превышении вытесняется ~25% самых старых вставок пачкой.
@@ -65,8 +65,14 @@ public static class AuthenticodeVerifier
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WINTRUST_FILE_INFO
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint cbStruct;
         [MarshalAs(UnmanagedType.LPWStr)]
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string pcwszFilePath;
         public IntPtr hFile;
         public IntPtr pgKnownSubject;
@@ -75,17 +81,38 @@ public static class AuthenticodeVerifier
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WINTRUST_DATA : IDisposable
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint cbStruct;
         public IntPtr pPolicyCallbackData;
         public IntPtr pSIPClientData;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwUIChoice;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint fdwRevocationChecks;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwUnionChoice;
         public IntPtr pFile;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwStateAction;
         public IntPtr hWVTStateData;
         public IntPtr pwszURLReference;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwProvFlags;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwUIContext;
         public IntPtr pSignatureSettings;
 
@@ -200,7 +227,7 @@ public static class AuthenticodeVerifier
     }
 
     /// <summary>PerformVerification: Выполняет операцию PerformVerification.</summary>
-    /// <param name="filePath">Входные данные: значение параметра filePath (string).</param>
+    /// <param name="filePath">Target file path.</param>
     /// <returns>Выходные данные: результирующее значение типа SignatureVerificationResult.</returns>
     private static SignatureVerificationResult PerformVerification(string filePath)
     {

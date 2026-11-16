@@ -158,9 +158,21 @@ public static class WindowHelper
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Left;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Top;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Right;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Bottom;
     }
 
@@ -170,13 +182,22 @@ public static class WindowHelper
         public int cbSize = Marshal.SizeOf(typeof(MONITORINFO));
         public RECT rcMonitor = new();
         public RECT rcWork = new();
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwFlags = 0;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int X;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Y;
     }
 

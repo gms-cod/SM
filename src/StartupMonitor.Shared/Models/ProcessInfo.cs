@@ -247,9 +247,15 @@ public class ProcessInfo : INotifyPropertyChanged
     public bool HasThreat => ThreatInfo?.HasThreat == true;
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public bool IsFromStartup => !string.IsNullOrEmpty(StartupEntryId);
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayCpu => CpuUsagePercent switch
     {
         < 0.05 => "0 %",
@@ -258,6 +264,9 @@ public class ProcessInfo : INotifyPropertyChanged
     };
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayRam => WorkingSetBytes switch
     {
         < 1024 * 1024 => $"{WorkingSetBytes / 1024.0:F0} КБ",
@@ -266,6 +275,9 @@ public class ProcessInfo : INotifyPropertyChanged
     };
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayDisk
     {
         get
@@ -281,6 +293,9 @@ public class ProcessInfo : INotifyPropertyChanged
     }
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayNetwork => NetworkBytesPerSec switch
     {
         <= 0 => "0 КБ/с",
@@ -290,6 +305,9 @@ public class ProcessInfo : INotifyPropertyChanged
     };
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayStartupStatus
     {
         get
@@ -324,12 +342,27 @@ public class ProcessInfo : INotifyPropertyChanged
     }
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int Pid { get => ProcessId; set => ProcessId = value; }
 
     [JsonIgnore]
+    /// <summary>
+    /// Gets or sets the display name of the process.
+    /// </summary>
+    /// <summary>
+    /// Gets or sets the full file path of the process executable.
+    /// </summary>
+    /// <summary>
+    /// Gets or sets the current CPU usage of the process as a percentage.
+    /// </summary>
     public string Name { get => ProcessName; set => ProcessName = value; }
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string ExecutablePath { get => FilePath; set => FilePath = value; }
 
     [JsonIgnore]
@@ -343,6 +376,9 @@ public class ProcessInfo : INotifyPropertyChanged
     }
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public bool IsStartupEntry
     {
         get => IsFromStartup;

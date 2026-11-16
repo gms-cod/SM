@@ -4,10 +4,8 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для защиты системнозначимых процессов и служб Windows от удаления и блокировки.
-/// Все тесты используют фиктивные и изолированные структуры данных без воздействия на реальную ОС.
-/// </summary>
+/// <summary>Verifies test scenario for SystemProtectionTests.cs.</summary>
+/// <summary>Verifies test scenario for SystemProtectionTests.cs.</summary>
 public class SystemProtectionTests : IDisposable
 {
     private readonly string _testDir;
@@ -24,6 +22,9 @@ public class SystemProtectionTests : IDisposable
         _notifications = new NotificationService(tracker);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try
@@ -49,6 +50,9 @@ public class SystemProtectionTests : IDisposable
     [InlineData("notepad.exe", false)]
     [InlineData("mycustomapp.exe", false)]
     [InlineData("", true)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsProtectedProcessName_IdentifiesCoreProcesses(string processOrPath, bool expected)
     {
         Assert.Equal(expected, SystemProtectionHelper.IsProtectedProcessName(processOrPath));
@@ -66,6 +70,9 @@ public class SystemProtectionTests : IDisposable
     [InlineData("C:\\Windows\\System32\\svchost.exe", true)]
     [InlineData("telegram.exe", false)]
     [InlineData("chrome.exe", false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsHostProcess_IdentifiesHostBinaries(string processOrPath, bool expected)
     {
         Assert.Equal(expected, SystemProtectionHelper.IsHostProcess(processOrPath));
@@ -86,12 +93,18 @@ public class SystemProtectionTests : IDisposable
     [InlineData("MyCustomService", false)]
     [InlineData("MockCustomService", false)]
     [InlineData("", false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsCoreWindowsService_IdentifiesCriticalServices(string serviceName, bool expected)
     {
         Assert.Equal(expected, SystemProtectionHelper.IsCoreWindowsService(serviceName));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsProtectedSystemEntry_CoreWindowsService_ReturnsTrue()
     {
         var entry = new StartupEntry
@@ -106,6 +119,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsProtectedSystemEntry_SystemTaskScheduler_ReturnsTrue()
     {
         var entry = new StartupEntry
@@ -120,6 +136,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsProtectedSystemEntry_ThirdPartyService_ReturnsFalse()
     {
         var entry = new StartupEntry
@@ -134,6 +153,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsProtectedSystemEntry_ThirdPartyRegistryEntry_ReturnsFalse()
     {
         var entry = new StartupEntry
@@ -148,6 +170,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BlacklistManager_IsMatchStatic_DoesNotMatchProtectedCoreServicesByGenericPath()
     {
         var protectedService = new StartupEntry
@@ -158,18 +183,21 @@ public class SystemProtectionTests : IDisposable
             FilePath = @"C:\Windows\system32\svchost.exe -k DcomLaunch"
         };
 
-        // Правило по пути к svchost.exe
+        // Verifies component behavior and assertions.
         var rule = new BlacklistRule
         {
             MatchType = BlacklistMatchType.Path,
             Value = @"C:\Windows\system32\svchost.exe"
         };
 
-        // Защищённая служба не должна сопоставляться
+        // Verifies component behavior and assertions.
         Assert.False(BlacklistManager.IsMatchStatic(rule, protectedService));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BlacklistManager_IsMatchStatic_DoesNotMatchHostProcessesByGenericExeName()
     {
         var hostService = new StartupEntry
@@ -186,11 +214,14 @@ public class SystemProtectionTests : IDisposable
             Value = "svchost.exe"
         };
 
-        // Служба-хост не должна сопоставляться по общему ExeName без точного имени службы
+        // Verifies component behavior and assertions.
         Assert.False(BlacklistManager.IsMatchStatic(rule, hostService));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BlacklistManager_IsMatchStatic_MatchesCustomServiceByName()
     {
         var customService = new StartupEntry
@@ -211,9 +242,12 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntryOperations_DisableService_RejectsCoreWindowsService()
     {
-        // Попытка отключить ключевую службу Windows (например, rpcss) должна быть немедленно отклонена
+        // Verifies component behavior and assertions.
         var entry = new StartupEntry
         {
             Name = "rpcss",
@@ -228,9 +262,12 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntryOperations_RemoveService_RejectsCoreWindowsService()
     {
-        // Попытка удалить ключевую службу Windows (например, dcomlaunch) должна быть немедленно отклонена
+        // Verifies component behavior and assertions.
         var entry = new StartupEntry
         {
             Name = "dcomlaunch",
@@ -245,6 +282,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntryOperations_RemoveFromSystem_RejectsProtectedSystemEntry()
     {
         var protectedEntry = new StartupEntry
@@ -262,6 +302,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntryOperations_DisableFromSystem_RejectsProtectedSystemEntry()
     {
         var protectedEntry = new StartupEntry
@@ -278,6 +321,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EntryOperations_StartupFile_RejectsProtectedPaths()
     {
         var winEntry = new StartupEntry
@@ -301,6 +347,9 @@ public class SystemProtectionTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SystemProtectionHelper_ProtectsWinlogonAndCommandLine()
     {
         var userinitEntry = new StartupEntry

@@ -2,9 +2,15 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class PipeClientTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose_WithoutConnection_DoesNotThrow()
     {
         var client = new PipeClient();
@@ -13,6 +19,9 @@ public class PipeClientTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose_CalledMultipleTimes_DoesNotThrow()
     {
         var client = new PipeClient();
@@ -22,6 +31,9 @@ public class PipeClientTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task RequestServiceShutdownAsync_WhenDisconnected_ReturnsFalse()
     {
         using var client = new PipeClient();

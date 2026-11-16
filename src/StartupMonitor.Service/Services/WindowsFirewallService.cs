@@ -989,6 +989,104 @@ public sealed class WindowsFirewallService : IPortDefenderFirewall
         }, null, ruleName.Trim());
     }
 
+    /// <summary>Читает действия по умолчанию для каждого профиля без подмены ошибок значениями по умолчанию.</summary>
+    /// <returns>Полный список политик профилей.</returns>
+    public IReadOnlyList<FirewallDefaultPolicyState> GetDefaultPolicies()
+    {
+        lock (_sync)
+        {
+            object? policyObj = null;
+            try
+            {
+                dynamic policy = OpenPolicy(out policyObj);
+                var result = new List<FirewallDefaultPolicyState>();
+                foreach (var profile in new[] { ProfileDomain, ProfilePrivate, ProfilePublic })
+                {
+                    int inbound = Convert.ToInt32(policy.DefaultInboundAction[profile]);
+                    int outbound = Convert.ToInt32(policy.DefaultOutboundAction[profile]);
+                    if (!Enum.IsDefined(typeof(FirewallAction), inbound) || !Enum.IsDefined(typeof(FirewallAction), outbound))
+                        throw new InvalidOperationException("Windows вернула неизвестное действие брандмауэра.");
+                    result.Add(new FirewallDefaultPolicyState((FirewallProfile)profile, (FirewallAction)inbound, (FirewallAction)outbound));
+                }
+                return result;
+            }
+            finally { Release(policyObj); }
+        }
+    }
+
+    /// <summary>Изменяет одно направление выбранных профилей и проверяет запись с откатом при ошибке.</summary>
+    /// <param name="request">Профили, направление и действие по умолчанию.</param>
+    /// <returns>Подтверждённый результат или сведения об ошибке и неполном откате.</returns>
+    public FirewallOperationResult SetDefaultPolicy(FirewallDefaultPolicyRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Profiles == 0 || (request.Profiles & ~FirewallProfile.All) != 0 ||
+            request.Direction is not (FirewallDirection.Inbound or FirewallDirection.Outbound) ||
+            !Enum.IsDefined(request.Action))
+            return FirewallOperationResult.Fail("Некорректные профили, направление или действие.");
+        lock (_sync)
+        {
+            object? policyObj = null;
+            try
+            {
+                dynamic policy = OpenPolicy(out policyObj);
+                var profiles = new[] { ProfileDomain, ProfilePrivate, ProfilePublic }
+                    .Where(profile => ((int)request.Profiles & profile) != 0).ToArray();
+                var before = new Dictionary<int, int>();
+                foreach (int profile in profiles)
+                    before[profile] = request.Direction == FirewallDirection.Inbound
+                        ? Convert.ToInt32(policy.DefaultInboundAction[profile]) : Convert.ToInt32(policy.DefaultOutboundAction[profile]);
+                try
+                {
+                    foreach (int profile in profiles)
+                    {
+                        if (request.Direction == FirewallDirection.Inbound) policy.DefaultInboundAction[profile] = (int)request.Action;
+                        else policy.DefaultOutboundAction[profile] = (int)request.Action;
+                    }
+                    foreach (int profile in profiles)
+                    {
+                        int actual = request.Direction == FirewallDirection.Inbound
+                            ? Convert.ToInt32(policy.DefaultInboundAction[profile]) : Convert.ToInt32(policy.DefaultOutboundAction[profile]);
+                        if (actual != (int)request.Action) throw new InvalidOperationException("Windows не подтвердила изменение политики.");
+                    }
+                    Interlocked.Increment(ref _policyRevision);
+                    return FirewallOperationResult.Ok("Политика профилей подтверждена Windows; существующие правила продолжают действовать.");
+                }
+                catch (Exception changeError)
+                {
+                    bool partial = false;
+                    foreach (int profile in profiles)
+                    {
+                        try
+                        {
+                            if (request.Direction == FirewallDirection.Inbound) policy.DefaultInboundAction[profile] = before[profile];
+                            else policy.DefaultOutboundAction[profile] = before[profile];
+                            int actual = request.Direction == FirewallDirection.Inbound
+                                ? Convert.ToInt32(policy.DefaultInboundAction[profile]) : Convert.ToInt32(policy.DefaultOutboundAction[profile]);
+                            if (actual != before[profile]) partial = true;
+                        }
+                        catch (Exception rollbackError)
+                        {
+                            partial = true;
+                            Log.Error(rollbackError, "Firewall: не восстановлена политика профиля {Profile}", profile);
+                        }
+                    }
+                    Interlocked.Increment(ref _policyRevision);
+                    Log.Warning(changeError, "Firewall: изменение политики не подтверждено");
+                    return FirewallOperationResult.Fail(partial
+                        ? "PartialFailure: изменение не подтверждено, откат выполнен не полностью. Проверьте политику Windows."
+                        : $"Изменение не подтверждено; исходная политика восстановлена: {FriendlyError(changeError)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Firewall: политика профилей недоступна");
+                return FirewallOperationResult.Fail($"Не удалось изменить политику: {FriendlyError(ex)}");
+            }
+            finally { Release(policyObj); }
+        }
+    }
+
     /// <summary>
     /// Устанавливает режим фильтрации: настраивает политику
     /// (FirewallEnabled / DefaultOutboundAction) или спецправило Killswitch.

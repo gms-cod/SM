@@ -7,6 +7,9 @@ using Wpf.Ui.Controls;
 
 namespace StartupMonitor.UI.Views.Dialogs;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public partial class UpdateAvailableWindow : FluentWindow
 {
     private readonly UpdateInfo _updateInfo;

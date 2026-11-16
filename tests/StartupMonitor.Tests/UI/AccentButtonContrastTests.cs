@@ -5,10 +5,10 @@ using Wpf.Ui.Controls;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет адаптивный контраст акцентных кнопок на реальных WPF-привязках.</summary>
+/// <summary>Verifies test scenario for AccentButtonContrastTests.cs.</summary>
 public sealed partial class NetworkRenderingRegressionTests
 {
-    /// <summary>Тёмный и светлый фон выбирают противоположные цвета, смена кисти обновляет и обычное, и нажатое состояние.</summary>
+    /// <summary>Verifies test scenario for AccentButtonContrastTests.cs.</summary>
     [Fact]
     public void PrimaryButton_UpdatesContrastWhenBackgroundChanges()
         => _host.Run(() =>
@@ -35,7 +35,7 @@ public sealed partial class NetworkRenderingRegressionTests
             Assert.Equal(Application.Current.FindResource("ButtonForeground"), button.Foreground);
         });
 
-    /// <summary>Замена динамического ресурса перекрашивает кнопку без повторного создания или смены темы.</summary>
+    /// <summary>Verifies test scenario for AccentButtonContrastTests.cs.</summary>
     [Fact]
     public void PrimaryButton_TracksDynamicAccentResourceReplacement()
         => _host.Run(() =>
@@ -63,7 +63,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { resources.Remove(key); }
         });
 
-    /// <summary>Полупрозрачный фон оценивается по обеим крайним подложкам, некорректный ресурс не создаёт ложный цвет.</summary>
+    /// <summary>Verifies test scenario for AccentButtonContrastTests.cs.</summary>
     [Fact]
     public void Converter_AccountsForOpacityAndUnavailableResources()
     {

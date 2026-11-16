@@ -5,6 +5,9 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class GitHubUpdateServiceTests
 {
     [Theory]
@@ -15,6 +18,9 @@ public class GitHubUpdateServiceTests
     [InlineData("v1.4.0-rc2", "1.4.0")]
     [InlineData("", "0.0.0")]
     [InlineData(null, "0.0.0")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CleanVersionTag_NormalizesProperly(string? input, string expected)
     {
         var result = GitHubUpdateService.CleanVersionTag(input ?? "");
@@ -22,6 +28,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ParseSemVer_ParsesValidVersionStrings()
     {
         var v1 = GitHubUpdateService.ParseSemVer("1.2.3");
@@ -38,6 +47,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SemVerComparison_CorrectlyDetectsNewerVersion()
     {
         var current = GitHubUpdateService.ParseSemVer("1.2.2");
@@ -54,6 +66,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FindInstallerAsset_PicksStartupMonitorSetupExe()
     {
         var json = """
@@ -87,6 +102,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ExtractSha256Checksum_FindsChecksumInBody()
     {
         var body1 = "Release notes for v1.2.3\n\nSHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\nEnjoy!";
@@ -104,6 +122,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UpdateInfo_SerializationRoundTrip_MaintainsIntegrity()
     {
         var original = new UpdateInfo
@@ -137,6 +158,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UpdateSettingsPayload_RecordsCorrectValues()
     {
         var payload = new UpdateSettingsPayload(true, false, "1.2.2");
@@ -155,6 +179,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UpdateProgressInfo_DefaultValuesAreConsistent()
     {
         var progress = new UpdateProgressInfo();
@@ -166,6 +193,9 @@ public class GitHubUpdateServiceTests
         Assert.Null(progress.ErrorMessage);
     }
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UpdateAvailable_WhenServiceIsCurrent_ButClientIsOlder_IsAvailableForClient()
     {
         var remote = GitHubUpdateService.ParseSemVer("1.2.4");
@@ -182,6 +212,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UpdateInfo_DtoSerialization_SupportsClientAndServiceVersion()
     {
         var info = new UpdateInfo
@@ -206,6 +239,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CheckForUpdatesRequest_SerializationRoundTrip()
     {
         var req = new CheckForUpdatesRequest("1.2.3");
@@ -217,6 +253,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CheckForUpdatesRequest_WithBuildDate_MaintainsDateIntegrity()
     {
         var buildDate = new DateTime(2026, 10, 14, 10, 0, 0, DateTimeKind.Utc);
@@ -231,6 +270,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FindInstallerAsset_ExtractsAssetTimestamps()
     {
         var json = """
@@ -257,6 +299,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsUpdateCandidate_WhenVersionIsSame_ReturnsFalseEvenIfRemoteInstallerDateIsNewer()
     {
         var remoteVer = new Version(1, 4, 0);
@@ -272,6 +317,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsUpdateCandidate_WhenVersionIsSame_AndRemoteInstallerIsOlder_ReturnsFalse()
     {
         var remoteVer = new Version(1, 4, 0);
@@ -287,12 +335,15 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsUpdateCandidate_WhenVersionIsSame_AndDifferenceIsUnderThreshold_ReturnsFalse()
     {
         var remoteVer = new Version(1, 4, 0);
         var localVer = new Version(1, 4, 0);
         var localBuildDate = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
-        var remoteInstallerDate = new DateTime(2026, 10, 14, 12, 1, 0, DateTimeKind.Utc); // всего 1 минута
+        var remoteInstallerDate = new DateTime(2026, 10, 14, 12, 1, 0, DateTimeKind.Utc); // Only 1 minute
 
         var candidate = GitHubUpdateService.IsUpdateCandidate(
             remoteVer, localVer, remoteInstallerDate, localBuildDate, out var isNewerByDate);
@@ -302,6 +353,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsUpdateCandidate_WhenRemoteVersionIsStrictlyNewer_ReturnsTrueWithoutDateFlag()
     {
         var remoteVer = new Version(1, 4, 1);
@@ -317,6 +371,9 @@ public class GitHubUpdateServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UpdateInfo_Serialization_PreservesInstallerDateAndNewerByDate()
     {
         var info = new UpdateInfo

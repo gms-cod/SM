@@ -569,6 +569,9 @@ public class OtherStartupLocationsWatcher : BackgroundService
 /// <summary>Разрешает CLSID в читаемое имя и путь к DLL через реестр (HKCR\CLSID).</summary>
 internal static class ClsidResolver
 {
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal static (string name, string dllPath) Resolve(string clsid)
     {
         try

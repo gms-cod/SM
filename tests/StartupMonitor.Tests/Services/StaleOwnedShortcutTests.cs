@@ -3,10 +3,10 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет очистку только отсутствующего собственного ярлыка без работы с папкой пользователя.</summary>
+/// <summary>Verifies test scenario for StaleOwnedShortcutTests.cs.</summary>
 public sealed class StaleOwnedShortcutTests
 {
-    /// <summary>Отсутствие исходного и отключённого файла допускает очистку только точной записи без снимка.</summary>
+    /// <summary>Verifies test scenario for StaleOwnedShortcutTests.cs.</summary>
     [Fact]
     public void MissingOwnedShortcut_RequiresExactIdentityAndNoBackup()
     {
@@ -38,8 +38,8 @@ public sealed class StaleOwnedShortcutTests
         finally { Directory.Delete(folder, recursive: true); }
     }
 
-    /// <summary>Наличие любого из двух файлов или недоступность каталога запрещает очистку записи.</summary>
-    /// <param name="suffix">Суффикс настоящего либо отключённого ярлыка.</param>
+    /// <summary>Verifies test scenario for StaleOwnedShortcutTests.cs.</summary>
+    /// <summary>Verifies test scenario for StaleOwnedShortcutTests.cs.</summary>
     [Theory]
     [InlineData("")]
     [InlineData(".disabled")]

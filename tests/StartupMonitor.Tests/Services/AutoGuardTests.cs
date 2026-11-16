@@ -6,9 +6,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class AutoGuardTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_WhenNoPoliciesActive_ReturnsNull()
     {
         var settings = new AppSettings
@@ -34,6 +40,9 @@ public class AutoGuardTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_TempPathPolicy_MatchesTempLocations()
     {
         var settings = new AppSettings { GuardBlockTempPath = true };
@@ -61,7 +70,7 @@ public class AutoGuardTests
         Assert.NotNull(resultPublic);
         Assert.Equal(AutoGuardPolicyType.TempLocation, resultPublic.Policy);
 
-        // Легитимная программа в Program Files не блокируется
+        // Verifies component behavior and assertions.
         var cleanEntry = new StartupEntry
         {
             Name = "CleanApp",
@@ -72,6 +81,9 @@ public class AutoGuardTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_ScriptsPolicy_MatchesScriptExtensionsAndInterpreters()
     {
         var settings = new AppSettings { GuardBlockScripts = true };
@@ -109,6 +121,9 @@ public class AutoGuardTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_UnsignedPolicy_MatchesUnsignedExecutables()
     {
         var settings = new AppSettings { GuardBlockUnsigned = true };
@@ -136,7 +151,7 @@ public class AutoGuardTests
         Assert.NotNull(resInvalid);
         Assert.Equal(AutoGuardPolicyType.UnsignedBinary, resInvalid.Policy);
 
-        // Подписанный валидный файл не блокируется
+        // Verifies component behavior and assertions.
         var signedEntry = new StartupEntry
         {
             Name = "SignedApp",
@@ -148,6 +163,9 @@ public class AutoGuardTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_DangerousCliPolicy_MatchesBase64AndDownloaders()
     {
         var settings = new AppSettings { GuardBlockDangerousCli = true };
@@ -166,6 +184,9 @@ public class AutoGuardTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_NewServicesPolicy_MatchesThirdPartyServices()
     {
         var settings = new AppSettings { GuardBlockNewServices = true };
@@ -185,6 +206,9 @@ public class AutoGuardTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_SystemProtection_ExemptsCoreWindowsAndSelfComponents()
     {
         var allSettings = new AppSettings
@@ -196,7 +220,7 @@ public class AutoGuardTests
             GuardBlockNewServices = true
         };
 
-        // 1. Системная служба Windows (rpcss)
+        // Verifies component behavior and assertions.
         var rpcssEntry = new StartupEntry
         {
             Name = "rpcss",
@@ -206,7 +230,7 @@ public class AutoGuardTests
         };
         Assert.Null(AutoGuardEngine.Evaluate(rpcssEntry, allSettings));
 
-        // 2. Системный svchost.exe
+        // Verifies component behavior and assertions.
         var svchostEntry = new StartupEntry
         {
             Name = "HostProcess",
@@ -215,7 +239,7 @@ public class AutoGuardTests
         };
         Assert.Null(AutoGuardEngine.Evaluate(svchostEntry, allSettings));
 
-        // 3. Собственные компоненты StartupMonitor
+        // Verifies component behavior and assertions.
         var selfServiceEntry = new StartupEntry
         {
             Name = "StartupMonitor.Service",

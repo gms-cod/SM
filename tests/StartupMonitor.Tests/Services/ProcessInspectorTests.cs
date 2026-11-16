@@ -9,11 +9,17 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class ProcessInspectorTests
 {
     private readonly ProcessInspectorService _inspector = new();
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void InspectProcess_CurrentProcess_ReturnsModules()
     {
         int currentPid = Process.GetCurrentProcess().Id;
@@ -24,7 +30,7 @@ public class ProcessInspectorTests
         Assert.Equal(currentPid, response.ProcessId);
         Assert.NotEmpty(response.Modules);
 
-        // В любом .NET процессе загружены ntdll.dll или kernel32.dll
+        // Verifies component behavior and assertions.
         var hasSystemModule = response.Modules.Any(m =>
             m.ModuleName.Equals("ntdll.dll", StringComparison.OrdinalIgnoreCase) ||
             m.ModuleName.Equals("kernel32.dll", StringComparison.OrdinalIgnoreCase) ||
@@ -34,6 +40,9 @@ public class ProcessInspectorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void InspectProcess_CurrentProcess_AuthenticodeSignaturesChecked()
     {
         int currentPid = Process.GetCurrentProcess().Id;
@@ -51,6 +60,9 @@ public class ProcessInspectorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void InspectProcess_IncludeHandles_False_ReturnsNoHandles()
     {
         int currentPid = Process.GetCurrentProcess().Id;
@@ -61,6 +73,9 @@ public class ProcessInspectorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void InspectProcess_InvalidPid_HandlesGracefully()
     {
         var response = _inspector.InspectProcess(99999999, includeHandles: true);
@@ -71,6 +86,9 @@ public class ProcessInspectorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessModuleInfo_DisplaySize_FormatsCorrectly()
     {
         var m1 = new ProcessModuleInfo { ModuleSize = 500 };
@@ -87,6 +105,9 @@ public class ProcessInspectorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessHandleInfo_AccessString_FormatsCorrectly()
     {
         var h = new ProcessHandleInfo { GrantedAccess = 0x001F0003 };

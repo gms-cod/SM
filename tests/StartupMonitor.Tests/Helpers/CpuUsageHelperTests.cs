@@ -3,9 +3,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Helpers;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class CpuUsageHelperTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateCpuPercentage_ZeroTotal_ReturnsZero()
     {
         var pct = CpuUsageHelper.CalculateCpuPercentage(0, 0, 0, true);
@@ -13,6 +19,9 @@ public class CpuUsageHelperTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateCpuPercentage_AllIdle_ReturnsZero()
     {
         // total = 1000, idle = 1000 -> 0%
@@ -21,6 +30,9 @@ public class CpuUsageHelperTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateCpuPercentage_HalfBusy_NoSelf_Returns50()
     {
         // total = 1000, idle = 500 -> busy = 500 -> 50%
@@ -29,6 +41,9 @@ public class CpuUsageHelperTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateCpuPercentage_ExcludeSelf_DeductsOurTicks()
     {
         // total = 1000, idle = 200 (busy = 800, 80% total)
@@ -42,6 +57,9 @@ public class CpuUsageHelperTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateCpuPercentage_OurTicksExceedsBusy_ClampsToZero()
     {
         // total = 1000, idle = 700 (busy = 300)
@@ -51,6 +69,9 @@ public class CpuUsageHelperTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateCpuPercentage_MaxClampedTo100()
     {
         // total = 100, idle = -50 (anomalous)
@@ -59,6 +80,9 @@ public class CpuUsageHelperTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetCpuUsage_ReturnsValueBetween0And100()
     {
         var usage = CpuUsageHelper.GetCpuUsage(excludeSelf: true);

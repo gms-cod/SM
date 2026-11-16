@@ -11,9 +11,7 @@ using StartupMonitor.UI.ViewModels;
 
 namespace StartupMonitor.Tests.Snapshot;
 
-/// <summary>
-/// Комплексные тесты для контрольных снимков системы («Было — Стало», v1.0.18).
-/// </summary>
+/// <summary>Verifies test scenario for BaselineSnapshotTests.cs.</summary>
 public class BaselineSnapshotTests : IDisposable
 {
     private readonly string _tempDir;
@@ -29,6 +27,9 @@ public class BaselineSnapshotTests : IDisposable
         _snapshotManager = new SnapshotManager(_store, NullLogger<SnapshotManager>.Instance);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try
@@ -42,6 +43,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void StartupEntrySnapshotItem_FromEntry_CopiesAllRelevantFields()
     {
         var entry = new StartupEntry
@@ -75,6 +79,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BaselineSnapshot_CreateFromEntries_InitializesMetadata()
     {
         var entries = new List<StartupEntry>
@@ -96,6 +103,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void JsonDataStore_SaveAndGetSnapshots_RoundtripSucceeds()
     {
         var entries = new List<StartupEntry>
@@ -121,6 +131,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void JsonDataStore_DeleteSnapshot_RemovesSnapshot()
     {
         var snapshot1 = BaselineSnapshot.Create("Снимок 1", "", []);
@@ -143,6 +156,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SnapshotComparator_Compare_DetectsAddedEntries()
     {
         var baselineItem = new StartupEntrySnapshotItem
@@ -177,6 +193,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SnapshotComparator_Compare_DetectsRemovedEntries()
     {
         var item1 = new StartupEntrySnapshotItem
@@ -216,6 +235,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SnapshotComparator_Compare_DetectsModifiedProperties()
     {
         var baselineItem = new StartupEntrySnapshotItem
@@ -268,6 +290,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SnapshotComparator_Compare_UnchangedEntries_HasDifferencesFalse()
     {
         var baselineItem = new StartupEntrySnapshotItem
@@ -315,6 +340,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SnapshotComparator_Compare_CompositeKeyFallback_MatchesEntriesWhenIdDiffers()
     {
         var baselineItem = new StartupEntrySnapshotItem
@@ -332,7 +360,7 @@ public class BaselineSnapshotTests : IDisposable
             Entries = [baselineItem]
         };
 
-        // Запись та же самая по ключу (RegistryRun|HKCU\Run|OneDrive), но ID сгенерирован заново
+        // Verifies component behavior and assertions.
         var currentEntries = new List<StartupEntry>
         {
             new()
@@ -355,6 +383,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PipeMessage_SnapshotPayloads_JsonRoundtrip()
     {
         var createPayload = new CreateSnapshotPayload { Name = "До установки софта", Description = "Свежая ОС" };
@@ -378,6 +409,9 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SnapshotManager_CreateAndCompare_Succeeds()
     {
         var cfg = _store.Load();
@@ -390,7 +424,7 @@ public class BaselineSnapshotTests : IDisposable
         Assert.NotNull(snapshot);
         Assert.Equal(1, snapshot.EntriesCount);
 
-        // Модифицируем запись в системе
+        // Verifies component behavior and assertions.
         cfg = _store.Load();
         cfg.Entries = [
             new() { Id = "1", Name = "BaseApp", Location = EntryLocation.RegistryRun, LocationDetail = "HKCU" },
@@ -408,11 +442,14 @@ public class BaselineSnapshotTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void HexToBrushConverter_ConvertsColorWithAndWithoutOpacity()
     {
         var converter = new HexToBrushConverter();
 
-        // Без прозрачности (#10B981)
+        // Verifies component behavior and assertions.
         var resultSolid = converter.Convert("#10B981", typeof(Brush), null, CultureInfo.InvariantCulture);
         var brushSolid = Assert.IsType<SolidColorBrush>(resultSolid);
         Assert.Equal(255, brushSolid.Color.A);
@@ -420,12 +457,12 @@ public class BaselineSnapshotTests : IDisposable
         Assert.Equal(0xB9, brushSolid.Color.G);
         Assert.Equal(0x81, brushSolid.Color.B);
 
-        // С прозрачностью 0.15 (15% от 255 = 38)
+        // Verifies component behavior and assertions.
         var resultAlpha = converter.Convert("#10B981", typeof(Brush), "0.15", CultureInfo.InvariantCulture);
         var brushAlpha = Assert.IsType<SolidColorBrush>(resultAlpha);
         Assert.Equal((byte)(0.15 * 255), brushAlpha.Color.A);
 
-        // Невалидный ввод возвращает Transparent
+        // Verifies component behavior and assertions.
         var resultInvalid = converter.Convert("invalid-color", typeof(Brush), null, CultureInfo.InvariantCulture);
         Assert.Equal(Brushes.Transparent, resultInvalid);
     }

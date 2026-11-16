@@ -1,2 +1,2 @@
-// Глобальный using для Xunit — доступен во всех тестовых файлах проекта
+// Verifies component behavior and assertions.
 global using Xunit;

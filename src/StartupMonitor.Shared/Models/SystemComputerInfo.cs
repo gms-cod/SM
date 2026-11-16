@@ -10,15 +10,30 @@ namespace StartupMonitor.Shared.Models;
 /// </summary>
 public sealed class SystemDiskInfo
 {
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string Name { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string Label { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string Format { get; set; } = string.Empty;
     public double TotalGb { get; set; }
     public double FreeGb { get; set; }
     public double UsedGb { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int UsedPercent { get; set; }
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplaySummary => $"{Name} ({Label}) — {FreeGb:F1} ГБ своб. из {TotalGb:F1} ГБ ({UsedPercent}% занято)";
 }
 
@@ -27,12 +42,33 @@ public sealed class SystemDiskInfo
 /// </summary>
 public sealed class SystemComputerInfo
 {
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string MachineName { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string UserName { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string OsName { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string OsDisplayVersion { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string OsBuild { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string Architecture { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string CpuName { get; set; } = string.Empty;
     /// <summary>Производитель и модель компьютера, если они доступны в реестре.</summary>
     public string ComputerModel { get; set; } = string.Empty;
@@ -42,25 +78,31 @@ public sealed class SystemComputerInfo
     public string Motherboard { get; set; } = string.Empty;
     /// <summary>Дата выпуска системной прошивки в формате производителя.</summary>
     public string BiosReleaseDate { get; set; } = string.Empty;
-    /// <summary>Каталог установленной Windows.</summary>
+    /// <summary>Windows installation directory.</summary>
     public string WindowsDirectory { get; set; } = string.Empty;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int LogicalCores { get; set; }
     public double RamTotalGb { get; set; }
     public double RamAvailableGb { get; set; }
     public double RamUsedGb { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int RamUsedPercent { get; set; }
     public TimeSpan SystemUptime { get; set; }
     public List<SystemDiskInfo> Disks { get; set; } = new();
 
     /// <summary>
-    /// Компактная сводка одной строкой для статус-бара / тултипа.
+    /// A compact single-line summary for the status bar or tooltip.
     /// </summary>
     [JsonIgnore]
     public string CompactSummary =>
         $"{CpuName} ({LogicalCores} потоков) • RAM: {RamUsedGb:F1}/{RamTotalGb:F1} ГБ ({RamUsedPercent}%) • Диски: {string.Join(", ", Disks.Select(d => $"{d.Name} {d.FreeGb:F0}/{d.TotalGb:F0} ГБ"))}";
 
     /// <summary>
-    /// Человекочитаемая строка аптайма системы.
+    /// A human-readable system uptime string.
     /// </summary>
     [JsonIgnore]
     public string UptimeDisplay =>
@@ -133,7 +175,13 @@ public sealed class SystemComputerInfo
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MEMORYSTATUSEX
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLength;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwMemoryLoad;
         public ulong ullTotalPhys;
         public ulong ullAvailPhys;

@@ -6,11 +6,10 @@ using StartupMonitor.UI.Views;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// UI-тесты бэкапов и пресетов брандмауэра (Worker 3):
-/// структура JSON экспорта/импорта, десериализация <see cref="FirewallBackupDto"/>,
-/// Pipe-контракты Import/Export/Preset и маппинг <see cref="SecurityPresetType"/>.
-/// Без WPF-диспетчера: проверяются статические хелперы
+/// <summary>Verifies test scenario for FirewallBackupAndPresetsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallBackupAndPresetsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallBackupAndPresetsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallBackupAndPresetsUiTests.cs.</summary>
 /// <c>NetworkSecurityHubView.SerializeBackupToJson / DeserializeBackupFromJson / GetSecurityPresetDisplayName</c>.
 /// </summary>
 public sealed class FirewallBackupAndPresetsUiTests
@@ -57,7 +56,7 @@ public sealed class FirewallBackupAndPresetsUiTests
         }
     };
 
-    // ─── 1. Экспорт: структура JSON ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void SerializeBackup_ProducesIndentedJson_WithAllSections()
@@ -70,11 +69,14 @@ public sealed class FirewallBackupAndPresetsUiTests
         Assert.Contains("\"rules\"", json);
         Assert.Contains("Allow SSH", json);
         Assert.Contains("Block Telemetry", json);
-        // WriteIndented = true: есть переносы строк и отступы.
+        // Verifies component behavior and assertions.
         Assert.Contains("\n", json);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SerializeBackup_Roundtrip_PreservesRules()
     {
         var backup = SampleBackup();
@@ -91,6 +93,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SerializeBackup_NullBackup_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(() =>
@@ -98,13 +103,16 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DeserializeBackup_NullJson_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(() =>
             NetworkSecurityHubView.DeserializeBackupFromJson(null!));
     }
 
-    // ─── 2. Импорт: валидация и десериализация ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void DeserializeBackup_ValidJson_RestoresVersionAndRules()
@@ -129,6 +137,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DeserializeBackup_InvalidJson_ThrowsJsonException()
     {
         Assert.Throws<JsonException>(() =>
@@ -136,6 +147,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DeserializeBackup_EmptyRules_AllowsZeroCount()
     {
         const string json = """{ "version": "1.6.0", "rules": [] } """;
@@ -147,6 +161,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildImportRequest_PreservesBackupAndOverwriteFlag()
     {
         var backup = SampleBackup();
@@ -160,6 +177,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ImportRequest_Serializes_WithOverwriteExistingContract()
     {
         var req = new ImportFirewallRulesRequest(SampleBackup(), overwriteExisting: true);
@@ -171,6 +191,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FirewallImportResultPayload_Deserializes_ImportedAndSkipped()
     {
         const string json = """{ "imported": 5, "skipped": 2 }""";
@@ -182,7 +205,7 @@ public sealed class FirewallBackupAndPresetsUiTests
         Assert.Equal(2, result.Skipped);
     }
 
-    // ─── 3. Пресеты: маппинг ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData(SecurityPresetType.MaxPrivacy, "Максимальная приватность")]
@@ -195,6 +218,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SecurityPresetType_AllValuesDefined()
     {
         Assert.True(Enum.IsDefined(typeof(SecurityPresetType), SecurityPresetType.MaxPrivacy));
@@ -209,6 +235,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     [InlineData(SecurityPresetType.Gaming)]
     [InlineData(SecurityPresetType.PublicWifi)]
     [InlineData(SecurityPresetType.ResetToDefaults)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildPresetRequest_PreservesPreset_InBothContractFields(SecurityPresetType preset)
     {
         var req = NetworkSecurityHubView.BuildPresetRequest(preset);
@@ -218,6 +247,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ApplyPresetRequest_Serializes_BothPresetAliases()
     {
         var req = new ApplySecurityPresetRequest(SecurityPresetType.Gaming);
@@ -229,6 +261,9 @@ public sealed class FirewallBackupAndPresetsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SecurityPresetResultPayload_Deserializes_AppliedCount()
     {
         const string json = """{ "preset": 1, "appliedCount": 7, "success": true, "message": "ok" }""";
@@ -241,7 +276,7 @@ public sealed class FirewallBackupAndPresetsUiTests
         Assert.True(result.Success);
     }
 
-    // ─── 4. Имя файла бэкапа ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void BuildDefaultBackupFileName_UsesDateStamp()
@@ -251,7 +286,7 @@ public sealed class FirewallBackupAndPresetsUiTests
         Assert.Equal("FirewallRules_Backup_20261015.json", name);
     }
 
-    // ─── 5. Pipe-контракты экспорта ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void PipeMessageTypes_ExportImportPresetDefined()

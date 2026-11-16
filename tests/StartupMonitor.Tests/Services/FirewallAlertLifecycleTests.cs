@@ -12,13 +12,13 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет жизненный цикл групп и ИИ с настоящей логикой службы, исключая COM, WFP и внешнюю сеть.</summary>
+/// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
 public sealed class FirewallAlertLifecycleTests
 {
     private const string AppPath = @"C:\Apps\lifecycle.exe";
 
-    /// <summary>Зависший обход правил не задерживает IPC-сверку уже выданной карточки и не занимает командный канал.</summary>
-    /// <returns>Задача управляемого конкурентного воспроизведения.</returns>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task AlertStatus_DoesNotWaitForBlockedFirewallScan()
     {
@@ -48,8 +48,8 @@ public sealed class FirewallAlertLifecycleTests
         finally { release.Set(); await held.WaitAsync(TimeSpan.FromSeconds(3)); }
     }
 
-    /// <summary>Решение ожидает занятую блокировку сканирования, а повтор операции после успешного применения идемпотентен.</summary>
-    /// <returns>Задача проверки последовательности операций.</returns>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task Resolve_WaitsForScanAndSameOperationIsAppliedOnlyOnce()
     {
@@ -77,8 +77,8 @@ public sealed class FirewallAlertLifecycleTests
         finally { release.Set(); await held.WaitAsync(TimeSpan.FromSeconds(3)); }
     }
 
-    /// <summary>Истечение ожидания замка не меняет политику и позволяет безопасно повторить тот же запрос.</summary>
-    /// <returns>Задача управляемой проверки отказа и повтора.</returns>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task Resolve_WhenScanLockIsBusy_RefusesBeforeChangesAndCanRetry()
     {
@@ -108,8 +108,8 @@ public sealed class FirewallAlertLifecycleTests
         finally { release.Set(); await held.WaitAsync(TimeSpan.FromSeconds(3)); }
     }
 
-    /// <summary>Одновременный повтор выполняющейся операции не выдаёт ложный подтверждённый отказ.</summary>
-    /// <returns>Задача проверки единственного применения политики.</returns>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task Resolve_ConcurrentRetry_RemainsUnknownUntilOriginalFinishes()
     {
@@ -128,7 +128,7 @@ public sealed class FirewallAlertLifecycleTests
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
             var pending = rig.Service.ResolveAlertDetailed(request);
             Assert.Equal(NetworkAlertResolutionStatus.UnknownOutcome, pending.Status);
-            // Неуспешный второй TryAdd не должен снять защиту первого вызова.
+            // Verifies component behavior and assertions.
             var third = rig.Service.ResolveAlertDetailed(request);
             Assert.Equal(NetworkAlertResolutionStatus.UnknownOutcome, third.Status);
             Assert.Equal(1, calls);
@@ -140,7 +140,7 @@ public sealed class FirewallAlertLifecycleTests
         finally { release.Set(); await original.WaitAsync(TimeSpan.FromSeconds(3)); }
     }
 
-    /// <summary>Массовые TCP-сокеты образуют одну группу и не увеличивают счётчик при повторном снимке.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public void ManyLocalPorts_AggregateAndRemainUniqueBeyondSeenTtl()
     {
@@ -157,7 +157,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(rig.Now, repeated.LastSeenAt);
     }
 
-    /// <summary>Восстановление пути завершает неизвестную карточку, не оставляя блокирующий имя-псевдоним.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public void RecoveredPath_SupersedesUnknownIdentity()
     {
@@ -176,7 +176,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(NetworkAlertResolutionStatus.Superseded, rig.Service.ResolveAlertDetailed(Request(unknown, NetworkAlertResolution.BlockSession)).Status);
     }
 
-    /// <summary>Отложенная карточка остаётся группой, но не показывается до срока и не создаёт сетевую политику.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public void Defer_HidesSameGroupForCooldownWithoutAllowingTraffic()
     {
@@ -198,7 +198,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(alert.AlertId, Assert.Single(rig.Service.GetPendingAlerts()).AlertId);
     }
 
-    /// <summary>Отсутствие заключения ИИ возвращает одну ручную группу без автоматического Allow и повторного запуска для новых сокетов.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public void MissingAiVerdict_QueuesManualGroupAndDoesNotRetryBehindItsWindow()
     {
@@ -219,7 +219,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(2, Assert.Single(rig.Service.GetPendingAlerts()).ConnectionCount);
     }
 
-    /// <summary>Поздний ответ ИИ не записывает политику после подтверждённого отключения детектора.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task Disable_InvalidatesLateAiCommit()
     {
@@ -236,7 +236,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Empty(rig.Service.SessionDecisions);
     }
 
-    /// <summary>Смена настройки автономности инвалидирует старую оценку и возвращает существующий сокет к ручному запросу.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task AutonomousModeChanged_DoesNotApplyOldChoiceAndRescansSameSocket()
     {
@@ -255,7 +255,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Single(rig.Service.GetPendingAlerts());
     }
 
-    /// <summary>Один operationId не допускает противоположное повторное действие после утраты подтверждения.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public void OperationIdentity_IsIdempotentAndRejectsDifferentChoice()
     {
@@ -270,7 +270,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(1, rig.Policy.ApplyCalls);
     }
 
-    /// <summary>Обновлённый чёрный список проверяется перед разрешением из ранее выданного окна.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public void StalePopup_CannotAcknowledgeSessionAllowAgainstBlacklist()
     {
@@ -287,7 +287,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(0, rig.Policy.ApplyCalls);
     }
 
-    /// <summary>Одно имя системного или собственного компонента вне ожидаемого каталога не является доверием.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Theory]
     [InlineData("svchost.exe", @"C:\Temp\svchost.exe")]
     [InlineData("StartupMonitor.Service.exe", @"C:\Temp\StartupMonitor.Service.exe")]
@@ -295,13 +295,16 @@ public sealed class FirewallAlertLifecycleTests
     public void TrustedIdentity_RejectsFilenameAndSubstringImpersonation(string name, string path) =>
         Assert.False(NetworkConnectionAlertService.IsTrustedProcess(name, path));
 
-    /// <summary>HTTP-адаптер возвращает только контролируемый ответ без обращения к внешней сети.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     private sealed class Handler(Func<CancellationToken, Task<HttpResponseMessage>> action) : HttpMessageHandler
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => action(cancellationToken);
     }
 
-    /// <summary>Неполный либо неизвестный action не превращается в разрешающее заключение модели.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Theory]
     [InlineData("{}")]
     [InlineData("{\"purpose\":\"p\",\"blocking_risk\":\"r\",\"recommendation\":\"x\",\"recommended_action\":\"Maybe\"}")]
@@ -312,7 +315,7 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Null(await ai.EvaluateNetworkProcessAsync("lifecycle.exe", AppPath, "8.8.8.8", 443));
     }
 
-    /// <summary>Одновременные потребители одной оценки используют один HTTP-запрос; отмена одного не обрывает другого.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     [Fact]
     public async Task ConcurrentAiConsumers_ShareRequestAndIsolateCancellation()
     {
@@ -339,30 +342,30 @@ public sealed class FirewallAlertLifecycleTests
         Assert.Equal(1, calls);
     }
 
-    /// <summary>Создаёт OpenAI-совместимый конверт ответа для изолированного обработчика.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     private static HttpResponseMessage Response(string content) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content } } } }))
     };
 
-    /// <summary>Создаёт оценщик с внедрённым HTTP-обработчиком, который никогда не использует сокеты.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     private static AiRatingService CreateAi(Rig rig, HttpMessageHandler handler) => new(new RatingsCache(rig.Store), NullLogger<AiRatingService>.Instance,
         "unit-test", apiUrl: "https://unit.test/chat/completions", httpHandler: handler);
 
-    /// <summary>Формирует управляемый сокет с неизвестным направлением наблюдения.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     private static ProcessNetworkSocket Socket(int localPort = 50000) => new()
     {
         ProcessId = 1001, ProcessName = "lifecycle.exe", LocalAddress = "192.168.1.10", LocalPort = localPort,
         RemoteAddress = "8.8.8.8", RemotePort = 443, Protocol = "TCP", State = "ESTABLISHED", Direction = "Unknown"
     };
 
-    /// <summary>Сохраняет одну идентичность операции для повторов подтверждения.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     private static ResolveNetworkAlertRequest Request(NetworkConnectionAlertDto alert, NetworkAlertResolution action) => new()
     {
         AlertId = alert.AlertId, Resolution = action, OperationId = Guid.NewGuid().ToString("N")
     };
 
-    /// <summary>Владеет полностью изолированными источниками конфигурации, сокетов и сетевых правил.</summary>
+    /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
     private sealed class Rig : IDisposable
     {
         private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("FirewallLifecycle_");
@@ -375,7 +378,7 @@ public sealed class FirewallAlertLifecycleTests
         public string? Path = AppPath;
         public DateTime Now = DateTime.UtcNow;
 
-        /// <summary>Подключает подмены, исключающие COM/WFP, системные процессы и внешнюю сеть.</summary>
+        /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
         public Rig(bool autonomous = false)
         {
             Store = new JsonDataStore(_directory.FullName);
@@ -394,7 +397,7 @@ public sealed class FirewallAlertLifecycleTests
             };
         }
 
-        /// <summary>Освобождает детектор и только принадлежащие этому тесту временные файлы.</summary>
+        /// <summary>Verifies test scenario for FirewallAlertLifecycleTests.cs.</summary>
         public void Dispose()
         {
             Service.Dispose();

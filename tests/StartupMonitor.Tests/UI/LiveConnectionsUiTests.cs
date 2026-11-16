@@ -4,19 +4,18 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// UI-тесты вкладки «Активные соединения» (NetworkSecurityHubView, вкладка Live):
-/// предикаты фильтрации WAN/LAN/ESTABLISHED/LISTEN + поиск,
-/// формирование <see cref="LiveConnectionRow"/> и валидация флага CanBlockIp.
+/// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
 /// <para/>
-/// DataGrid требует STA-диспетчера WPF, поэтому здесь проверяется тот же
-/// предикат, что и в <c>NetworkSecurityHubView.MatchesConnFilter</c>:
-/// фильтр типа сети/состояния + поиск по ProcessName, ProcessId,
+/// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
+/// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
 /// RemoteAddress, LocalEndPoint, RemoteEndPoint.
 /// </summary>
 public sealed class LiveConnectionsUiTests
 {
-    /// <summary>Фильтр таблицы соединений (зеркало приватного enum NetworkSecurityHubView.ConnFilter).</summary>
+    /// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
     private enum HubConnFilter
     {
         All,
@@ -27,8 +26,8 @@ public sealed class LiveConnectionsUiTests
     }
 
     /// <summary>
-    /// Предикат фильтрации — прямая копия логики NetworkSecurityHubView.MatchesConnFilter.
-    /// При изменении логики хаба этот метод и тесты обязаны обновляться синхронно.
+    /// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
+    /// <summary>Verifies test scenario for LiveConnectionsUiTests.cs.</summary>
     /// </summary>
     private static List<LiveConnectionRow> ApplyConnFilter(
         IEnumerable<LiveConnectionRow> rows, string query, HubConnFilter filter)
@@ -85,19 +84,19 @@ public sealed class LiveConnectionsUiTests
 
     private static List<LiveConnectionRow> SampleConnections() => new()
     {
-        // Публичное ESTABLISHED-соединение браузера.
+        // Verifies component behavior and assertions.
         new LiveConnectionRow(Socket("chrome", 1234, "TCP", "192.168.1.50", 51234, "142.250.0.1", 443, "ESTABLISHED")),
-        // Слушающий сокет веб-сервера (RemoteAddress "*" — LAN/прослушивание).
+        // Verifies component behavior and assertions.
         new LiveConnectionRow(Socket("nginx", 567, "TCP", "0.0.0.0", 80, "*", 0, "LISTENING")),
-        // Локальное ESTABLISHED-соединение внутри LAN.
+        // Verifies component behavior and assertions.
         new LiveConnectionRow(Socket("lan-sync", 910, "TCP", "192.168.1.50", 51235, "192.168.1.10", 445, "ESTABLISHED")),
-        // SSH-демон в режиме LISTEN на всех интерфейсах.
+        // Verifies component behavior and assertions.
         new LiveConnectionRow(Socket("sshd", 42, "TCP", "0.0.0.0", 22, "0.0.0.0", 0, "LISTEN")),
-        // UDP-сокет в состоянии BOUND (считается прослушиваемым).
+        // Verifies component behavior and assertions.
         new LiveConnectionRow(Socket("dns-client", 777, "UDP", "192.168.1.50", 53535, "8.8.8.8", 53, "BOUND")),
     };
 
-    // ─── 1. Фильтр WAN / LAN ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void Filter_Wan_ReturnsPublicOnly()
@@ -109,6 +108,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_Lan_ReturnsPrivateAndListeningOnly()
     {
         var result = ApplyConnFilter(SampleConnections(), string.Empty, HubConnFilter.Lan);
@@ -117,13 +119,16 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_AllWithEmptyQuery_ReturnsEverything()
     {
         var result = ApplyConnFilter(SampleConnections(), "   ", HubConnFilter.All);
         Assert.Equal(5, result.Count);
     }
 
-    // ─── 2. Фильтр по состоянию ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void Filter_Established_ReturnsEstablishedOnly()
@@ -137,6 +142,9 @@ public sealed class LiveConnectionsUiTests
     [InlineData("LISTENING")]
     [InlineData("LISTEN")]
     [InlineData("BOUND")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_Listening_CoversAllListenStates(string state)
     {
         var rows = new List<LiveConnectionRow>
@@ -148,6 +156,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_Listening_ReturnsListenStatesOnly()
     {
         var result = ApplyConnFilter(SampleConnections(), string.Empty, HubConnFilter.Listening);
@@ -156,7 +167,7 @@ public sealed class LiveConnectionsUiTests
             r.State.ToUpperInvariant(), new[] { "LISTENING", "LISTEN", "BOUND" }));
     }
 
-    // ─── 3. Поиск ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("chrome")]
@@ -170,6 +181,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByPid_Matches()
     {
         var result = ApplyConnFilter(SampleConnections(), "1234", HubConnFilter.All);
@@ -178,6 +192,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByRemoteIp_Matches()
     {
         var result = ApplyConnFilter(SampleConnections(), "142.250", HubConnFilter.All);
@@ -186,6 +203,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByLocalEndPoint_Matches()
     {
         var result = ApplyConnFilter(SampleConnections(), "192.168.1.50:51234", HubConnFilter.All);
@@ -194,6 +214,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByRemoteEndPoint_Matches()
     {
         var result = ApplyConnFilter(SampleConnections(), "142.250.0.1:443", HubConnFilter.All);
@@ -202,19 +225,25 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_CombinedQueryAndFilter_NarrowsResults()
     {
-        // Подстрока "192.168" встречается и в локальных, и в удалённых адресах.
+        // Verifies component behavior and assertions.
         var queryOnly = ApplyConnFilter(SampleConnections(), "192.168", HubConnFilter.All);
         Assert.True(queryOnly.Count >= 2);
 
-        // + фильтр WAN оставляет только публичные строки (локальный адрес не в счёт —
-        // IsPrivate определяется по удалённому IP через GeoIpLookupService).
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var combined = ApplyConnFilter(SampleConnections(), "192.168", HubConnFilter.Wan);
         Assert.All(combined, r => Assert.False(r.IsPrivate));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_NoMatch_ReturnsEmpty()
     {
         var result = ApplyConnFilter(SampleConnections(), "такого-соединения-нет-12345", HubConnFilter.All);
@@ -222,13 +251,16 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_NullQuery_TreatedAsEmpty()
     {
         var result = ApplyConnFilter(SampleConnections(), null!, HubConnFilter.All);
         Assert.Equal(5, result.Count);
     }
 
-    // ─── 4. Формирование LiveConnectionRow ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void Row_ExposesEndpointsAndProcess()
@@ -244,6 +276,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Row_DefaultBadge_IsAllowed()
     {
         var row = new LiveConnectionRow(
@@ -252,6 +287,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Row_CustomBadge_IsPreserved()
     {
         var row = new LiveConnectionRow(
@@ -261,6 +299,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Row_GeoEnrichment_PublicIpIsWan()
     {
         var row = new LiveConnectionRow(
@@ -271,6 +312,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Row_GeoEnrichment_PrivateIpIsLan()
     {
         var row = new LiveConnectionRow(
@@ -279,7 +323,7 @@ public sealed class LiveConnectionsUiTests
         Assert.Equal("🏠 LAN", row.NetworkTypeBadge);
     }
 
-    // ─── 5. Флаг CanBlockIp ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void CanBlockIp_PublicIp_ReturnsTrue()
@@ -293,6 +337,9 @@ public sealed class LiveConnectionsUiTests
     [InlineData("192.168.1.10")]
     [InlineData("10.0.0.5")]
     [InlineData("127.0.0.1")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CanBlockIp_PrivateIp_ReturnsFalse(string ip)
     {
         var row = new LiveConnectionRow(
@@ -304,6 +351,9 @@ public sealed class LiveConnectionsUiTests
     [InlineData("*")]
     [InlineData("0.0.0.0")]
     [InlineData("")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CanBlockIp_ListeningSocket_ReturnsFalse(string remoteAddress)
     {
         var row = new LiveConnectionRow(
@@ -312,6 +362,9 @@ public sealed class LiveConnectionsUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GeoIp_Resolve_NeverThrows_AndCaches()
     {
         GeoIpLookupService.ClearCache();

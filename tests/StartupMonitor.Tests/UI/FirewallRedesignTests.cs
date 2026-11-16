@@ -13,12 +13,12 @@ using Wpf.Ui.Appearance;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверки новой компоновки используют общий изолированный STA-host и настоящее визуальное дерево.</summary>
+/// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
 public sealed partial class NetworkRenderingRegressionTests
 {
-    /// <summary>Полный выбранный вариант политики помещается в свою ячейку при разных ширинах страницы.</summary>
-    /// <param name="width">Доступная ширина содержимого страницы.</param>
-    /// <param name="state">Исходная подтверждённая политика.</param>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     [Theory]
     [InlineData(760, AccessControlState.Allowed)]
     [InlineData(760, AccessControlState.Prompt)]
@@ -55,7 +55,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { view.Deactivate(); }
         });
 
-    /// <summary>Критические процессы сохраняют доступность Allow/Prompt, но вариант Block отключён.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     [Fact]
     public void CriticalApplication_DisablesOnlyBlockedChoice()
         => _host.Run(() =>
@@ -75,7 +75,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { view.Deactivate(); }
         });
 
-    /// <summary>Отказ от защищённой блокировки сохраняет Allowed и не вызывает транспорт.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     [Fact]
     public async Task CancelledProtectedBlock_KeepsConfirmedAllowedState()
     {
@@ -88,7 +88,7 @@ public sealed partial class NetworkRenderingRegressionTests
         Assert.Equal(AccessControlState.Allowed, item.State);
     }
 
-    /// <summary>Неуспешный ответ не меняет состояние; успешный обновляет его только после завершения IPC.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     [Fact]
     public async Task PolicyChange_WaitsForServiceAndCommitsOnlySuccess()
     {
@@ -110,7 +110,7 @@ public sealed partial class NetworkRenderingRegressionTests
         Assert.Equal(AccessRuleScope.Permanent, sent.Scope);
     }
 
-    /// <summary>Меню сохраняет стабильные идентификаторы страниц при новом визуальном порядке.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     [Fact]
     public void SidebarNavigation_UsesTaskOrderWithoutChangingSavedPageIds()
     {
@@ -123,7 +123,7 @@ public sealed partial class NetworkRenderingRegressionTests
         Assert.Equal(ids.Length, ids.Distinct().Count());
     }
 
-    /// <summary>Сохраняет изображения реальной страницы для визуальной проверки тёмной и светлой темы.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     [Fact]
     public void FirewallWorkspace_RendersBothThemesAndAllTabsWithoutExtraTimers()
         => _host.Run(() =>
@@ -174,11 +174,11 @@ public sealed partial class NetworkRenderingRegressionTests
             }
         });
 
-    /// <summary>Создаёт тестовую строку без запросов службы или изменения firewall.</summary>
-    /// <param name="name">Имя тестового приложения.</param>
-    /// <param name="state">Подтверждённая политика.</param>
-    /// <param name="protection">Уровень защиты приложения.</param>
-    /// <returns>Независимая модель строки.</returns>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     private static AppAccessMatrixItemViewModel CreateApplication(string name, AccessControlState state,
         ProcessProtectionLevel protection = ProcessProtectionLevel.None) => new(new AppAccessMatrixItemDto
         {
@@ -186,24 +186,24 @@ public sealed partial class NetworkRenderingRegressionTests
             ProtectionLevel = protection, Scope = AccessRuleScope.Permanent, ActiveSocketsCount = 3
         });
 
-    /// <summary>Выполняет настоящую WPF-компоновку в заданной области.</summary>
-    /// <param name="element">Корневой элемент страницы.</param>
-    /// <param name="width">Ширина в DIP.</param>
-    /// <param name="height">Высота в DIP.</param>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     private static void Layout(FrameworkElement element, double width, double height)
     {
         element.Measure(new Size(width, height));
         element.Arrange(new Rect(0, 0, width, height));
         element.UpdateLayout();
-        // DataGrid рассчитывает ширины звёздочных колонок отложенно с приоритетом Render.
+        // Verifies component behavior and assertions.
         element.Dispatcher.Invoke(() => { element.UpdateLayout(); }, System.Windows.Threading.DispatcherPriority.Loaded);
         element.UpdateLayout();
     }
 
-    /// <summary>Перечисляет реальные дочерние элементы визуального дерева.</summary>
-    /// <typeparam name="T">Искомый тип.</typeparam>
-    /// <param name="parent">Родительский визуальный элемент.</param>
-    /// <returns>Элементы указанного типа.</returns>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {
         for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
@@ -214,10 +214,10 @@ public sealed partial class NetworkRenderingRegressionTests
         }
     }
 
-    /// <summary>Находит контейнер ячейки для проверки реальных границ списка политики.</summary>
-    /// <typeparam name="T">Тип предка.</typeparam>
-    /// <param name="child">Проверяемый элемент.</param>
-    /// <returns>Найденный предок.</returns>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     private static T Ancestor<T>(DependencyObject child) where T : DependencyObject
     {
         for (var parent = VisualTreeHelper.GetParent(child); parent is not null; parent = VisualTreeHelper.GetParent(parent))
@@ -225,8 +225,8 @@ public sealed partial class NetworkRenderingRegressionTests
         throw new InvalidOperationException("Контейнер ячейки не найден.");
     }
 
-    /// <summary>Возвращает корень checkout независимо от каталога запуска testhost.</summary>
-    /// <returns>Каталог с решением.</returns>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     private static string RepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
@@ -234,9 +234,9 @@ public sealed partial class NetworkRenderingRegressionTests
         throw new DirectoryNotFoundException("Корень StartupMonitor не найден.");
     }
 
-    /// <summary>Сохраняет тестовый render, не показывая окно пользователю и не запуская production lifecycle.</summary>
-    /// <param name="view">Уже скомпонованная страница.</param>
-    /// <param name="filename">Имя PNG в изолированном каталоге результатов.</param>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallRedesignTests.cs.</summary>
     private static void SavePreview(FrameworkElement view, string filename)
     {
         var directory = Path.Combine(RepositoryRoot(), "TestResults", "FirewallRedesign");

@@ -4,10 +4,10 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет стоимость сопоставления большого числа сокетов без настоящей сети и COM.</summary>
+/// <summary>Verifies test scenario for NetworkAlertCollectionEfficiencyTests.cs.</summary>
 public sealed class NetworkAlertCollectionEfficiencyTests
 {
-    /// <summary>Много соединений одного PID требуют одного получения пути на снимок без долгоживущего PID-кэша.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertCollectionEfficiencyTests.cs.</summary>
     [Fact]
     public void RepeatedProcessConnections_ResolvePathOncePerSnapshot()
     {

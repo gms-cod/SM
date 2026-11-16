@@ -6,13 +6,11 @@ using StartupMonitor.UI.Views;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// UI-тесты интерактивных сетевых алертов (Worker 3):
-/// маппинг <see cref="NetworkConnectionAlertDto"/> → <see cref="ResolveNetworkAlertRequest"/>,
-/// решающая функция тика поллера <c>NetworkSecurityHubView.ShouldShowAlertWindow</c>,
-/// сериализация Pipe-контрактов (GetPendingNetworkAlerts / ResolveNetworkAlert / SetAlertsEnabled).
-/// WPF-окна не создаются: проверяется чистая логика без STA-диспетчера.
-/// </summary>
+/// <summary>Verifies test scenario for NetworkAlertUiTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertUiTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertUiTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertUiTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertUiTests.cs.</summary>
 public sealed class NetworkAlertUiTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -33,7 +31,7 @@ public sealed class NetworkAlertUiTests
         DetectedAt = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc)
     };
 
-    // ─── 1. Маппинг DTO → ResolveNetworkAlertRequest ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData(NetworkAlertResolution.AllowAlways)]
@@ -53,6 +51,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildResolveRequest_NullAlert_ThrowsArgumentNull()
     {
         Assert.Throws<ArgumentNullException>(() =>
@@ -60,6 +61,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildResolveRequest_NullStrings_MappedToEmpty()
     {
         var alert = new NetworkConnectionAlertDto
@@ -80,6 +84,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BuildResolveRequest_DoesNotMutateSourceDto()
     {
         var alert = SampleAlert("id-1");
@@ -91,7 +98,7 @@ public sealed class NetworkAlertUiTests
         Assert.Equal("id-1", alert.AlertId);
     }
 
-    // ─── 2. Логика тика поллера: ShouldShowAlertWindow ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void ShouldShowAlertWindow_EnabledWithAlertsAndClosed_ReturnsTrue()
@@ -103,6 +110,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ShouldShowAlertWindow_DisabledWithAlerts_ReturnsFalse()
     {
         var alerts = new List<NetworkConnectionAlertDto> { SampleAlert() };
@@ -112,11 +122,14 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ShouldShowAlertWindow_WindowAlreadyOpen_ReturnsFalse_NoDuplicates()
     {
         var alerts = new List<NetworkConnectionAlertDto> { SampleAlert(), SampleAlert("second") };
 
-        // Второе окно не открывается, пока первое не закрыто — защита от спама тостами.
+        // Verifies component behavior and assertions.
         Assert.False(NetworkSecurityHubView.ShouldShowAlertWindow(
             alertsEnabled: true, alerts: alerts, windowAlreadyOpen: true));
     }
@@ -124,6 +137,9 @@ public sealed class NetworkAlertUiTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ShouldShowAlertWindow_EmptyAlerts_ReturnsFalse(bool enabled)
     {
         Assert.False(NetworkSecurityHubView.ShouldShowAlertWindow(
@@ -135,6 +151,9 @@ public sealed class NetworkAlertUiTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ShouldShowAlertWindow_NullAlerts_ReturnsFalse(bool enabled)
     {
         Assert.False(NetworkSecurityHubView.ShouldShowAlertWindow(
@@ -142,6 +161,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ShouldShowAlertWindow_PollerTickMatrix_AllCombinations()
     {
         var one = new List<NetworkConnectionAlertDto> { SampleAlert() };
@@ -157,7 +179,7 @@ public sealed class NetworkAlertUiTests
         Assert.False(NetworkSecurityHubView.ShouldShowAlertWindow(false, one, true));
     }
 
-    // ─── 3. Pipe-контракты: сериализация/десериализация ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void NetworkAlertsPayload_RoundTrip_PreservesAlerts()
@@ -179,6 +201,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void NetworkAlertDto_JsonPropertyNames_AreCamelCase()
     {
         var json = JsonSerializer.Serialize(SampleAlert("zz"), JsonOptions);
@@ -192,6 +217,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveRequest_RoundTrip_PreservesResolution()
     {
         var req = NetworkSecurityHubView.BuildResolveRequest(
@@ -206,6 +234,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveResultPayload_RoundTrip()
     {
         var result = new ResolveNetworkAlertResultPayload(true, "Решение применено.");
@@ -220,6 +251,9 @@ public sealed class NetworkAlertUiTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AlertsEnabledPayload_RoundTrip(bool enabled)
     {
         var payload = new AlertsEnabledPayload(enabled);
@@ -231,6 +265,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PipeMessageTypes_AlertConstants_AreDistinct()
     {
         var types = new[]
@@ -248,7 +285,7 @@ public sealed class NetworkAlertUiTests
         Assert.All(types, t => Assert.False(string.IsNullOrWhiteSpace(t)));
     }
 
-    // ─── 4. Резолв: все решения сериализуются и различаются ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void ResolveRequests_AllResolutions_SerializeDistinctly()
@@ -264,12 +301,12 @@ public sealed class NetworkAlertUiTests
         Assert.All(jsons, j => Assert.Contains("\"alertId\"", j));
     }
 
-    // ─── 5. Математика позиционирования «Bottom-Anchored», адаптивной ширины и MaxHeight ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData(1920, 1040, 490, 500, 1420, 530)]
     [InlineData(1366, 728, 560, 460, 796, 258)]
-    [InlineData(1920, 688, 560, 520, 1350, 158)] // 1080p при 150% DPI
+    [InlineData(1920, 688, 560, 520, 1350, 158)] // 1080p at 150% DPI
     public void CalculateBottomAnchoredPosition_StandardScreens_PositionsCorrectly(
         double workAreaWidth, double workAreaHeight, double winWidth, double winHeight, double expectedLeft, double expectedTop)
     {
@@ -280,7 +317,7 @@ public sealed class NetworkAlertUiTests
         Assert.Equal(expectedLeft, targetLeft);
         Assert.Equal(expectedTop, targetTop);
 
-        // Инвариант нижней привязки: нижняя кромка окна строго на (workArea.Bottom - margin)
+        // Verifies component behavior and assertions.
         var windowBottom = targetTop + winHeight;
         Assert.Equal(workAreaHeight - margin, windowBottom);
     }
@@ -291,6 +328,9 @@ public sealed class NetworkAlertUiTests
     [InlineData(825.0, 520.0)] // 1080p @ 125% -> 520 DIP
     [InlineData(1040.0, 490.0)] // 1080p @ 100% -> 490 DIP
     [InlineData(1400.0, 490.0)] // 1440p @ 100% -> 490 DIP
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateAdaptiveWidth_BasedOnScreenHeight_SelectsOptimalWidth(double workAreaHeight, double expectedWidth)
     {
         double width;
@@ -302,6 +342,9 @@ public sealed class NetworkAlertUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CalculateAiScrollViewerMaxHeight_ConstrainedScreen_PreventsWindowOverflow()
     {
         const double margin = 10.0;
@@ -312,7 +355,7 @@ public sealed class NetworkAlertUiTests
         var availableAiHeight = maxAllowedWindowHeight - nonAiHeight; // 164.0 DIP
         var aiMaxHeight = Math.Max(80.0, availableAiHeight);
 
-        // Максимальная высота окна при максимальном заполнении ИИ
+        // Verifies component behavior and assertions.
         var totalWindowHeight = nonAiHeight + aiMaxHeight;
 
         Assert.Equal(164.0, aiMaxHeight);

@@ -66,6 +66,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _viewMode = "flat"; // "flat" или "tree"
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public bool IsTreeView => ViewMode == "tree";
 
     private readonly HashSet<int> _collapsedPids = new();
@@ -83,6 +86,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     public string TotalCpuDisplay => PerformanceSnapshot != null ? $"{PerformanceSnapshot.TotalCpuPercent:F0}%" : "0%";
     public double TotalCpuValue => PerformanceSnapshot?.TotalCpuPercent ?? 0;
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string TotalMemoryDisplay
     {
         get
@@ -95,6 +101,9 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
     }
     public double TotalMemoryValue => PerformanceSnapshot?.TotalMemoryPercent ?? 0;
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string TotalDiskDisplay
     {
         get
@@ -107,17 +116,41 @@ public partial class TaskManagerViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string ProcessesCountDisplay => PerformanceSnapshot != null ? $"{PerformanceSnapshot.TotalProcessesCount}" : "0";
 
     // ──── Индикаторы сортировки ────
 
     public string SortNameIndicator => _sortColumn == "name" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortPidIndicator => _sortColumn == "pid" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortCpuIndicator => _sortColumn == "cpu" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortRamIndicator => _sortColumn == "ram" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortDiskIndicator => _sortColumn == "disk" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortNetIndicator => _sortColumn == "net" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortPublisherIndicator => _sortColumn == "publisher" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string SortStartupIndicator => _sortColumn == "startup" ? (_sortAscending ? "\u25B2" : "\u25BC") : "";
 
     /// <summary>TaskManagerViewModel: Выполняет операцию TaskManagerViewModel.</summary>

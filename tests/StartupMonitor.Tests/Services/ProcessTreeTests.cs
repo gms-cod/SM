@@ -9,9 +9,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class ProcessTreeTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessStartupLinker_GetParentPidMap_ReturnsCurrentProcessParent()
     {
         var map = ProcessStartupLinker.GetParentPidMap();
@@ -25,6 +31,9 @@ public class ProcessTreeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void TaskManagerViewModel_FlatTreeHierarchy_BuildsCorrectLevelsAndExpands()
     {
         var vm = new TaskManagerViewModel(new PipeClient());
@@ -41,10 +50,10 @@ public class ProcessTreeTests
             }
         };
 
-        // Загружаем снимок
+        // Verifies component behavior and assertions.
         vm.UpdateSnapshot(snapshot);
 
-        // 1. Проверяем плоский режим
+        // Verifies component behavior and assertions.
         vm.SetViewMode("flat");
         Assert.False(vm.IsTreeView);
         Assert.Equal(5, vm.FilteredProcesses.Count);
@@ -54,7 +63,7 @@ public class ProcessTreeTests
             Assert.False(p.HasChildren);
         });
 
-        // 2. Переключаем в древовидный режим
+        // Verifies component behavior and assertions.
         vm.SetViewMode("tree");
         Assert.True(vm.IsTreeView);
         Assert.Equal(5, vm.FilteredProcesses.Count);
@@ -81,9 +90,9 @@ public class ProcessTreeTests
         Assert.Equal(0, svchost.TreeLevel);
         Assert.False(svchost.HasChildren);
 
-        // 3. Тестируем сворачивание (Collapse) узла explorer
+        // Verifies component behavior and assertions.
         vm.ToggleExpand(explorer);
-        // explorer свернут: его дети (cmd, git, powershell) должны скрыться
+        // Verifies component behavior and assertions.
         Assert.Equal(2, vm.FilteredProcesses.Count);
         Assert.Contains(vm.FilteredProcesses, p => p.Pid == 1000);
         Assert.Contains(vm.FilteredProcesses, p => p.Pid == 2000);
@@ -91,17 +100,17 @@ public class ProcessTreeTests
         Assert.DoesNotContain(vm.FilteredProcesses, p => p.Pid == 1020);
         Assert.DoesNotContain(vm.FilteredProcesses, p => p.Pid == 1030);
 
-        // 4. Тестируем разворачивание (Expand) узла explorer обратно
+        // Verifies component behavior and assertions.
         vm.ToggleExpand(explorer);
         Assert.Equal(5, vm.FilteredProcesses.Count);
 
-        // 5. Тестируем поиск по имени в дереве (поиск "git" должен развернуть explorer и cmd)
-        vm.ToggleExpand(explorer); // Снова свернем explorer
+        // Verifies component behavior and assertions.
+        vm.ToggleExpand(explorer); // Collapse explorer again
         Assert.Equal(2, vm.FilteredProcesses.Count);
 
         vm.SearchText = "git";
         vm.ApplyFilterAndSort();
-        // Поиск должен найти git и автоматически развернуть всех предков (explorer, cmd)
+        // Verifies component behavior and assertions.
         Assert.Contains(vm.FilteredProcesses, p => p.Pid == 1030);
         Assert.Contains(vm.FilteredProcesses, p => p.Pid == 1010);
         Assert.Contains(vm.FilteredProcesses, p => p.Pid == 1000);

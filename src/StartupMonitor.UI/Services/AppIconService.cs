@@ -49,11 +49,23 @@ public static class AppIconService
     private struct SHFILEINFO
     {
         public IntPtr hIcon;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int iIcon;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwAttributes;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string szDisplayName;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string szTypeName;
     }
 

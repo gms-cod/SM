@@ -6,14 +6,14 @@ using Microsoft.Win32;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет обратимую автоматическую блокировку и гонку ручного восстановления без реальных задач Windows.</summary>
+/// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
 public sealed class AutomaticStartupDisableRestoreTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitor_RestoreTests_" + Guid.NewGuid().ToString("N"));
     private readonly JsonDataStore _store;
     private readonly NotificationService _notifications = new(new InitialScanTracker(1));
 
-    /// <summary>Создаёт изолированное хранилище и включает только скриптовую политику для проверки Antigravity.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     public AutomaticStartupDisableRestoreTests()
     {
         _store = new JsonDataStore(Path.Combine(_directory, "startup-monitor.json"));
@@ -27,8 +27,8 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         _store.Save(config);
     }
 
-    /// <summary>Создаёт безвредный файл сценария в собственной временной папке.</summary>
-    /// <returns>Изолированная запись автозапуска.</returns>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     private StartupEntry Entry()
     {
         var file = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".vbs");
@@ -36,8 +36,8 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         return new StartupEntry { Name = "AntigravityAutoPatch", FilePath = file, CommandLine = file, Location = EntryLocation.StartupFolder };
     }
 
-    /// <summary>AutoGuard и строгий режим сохраняют отключённую запись и возможность включения.</summary>
-    /// <param name="strict">Включает строгий режим вместо скриптовой политики.</param>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -60,9 +60,9 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.True(File.Exists(entry.FilePath));
     }
 
-    /// <summary>Отказ системного отключения показывает ошибку вместо сообщения об успешной блокировке.</summary>
-    /// <param name="strict">Выбирает строгий режим или политику AutoGuard.</param>
-    /// <returns>Задача получения уведомления и проверки состояния записи.</returns>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -90,11 +90,11 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
     }
 
     /// <summary>
-    /// Реальное Enforce-завершение сохраняется для собственного обычного EXE, но общий
-    /// интерпретатор остаётся работать. В обоих случаях отключается только значение
-    /// в собственном подключе Run, который Windows не использует как точку автозапуска.
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     /// </summary>
-    /// <param name="sharedHost">Выбирает собственную копию cmd вместо собственного уникально названного ping.</param>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -155,7 +155,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
             {
                 if (process != null)
                 {
-                    // Полный путь клона уникален, а cleanup использует только принадлежащий тесту PID.
+                    // Verifies component behavior and assertions.
                     try
                     {
                         if (!process.HasExited)
@@ -170,13 +170,13 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
             }
             finally
             {
-                // Удаляем только собственный подключ, не затрагивая действующие значения Run.
+                // Verifies component behavior and assertions.
                 Registry.CurrentUser.DeleteSubKeyTree(relativeKey, throwOnMissingSubKey: false);
             }
         }
     }
 
-    /// <summary>Повторное отключение не уничтожает первый файл или данные включения.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void RepeatedDisable_PreservesOriginalPayloadAndConflictingFiles()
     {
@@ -193,7 +193,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Equal(payload, entry.DisablePayload);
     }
 
-    /// <summary>Включение не заменяет новое значение реестра и сохраняет исходный снимок для ручного разрешения конфликта.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void EnableRegistry_RejectsConflictingValueAndPreservesBackup()
     {
@@ -224,8 +224,8 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         }
     }
 
-    /// <summary>Повторное отключение удаляет только совпадающее значение, сохраняя изменённые данные и первый снимок.</summary>
-    /// <param name="sameValue">Указывает, совпадает ли новое значение с первоначальным.</param>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -258,8 +258,8 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         }
     }
 
-    /// <summary>Watcher сообщает конфликт один раз, показывает активное значение и сохраняет первый снимок при повторном ручном отключении.</summary>
-    /// <returns>Задача ожидания уведомления о конфликте.</returns>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public async Task Watcher_ChangedRegistryValue_ReportsEnabledAndKeepsBackup()
     {
@@ -303,7 +303,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         }
     }
 
-    /// <summary>Ручное восстановление Antigravity не считается новой подозрительной записью watcher.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void RestoreAntigravity_RegistersKnownIdentityBeforeWatcherAndRemovesBackupAfterSuccess()
     {
@@ -326,7 +326,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.False(File.Exists(entry.FilePath + ".disabled"));
     }
 
-    /// <summary>Устаревший снимок уже удалённой резервной копии не вызывает повторное восстановление ОС.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void RestoreStaleBackup_DoesNotInvokeOperatingSystem()
     {
@@ -343,7 +343,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.False(EntryOperations.IsRestoreInProgress(_store, removed.OriginalEntryId));
     }
 
-    /// <summary>Отказ ОС сохраняет резервную копию и удаляет только созданную текущим запросом предварительную запись.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void RestoreFailure_KeepsBackupAndRollsBackPlaceholder()
     {
@@ -357,7 +357,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.False(EntryOperations.IsRestoreInProgress(_store, removed.OriginalEntryId));
     }
 
-    /// <summary>Действующее правило ЧС требует явного снятия перед восстановлением; ОС не вызывается.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void RestoreWithActiveBlacklist_DoesNotInvokeOperatingSystem()
     {
@@ -374,7 +374,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Empty(_store.Load().Entries);
     }
 
-    /// <summary>Самовосстановившийся файл остаётся видимым отключённым и включается из Removed без перезаписи.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void ReappearedRemovedEntry_DisablesAndRestoresExistingPoint()
     {
@@ -392,8 +392,8 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Equal(EntryStatus.Enabled, Assert.Single(_store.Load().Entries).Status);
     }
 
-    /// <summary>Повтор завершённого Restore идемпотентен, а иной файл по целевому пути сохраняется.</summary>
-    /// <param name="identical">Совпадает ли существующий файл с резервной копией.</param>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -409,7 +409,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Equal(identical ? "original" : "different", File.ReadAllText(original));
     }
 
-    /// <summary>Разница Enabled допустима только при неизменённых действиях задачи.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void TaskDefinitionComparison_RejectsChangedAction()
     {
@@ -418,7 +418,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.False(EntryOperations.AreEquivalentTaskDefinitions(original, original.Replace("wscript.exe", "other.exe")));
     }
 
-    /// <summary>Сбой сохранения после успешного восстановления ОС допускает безопасный повтор без потери backup.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     [Fact]
     public void RestoreStoreSaveFailsAfterOsSuccess_RetryFinalizesWithoutOverwriting()
     {
@@ -451,9 +451,9 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         Assert.Equal("' harmless isolated test", File.ReadAllText(entry.FilePath));
     }
 
-    /// <summary>Создаёт резервную копию, соответствующую прежнему автоматическому удалению.</summary>
-    /// <param name="entry">Исходная запись.</param>
-    /// <returns>Изолированная резервная копия с исходной identity.</returns>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     private static RemovedEntry Removed(StartupEntry entry) => new()
     {
         OriginalEntryId = entry.Id, Name = entry.Name, FilePath = entry.FilePath, Location = entry.Location,
@@ -461,7 +461,7 @@ public sealed class AutomaticStartupDisableRestoreTests : IDisposable
         RemovalReason = "AutoGuardBlocked:script", RestorePayload = "isolated injected restore"
     };
 
-    /// <summary>Освобождает уведомления и удаляет только собственную проверенную временную директорию.</summary>
+    /// <summary>Verifies test scenario for AutomaticStartupDisableRestoreTests.cs.</summary>
     public void Dispose()
     {
         _notifications.Dispose();

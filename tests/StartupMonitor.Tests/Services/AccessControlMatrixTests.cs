@@ -7,10 +7,8 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Набор автоматических тестов для Единой матрицы контроля доступа (ACL),
-/// классификатора системных процессов Windows и моделей представления.
-/// </summary>
+/// <summary>Verifies test scenario for AccessControlMatrixTests.cs.</summary>
+/// <summary>Verifies test scenario for AccessControlMatrixTests.cs.</summary>
 public sealed class AccessControlMatrixTests
 {
     [Theory]
@@ -20,6 +18,9 @@ public sealed class AccessControlMatrixTests
     [InlineData("services.exe", ProcessProtectionLevel.Critical)]
     [InlineData("csrss.exe", ProcessProtectionLevel.Critical)]
     [InlineData("StartupMonitor.Service.exe", ProcessProtectionLevel.Critical)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessProtectionHelper_IdentifiesCriticalCoreProcesses(string procName, ProcessProtectionLevel expected)
     {
         var actual = ProcessProtectionHelper.EvaluateProtectionLevel(procName, $@"C:\Windows\System32\{procName}");
@@ -31,6 +32,9 @@ public sealed class AccessControlMatrixTests
     [InlineData("spoolsv.exe", ProcessProtectionLevel.HighRisk)]
     [InlineData("dwm.exe", ProcessProtectionLevel.HighRisk)]
     [InlineData("RuntimeBroker.exe", ProcessProtectionLevel.HighRisk)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessProtectionHelper_IdentifiesProtectedSubsystems(string procName, ProcessProtectionLevel expected)
     {
         var actual = ProcessProtectionHelper.EvaluateProtectionLevel(procName, $@"C:\Windows\System32\{procName}");
@@ -42,6 +46,9 @@ public sealed class AccessControlMatrixTests
     [InlineData("telegram.exe", ProcessProtectionLevel.None)]
     [InlineData("curl.exe", ProcessProtectionLevel.None)]
     [InlineData("unknown_miner.exe", ProcessProtectionLevel.None)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessProtectionHelper_IdentifiesUserApps(string procName, ProcessProtectionLevel expected)
     {
         var actual = ProcessProtectionHelper.EvaluateProtectionLevel(procName, $@"C:\Users\User\AppData\Local\{procName}");
@@ -49,6 +56,9 @@ public sealed class AccessControlMatrixTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AppAccessMatrixItemViewModel_CriticalProcess_CannotBlock()
     {
         var dto = new AppAccessMatrixItemDto
@@ -69,6 +79,9 @@ public sealed class AccessControlMatrixTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AppAccessMatrixItemViewModel_UserProcess_CanBlock()
     {
         var dto = new AppAccessMatrixItemDto
@@ -88,7 +101,7 @@ public sealed class AccessControlMatrixTests
         Assert.False(vm.IsAllowedChecked);
         Assert.False(vm.IsBlockedChecked);
 
-        // Переключение состояния
+        // Verifies component behavior and assertions.
         vm.IsBlockedChecked = true;
         Assert.Equal(AccessControlState.Blocked, vm.State);
         Assert.True(vm.IsBlockedChecked);
@@ -96,6 +109,9 @@ public sealed class AccessControlMatrixTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AppAccessMatrixItemViewModel_ScopeAndBadgeFormatting_Validates()
     {
         var dto = new AppAccessMatrixItemDto
@@ -114,6 +130,9 @@ public sealed class AccessControlMatrixTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SetAppAccessStateRequest_ConstructsWithDefaults()
     {
         var req = new SetAppAccessStateRequest(@"C:\app.exe", "app.exe", AccessControlState.Allowed);

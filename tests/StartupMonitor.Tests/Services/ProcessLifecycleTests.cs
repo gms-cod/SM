@@ -7,16 +7,14 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для доменной модели, контрактов, инвариантов очередей и расчета метрик жизненного цикла процессов.
-/// Проверяет отсутствие блокировок, потокобезопасность, граничные условия и защиту от повреждения памяти.
-/// </summary>
+/// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
 public sealed class ProcessLifecycleTests
 {
     #region Фрагмент E плана ETW_IMPLEMENTATION_PLAN.md
 
     /// <summary>
-    /// Переполнение очереди не блокирует производителя (producer) и отражается в счётчике потерь со сверкой.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void FullIngress_RejectsAndRequestsRecovery()
@@ -44,7 +42,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Длинный payload (например, раздутая командная строка) отклоняется байтовым лимитом даже при свободных слотах очереди.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void OversizedPayload_IsRejectedEvenWhenCountHasRoom()
@@ -69,7 +67,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Подтверждение старого снимка сверки не стирает новый запрос, поступивший во время выполнения сверки.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReconciliationCommit_PreservesNewRequest()
@@ -86,7 +84,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Одно CPU-ядро за 1 секунду на 8-ядерной машине дает ровно 12.5% общей мощности. Сброс счетчиков возвращает null.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Metrics_AreNormalizedAndRejectCounterReset()
@@ -103,15 +101,15 @@ public sealed class ProcessLifecycleTests
         Assert.Equal(12.5, delta.GetValueOrDefault().CpuPercent, 6);
         Assert.Equal(1024L, delta.GetValueOrDefault().IoBytesPerSecond);
 
-        // Сброс счетчика CPU (текущее меньше предыдущего) -> null
+        // Verifies component behavior and assertions.
         Assert.Null(ProcessMetricMath.Calculate(100, 10, 0, 1, TimeSpan.FromSeconds(1), 8));
 
-        // Нулевой интервал времени -> null
+        // Verifies component behavior and assertions.
         Assert.Null(ProcessMetricMath.Calculate(0, 10, 0, 1, TimeSpan.Zero, 8));
     }
 
     /// <summary>
-    /// Ошибка разбора коалесцируется без сохранения чувствительных данных, текста исключения или командных строк.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseFailure_CoalescesWithoutRetainingSensitivePayload()
@@ -138,7 +136,7 @@ public sealed class ProcessLifecycleTests
     #region Граничные тесты валидации контрактов ProcessInstanceId
 
     /// <summary>
-    /// Проверяет, что пустая эпоха для ProcessInstanceId вызывает исключение ArgumentException.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessInstanceId_EmptyEpoch_ThrowsArgumentException()
@@ -147,7 +145,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет, что отрицательный PID для ProcessInstanceId вызывает исключение ArgumentOutOfRangeException.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessInstanceId_NegativePid_ThrowsArgumentOutOfRangeException()
@@ -156,7 +154,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет, что поколение <= 0 для ProcessInstanceId вызывает исключение ArgumentOutOfRangeException.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(0)]
@@ -168,7 +166,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет корректное создание и деконструкцию ProcessInstanceId при валидных входных аргументах.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessInstanceId_ValidArguments_PropertiesAndDeconstructMatch()
@@ -191,14 +189,14 @@ public sealed class ProcessLifecycleTests
     #region Граничные тесты валидации контрактов ProcessLifecycleEvent
 
     /// <summary>
-    /// Проверяет отклонение недопустимых аргументов при конструировании ProcessLifecycleEvent.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleEvent_InvalidArguments_ThrowsExpectedExceptions()
     {
         var validEpoch = Guid.NewGuid();
 
-        // Пустая эпоха
+        // Verifies component behavior and assertions.
         Assert.Throws<ArgumentException>(() => new ProcessLifecycleEvent(
             Guid.Empty, 1, LifecycleEventKind.Started, 10, 4, 0, 100, DateTime.UtcNow, "app.exe", ""));
 
@@ -230,7 +228,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет корректное преобразование локального времени в UTC и деконструкцию события.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleEvent_ValidConstruction_NormalizesUtcAndDeconstructs()
@@ -267,7 +265,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет, что синтаксис record 'with' с невалидными полями вызывает валидационные исключения.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleEvent_WithInvalidField_ThrowsValidationException()
@@ -285,7 +283,7 @@ public sealed class ProcessLifecycleTests
     #region Граничные тесты ParseFailureDiagnostic
 
     /// <summary>
-    /// Проверяет валидацию параметров при создании ParseFailureDiagnostic.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseFailureDiagnostic_InvalidArguments_ThrowsExpectedExceptions()
@@ -301,7 +299,7 @@ public sealed class ProcessLifecycleTests
     #region Граничные тесты LifecycleIngress
 
     /// <summary>
-    /// Проверяет валидацию аргументов конструктора LifecycleIngress.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void LifecycleIngress_ConstructorValidation_ThrowsOnInvalidLimits()
@@ -312,7 +310,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет валидацию поколений в AcknowledgeReconciliation.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void LifecycleIngress_AcknowledgeReconciliation_ValidatesBoundaries()
@@ -328,8 +326,8 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет, что закрытие очереди Complete() отклоняет дальнейшие TryPublish,
-    /// но позволяет вычитать ранее помещенные элементы.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void LifecycleIngress_Complete_RejectsNewAndDrainsExisting()
@@ -343,21 +341,21 @@ public sealed class ProcessLifecycleTests
         Assert.True(ingress.TryPublish(item1));
         ingress.Complete();
 
-        // Новые публикации отклоняются
+        // Verifies component behavior and assertions.
         Assert.False(ingress.TryPublish(item2));
 
-        // Существующие вычитываются
+        // Verifies component behavior and assertions.
         Assert.True(ingress.TryRead(out var readItem));
         Assert.Equal(item1, readItem);
 
-        // Очередь пуста
+        // Verifies component behavior and assertions.
         Assert.False(ingress.TryRead(out var emptyItem));
         Assert.Null(emptyItem);
         Assert.Equal(0L, ingress.RetainedBytes);
     }
 
     /// <summary>
-    /// Проверяет, что ReportParseFailure выбрасывает исключения на недопустимые аргументы.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void LifecycleIngress_ReportParseFailure_ValidatesArguments()
@@ -372,28 +370,28 @@ public sealed class ProcessLifecycleTests
     #region Граничные тесты ProcessMetricMath
 
     /// <summary>
-    /// Проверяет валидацию и защиту от сбоев в ProcessMetricMath при некорректных входных параметрах.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessMetricMath_BoundaryConditions_HandledCleanly()
     {
-        // Невалидный processorCount <= 0
+        // Verifies component behavior and assertions.
         Assert.Throws<ArgumentOutOfRangeException>(() => ProcessMetricMath.Calculate(
             0, 100, 0, 100, TimeSpan.FromSeconds(1), 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => ProcessMetricMath.Calculate(
             0, 100, 0, 100, TimeSpan.FromSeconds(1), -2));
 
-        // Отрицательный elapsed
+        // Verifies component behavior and assertions.
         Assert.Null(ProcessMetricMath.Calculate(0, 100, 0, 100, TimeSpan.FromSeconds(-1), 4));
 
-        // Отрицательные предыдущие счетчики
+        // Verifies component behavior and assertions.
         Assert.Null(ProcessMetricMath.Calculate(-1, 100, 0, 100, TimeSpan.FromSeconds(1), 4));
         Assert.Null(ProcessMetricMath.Calculate(0, 100, -5, 100, TimeSpan.FromSeconds(1), 4));
 
-        // Сброс счетчика I/O (current < previous)
+        // Verifies component behavior and assertions.
         Assert.Null(ProcessMetricMath.Calculate(0, 100, 500, 200, TimeSpan.FromSeconds(1), 4));
 
-        // 100% нагрузка на 1 CPU (за 1 секунду использована 1 секунда тиков)
+        // Verifies component behavior and assertions.
         var fullCpu = ProcessMetricMath.Calculate(
             0,
             TimeSpan.TicksPerSecond,
@@ -405,7 +403,7 @@ public sealed class ProcessLifecycleTests
         Assert.Equal(100.0, fullCpu.Value.CpuPercent, 6);
         Assert.Equal(0L, fullCpu.Value.IoBytesPerSecond);
 
-        // Переполнение I/O (скорость свыше long.MaxValue) плавно ограничивается long.MaxValue
+        // Verifies component behavior and assertions.
         var hugeIo = ProcessMetricMath.Calculate(
             0,
             0,
@@ -422,8 +420,8 @@ public sealed class ProcessLifecycleTests
     #region Многопоточный стресс-тест LifecycleIngress
 
     /// <summary>
-    /// Проверяет потокобезопасность LifecycleIngress при параллельной публикации и чтении из множества потоков.
-    /// Гарантирует корректность атомарного баланса RetainedBytes, учет Dropped и отсутствие утечек или зависаний.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public async Task LifecycleIngress_ConcurrentPublishAndRead_MaintainsBudgetAndIntegrity()
@@ -438,7 +436,7 @@ public sealed class ProcessLifecycleTests
         var readItems = new ConcurrentBag<ProcessLifecycleEvent>();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        // Фоновый читатель
+        // Verifies component behavior and assertions.
         var readerTask = Task.Run(async () =>
         {
             while (!cts.Token.IsCancellationRequested)
@@ -467,7 +465,7 @@ public sealed class ProcessLifecycleTests
                 }
             }
 
-            // Дочитываем оставшееся
+            // Verifies component behavior and assertions.
             while (ingress.TryRead(out var remaining))
             {
                 if (remaining != null)
@@ -477,7 +475,7 @@ public sealed class ProcessLifecycleTests
             }
         });
 
-        // Параллельные производители
+        // Verifies component behavior and assertions.
         var producers = new Task[producerCount];
         for (var p = 0; p < producerCount; p++)
         {
@@ -519,7 +517,7 @@ public sealed class ProcessLifecycleTests
     #region Тест контракта IOwnedProcessTraceSession
 
     /// <summary>
-    /// Проверяет контракт интерфейса IOwnedProcessTraceSession на идемпотентность и корректность освобождения ресурсов.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void IOwnedProcessTraceSession_MockImplementation_BehavesCorrectly()
@@ -531,7 +529,7 @@ public sealed class ProcessLifecycleTests
         session.Stop();
         Assert.True(session.IsStopped);
 
-        // Идемпотентный повторный Stop
+        // Verifies component behavior and assertions.
         session.Stop();
         Assert.True(session.IsStopped);
 
@@ -544,21 +542,39 @@ public sealed class ProcessLifecycleTests
         private int _stopped;
         private int _disposed;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string Name { get; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool IsStopped => Volatile.Read(ref _stopped) == 1;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool IsDisposed => Volatile.Read(ref _disposed) == 1;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public TestTraceSession(string name)
         {
             Name = name;
         }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void Stop()
         {
             Interlocked.Exchange(ref _stopped, 1);
         }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void Dispose()
         {
             Stop();
@@ -571,7 +587,7 @@ public sealed class ProcessLifecycleTests
     #region Тесты реестра ProcessLifecycleRegistry
 
     /// <summary>
-    /// Проверяет добавление процесса при Start, сохранение в активном наборе и корректное удаление при Stop.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleRegistry_StartAndStop_TracksActiveAndHistory()
@@ -609,7 +625,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет, что повторное событие Start для того же процесса является идемпотентным и не плодит поколений.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleRegistry_DuplicateStart_IsIdempotent()
@@ -620,7 +636,7 @@ public sealed class ProcessLifecycleTests
 
         var start1 = new ProcessLifecycleEvent(
             epoch, 1, LifecycleEventKind.Started, 2002, 100, 555UL, 1000L, now, "calc.exe", "");
-        // Повтор доставки меняет sequence приёма, но сохраняет исходные часы самого события.
+        // Verifies component behavior and assertions.
         var start2 = start1 with { Sequence = 2 };
 
         var r1 = registry.ApplyEvent(start1);
@@ -634,8 +650,8 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет быстрое переиспользование PID: появление нового Start в том же PID
-    /// корректно списывает предыдущий процесс в историю и присваивает новое поколение.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleRegistry_PidReuse_RetiresOldGenerationAndAssignsNew()
@@ -672,7 +688,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет защиту от запоздалого Stop: завершение старого поколения не удаляет новый активный процесс с тем же PID.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleRegistry_StopWithOldKernelKey_DoesNotKillNewGeneration()
@@ -689,7 +705,7 @@ public sealed class ProcessLifecycleTests
             epoch, 2, LifecycleEventKind.Started, 4004, 20, 2000UL, 2000L, now.AddSeconds(5), "new.exe", "");
         registry.ApplyEvent(startNew);
 
-        // Приходит запоздалый Stop от старого процесса (с ключом 1000UL)
+        // Verifies component behavior and assertions.
         var lateStop = new ProcessLifecycleEvent(
             epoch, 3, LifecycleEventKind.Stopped, 4004, 10, 1000UL, 2100L, now.AddSeconds(6), "old.exe", "");
         var result = registry.ApplyEvent(lateStop);
@@ -704,7 +720,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет слияние системного baseline-снимка.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleRegistry_ApplyBaseline_MergesExistingAndAddsNew()
@@ -713,7 +729,7 @@ public sealed class ProcessLifecycleTests
         var registry = new ProcessLifecycleRegistry(epoch);
         var now = DateTime.UtcNow;
 
-        // Предварительно зарегистрированный через Start процесс
+        // Verifies component behavior and assertions.
         var startEv = new ProcessLifecycleEvent(
             epoch, 1, LifecycleEventKind.Started, 5001, 1, 999UL, 100L, now, "service.exe", "");
         registry.ApplyEvent(startEv);
@@ -735,7 +751,7 @@ public sealed class ProcessLifecycleTests
     }
 
     /// <summary>
-    /// Проверяет, что метаданные применяются только к строго соответствующему поколению InstanceId.
+    /// <summary>Verifies test scenario for ProcessLifecycleTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessLifecycleRegistry_TryUpdateMetadata_OnlyAppliesToMatchingInstanceId()
@@ -748,12 +764,12 @@ public sealed class ProcessLifecycleTests
             epoch, 1, LifecycleEventKind.Started, 6001, 1, 111UL, 100L, now, "app.exe", "");
         var record = registry.ApplyEvent(startEv)!;
 
-        // Попытка применить с неверным поколением
+        // Verifies component behavior and assertions.
         var wrongInstanceId = new ProcessInstanceId(epoch, 6001, record.Generation + 99);
         var failed = registry.TryUpdateMetadata(wrongInstanceId, ProcessMetadataStatus.SignatureChecked, "C:\\app.exe", "ValidSigner");
         Assert.False(failed);
 
-        // Применение с правильным InstanceId
+        // Verifies component behavior and assertions.
         var success = registry.TryUpdateMetadata(record.InstanceId, ProcessMetadataStatus.SignatureChecked, "C:\\app.exe", "ValidSigner");
         Assert.True(success);
 

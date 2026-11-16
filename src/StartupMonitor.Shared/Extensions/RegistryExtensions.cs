@@ -4,6 +4,9 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Shared.Extensions;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public static class RegistryExtensions
 {
     private static readonly (string Key, string? Name, EntryLocation Location, string Label)[] RegistryLocations =
@@ -15,8 +18,8 @@ public static class RegistryExtensions
         (@"Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run", null, EntryLocation.RegistryPolicies, @"HKLM\...\Policies\Run"),
     ];
 
-    /// <summary>ScanHklmRunKeys: Выполняет операцию ScanHklmRunKeys.</summary>
-    /// <returns>Выходные данные: результирующее значение типа List<StartupEntry>.</returns>
+    /// <summary>Scans HKLM Run registry keys for startup entries.</summary>
+    /// <returns>List of discovered startup entries.</returns>
     public static List<StartupEntry> ScanHklmRunKeys()
     {
         var entries = new List<StartupEntry>();
@@ -46,8 +49,8 @@ public static class RegistryExtensions
         return entries;
     }
 
-    /// <summary>ScanHkcuRunKeys: Выполняет операцию ScanHkcuRunKeys.</summary>
-    /// <returns>Выходные данные: результирующее значение типа List<StartupEntry>.</returns>
+    /// <summary>Scans HKCU Run registry keys for startup entries.</summary>
+    /// <returns>List of discovered startup entries.</returns>
     public static List<StartupEntry> ScanHkcuRunKeys()
     {
         var entries = new List<StartupEntry>();
@@ -83,9 +86,9 @@ public static class RegistryExtensions
         return entries;
     }
 
-    /// <summary>ParsePath: Выполняет операцию ParsePath.</summary>
-    /// <param name="commandLine">Входные данные: значение параметра commandLine (string).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Extracts the executable file path from a command line string.</summary>
+    /// <param name="commandLine">The command line to parse.</param>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string ParsePath(string commandLine)
     {
         if (string.IsNullOrWhiteSpace(commandLine)) return string.Empty;
@@ -101,9 +104,9 @@ public static class RegistryExtensions
         return spaceIdx > 0 ? trimmed[..spaceIdx] : trimmed;
     }
 
-    /// <summary>GetFilePublisher: Возвращает FilePublisher.</summary>
-    /// <param name="filePath">Входные данные: значение параметра filePath (string).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Retrieves publisher or company name from file version info.</summary>
+    /// <param name="filePath">Target file path.</param>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string GetFilePublisher(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))

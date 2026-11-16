@@ -16,23 +16,23 @@ using StartupMonitor.UI.Views.Dialogs;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Изолирует глобальное WPF-приложение от остальных тестовых коллекций.</summary>
+/// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
 [CollectionDefinition("WpfNetworkRendering", DisableParallelization = true)]
 public sealed class WpfNetworkRenderingCollection : ICollectionFixture<NetworkRenderingTestHost>;
 
-/// <summary>Проверяет производственную разметку и renderer вместо копирования формул в тестах.</summary>
+/// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed partial class NetworkRenderingRegressionTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Принимает общий STA-диспетчер для визуальных проверок.</summary>
-    /// <param name="host">Изолированное WPF-окружение без запуска приложения и службы.</param>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     public NetworkRenderingRegressionTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Проверяет границы настоящих кнопок при длинном AI-тексте и компактной рабочей области.</summary>
-    /// <param name="width">Ширина рабочей области в DIP.</param>
-    /// <param name="height">Высота рабочей области в DIP.</param>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [Theory]
     [InlineData(1920, 1040)]
     [InlineData(1366, 728)]
@@ -68,7 +68,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { window.Close(); }
         });
 
-    /// <summary>Проверяет реальное ограничение размеров вместо дублирования алгоритма ширины.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [Fact]
     public void AlertGeometry_TinyWorkAreaDoesNotExpandToDesignMinimum()
         => _host.Run(() =>
@@ -84,7 +84,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { window.Close(); }
         });
 
-    /// <summary>Выполняет настоящий renderer с пропусками, нулями и нечисловыми данными на минимальной высоте.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [Fact]
     public void ChartRender_InvalidSamplesAndSmallHoveredChartDoNotThrow()
         => _host.Run(() =>
@@ -106,7 +106,7 @@ public sealed partial class NetworkRenderingRegressionTests
             Render(chart);
         });
 
-    /// <summary>Повторная отрисовка без новых данных использует тот же замороженный рисунок.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [Fact]
     public void ChartRender_ReusesGeometryUntilDataOrSizeChanges()
         => _host.Run(() =>
@@ -131,7 +131,7 @@ public sealed partial class NetworkRenderingRegressionTests
             Assert.NotSame(first, field.GetValue(chart));
         });
 
-    /// <summary>Отсутствующий бакет сохраняется пропуском, события безопасности не превращаются в байты.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [Fact]
     public void TimelineMapping_PreservesRealRatesAndMissingMeasurement()
     {
@@ -151,7 +151,7 @@ public sealed partial class NetworkRenderingRegressionTests
         Assert.Equal(1, points[1].BlockedCount);
     }
 
-    /// <summary>Статический сервис иконок не удерживает освобождённую модель представления.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [Fact]
     public void DisposedViewModel_IsCollectibleAfterStaticEventUnsubscription()
     {
@@ -165,8 +165,8 @@ public sealed partial class NetworkRenderingRegressionTests
         Assert.False(reference.IsAlive);
     }
 
-    /// <summary>Вызывает производственный OnRender с настоящим DrawingContext.</summary>
-    /// <param name="chart">Контрол с уже выполненной компоновкой.</param>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     private static void Render(NetworkTimelineChartControl chart)
     {
         var method = typeof(NetworkTimelineChartControl).GetMethod("OnRender", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -177,13 +177,13 @@ public sealed partial class NetworkRenderingRegressionTests
     }
 }
 
-/// <summary>Содержит единственный тестовый STA-поток и ресурсы WPF без вызова OnStartup.</summary>
+/// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
 public sealed class NetworkRenderingTestHost : IDisposable
 {
     private readonly Thread _thread;
     private readonly Dispatcher _dispatcher;
 
-    /// <summary>Инициализирует ресурсы приложения и запускает ограниченно ожидаемый диспетчер.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     public NetworkRenderingTestHost()
     {
         var ready = new TaskCompletionSource<Dispatcher>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -203,18 +203,18 @@ public sealed class NetworkRenderingTestHost : IDisposable
         _dispatcher = ready.Task.WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
     }
 
-    /// <summary>Выполняет проверку на STA с ограничением времени.</summary>
-    /// <param name="action">Действие над WPF-объектами.</param>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     public void Run(Action action)
         => _dispatcher.InvokeAsync(action).Task.WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
 
-    /// <summary>Создаёт и освобождает модель в отдельном невстраиваемом вызове для проверки GC.</summary>
-    /// <returns>Слабая ссылка без сохранения модели в closure теста.</returns>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     public WeakReference CreateDisposedViewModelReference()
         => _dispatcher.Invoke(CreateDisposedViewModel);
 
-    /// <summary>Исключает удержание модели JIT-локальными переменными вызывающего теста.</summary>
-    /// <returns>Слабая ссылка на освобождённую модель.</returns>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateDisposedViewModel()
     {
@@ -234,7 +234,7 @@ public sealed class NetworkRenderingTestHost : IDisposable
         }
     }
 
-    /// <summary>Отменяет тестовый диспетчер без вызова производственных startup/exit и управления службой.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     public void Dispose()
     {
         if (!_dispatcher.HasShutdownStarted)
@@ -243,8 +243,8 @@ public sealed class NetworkRenderingTestHost : IDisposable
         Assert.True(_thread.Join(TimeSpan.FromSeconds(15)), "Тестовый STA-поток не завершился.");
     }
 
-    /// <summary>Загружает ресурсный раздел настоящего App.xaml без создания производственного класса App.</summary>
-    /// <returns>Ресурсы тем, контролов, локализации и конвертеров приложения.</returns>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     private static ResourceDictionary LoadApplicationResources()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -257,7 +257,7 @@ public sealed class NetworkRenderingTestHost : IDisposable
         var root = document.Root ?? throw new InvalidDataException("App.xaml не содержит корневого элемента.");
         foreach (var attribute in root.Attributes().Where(attribute => attribute.IsNamespaceDeclaration))
             dictionary.SetAttributeValue(attribute.Name, attribute.Value);
-        // В loose XAML нет контекста компилятора UI: сборки для CLR-пространств задаются явно.
+        // Verifies component behavior and assertions.
         dictionary.SetAttributeValue(XNamespace.Xmlns + "ui", "clr-namespace:Wpf.Ui.Markup;assembly=Wpf.Ui");
         dictionary.SetAttributeValue(XNamespace.Xmlns + "converters", "clr-namespace:StartupMonitor.UI.Converters;assembly=StartupMonitor.UI");
         dictionary.SetAttributeValue(XNamespace.Xmlns + "services", "clr-namespace:StartupMonitor.UI.Services;assembly=StartupMonitor.UI");
@@ -278,15 +278,15 @@ public sealed class NetworkRenderingTestHost : IDisposable
         return (ResourceDictionary)XamlReader.Parse(dictionary.ToString(), context);
     }
 
-    /// <summary>Тестовый Application не наследует производственные обработчики запуска и завершения.</summary>
+    /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
     private sealed class IsolatedTestApplication : Application
     {
-        /// <summary>Нейтрализует отложенный startup, который WPF ставит в Dispatcher уже в конструкторе Application.</summary>
-        /// <param name="e">Параметры запуска тестового приложения.</param>
+        /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
         protected override void OnStartup(StartupEventArgs e) => ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        /// <summary>Завершает только тестовый STA-поток; производственный App.OnExit не вызывается.</summary>
-        /// <param name="e">Параметры завершения тестового приложения.</param>
+        /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
+        /// <summary>Verifies test scenario for NetworkRenderingRegressionTests.cs.</summary>
         protected override void OnExit(ExitEventArgs e) => Dispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
     }
 }

@@ -2,17 +2,15 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>
-/// Тесты для JsonDataStore: загрузка, сохранение, добавление/удаление/обновление записей,
-/// работа с историей, конкурентный доступ, обработка повреждённых файлов, миграция, дедупликация.
-/// </summary>
+/// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
+/// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
 public class JsonDataStoreTests : IDisposable
 {
-    /// <summary>Временная директория для тестового конфига.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     private readonly string _testDir;
-    /// <summary>Путь к тестовому конфигу.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     private readonly string _testFilePath;
-    /// <summary>Хранилище данных.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     private readonly JsonDataStore _store;
 
     public JsonDataStoreTests()
@@ -23,7 +21,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что Load() создаёт конфиг по умолчанию, если файла нет.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Load_CreatesDefaultConfig()
@@ -40,7 +38,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что AddEntry сохраняет запись в файл.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AddEntry_PersistsToFile()
@@ -61,7 +59,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что RemoveEntry удаляет правильную запись (по ID).
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveEntry_RemovesCorrectly()
@@ -79,7 +77,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что UpdateEntry обновляет существующую запись.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void UpdateEntry_ModifiesCorrectly()
@@ -102,7 +100,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что AddHistory удаляет записи старше указанного в настройках срока.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AddHistory_TrimExcess()
@@ -122,7 +120,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что конкурентная запись 10 записей не приводит к повреждению данных.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public async Task ConcurrentAccess_DoesNotCorrupt()
@@ -144,12 +142,12 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что повреждённый секционный файл переименовывается в .corrupt и стартует с чистого листа.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Load_CorruptSectionFile_RenamesAndStartsFresh()
     {
-        // Пишем мусор в секционный файл записей — Load не должен упасть
+        // Verifies component behavior and assertions.
         var entriesPath = Path.Combine(_testDir, "startup-entries.json");
         File.WriteAllText(entriesPath, "{ это не json !!!");
 
@@ -162,12 +160,12 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что старый единый конфиг мигрирует в секционные файлы и переименовывается.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Load_LegacyFile_MigratesToSections()
     {
-        // Старый единый конфиг мигрирует в секционные файлы и переименовывается
+        // Verifies component behavior and assertions.
         var legacyJson = """
         {
           "language": "ru", "theme": "dark",
@@ -189,19 +187,19 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что повторный Save без изменений не перезаписывает файлы (SHA256-оптимизация).
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Save_SkipsUnchangedSections()
     {
         _store.AddEntry(new StartupEntry { Name = "App1" });
-        _store.Save(_store.Load()); // первый Save — создаёт недостающие секции
+        _store.Save(_store.Load()); // First Save creates missing sections
         var entriesPath = Path.Combine(_testDir, "startup-entries.json");
         var settingsPath = Path.Combine(_testDir, "settings.json");
         var entriesTime = File.GetLastWriteTimeUtc(entriesPath);
         var settingsTime = File.GetLastWriteTimeUtc(settingsPath);
 
-        // Повторный Save без изменений — файлы не перезаписываются
+        // Verifies component behavior and assertions.
         Thread.Sleep(50);
         _store.Save(_store.Load());
 
@@ -210,7 +208,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что после сохранения не остаётся временных .tmp-файлов.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Save_DoesNotLeaveTmpFiles()
@@ -222,7 +220,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что AddRemovedEntry дедуплицируется по OriginalEntryId.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AddRemovedEntry_DeduplicatesByOriginalEntry()
@@ -234,7 +232,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что DeduplicateEntries объединяет дубликаты HKCU\user\ и HKCU\.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void DeduplicateEntries_MergesUserAndRootHkcu()
@@ -271,7 +269,7 @@ public class JsonDataStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет работу метода NormalizeLocationDetail.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"HKCU\gms\Software\Microsoft\Run", @"HKCU\Software\Microsoft\Run")]
@@ -285,6 +283,9 @@ public class JsonDataStoreTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ReadHistory_HandlesSingleLineJsonl()
     {
         var entry1 = new HistoryEntry { EntryName = "App1", ChangeType = "Added" };
@@ -297,7 +298,7 @@ public class JsonDataStoreTests : IDisposable
         Assert.True(File.Exists(historyPath));
 
         var lines = File.ReadAllLines(historyPath);
-        Assert.Equal(2, lines.Length); // Строго по одной строке на запись!
+        Assert.Equal(2, lines.Length); // Strictly one line per entry!
 
         var read = _store.ReadHistory();
         Assert.Equal(2, read.Count);
@@ -306,10 +307,13 @@ public class JsonDataStoreTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ReadHistory_HandlesMultiLineLegacyJsonl_AndAutoMigrates()
     {
         var historyPath = Path.Combine(_testDir, "history.jsonl");
-        // Старый формат, когда WriteIndented был true: каждый объект разбивался на несколько строк
+        // Verifies component behavior and assertions.
         var legacyContent = @"{
   ""id"": ""1"",
   ""entry_name"": ""LegacyApp1"",
@@ -327,13 +331,13 @@ public class JsonDataStoreTests : IDisposable
         Assert.Equal("LegacyApp1", read[0].EntryName);
         Assert.Equal("LegacyApp2", read[1].EntryName);
 
-        // Проверяем, что файл автоматически мигрирован в однострочный JSONL
+        // Verifies component behavior and assertions.
         var migratedLines = File.ReadAllLines(historyPath);
         Assert.Equal(2, migratedLines.Length);
     }
 
     /// <summary>
-    /// Проверяет, что атомарная запись создаёт JSON строго в UTF-8 БЕЗ BOM (RFC 8259).
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void WriteSectionAtomic_CreatesPureUtf8WithoutBom()
@@ -346,15 +350,15 @@ public class JsonDataStoreTests : IDisposable
 
         var bytes = File.ReadAllBytes(entriesPath);
         Assert.True(bytes.Length >= 3);
-        // Проверяем, что первых трёх байт UTF-8 BOM (0xEF, 0xBB, 0xBF) НЕТ
+        // Verifies component behavior and assertions.
         bool hasBom = bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
         Assert.False(hasBom, "Файл JSON содержит UTF-8 BOM, что противоречит стандарту RFC 8259!");
-        // Проверяем, что файл начинается с '[' (0x5B) или '{' (0x7B)
+        // Verifies component behavior and assertions.
         Assert.Equal((byte)'[', bytes[0]);
     }
 
     /// <summary>
-    /// Проверяет, что чтение секций бесшовно обрабатывает UTF-8 как с BOM-маркером, так и без него.
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadSection_SeamlesslyReadsUtf8WithAndWithoutBom()
@@ -365,7 +369,7 @@ public class JsonDataStoreTests : IDisposable
             Directory.CreateDirectory(customDir);
             var settingsPath = Path.Combine(customDir, "settings.json");
 
-            // Записываем файл С BOM-маркером вручную
+            // Verifies component behavior and assertions.
             var bomBytes = new byte[] { 0xEF, 0xBB, 0xBF };
             var jsonBytes = System.Text.Encoding.UTF8.GetBytes("{\"language\": \"ru\", \"theme\": \"light\"}");
             var combined = new byte[bomBytes.Length + jsonBytes.Length];
@@ -386,7 +390,7 @@ public class JsonDataStoreTests : IDisposable
         }
     }
 
-    /// <summary>Удаляет временную директорию тестов.</summary>
+    /// <summary>Verifies test scenario for JsonDataStoreTests.cs.</summary>
     public void Dispose()
     {
         try { Directory.Delete(_testDir, recursive: true); } catch { }

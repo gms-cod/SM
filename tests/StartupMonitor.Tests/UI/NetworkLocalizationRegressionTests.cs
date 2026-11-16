@@ -12,10 +12,10 @@ using StartupMonitor.UI.Views.Dialogs;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет смену языка в настоящих открытых контролах без подключения к рабочей службе.</summary>
+/// <summary>Verifies test scenario for NetworkLocalizationRegressionTests.cs.</summary>
 public sealed partial class NetworkRenderingRegressionTests
 {
-    /// <summary>Перевод истории не меняет смысл выбранного вердикта и протокола.</summary>
+    /// <summary>Verifies test scenario for NetworkLocalizationRegressionTests.cs.</summary>
     [Fact]
     public void HistoryLanguageSwitch_UpdatesLabelsAndPreservesFilters()
         => _host.Run(() =>
@@ -53,7 +53,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { view.Deactivate(); loc.ChangeLanguage(previousCulture); }
         });
 
-    /// <summary>Открытый редактор переводит заголовок, описание и ошибку, сохраняя введённое значение.</summary>
+    /// <summary>Verifies test scenario for NetworkLocalizationRegressionTests.cs.</summary>
     [Fact]
     public void DefenderDialogs_LanguageSwitchPreservesInputAndValidation()
         => _host.Run(() =>
@@ -86,7 +86,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { editor.Close(); config.Close(); loc.ChangeLanguage(previousCulture); }
         });
 
-    /// <summary>Подсказка графика меняет язык без очередного сетевого снимка и движения мыши.</summary>
+    /// <summary>Verifies test scenario for NetworkLocalizationRegressionTests.cs.</summary>
     [Fact]
     public void ChartLanguageSwitch_InvalidatesHoveredTooltipImmediately()
         => _host.Run(() =>
@@ -116,7 +116,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { loc.ChangeLanguage(previousCulture); }
         });
 
-    /// <summary>Диалог удаляет правила исключённых портов и допускает явно пустой список, сохраняя параметры соседнего правила.</summary>
+    /// <summary>Verifies test scenario for NetworkLocalizationRegressionTests.cs.</summary>
     [Fact]
     public void DefenderConfigDialog_ReconcilesRulesAndAllowsRemovingLastPort()
     {

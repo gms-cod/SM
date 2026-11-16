@@ -3,14 +3,12 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для NotificationService: проверка подавления уведомлений во время начального сканирования
-/// и корректной флюшизации батчей после его завершения.
-/// </summary>
+/// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
+/// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
 public class NotificationServiceTests
 {
     /// <summary>
-    /// Проверяет, что уведомления, поставленные в очередь до завершения сканирования, не флюшатся.
+    /// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Enqueue_BeforeScanCompleted_DoesNotFlush()
@@ -28,7 +26,7 @@ public class NotificationServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что после завершения сканирования уведомления флюшатся батчем.
+    /// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Enqueue_AfterScanCompleted_FlushesBatch()
@@ -60,7 +58,7 @@ public class NotificationServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что сообщения, поставленные до завершения скана, отбрасываются, и батч содержит только сообщения после.
+    /// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Enqueue_BeforeAndAfterScan_BatchContainsOnlyPostScanMessages()
@@ -82,7 +80,7 @@ public class NotificationServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что FlushBatch не падает с исключением при отсутствии подписчиков.
+    /// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void FlushBatch_NoSubscribers_DoesNotThrow()
@@ -99,7 +97,7 @@ public class NotificationServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что несколько батчей шлются раздельно — каждый таймаут порождает отдельный флюш.
+    /// <summary>Verifies test scenario for NotificationServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MultipleBatches_FlushSeparately()

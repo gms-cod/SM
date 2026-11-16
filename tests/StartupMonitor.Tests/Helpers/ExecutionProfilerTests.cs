@@ -3,9 +3,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Helpers;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class ExecutionProfilerTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Measure_RecordsCountAvgMaxTotal()
     {
         ExecutionProfiler.Enabled = true;
@@ -25,6 +31,9 @@ public class ExecutionProfilerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Disabled_NoRecordingZeroOverhead()
     {
         ExecutionProfiler.Clear();
@@ -43,6 +52,9 @@ public class ExecutionProfilerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DrainReport_ContainsHeaderAndResets()
     {
         ExecutionProfiler.Enabled = true;
@@ -54,12 +66,15 @@ public class ExecutionProfilerTests
         Assert.Contains("Count", report);
         Assert.Contains("Avg ms", report);
 
-        // После Drain счётчики сброшены
+        // Verifies component behavior and assertions.
         var snap = ExecutionProfiler.GetSnapshotAndReset();
         Assert.DoesNotContain(snap, s => s.Name == "Test.A");
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Concurrent_RecordsAreThreadSafe()
     {
         ExecutionProfiler.Enabled = true;

@@ -4,19 +4,19 @@ using System.ServiceProcess;
 
 namespace StartupMonitor.Shared;
 
-/// <summary>Управление жизненным циклом службы StartupMonitor и привязанного UI-процесса.</summary>
+/// <summary>Manages the lifecycle of the StartupMonitor service and the associated UI process.</summary>
 public static class ServiceManager
 {
-    /// <summary>Имя исполняемого файла службы.</summary>
+    /// <summary>Gets or sets the name of the service executable file.</summary>
     private static readonly string ServiceExeName = "StartupMonitor.Service.exe";
-    /// <summary>Имя службы Windows (для SCM).</summary>
+    /// <summary>Gets or sets the name of the Windows service (for SCM).</summary>
     private const string ServiceName = "StartupMonitor";
-    /// <summary>Обычному интерактивному пользователю разрешены запросы и запуск; остановка и изменение службы доступны только системе и администраторам.</summary>
+    /// <summary>Allows standard interactive users to query and start the service; stopping and modifying it is restricted to the system and administrators.</summary>
     private const string DefaultServiceSecurityDescriptor = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
 
-    /// <summary>Проверяет, запущен ли процесс с указанным именем (без .exe).</summary>
-    /// <param name="processName">Имя процесса без расширения.</param>
-    /// <returns>true, если хотя бы один процесс найден.</returns>
+    /// <summary>Checks whether a process with the specified name (without the .exe extension) is running.</summary>\
+    /// <param name="processName">The process name without the extension.</param>\
+    /// <returns><c>true</c> if at least one matching process is found; otherwise, <c>false</c>.</returns>
     public static bool IsProcessRunning(string processName)
     {
         var procs = Process.GetProcessesByName(processName);
@@ -25,13 +25,13 @@ public static class ServiceManager
         return found;
     }
 
-    /// <summary>Проверяет, запущен ли процесс службы StartupMonitor.Service.</summary>
+    /// <summary>Checks whether the StartupMonitor.Service process is running.</summary>
     public static bool IsServiceRunning()
     {
         return IsProcessRunning("StartupMonitor.Service");
     }
 
-    /// <summary>Проверяет, установлена ли служба StartupMonitor в SCM.</summary>
+    /// <summary>Checks whether the StartupMonitor service is installed in the SCM.</summary>
     public static bool IsServiceInstalled()
     {
         try
@@ -46,7 +46,7 @@ public static class ServiceManager
         }
     }
 
-    /// <summary>Путь к exe установленной службы из реестра (ImagePath).</summary>
+    /// <summary>Path to the installed service's executable from the registry (ImagePath).</summary>
     public static string? GetInstalledServicePath()
     {
         try
@@ -61,13 +61,13 @@ public static class ServiceManager
         }
     }
 
-    /// <summary>Информация о регистрации и состоянии службы Windows.</summary>
-    /// <param name="IsInstalled">Установлена ли служба в SCM.</param>
-    /// <param name="IsAutoStart">Настроен ли автоматический запуск (start=auto).</param>
-    /// <param name="IsPathCorrect">Соответствует ли ImagePath текущему расположению исполняемого файла.</param>
-    /// <param name="IsRunning">Запущен ли процесс или служба со статусом Running.</param>
-    /// <param name="CurrentPath">Текущий путь из реестра (ImagePath).</param>
-    /// <param name="ExpectedPath">Ожидаемый путь к исполняемому файлу службы.</param>
+    /// <summary>Information about the registration and state of the Windows service.</summary>
+    /// <param name="IsInstalled">Whether the service is installed in the SCM.</param>
+    /// <param name="IsAutoStart">Whether automatic startup is configured (start=auto).</param>
+    /// <param name="IsPathCorrect">Whether ImagePath matches the current executable location.</param>
+    /// <param name="IsRunning">Whether the process or service is running with the Running status.</param>
+    /// <param name="CurrentPath">Current path from the registry (ImagePath).</param>
+    /// <param name="ExpectedPath">Expected path to the service executable.</param>
     public record ServiceRegistrationStatus(
         bool IsInstalled,
         bool IsAutoStart,
@@ -77,7 +77,7 @@ public static class ServiceManager
         string ExpectedPath
     );
 
-    /// <summary>Выполняет детальную проверку регистрации, автозапуска и активности службы.</summary>
+    /// <summary>Performs a detailed check of the service registration, auto-start, and activity.</summary>
     public static ServiceRegistrationStatus CheckServiceStatus()
     {
         var baseDir = AppContext.BaseDirectory;
@@ -105,7 +105,7 @@ public static class ServiceManager
         }
         catch
         {
-            // Ошибка чтения реестра — используем ServiceController как запасной вариант
+            // Registry read failed — falling back to ServiceController
         }
 
         if (!isInstalled && IsServiceInstalled())
@@ -140,11 +140,11 @@ public static class ServiceManager
     }
 
     /// <summary>
-    /// Комплексно проверяет службу: если не установлена, не в автозапуске или путь устарел —
-    /// настраивает её с start=auto, запускает и ожидает готовности, выводя статус на экран.
+    /// Comprehensively checks the service: if it is not installed, not set to auto-start, or its path is outdated,
+    /// configures it with start=auto, starts it, and waits for readiness, displaying the status on screen.
     /// </summary>
-    /// <param name="reportProgress">Колбэк для вывода текстового статуса на экран.</param>
-    /// <param name="timeoutMs">Максимальное время ожидания запуска (мс).</param>
+    /// <param name="reportProgress">Callback for displaying text status on the screen.</param>
+    /// <param name="timeoutMs">Maximum time to wait for the service to start (ms).</param>
     public static async Task EnsureServiceConfiguredAndRunningAsync(Action<string>? reportProgress = null, int timeoutMs = 45000)
     {
         var status = CheckServiceStatus();
@@ -152,18 +152,18 @@ public static class ServiceManager
         if (!File.Exists(status.ExpectedPath))
             throw new FileNotFoundException($"Исполняемый файл службы не найден: {status.ExpectedPath}", status.ExpectedPath);
 
-        // 1. Если служба не установлена или путь устарел — настраиваем или создаем с start=auto
+        // 1. If the service is not installed or the path is outdated — configure or create it with start=auto
         if (!status.IsInstalled || !status.IsPathCorrect)
         {
             if (status.IsInstalled)
             {
-                // Служба уже зарегистрирована в SCM, но путь изменился — обновляем конфигурацию атомарно без sc delete!
+                // Service is already registered in SCM, but the path changed — update the configuration atomically without sc delete!
                 reportProgress?.Invoke("Обновление пути к службе в реестре Windows...");
                 await RunScElevated($"config \"{ServiceName}\" binPath=\"\\\"{status.ExpectedPath}\\\" --windows-service\" start=auto");
             }
             else
             {
-                // Служба не зарегистрирована — создаем её с автозапуском
+                // Service is not registered — create it with auto-start
                 reportProgress?.Invoke("Служба не зарегистрирована. Регистрация в автозапуск Windows...");
                 try
                 {
@@ -171,30 +171,30 @@ public static class ServiceManager
                 }
                 catch (Exception ex) when (ex.Message.Contains("1072"))
                 {
-                    // 1072 = ERROR_SERVICE_MARKED_FOR_DELETE: служба ожидает закрытия дескрипторов после удаления
+                    // 1072 = ERROR_SERVICE_MARKED_FOR_DELETE: the service is waiting for open handles to close after deletion
                     try { Process.GetProcessesByName("StartupMonitor.Service").ToList().ForEach(p => p.Kill()); } catch { }
                     await Task.Delay(2000);
                     await RunScElevated($"create \"{ServiceName}\" binPath=\"\\\"{status.ExpectedPath}\\\" --windows-service\" start=auto");
                 }
             }
 
-            // Настройка перезапуска при сбоях
+            // Configure restart on failure
             await RunScElevated($"failure \"{ServiceName}\" reset=86400 actions=restart/5000/restart/10000/restart/30000", checkExitCode: false);
 
-            // Права SCM не должны позволять обойти административную авторизацию IPC прямой остановкой службы.
+            // SCM permissions must not allow bypassing administrative IPC authorization by directly stopping the service.
             await RunScElevated($"sdset \"{ServiceName}\" \"{DefaultServiceSecurityDescriptor}\"", checkExitCode: true);
 
             status = CheckServiceStatus();
         }
         else if (!status.IsAutoStart)
         {
-            // 2. Служба установлена, но режим автозапуска сбит (например, Manual или Disabled)
+            // 2. The service is installed, but its startup type is misconfigured (for example, Manual or Disabled)
             reportProgress?.Invoke("Служба отключена в автозапуске. Настройка режима автозапуска...");
             await RunScElevated($"config \"{ServiceName}\" start=auto");
             status = CheckServiceStatus();
         }
 
-        // 3. Запуск службы, если она не работает
+        // 3. Starts the service if it is not running
         if (!status.IsRunning)
         {
             reportProgress?.Invoke("Запуск службы StartupMonitor...");
@@ -211,7 +211,7 @@ public static class ServiceManager
             }
             catch
             {
-                // Не хватило прав обычного пользователя — пробуем через повышенный sc start
+                // Insufficient standard user privileges — retrying with elevated sc start
             }
 
             if (!startedViaSc)
@@ -223,7 +223,7 @@ public static class ServiceManager
                 }
                 catch (Exception ex)
                 {
-                    // Если запуск через SCM не удался, проверяем не запущен ли процесс напрямую
+                    // If SCM start failed, check if the process is running directly
                     if (!IsServiceRunning())
                     {
                         reportProgress?.Invoke("Запуск фонового процесса службы...");
@@ -242,7 +242,7 @@ public static class ServiceManager
                 }
             }
 
-            // 4. Ожидаем, пока служба выйдет в рабочий статус
+            // 4. Wait until the service reaches running state
             var sw = Stopwatch.StartNew();
             while (sw.ElapsedMilliseconds < timeoutMs)
             {
@@ -264,21 +264,21 @@ public static class ServiceManager
         reportProgress?.Invoke("Служба активна.");
     }
 
-    /// <summary>Ожидает запуска службы (до timeoutMs), при необходимости запуская процесс напрямую.</summary>
+    /// <summary>Waits for the service to start (up to timeoutMs), launching the process directly if needed.</summary>
     public static async Task EnsureServiceRunningAsync(int timeoutMs = 60000)
     {
         await EnsureServiceConfiguredAndRunningAsync(null, timeoutMs);
     }
 
-    /// <summary>Устанавливает или перерегистрирует службу StartupMonitor в SCM (требует прав администратора).</summary>
+    /// <summary>Installs or re-registers the StartupMonitor service in SCM (requires administrator rights).</summary>
     public static async Task TryInstallServiceAsync()
     {
         await EnsureServiceConfiguredAndRunningAsync(null);
     }
 
-    /// <summary>Запускает sc.exe с правами администратора (UAC) и ожидает завершения.</summary>
-    /// <param name="arguments">Аргументы командной строки для sc.</param>
-    /// <param name="checkExitCode">Проверять код возврата (выбрасывать исключение при ненулевом).</param>
+    /// <summary>Runs sc.exe with administrator privileges (UAC) and waits for completion.</summary>
+    /// <param name="arguments">Command-line arguments for sc.</param>
+    /// <param name="checkExitCode">Whether to verify exit code (throws on non-zero).</param>
     private static async Task RunScElevated(string arguments, bool checkExitCode = true)
     {
         try
@@ -305,7 +305,7 @@ public static class ServiceManager
         }
     }
 
-    /// <summary>Останавливает службу StartupMonitor (через SCM или убивает процесс).</summary>
+    /// <summary>Stops the StartupMonitor service (via SCM or terminates process).</summary>
     public static void StopService()
     {
         if (IsServiceInstalled())
@@ -321,7 +321,7 @@ public static class ServiceManager
             catch { }
         }
 
-        // Fallback: убиваем процесс
+        // Fallback: terminate process
         foreach (var proc in Process.GetProcessesByName("StartupMonitor.Service"))
         {
             try { proc.Kill(); } catch { }
@@ -329,7 +329,7 @@ public static class ServiceManager
         }
     }
 
-    /// <summary>Проверяет, запущен ли процесс UI.</summary>
+    /// <summary>Determines whether the UI process is running.</summary>
     public static bool IsUiRunning()
     {
         return IsProcessRunning("StartupMonitor.UI");

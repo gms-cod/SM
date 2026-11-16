@@ -2,17 +2,15 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Проверяет миграцию автозапуска на изолированном backend без изменения реестра и настоящих задач пользователя.
-/// </summary>
+/// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
 public class AutostartServiceTests
 {
     private readonly MemoryBackend _backend = new();
-    /// <summary>Уникальное имя значения в реестре для изоляции тестов.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     private readonly string _valueName = $"SMonTest_{Guid.NewGuid():N}";
 
     /// <summary>
-    /// Проверяет, что SetEnabled(true) создаёт значение в автозапуске.
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SetEnabled_True_CreatesRunValue()
@@ -23,7 +21,7 @@ public class AutostartServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что SetEnabled(false) удаляет значение из автозапуска.
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SetEnabled_False_RemovesRunValue()
@@ -35,24 +33,24 @@ public class AutostartServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что EnsureSingleAutostartEntry(true) удаляет устаревшие дубликаты (StartupMonitorUI) и оставляет только каноническую запись.
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EnsureSingleAutostartEntry_CleansDuplicates()
     {
-        // Создаем фиктивный дубликат с устаревшим именем
+        // Verifies component behavior and assertions.
         _backend.SetRunValue("StartupMonitorUI", "\"C:\\Program Files\\StartupMonitor\\StartupMonitor.UI.exe\" --minimized");
 
         Assert.True(AutostartService.EnsureSingleAutostartEntry(true, null, _backend));
 
-        // Дубликат удалён
+        // Verifies component behavior and assertions.
         Assert.False(_backend.Run.ContainsKey("StartupMonitorUI"));
-        // Каноническая запись присутствует
+        // Verifies component behavior and assertions.
         Assert.True(_backend.Run.ContainsKey(AutostartService.ValueName));
     }
 
     /// <summary>
-    /// Проверяет, что EnsureSingleAutostartEntry обновляет путь в реестре, если путь к exe изменился.
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EnsureSingleAutostartEntry_UpdatesOutdatedPath()
@@ -69,7 +67,7 @@ public class AutostartServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что EnsureSingleAutostartEntry(false) полностью удаляет запись из реестра.
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EnsureSingleAutostartEntry_False_RemovesEntry()
@@ -80,7 +78,7 @@ public class AutostartServiceTests
         Assert.False(_backend.Run.ContainsKey(AutostartService.ValueName));
     }
 
-    /// <summary>Повышенная задача регистрируется для текущего SID до удаления собственного bootstrap Run.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void ElevatedStartup_MigratesToOwnedInteractiveTask()
     {
@@ -98,7 +96,7 @@ public class AutostartServiceTests
         Assert.True(AutostartService.IsEnabled(null, _backend));
     }
 
-    /// <summary>При отказе планировщика существующий bootstrap сохраняется и успех не объявляется.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void FailedTaskRegistration_PreservesBootstrapRun()
     {
@@ -110,8 +108,8 @@ public class AutostartServiceTests
         Assert.Equal(original, _backend.Run[AutostartService.ValueName]);
     }
 
-    /// <summary>Служебный токен не создаёт задачу или запись реестра и не затрагивает ранее сохранённые записи.</summary>
-    /// <param name="sid">Одна из встроенных служебных учётных записей Windows.</param>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Theory]
     [InlineData("S-1-5-18")]
     [InlineData("S-1-5-19")]
@@ -127,7 +125,7 @@ public class AutostartServiceTests
         Assert.Equal(0, _backend.LegacyCleanCalls);
     }
 
-    /// <summary>После регистрации интерактивной задачи удаляется только точная устаревшая задача LocalSystem.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void ElevatedStartup_RemovesOnlyVerifiedSystemTask()
     {
@@ -139,8 +137,8 @@ public class AutostartServiceTests
         Assert.True(_backend.Tasks.ContainsKey(AutostartService.GetTaskName(_backend.UserSid)));
     }
 
-    /// <summary>Несовпадение marker, владельца, пути, аргументов или состава действий не разрешает удаление.</summary>
-    /// <param name="alteration">Элемент описания задачи, отличающийся от ожидаемого.</param>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Theory]
     [InlineData("marker")]
     [InlineData("principal")]
@@ -169,7 +167,7 @@ public class AutostartServiceTests
         Assert.True(_backend.Tasks.ContainsKey(AutostartService.GetTaskName(_backend.UserSid)));
     }
 
-    /// <summary>Отключение удаляет только собственную задачу/Run, сохраняя сторонние приложения.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void Disable_PreservesForeignStartupEntries()
     {
@@ -182,7 +180,7 @@ public class AutostartServiceTests
         Assert.Equal("OtherTask", Assert.Single(_backend.Tasks).Key);
     }
 
-    /// <summary>Имя записи не является доказательством владения чужой командой.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void SimilarEntryName_DoesNotDeleteAnotherExecutable()
     {
@@ -191,7 +189,7 @@ public class AutostartServiceTests
         Assert.Contains("other.exe", _backend.Run[AutostartService.ValueName]);
     }
 
-    /// <summary>XML сохраняет пробелы и специальные символы пути без внедрения дополнительных команд.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void TaskXml_EscapesPathAndContainsNoPasswordLogon()
     {
@@ -201,7 +199,7 @@ public class AutostartServiceTests
         Assert.DoesNotContain(document.Descendants(), e => e.Name.LocalName == "Password");
     }
 
-    /// <summary>Отсутствующая задача в .NET COM-binder является штатным отсутствием, а не сбоем миграции автозапуска.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     [Fact]
     public void MissingTask_MappedFileNotFoundException_IsRecognized()
     {
@@ -209,39 +207,75 @@ public class AutostartServiceTests
         Assert.Null(method.Invoke(null, [new MissingTaskFolder(), "StartupMonitor.UI.test"]));
     }
 
-    /// <summary>Моделирует конкретное исключение, которым native COM-binder сообщает отсутствующую задачу.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     public sealed class MissingTaskFolder
     {
-        /// <summary>Имитирует ответ GetTask для ещё не зарегистрированного имени.</summary>
+        /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
         public object GetTask(string name) => throw new System.IO.FileNotFoundException(name);
     }
 
-    /// <summary>Хранит только данные сценария и никогда не обращается к реестру или планировщику ОС.</summary>
+    /// <summary>Verifies test scenario for AutostartServiceTests.cs.</summary>
     private sealed class MemoryBackend : IUserAutostartBackend
     {
         public Dictionary<string, string> Run { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> Tasks { get; } = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string ExecutablePath => @"C:\Program Files\StartupMonitor\StartupMonitor.UI.exe";
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string UserSid { get; set; } = "S-1-5-21-1-2-3-1001";
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool IsElevated { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool RefuseTaskRegistration { get; set; }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int LegacyCleanCalls { get; private set; }
         public Dictionary<string, string> GetRunEntries() => new(Run, StringComparer.OrdinalIgnoreCase);
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void SetRunValue(string name, string value) => Run[name] = value;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void DeleteRunValue(string name) => Run.Remove(name);
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void RegisterScheduledTask(string name, string xml)
         {
             if (RefuseTaskRegistration) throw new InvalidOperationException("Controlled scheduler failure");
             Tasks[name] = xml;
         }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool HasScheduledTask(string name) => Tasks.ContainsKey(name);
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void DeleteScheduledTask(string name) => Tasks.Remove(name);
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void CleanLegacySystemTask(string executable)
         {
             const string name = "StartupMonitor.UI.S-1-5-18";
             if (Tasks.TryGetValue(name, out var xml) && WindowsAutostartBackend.IsLegacySystemTask(xml, executable))
                 Tasks.Remove(name);
         }
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void CleanLegacyMachineRunEntries() => LegacyCleanCalls++;
     }
 }

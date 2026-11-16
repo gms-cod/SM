@@ -4,16 +4,16 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>Проверяет восстановление семантически повреждённых данных и независимость конкурентных изменений.</summary>
+/// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
 public sealed class ConfigurationConsistencyRegressionTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitorConsistency_" + Guid.NewGuid().ToString("N"));
 
-    /// <summary>Создаёт изолированное хранилище всех секционных файлов теста.</summary>
-    /// <returns>Хранилище, не использующее общие TEMP-файлы.</returns>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     private JsonDataStore CreateStore() => new(Path.Combine(_directory, "startup-monitor.json"));
 
-    /// <summary>Явные null и недопустимые диапазоны восстанавливаются из проверенной резервной копии.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Theory]
     [InlineData("{\"settings\":null}")]
     [InlineData("{\"settings\":{\"port_defender\":null}}")]
@@ -31,7 +31,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_directory, "settings.json.corrupt")));
     }
 
-    /// <summary>Null-элемент секции записей не попадает в кэш и не прерывает запуск.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void NullEntry_IsRejectedBeforeSnapshotClone()
     {
@@ -41,7 +41,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_directory, "startup-entries.json.corrupt")));
     }
 
-    /// <summary>Сохранение настройки из старого снимка не удаляет параллельно добавленную запись.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void StaleSettingsSave_PreservesConcurrentEntryAndRepeatedSave()
     {
@@ -58,7 +58,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Equal("en", current.Language);
     }
 
-    /// <summary>Независимые поля настроек объединяются, хотя оба writer прочитали одну базу.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void ParallelSnapshots_MergeIndependentSettings()
     {
@@ -74,7 +74,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.False(settings.NotifyOnNewEntry);
     }
 
-    /// <summary>Конфликт одного поля не скрывается перезаписью чужого значения.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void ConflictingSnapshots_RejectSecondValueWithoutOverwritingFirst()
     {
@@ -88,7 +88,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Equal("light", store.Load().Theme);
     }
 
-    /// <summary>Старый результат анализа не воскрешает запись, удалённую пользователем.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void ConcurrentDelete_IsNotUndoneByOldSnapshot()
     {
@@ -101,7 +101,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Empty(store.Load().Entries);
     }
 
-    /// <summary>Изменение рейтинга отдельной записи сохраняет параллельно изменённый статус.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void EntrySnapshots_MergeRatingAndStatus()
     {
@@ -118,7 +118,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Equal(7, actual.AiRating);
     }
 
-    /// <summary>Пакет репутации обновляет только принадлежащие сканеру поля одной дисковой записью.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void ReputationBatch_PreservesCurrentStatusAndUnrelatedFields()
     {
@@ -138,7 +138,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Equal("Green", actual.KasperskyZone);
     }
 
-    /// <summary>Принятие уже истёкшей записи не увеличивает файл истории.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void ExpiredHistory_IsNotAppendedToDisk()
     {
@@ -151,7 +151,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Single(CreateStore().Load().History);
     }
 
-    /// <summary>Копирование сохраняет срок временного бана и его диагностические поля.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     [Fact]
     public void SettingsClone_PreservesAllBanFields()
     {
@@ -169,7 +169,7 @@ public sealed class ConfigurationConsistencyRegressionTests : IDisposable
         Assert.Equal("rule", ban.RuleName);
     }
 
-    /// <summary>Удаляет только созданную этим экземпляром уникальную директорию теста.</summary>
+    /// <summary>Verifies test scenario for ConfigurationConsistencyRegressionTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);

@@ -3,12 +3,18 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public sealed class FirewallGuardTests
 {
     [Theory]
     [InlineData("8.8.8.8")]
     [InlineData("185.220.101.5")]
     [InlineData("1.1.1.1")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_ValidPublicIpv4_ReturnsTrueAndNoError(string ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip, out var error);
@@ -20,6 +26,9 @@ public sealed class FirewallGuardTests
     [Theory]
     [InlineData("2001:4860:4860::8888")]
     [InlineData("2606:4700:4700::1111")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_ValidIpv6_ReturnsTrueAndNoError(string ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip, out var error);
@@ -32,6 +41,9 @@ public sealed class FirewallGuardTests
     [InlineData("127.0.0.1")]
     [InlineData("127.0.0.2")]
     [InlineData("::1")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_Loopback_ReturnsFalseWithSelfLockoutError(string ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip, out var error);
@@ -45,6 +57,9 @@ public sealed class FirewallGuardTests
     [Theory]
     [InlineData("0.0.0.0")]
     [InlineData("::")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_Unspecified_ReturnsFalseWithError(string ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip, out var error);
@@ -59,6 +74,9 @@ public sealed class FirewallGuardTests
     [InlineData("224.0.0.1")]
     [InlineData("239.255.255.250")]
     [InlineData("ff02::1")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_BroadcastAndMulticast_ReturnsFalseWithError(string ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip, out var error);
@@ -74,6 +92,9 @@ public sealed class FirewallGuardTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_NullOrWhiteSpace_ReturnsFalseWithEmptyIpError(string? ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip!, out var error);
@@ -88,6 +109,9 @@ public sealed class FirewallGuardTests
     [InlineData("999.999.999.999")]
     [InlineData("192.168.1.300")]
     [InlineData("not:an:ip:address:xyz")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_MalformedStrings_ReturnsFalseWithFormatError(string ip)
     {
         var result = FirewallGuard.IsBlockableAddress(ip, out var error);
@@ -101,6 +125,9 @@ public sealed class FirewallGuardTests
     [InlineData("192.168.1.0/24")]
     [InlineData("10.0.0.0/8")]
     [InlineData("172.16.0.0/12")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsBlockableAddress_SubnetCidr_ExtractsAddressCorrectlyAndReturnsTrue(string subnet)
     {
         var result = FirewallGuard.IsBlockableAddress(subnet, out var error);
@@ -115,6 +142,9 @@ public sealed class FirewallGuardTests
     [InlineData(443)]
     [InlineData(3389)]
     [InlineData(65535)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsValidPort_BoundaryAndStandardPorts_ReturnsTrue(int port)
     {
         Assert.True(FirewallGuard.IsValidPort(port));
@@ -126,6 +156,9 @@ public sealed class FirewallGuardTests
     [InlineData(65536)]
     [InlineData(100000)]
     [InlineData(-65535)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsValidPort_InvalidValues_ReturnsFalse(int port)
     {
         Assert.False(FirewallGuard.IsValidPort(port));

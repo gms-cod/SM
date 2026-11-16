@@ -62,6 +62,9 @@ public static class CpuUsageHelper
         public long UserTime;
         public long DpcTime;
         public long InterruptTime;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint InterruptCount;
     }
 

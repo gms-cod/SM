@@ -3,11 +3,11 @@ using StartupMonitor.Service.Services.ProcessLifecycle;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет отказ запуска и отмену супервизора через фабрику, которая никогда не создаёт нативную ETW-сессию.</summary>
+/// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
 public sealed class ProcessLifecycleSupervisorFailureTests
 {
-    /// <summary>Проверяет отсутствие даже попытки запуска источника в режиме Legacy.</summary>
-    /// <returns>Задача безопасного завершения супервизора.</returns>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
     [Fact]
     public async Task LegacyMode_DoesNotInvokeSessionFactoryOrSnapshotSource()
     {
@@ -26,12 +26,12 @@ public sealed class ProcessLifecycleSupervisorFailureTests
     }
 
     /// <summary>
-    /// Проверяет немедленный возврат Host.StartAsync при медленном контроллере, переход в Degraded
-    /// и повтор попытки после отказа без ложного Healthy или заполнения реестра фиктивным baseline.
-    /// Сам контракт неблокирующего запуска проверяется завершённой задачей, независимо от задержек ThreadPool
-    /// полного параллельного набора; bounded ожидания фабрики не подменяют эту проверку таймингом планировщика.
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
     /// </summary>
-    /// <returns>Задача ожидания управляемого отказа и последующего shutdown.</returns>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
     [Fact]
     public async Task SessionFactoryFails_StartDoesNotBlockAndFailureRemainsDegradedDuringRetry()
     {
@@ -72,15 +72,15 @@ public sealed class ProcessLifecycleSupervisorFailureTests
         }
         finally
         {
-            // Даже провал первого assertion освобождает заблокированную фабрику и завершает все задачи супервизора.
+            // Verifies component behavior and assertions.
             release.Set();
             await supervisor.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
         }
         Assert.Equal(ProcessLifecycleHealthState.Stopped, supervisor.HealthState);
     }
 
-    /// <summary>Проверяет отмену до запуска без вызова фабрики и без активации фоновых задач.</summary>
-    /// <returns>Задача проверки отменённого запуска.</returns>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleSupervisorFailureTests.cs.</summary>
     [Fact]
     public async Task Start_PreCanceled_DoesNotInvokeSessionFactory()
     {

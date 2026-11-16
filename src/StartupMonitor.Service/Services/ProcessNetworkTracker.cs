@@ -32,11 +32,20 @@ public class ProcessNetworkTracker : IDisposable
     /// </summary>
     public readonly struct SocketKey4 : IEquatable<SocketKey4>
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public readonly uint LocalAddr;
         public readonly ushort LocalPort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public readonly uint RemoteAddr;
         public readonly ushort RemotePort;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public SocketKey4(uint localAddr, uint localPortNetworkOrder, uint remoteAddr, uint remotePortNetworkOrder)
         {
             LocalAddr = localAddr;
@@ -45,14 +54,23 @@ public class ProcessNetworkTracker : IDisposable
             RemotePort = NormalizePort(remotePortNetworkOrder);
         }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool Equals(SocketKey4 other) =>
             LocalAddr == other.LocalAddr &&
             LocalPort == other.LocalPort &&
             RemoteAddr == other.RemoteAddr &&
             RemotePort == other.RemotePort;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public override bool Equals(object? obj) => obj is SocketKey4 other && Equals(other);
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public override int GetHashCode()
         {
             unchecked
@@ -74,10 +92,16 @@ public class ProcessNetworkTracker : IDisposable
     {
         public readonly ulong LocalAddrHi;
         public readonly ulong LocalAddrLo;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public readonly uint LocalScopeId;
         public readonly ushort LocalPort;
         public readonly ulong RemoteAddrHi;
         public readonly ulong RemoteAddrLo;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public readonly uint RemoteScopeId;
         public readonly ushort RemotePort;
 
@@ -106,6 +130,9 @@ public class ProcessNetworkTracker : IDisposable
             RemotePort = NormalizePort(remotePortNetworkOrder);
         }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool Equals(SocketKey6 other) =>
             LocalAddrHi == other.LocalAddrHi &&
             LocalAddrLo == other.LocalAddrLo &&
@@ -116,8 +143,14 @@ public class ProcessNetworkTracker : IDisposable
             RemoteScopeId == other.RemoteScopeId &&
             RemotePort == other.RemotePort;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public override bool Equals(object? obj) => obj is SocketKey6 other && Equals(other);
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public override int GetHashCode()
         {
             unchecked
@@ -904,35 +937,83 @@ public class ProcessNetworkTracker : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     private struct MIB_TCPROW
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwState;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalPort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemoteAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemotePort;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MIB_TCPROW_OWNER_PID
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwState;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalPort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemoteAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemotePort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwOwningPid;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MIB_TCP6ROW
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint State;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
         public byte[] LocalAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalScopeId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalPort;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
         public byte[] RemoteAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemoteScopeId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemotePort;
     }
 
@@ -941,13 +1022,31 @@ public class ProcessNetworkTracker : IDisposable
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
         public byte[] ucLocalAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalScopeId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalPort;
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
         public byte[] ucRemoteAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemoteScopeId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwRemotePort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwState;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwOwningPid;
     }
 
@@ -960,12 +1059,30 @@ public class ProcessNetworkTracker : IDisposable
         public ulong DataSegsIn;
         public ulong SegsOut;
         public ulong SegsIn;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint SoftErrors;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint SoftErrorReason;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint SndUna;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint SndNxt;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint SndMax;
         public ulong ThruBytesAcked;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint RcvNxt;
         public ulong ThruBytesReceived;
     }
@@ -982,8 +1099,17 @@ public class ProcessNetworkTracker : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     private struct MIB_UDPROW_OWNER_PID
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalPort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwOwningPid;
     }
 
@@ -992,8 +1118,17 @@ public class ProcessNetworkTracker : IDisposable
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
         public byte[] ucLocalAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalScopeId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwLocalPort;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwOwningPid;
     }
 

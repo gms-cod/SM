@@ -303,8 +303,14 @@ internal sealed class SessionFirewallPolicy : ISessionFirewallPolicy
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeFilter
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public Guid Key; public NativeDisplay Display; public uint Flags; public IntPtr ProviderKey;
         public NativeBlob ProviderData; public Guid LayerKey, SublayerKey; public NativeValue Weight;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint ConditionCount; public IntPtr Conditions; public NativeAction Action;
         public ulong ContextLow, ContextHigh; public IntPtr Reserved; public ulong Id; public NativeValue EffectiveWeight;
     }

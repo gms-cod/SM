@@ -7,20 +7,21 @@ using Xunit;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// Модульные тесты для контрола таймлайна сетевой телеметрии NetworkTimelineChartControl
-/// и математического алгоритма адаптивного масштабирования (Dynamic AGC).
-/// </summary>
+/// <summary>Verifies test scenario for NetworkTimelineChartControlTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkTimelineChartControlTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class NetworkTimelineChartControlTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Использует общий STA-диспетчер и ресурсы WPF, исключая отдельные конкурирующие потоки холодной инициализации.</summary>
-    /// <param name="host">Единственный WPF-хост тестовой коллекции.</param>
+    /// <summary>Verifies test scenario for NetworkTimelineChartControlTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkTimelineChartControlTests.cs.</summary>
     public NetworkTimelineChartControlTests(NetworkRenderingTestHost host) => _host = host;
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ChartDataPoint_Constructor_InitializesAllPropertiesCorrectly()
     {
         // Arrange
@@ -41,7 +42,7 @@ public sealed class NetworkTimelineChartControlTests
         Assert.Equal(alerts, point.AlertCount);
     }
 
-    /// <summary>Проверяет пустые и настоящие данные графика на том же STA, которому принадлежат ресурсы приложения.</summary>
+    /// <summary>Verifies test scenario for NetworkTimelineChartControlTests.cs.</summary>
     [Fact]
     public void NetworkTimelineChartControl_SetDataPoints_HandlesNullAndEmptyGracefully()
         => _host.Run(() =>
@@ -58,11 +59,14 @@ public sealed class NetworkTimelineChartControlTests
 
     [Theory]
     [InlineData(0.0, 0.0)]
-    [InlineData(24000.0, 24100.0)] // Малая вариация (высокое смещение DC)
-    [InlineData(100.0, 1000000.0)] // Широкий динамический диапазон
+    [InlineData(24000.0, 24100.0)] // Low variation (high DC bias)
+    [InlineData(100.0, 1000000.0)] // Wide dynamic range
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DynamicRangeCalculation_ExpandsSpanAdequately(double minVal, double maxVal)
     {
-        // Проверяем рабочий алгоритм, а не его независимую копию в тесте.
+        // Verifies component behavior and assertions.
         var (effectiveMin, effectiveMax) = NetworkTimelineChartControl.CalculateTrafficRange(minVal, maxVal);
 
         double span = effectiveMax - effectiveMin;

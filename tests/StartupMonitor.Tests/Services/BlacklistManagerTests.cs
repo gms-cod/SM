@@ -3,17 +3,15 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для BlacklistManager: сопоставление записей с правилами чёрного списка по различным критериям,
-/// вычисление SHA256, добавление/удаление правил.
-/// </summary>
+/// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
+/// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
 public class BlacklistManagerTests : IDisposable
 {
-    /// <summary>Путь к временному файлу конфига для тестов.</summary>
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     private readonly string _testFilePath;
-    /// <summary>Хранилище данных JsonDataStore для тестов.</summary>
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     private readonly JsonDataStore _store;
-    /// <summary>Экземпляр BlacklistManager, привязанный к временному хранилищу.</summary>
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     private readonly BlacklistManager _manager;
 
     public BlacklistManagerTests()
@@ -24,7 +22,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет точное совпадение пути файла — базовый сценарий.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_ExactPath_Success()
@@ -47,7 +45,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что сравнение путей регистронезависимо.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_ExactPath_CaseInsensitive()
@@ -67,7 +65,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что при несовпадении пути возвращается null.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_PathMismatch_ReturnsNull()
@@ -87,7 +85,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет сопоставление по wildcard-шаблону пути.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_Wildcard_Success()
@@ -107,7 +105,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет wildcard-шаблон с глубоким путём.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_Wildcard_DeepPath()
@@ -127,7 +125,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что wildcard не совпадает с неподходящим файлом.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_Wildcard_NoMatch()
@@ -147,7 +145,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет сопоставление по издателю.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_Publisher_Success()
@@ -168,7 +166,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что сравнение по издателю регистронезависимо.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_Publisher_CaseInsensitive()
@@ -185,7 +183,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет сопоставление по SHA256-хешу файла.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_SHA256_Success()
@@ -214,7 +212,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что при пустом чёрном списке MatchEntry возвращает null.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_EmptyBlacklist_ReturnsNull()
@@ -228,7 +226,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что при нескольких правилах побеждает первое подходящее.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_MultipleRules_FirstMatchWins()
@@ -252,7 +250,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что ComputeSha256 возвращает пустую строку для несуществующего файла.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ComputeSha256_NonExistentFile_ReturnsEmpty()
@@ -262,7 +260,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что ComputeSha256 возвращает 64-символьный hex-хеш для существующего файла.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ComputeSha256_ValidFile_ReturnsHash()
@@ -282,7 +280,7 @@ public class BlacklistManagerTests : IDisposable
         }
     }
 
-    /// <summary>Добавляет правило в чёрный список.</summary>
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     private void AddRule(BlacklistRule rule)
     {
         var config = _store.Load();
@@ -290,7 +288,7 @@ public class BlacklistManagerTests : IDisposable
         _store.Save(config);
     }
 
-    /// <summary>Удаляет правило из чёрного списка по ID.</summary>
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     private void RemoveRule(string ruleId)
     {
         var config = _store.Load();
@@ -299,7 +297,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что после удаления правила запись больше не блокируется.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_AfterRuleRemoved_ReturnsNull()
@@ -324,7 +322,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что удаление одного правила не влияет на блокировку по другим правилам.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_UnblockViaRuleRemoval_OnlyAffectsTarget()
@@ -348,7 +346,7 @@ public class BlacklistManagerTests : IDisposable
         Assert.NotNull(_manager.MatchEntry(malEntry));
         Assert.NotNull(_manager.MatchEntry(toolEntry));
 
-        // Unblock только rule1
+        // Verifies component behavior and assertions.
         RemoveRule(rule1.Id);
 
         Assert.Null(_manager.MatchEntry(malEntry));
@@ -356,7 +354,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что удаление правила по издателю снимает блокировку.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchEntry_UnblockPublisher_RemovesBlock()
@@ -381,10 +379,10 @@ public class BlacklistManagerTests : IDisposable
         Assert.Null(_manager.MatchEntry(entry));
     }
 
-    // ───── MatchesFilePath (сопоставление пути процесса с правилом ЧС) ─────
+    // Verifies component behavior and assertions.
 
     /// <summary>
-    /// Проверяет точное совпадение пути файла (используется для процессов вне списка записей).
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchesFilePath_ExactPath_True()
@@ -399,7 +397,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет совпадение по wildcard-маске пути.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchesFilePath_Wildcard_True()
@@ -415,7 +413,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что MatchesFilePath не матчит правила по издателю или SHA256.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchesFilePath_OtherMatchTypes_False()
@@ -429,7 +427,7 @@ public class BlacklistManagerTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что некорректные символы в маске не вызывают необработанных исключений и корректно отклоняются.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchesFilePath_InvalidWildcard_DoesNotThrow()
@@ -440,13 +438,13 @@ public class BlacklistManagerTests : IDisposable
             MatchType = BlacklistMatchType.PathWildcard
         };
 
-        // Не должно выбрасывать RegexParseException
+        // Verifies component behavior and assertions.
         var result = BlacklistManager.MatchesFilePath(rule, @"C:\test\app.exe");
         Assert.False(result);
     }
 
     /// <summary>
-    /// Проверяет, что пустой путь или пустая маска возвращают false без ошибок.
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MatchesFilePath_EmptyOrNull_ReturnsFalse()
@@ -461,7 +459,7 @@ public class BlacklistManagerTests : IDisposable
         Assert.False(BlacklistManager.MatchesFilePath(rule, ""));
     }
 
-    /// <summary>Удаляет временный конфиг после тестов.</summary>
+    /// <summary>Verifies test scenario for BlacklistManagerTests.cs.</summary>
     public void Dispose()
     {
         if (File.Exists(_testFilePath))

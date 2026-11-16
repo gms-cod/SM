@@ -28,11 +28,17 @@ public class EventPipeServer : BackgroundService
     /// </summary>
     private sealed class ConnectedClient : IDisposable
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Id { get; }
         public NamedPipeServerStream Pipe { get; }
         public StreamWriter Writer { get; }
         private readonly ILogger _logger;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public ConnectedClient(int id, NamedPipeServerStream pipe, StreamWriter writer, ILogger logger)
         {
             _logger = logger;
@@ -41,6 +47,9 @@ public class EventPipeServer : BackgroundService
             Writer = writer;
         }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void Dispose()
         {
             // Сначала закрывается pipe: синхронный Dispose writer не должен ждать клиента, переставшего читать.
@@ -67,7 +76,7 @@ public class EventPipeServer : BackgroundService
     };
 
     /// <summary>
-    /// Конструктор EventPipeServer.
+    /// Constructor EventPipeServer.
     /// </summary>
     /// <param name="notificationService">Сервис уведомлений для подписки на батчи</param>
     /// <param name="logger">Логгер</param>

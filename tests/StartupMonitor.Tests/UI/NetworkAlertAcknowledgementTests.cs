@@ -10,26 +10,24 @@ using StartupMonitor.UI.Views.Dialogs;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// Проверяет настоящий WPF-диалог на общем STA-диспетчере: ожидание ACK,
-/// повторный клик, отказ и тайм-аут. IPC и реальный брандмауэр не используются.
-/// </summary>
+/// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class NetworkAlertAcknowledgementTests
 {
     private readonly NetworkRenderingTestHost _host;
     private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
 
-    /// <summary>Принимает единственный WPF-host тестовой коллекции.</summary>
-    /// <param name="host">Изолированный диспетчер с ресурсами приложения.</param>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     public NetworkAlertAcknowledgementTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Создаёт диалог с готовой AI-подсказкой, исключающей фоновое обращение к IPC.</summary>
-    /// <param name="client">Клиент, принадлежащий текущему тесту.</param>
-    /// <param name="sender">Управляемое подтверждение решения.</param>
-    /// <param name="canAllowSession">Доступно ли временное разрешение для текущей политики.</param>
-    /// <param name="canBlockSession">Доступна ли адресная временная блокировка приложения.</param>
-    /// <returns>Созданный, но ещё не показанный диалог.</returns>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     private static NetworkConnectionAlertWindow CreateWindow(PipeClient client, Func<ResolveNetworkAlertRequest, CancellationToken, Task<bool>> sender,
         bool canAllowSession = true, bool canBlockSession = true,
         Func<ResolveNetworkAlertRequest, CancellationToken, Task<ResolveNetworkAlertResultPayload>>? detailedSender = null) => new(
@@ -45,15 +43,15 @@ public sealed class NetworkAlertAcknowledgementTests
             AiPurpose = "Изолированная проверка подтверждения решения"
         }, client, countdownSeconds: 3600, resolutionSender: sender, detailedResolutionSender: detailedSender);
 
-    /// <summary>Возвращает настоящую кнопку действия из производственной разметки.</summary>
-    /// <param name="window">Проверяемое окно.</param>
-    /// <param name="name">Имя кнопки в XAML.</param>
-    /// <returns>Настоящий элемент кнопки.</returns>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     private static ButtonBase Button(NetworkConnectionAlertWindow window, string name) =>
         Assert.IsAssignableFrom<ButtonBase>(window.FindName(name));
 
-    /// <summary>Прокачивает STA-диспетчер до условия с независимым ограничением времени.</summary>
-    /// <param name="condition">Наблюдаемое условие завершения.</param>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     private static void PumpUntil(Func<bool> condition)
     {
         if (condition()) return;
@@ -70,8 +68,8 @@ public sealed class NetworkAlertAcknowledgementTests
         Assert.True(condition(), "Диалог не достиг ожидаемого состояния за три секунды.");
     }
 
-    /// <summary>Освобождает окно даже после отрицательного ACK без отправки нового пользовательского решения.</summary>
-    /// <param name="window">Окно, принадлежащее тесту.</param>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     private static void Cleanup(NetworkConnectionAlertWindow window)
     {
         var confirmed = typeof(NetworkConnectionAlertWindow).GetField("_resolutionConfirmed", PrivateInstance)
@@ -80,9 +78,9 @@ public sealed class NetworkAlertAcknowledgementTests
         window.Close();
     }
 
-    /// <summary>Проверяет все кнопки: окно остаётся открытым до ACK, а повторный клик не создаёт второй запрос.</summary>
-    /// <param name="buttonName">Имя производственной кнопки.</param>
-    /// <param name="expected">Ожидаемое решение пользователя.</param>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Theory]
     [InlineData("BtnWhitelist", NetworkAlertResolution.WhitelistProgram)]
     [InlineData("BtnBlockAlways", NetworkAlertResolution.BlacklistProgram)]
@@ -118,7 +116,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Проверяет отказ службы: сохраняется то же окно, таймер останавливается и доступен явный повтор.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void Action_Rejected_KeepsSameWindowAndAllowsExplicitRetry()
         => _host.Run(() =>
@@ -153,7 +151,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>После отказа крестик отправляет Defer и не подменяет скрытие изменением сетевой политики.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void Action_Rejected_AllowsForceCloseViaCloseButton()
         => _host.Run(() =>
@@ -173,7 +171,7 @@ public sealed class NetworkAlertAcknowledgementTests
                 PumpUntil(() => button.IsEnabled);
                 Assert.True(window.IsVisible);
 
-                // Откладывание подтверждается отдельно и не повторяет отклонённое разрешение.
+                // Verifies component behavior and assertions.
                 var closeButton = Button(window, "BtnClose");
                 closeButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 PumpUntil(() => !window.IsVisible);
@@ -184,7 +182,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Проверяет, что тайм-аут доставки не превращается в успешное решение и не закрывает карточку.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void Action_TransportTimesOut_KeepsWindowAndShowsFailure()
         => _host.Run(() =>
@@ -206,7 +204,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Проверяет, что истечение отсчёта отправляет BlockSession и также ожидает подтверждения.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void CountdownExpires_SendsSessionBlockAndWaitsForAcknowledgement()
         => _host.Run(() =>
@@ -235,9 +233,9 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Проверяет отключение недоступных сессионных действий согласно capability конкретного алерта.</summary>
-    /// <param name="canAllow">Доступно ли временное разрешение.</param>
-    /// <param name="canBlock">Доступна ли временная блокировка.</param>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Theory]
     [InlineData(false, true)]
     [InlineData(false, false)]
@@ -261,7 +259,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Потеря ACK разрешает только повтор той же операции, сохраняя её действие и идентификатор.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void UnknownOutcome_RetryUsesSameOperationAndPreventsOppositeAction()
         => _host.Run(() =>
@@ -291,7 +289,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Во время ожидающего ACK повтора принудительные нажатия не запускают третью или противоположную операцию.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void UnknownOutcome_PendingRetryRejectsAdditionalClicks()
         => _host.Run(() =>
@@ -324,7 +322,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Состояние Closing резервируется до анимации и блокирует второй клик даже при принудительном RaiseEvent.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void ClosingAnimation_RejectsAdditionalPolicyAction()
         => _host.Run(() =>
@@ -343,8 +341,8 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Отключение и внешнее завершение закрывают карточку без отправки BlockSession.</summary>
-    /// <param name="enabled">Продолжает ли работать детектор.</param>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -365,7 +363,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>После восстановления метаданных та же карточка получает число соединений и доступные действия.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void ServiceUpdatesGroup_RefreshesSummaryAndCapabilities()
         => _host.Run(() =>
@@ -389,7 +387,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Пустой путь по окончании отсчёта освобождает очередь через Defer, не создавая глобального разрешения порта.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void UnknownPath_CountdownDefersWithoutPolicyChange()
         => _host.Run(() =>
@@ -409,7 +407,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Точный отказ службы сохраняет объяснение вместо общего сообщения и позволяет безопасный новый выбор.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void DetailedUnsupported_ShowsServiceReasonAndKeepsWindow()
         => _host.Run(() =>
@@ -430,7 +428,7 @@ public sealed class NetworkAlertAcknowledgementTests
             finally { Cleanup(window); }
         });
 
-    /// <summary>Завершённый другим клиентом запрос не превращается в ошибку нового правила и закрывается без повторной операции.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertAcknowledgementTests.cs.</summary>
     [Fact]
     public void DetailedSuperseded_ClosesWithoutClaimingChosenActionApplied()
         => _host.Run(() =>

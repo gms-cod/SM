@@ -218,20 +218,41 @@ public partial class NetworkSecurityHubView : UserControl
 
     {
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string FullPath { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string ProcessName { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string DateAddedDisplay { get; set; } = "—";
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string FileSizeDisplay { get; set; } = "—";
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool ExistsOnDisk { get; set; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string StatusBadge { get; set; } = string.Empty;
 
 
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public static FirewallAppEntry FromPath(string path, bool isBlacklist = false)
 
         {
@@ -306,6 +327,9 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public sealed class FirewallRuleRow
 
     {
@@ -320,8 +344,14 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string Name { get => Dto.Name; set => Dto.Name = value; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string Description { get => Dto.Description; set => Dto.Description = value; }
 
         public FirewallDirection Direction { get => Dto.Direction; set => Dto.Direction = value; }
@@ -330,22 +360,34 @@ public partial class NetworkSecurityHubView : UserControl
 
         public FirewallProtocol Protocol { get => Dto.Protocol; set => Dto.Protocol = value; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string LocalPorts { get => Dto.LocalPorts; set => Dto.LocalPorts = value; }
 
         public string? RemotePorts { get => Dto.RemotePorts; set => Dto.RemotePorts = value; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string RemoteAddresses { get => Dto.RemoteAddresses; set => Dto.RemoteAddresses = value; }
 
         public string? ApplicationPath { get => Dto.ApplicationPath; set => Dto.ApplicationPath = value; }
 
         public string? ServiceName { get => Dto.ServiceName; set => Dto.ServiceName = value; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool Enabled { get => Dto.Enabled; set => Dto.Enabled = value; }
 
         public FirewallProfile Profiles { get => Dto.Profiles; set => Dto.Profiles = value; }
 
         public string? Grouping { get => Dto.Grouping; set => Dto.Grouping = value; }
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool IsManaged { get => Dto.IsManaged; set => Dto.IsManaged = value; }
 
 
@@ -508,20 +550,41 @@ public partial class NetworkSecurityHubView : UserControl
 
 
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string Ip => Dto.Ip;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int TargetPort => Dto.TargetPort;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string TargetProcess => string.IsNullOrWhiteSpace(Dto.TargetProcess) ? "—" : Dto.TargetProcess;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int AttackRate => Dto.AttackRate;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string Reason => string.IsNullOrWhiteSpace(Dto.Reason) ? "—" : Dto.Reason;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int RepeatCount => Dto.RepeatCount;
 
 
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string RemainingText
 
         {
@@ -4875,6 +4938,9 @@ public partial class NetworkSecurityHubView : UserControl
 
     public async Task LoadWhitelistAsync() => await LoadAccessMatrixAsync();
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task LoadBlacklistAsync() => await LoadAccessMatrixAsync();
 
 

@@ -225,7 +225,7 @@ public class PipeServer : BackgroundService
 
     /// <summary>
 
-    /// Конструктор PipeServer. Инициализирует все сервисы, загружает API-ключ из конфига.
+    /// Constructor PipeServer. Инициализирует все сервисы, загружает API-ключ из конфига.
 
     /// </summary>
 
@@ -5080,7 +5080,7 @@ public class PipeServer : BackgroundService
 
     /// <summary>
 
-    /// Освобождение ресурсов: отмена токена, освобождение AI-сервиса.
+    /// Resource disposal: отмена токена, освобождение AI-сервиса.
 
     /// </summary>
 

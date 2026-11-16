@@ -17,7 +17,7 @@ public class LogEntry
     [JsonPropertyName("level")]
     public string Level { get; set; } = string.Empty;
 
-    /// <summary>Текст сообщения.</summary>
+    /// <summary>Log message text.</summary>
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
 

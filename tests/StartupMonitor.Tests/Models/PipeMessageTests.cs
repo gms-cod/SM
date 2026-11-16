@@ -3,13 +3,11 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>
-/// Тесты для PipeMessage: сериализация/десериализация, уникальность типов сообщений, JSON-цикл StartupEntry.
-/// </summary>
+/// <summary>Verifies test scenario for PipeMessageTests.cs.</summary>
 public class PipeMessageTests
 {
     /// <summary>
-    /// Проверяет полный цикл сериализации/десериализации PipeMessage.
+    /// <summary>Verifies test scenario for PipeMessageTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SerializeDeserialize_RoundTrip()
@@ -30,12 +28,12 @@ public class PipeMessageTests
     }
 
     /// <summary>
-    /// Проверяет, что все строковые константы PipeMessageTypes уникальны (нет дубликатов).
+    /// <summary>Verifies test scenario for PipeMessageTests.cs.</summary>
     /// </summary>
     [Fact]
     public void MessageTypes_AllUnique()
     {
-        // Все строковые константы протокола уникальны (рефлексия — не надо править при добавлении типов)
+        // Verifies component behavior and assertions.
         var values = typeof(PipeMessageTypes)
             .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
             .Where(f => f.IsLiteral && f.FieldType == typeof(string))
@@ -47,7 +45,7 @@ public class PipeMessageTests
     }
 
     /// <summary>
-    /// Проверяет JSON-сериализацию StartupEntry с различными полями.
+    /// <summary>Verifies test scenario for PipeMessageTests.cs.</summary>
     /// </summary>
     [Fact]
     public void StartupEntry_JsonRoundTrip()
@@ -74,6 +72,9 @@ public class PipeMessageTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CpuThrottlePayload_JsonRoundTrip()
     {
         var payload = new CpuThrottlePayload(true, 75);
@@ -86,6 +87,9 @@ public class PipeMessageTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void StrictModePayload_JsonRoundTrip()
     {
         var payload = new StrictModePayload(true);

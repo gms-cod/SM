@@ -1,10 +1,10 @@
 namespace StartupMonitor.Shared.Models.Firewall;
 
-/// <summary>Наблюдаемое после принятия входящее TCP-соединение; не является решением брандмауэра.</summary>
-/// <param name="ProcessId">Идентификатор процесса из события ETW.</param>
-/// <param name="LocalAddress">Локальный адрес.</param>
-/// <param name="LocalPort">Локальный порт.</param>
-/// <param name="RemoteAddress">Удалённый адрес.</param>
-/// <param name="RemotePort">Удалённый порт.</param>
-/// <param name="ObservedAtUtc">Время наблюдения в UTC.</param>
+/// <summary>Observed accepted inbound TCP connection; not an active firewall decision.</summary>
+/// <param name="ProcessId">Process identifier from ETW event.</param>
+/// <param name="LocalAddress">Local IP address.</param>
+/// <param name="LocalPort">Local port number.</param>
+/// <param name="RemoteAddress">Remote IP address.</param>
+/// <param name="RemotePort">Remote port number.</param>
+/// <param name="ObservedAtUtc">Observation timestamp in UTC.</param>
 public sealed record IncomingTcpObservation(int ProcessId, string LocalAddress, int LocalPort, string RemoteAddress, int RemotePort, DateTime ObservedAtUtc);

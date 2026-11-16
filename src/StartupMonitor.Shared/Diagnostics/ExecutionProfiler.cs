@@ -10,14 +10,14 @@ using System.Threading.Tasks;
 namespace StartupMonitor.Shared.Diagnostics;
 
 /// <summary>
-/// Статический потокобезопасный профайлер длительности выполнения подпрограмм (Service и UI).
-/// Замер через <see cref="Stopwatch.GetTimestamp"/> (~20 нс на вызов).
-/// Нулевые GC-аллокации при вызове (структура 16 байт на стеке, компилятор вызывает Dispose напрямую).
-/// Периодический сброс отчёта каждые 5 минут через <see cref="StartAutoReportAsync"/> или <see cref="DrainReport"/>.
+/// Static thread-safe profiler of subroutine execution duration (Service and UI).
+/// Measured via <see cref="Stopwatch.GetTimestamp"/> (~20 ns per call).
+/// Zero GC allocations per call (16-byte struct on the stack; compiler calls Dispose directly).
+/// Periodic report flush every 5 minutes via <see cref="StartAutoReportAsync"/> or <see cref="DrainReport"/>.
 /// </summary>
 public static class ExecutionProfiler
 {
-    /// <summary>Глобальный флаг активности замеров.</summary>
+    /// <summary>Global flag indicating whether measurements are active.</summary>
     public static volatile bool Enabled = true;
 
     private static readonly ConcurrentDictionary<string, Aggregate> _stats =
@@ -25,9 +25,12 @@ public static class ExecutionProfiler
 
     private static readonly double _tickToMs = 1000.0 / Stopwatch.Frequency;
 
-    /// <summary>Снимок метрик одной операции.</summary>
+    /// <summary>Snapshot of metrics for a single operation.</summary>
     public sealed class ProfileSnapshot
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string Name { get; init; } = string.Empty;
         public long Count { get; init; }
         public double TotalMs { get; init; }
@@ -44,9 +47,9 @@ public static class ExecutionProfiler
         public readonly object Sync = new();
     }
 
-    /// <summary>
-    /// Начинает замер операции. Нулевые GC-аллокации.
-    /// Использование: <c>using var _ = ExecutionProfiler.Profile("Service.ScanAll");</c>
+    /// <summary>\
+    /// Starts measuring an operation. Zero GC allocations.\
+    /// Usage: <c>using var _ = ExecutionProfiler.Profile("Service.ScanAll");</c>\
     /// </summary>
     public static Scope Profile(string operationName)
     {
@@ -55,13 +58,13 @@ public static class ExecutionProfiler
         return new Scope(operationName, Stopwatch.GetTimestamp());
     }
 
-    /// <summary>
-    /// Алиас <see cref="Profile"/> для удобства и обратной совместимости.
-    /// Использование: <c>using var _ = ExecutionProfiler.Measure("Service.ScanAll");</c>
+    /// <summary>\
+    /// Alias for <see cref="Profile"/> for convenience and backward compatibility.\
+    /// Usage: <c>using var _ = ExecutionProfiler.Measure("Service.ScanAll");</c>\
     /// </summary>
     public static Scope Measure(string operationName) => Profile(operationName);
 
-    /// <summary>Записывает готовый замер в тиках Stopwatch.</summary>
+    /// <summary>Records a completed measurement in Stopwatch ticks.</summary>
     public static void Record(string operationName, long elapsedTicks)
     {
         if (!Enabled || string.IsNullOrEmpty(operationName) || elapsedTicks < 0)
@@ -79,15 +82,15 @@ public static class ExecutionProfiler
         }
     }
 
-    /// <summary>Записывает готовый замер из <see cref="TimeSpan"/>.</summary>
+    /// <summary>Records a finished measurement from a <see cref="TimeSpan"/>.</summary>
     public static void Record(string operationName, TimeSpan elapsed)
     {
         Record(operationName, (long)(elapsed.TotalSeconds * Stopwatch.Frequency));
     }
 
     /// <summary>
-    /// Возвращает структурированный снимок всех замеров и сбрасывает счётчики (атомарно).
-    /// Сортировка — по убыванию TotalMs.
+    /// Returns a structured snapshot of all measurements and resets the counters (atomically).
+    /// Sorted by TotalMs in descending order.
     /// </summary>
     public static List<ProfileSnapshot> GetSnapshotAndReset()
     {
@@ -131,7 +134,7 @@ public static class ExecutionProfiler
     }
 
     /// <summary>
-    /// Формирует структурированный текстовый отчёт за прошедшее окно (5 минут) и сбрасывает счётчики.
+    /// Builds a structured text report for the elapsed window (5 minutes) and resets the counters.
     /// </summary>
     public static string DrainReport(string componentName = "")
     {
@@ -156,13 +159,13 @@ public static class ExecutionProfiler
     }
 
     /// <summary>
-    /// Алиас для <see cref="DrainReport"/>.
+    /// Alias for <see cref="DrainReport"/>.
     /// </summary>
     public static string DumpAndReset(string componentName = "") => DrainReport(componentName);
 
     /// <summary>
-    /// Запускает фоновую задачу периодического сброса отчёта в лог.
-    /// Не блокирует вызывающий поток.
+    /// Starts a background task that periodically flushes the report to the log.
+    /// Does not block the calling thread.
     /// </summary>
     public static async Task StartAutoReportAsync(
         TimeSpan interval,
@@ -189,28 +192,28 @@ public static class ExecutionProfiler
         }
     }
 
-    /// <summary>Очищает все счётчики без отчёта (для тестов).</summary>
+    /// <summary>Clears all counters without a report (for tests).</summary>
     public static void Clear() => _stats.Clear();
 
     /// <summary>
-    /// Стековый таймер замера. Readonly-структура 16 байт,
-    /// не боксируется при using и безопасно работает в async/await методах.
+    /// Stack measurement timer. 16-byte readonly struct; not boxed when used with `using`
+    /// and safe to use in async/await methods.
     /// </summary>
     public readonly struct Scope : IDisposable
     {
         private readonly string? _operationName;
         private readonly long _startTimestamp;
 
-        /// <summary>Scope: Выполняет операцию Scope.</summary>
-        /// <param name="operationName">Входные данные: значение параметра operationName (string).</param>
-        /// <param name="startTimestamp">Входные данные: значение параметра startTimestamp (long).</param>
+        /// <summary>Scope: Executes a scope operation.</summary>
+        /// <param name="operationName">Input data: value of the operationName parameter (string).</param>
+        /// <param name="startTimestamp">Input data: value of the startTimestamp parameter (long).</param>
         internal Scope(string operationName, long startTimestamp)
         {
             _operationName = operationName;
             _startTimestamp = startTimestamp;
         }
 
-        /// <summary>Dispose: Освобождает занятые ресурсы объекта.</summary>
+        /// <summary>Dispose: Releases resources used by the object.</summary>
         public void Dispose()
         {
             var name = _operationName;

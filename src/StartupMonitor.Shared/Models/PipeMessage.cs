@@ -247,6 +247,12 @@ public static class PipeMessageTypes
     public const string ToggleFirewallRule = "ToggleFirewallRule";
     /// <summary>Установка режима фильтрации брандмауэра.</summary>
     public const string SetFirewallFilteringMode = "SetFirewallFilteringMode";
+    /// <summary>Запрос изменения действия по умолчанию для направления и профилей.</summary>
+    public const string SetFirewallDefaultPolicy = "SetFirewallDefaultPolicy";
+    /// <summary>Запрос фактической политики направлений по профилям.</summary>
+    public const string GetFirewallDefaultPolicy = "GetFirewallDefaultPolicy";
+    /// <summary>Ответ с фактической политикой направлений.</summary>
+    public const string GetFirewallDefaultPolicyResponse = "GetFirewallDefaultPolicyResponse";
     /// <summary>Запрос режима фильтрации брандмауэра.</summary>
     public const string GetFirewallFilteringMode = "GetFirewallFilteringMode";
     /// <summary>Ответ с режимом фильтрации брандмауэра.</summary>
@@ -418,6 +424,9 @@ public record CompareSnapshotPayload(string SnapshotId);
 public record MonitoringStatePayload
 {
     [JsonPropertyName("IsPaused")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public bool IsPaused { get; init; }
 
     [JsonPropertyName("is_paused")]

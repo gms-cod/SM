@@ -2,6 +2,9 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public sealed class GeoIpLookupServiceTests
 {
     [Theory]
@@ -18,6 +21,9 @@ public sealed class GeoIpLookupServiceTests
     [InlineData("fe80::1")]
     [InlineData("fc00::1")]
     [InlineData("::ffff:192.168.0.1")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_PrivateAndLoopback_ReturnsLocalNetwork(string ip)
     {
         var (countryName, countryFlag, isPrivate) = GeoIpLookupService.Resolve(ip);
@@ -30,6 +36,9 @@ public sealed class GeoIpLookupServiceTests
     [Theory]
     [InlineData("172.15.0.1")]
     [InlineData("172.32.0.1")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_PublicRangeNearPrivateBoundaries_IsNotPrivate(string ip)
     {
         var (_, _, isPrivate) = GeoIpLookupService.Resolve(ip);
@@ -44,6 +53,9 @@ public sealed class GeoIpLookupServiceTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_UnspecifiedOrEmpty_ReturnsListening(string? ip)
     {
         var (countryName, countryFlag, isPrivate) = GeoIpLookupService.Resolve(ip);
@@ -61,6 +73,9 @@ public sealed class GeoIpLookupServiceTests
     [InlineData("77.88.8.8", "Россия (Yandex DNS)")]
     [InlineData("77.88.8.1", "Россия (Yandex DNS)")]
     [InlineData("9.9.9.9", "США (Quad9)")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_WellKnownDns_ReturnsExpectedCountry(string ip, string expectedCountry)
     {
         var (countryName, countryFlag, isPrivate) = GeoIpLookupService.Resolve(ip);
@@ -71,6 +86,9 @@ public sealed class GeoIpLookupServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_GoogleDns_HasUsaFlag()
     {
         var (_, flag, _) = GeoIpLookupService.Resolve("8.8.8.8");
@@ -79,6 +97,9 @@ public sealed class GeoIpLookupServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_YandexDns_HasRussiaFlag()
     {
         var (_, flag, _) = GeoIpLookupService.Resolve("77.88.8.8");
@@ -90,6 +111,9 @@ public sealed class GeoIpLookupServiceTests
     [InlineData("not-an-ip")]
     [InlineData("999.999.999.999")]
     [InlineData("8.8.8.8:53")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_InvalidInput_ReturnsInternetFallbackWithoutThrow(string ip)
     {
         var ex = Record.Exception(() => GeoIpLookupService.Resolve(ip));
@@ -110,6 +134,9 @@ public sealed class GeoIpLookupServiceTests
     [InlineData("86.54.10.20", "Великобритания")]
     [InlineData("65.21.10.20", "Финляндия")]
     [InlineData("120.25.10.20", "Китай")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_PopularPrefixes_ReturnsExpectedRegion(string ip, string expectedPart)
     {
         var (countryName, countryFlag, isPrivate) = GeoIpLookupService.Resolve(ip);
@@ -120,6 +147,9 @@ public sealed class GeoIpLookupServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_SameIpTwice_ReturnsCachedResult()
     {
         GeoIpLookupService.ClearCache();
@@ -133,6 +163,9 @@ public sealed class GeoIpLookupServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resolve_DifferentIps_CachesEachSeparately()
     {
         GeoIpLookupService.ClearCache();

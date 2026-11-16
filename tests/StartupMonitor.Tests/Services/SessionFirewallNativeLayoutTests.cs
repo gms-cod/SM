@@ -4,12 +4,12 @@ using StartupMonitor.Service.Services.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет ABI управляемых WFP-структур против размеров и смещений Windows SDK x64 без нативных вызовов.</summary>
+/// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
 public sealed class SessionFirewallNativeLayoutTests
 {
-    /// <summary>Находит приватную структуру WFP без создания адаптера или открытия engine.</summary>
-    /// <param name="name">Имя управляемого представления структуры.</param>
-    /// <returns>Тип структуры из производственной сборки.</returns>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
     private static Type NativeType(string name)
     {
         var policy = typeof(NetworkConnectionAlertService).Assembly.GetType("StartupMonitor.Service.Services.Firewall.SessionFirewallPolicy")
@@ -18,9 +18,9 @@ public sealed class SessionFirewallNativeLayoutTests
             ?? throw new TypeLoadException($"Не найдена структура {name}.");
     }
 
-    /// <summary>Проверяет размеры структур, независимо подтверждённые C++ static_assert по Windows SDK x64.</summary>
-    /// <param name="name">Имя управляемой структуры.</param>
-    /// <param name="expected">Размер структуры в байтах.</param>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
     [Theory]
     [InlineData("NativeSession", 72)]
     [InlineData("NativeSublayer", 72)]
@@ -34,9 +34,9 @@ public sealed class SessionFirewallNativeLayoutTests
         Assert.Equal(expected, Marshal.SizeOf(NativeType(name)));
     }
 
-    /// <summary>Проверяет выравнивание action/context union и хвоста FWPM_FILTER0, от которых зависит корректность применения фильтра.</summary>
-    /// <param name="field">Имя поля в управляемом FWPM_FILTER0.</param>
-    /// <param name="expected">Смещение в байтах.</param>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
+    /// <summary>Verifies test scenario for SessionFirewallNativeLayoutTests.cs.</summary>
     [Theory]
     [InlineData("Action", 128)]
     [InlineData("ContextLow", 152)]

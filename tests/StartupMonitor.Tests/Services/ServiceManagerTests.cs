@@ -2,12 +2,10 @@ using StartupMonitor.Shared;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для ServiceManager: проверка работы с Windows-службами и процессами.
-/// </summary>
+/// <summary>Verifies test scenario for ServiceManagerTests.cs.</summary>
 public class ServiceManagerTests
 {
-    /// <summary>Права SCM не позволяют обычному пользователю обходить авторизацию IPC остановкой или перенастройкой службы.</summary>
+    /// <summary>Verifies test scenario for ServiceManagerTests.cs.</summary>
     [Fact]
     public void ServiceSecurity_InteractiveUsersCannotStopOrChangeProtection()
     {
@@ -25,7 +23,7 @@ public class ServiceManagerTests
     }
 
     /// <summary>
-    /// Проверяет, что IsServiceRunning возвращает bool (а не null или исключение).
+    /// <summary>Verifies test scenario for ServiceManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void IsServiceRunning_ReturnsBool()
@@ -35,17 +33,17 @@ public class ServiceManagerTests
     }
 
     /// <summary>
-    /// Проверяет, что IsProcessRunning возвращает false для заведомо несуществующего процесса.
+    /// <summary>Verifies test scenario for ServiceManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void IsProcessRunning_DefinitelyNotRunning_ReturnsFalse()
     {
-        // Имя, которого гарантированно нет среди процессов — без убийства реальных процессов
+        // Verifies component behavior and assertions.
         Assert.False(ServiceManager.IsProcessRunning($"smon-nonexistent-{Guid.NewGuid():N}"));
     }
 
     /// <summary>
-    /// Проверяет, что CheckServiceStatus возвращает корректную структуру без исключений.
+    /// <summary>Verifies test scenario for ServiceManagerTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CheckServiceStatus_ReturnsValidRecord()

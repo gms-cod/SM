@@ -6,9 +6,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Converters;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class CliThreatConvertersTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ThreatLevelToBackgroundConverter_ReturnsExpectedBrushes()
     {
         var converter = new ThreatLevelToBackgroundConverter();
@@ -28,6 +34,9 @@ public class CliThreatConvertersTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ThreatLevelToForegroundConverter_ReturnsExpectedBrushes()
     {
         var converter = new ThreatLevelToForegroundConverter();

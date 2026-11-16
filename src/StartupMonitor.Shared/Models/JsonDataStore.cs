@@ -676,7 +676,7 @@ public class JsonDataStore
     }
 
     /// <summary>
-    /// Проверяет наличие записи по произвольному предикату без выделения памяти (P0-02).
+    /// Checks whether a record matching an arbitrary predicate exists without allocating memory (P0-02).
     /// </summary>
     public bool EntryExists(Func<StartupEntry, bool> predicate)
     {
@@ -688,7 +688,7 @@ public class JsonDataStore
     }
 
     /// <summary>
-    /// Возвращает изолированную копию настроек без дорогостоящего клонирования коллекций записей и истории (P0-03).
+    /// Returns an isolated copy of the settings without expensive cloning of record and history collections (P0-03).
     /// </summary>
     public AppSettings GetSettings()
     {
@@ -700,7 +700,7 @@ public class JsonDataStore
     }
 
     /// <summary>
-    /// Находит первое подходящее правило черного списка без клонирования всего снимка конфигурации (P0-04).
+    /// Finds the first matching blacklist rule without cloning the entire configuration snapshot (P0-04).
     /// </summary>
     public BlacklistRule? FindBlacklistRule(Func<BlacklistRule, bool> predicate)
     {
@@ -1022,7 +1022,7 @@ public class JsonDataStore
         }
     }
 
-    /// <summary>Удаляет все записи из бэкапа с указанной причиной удаления (например LockdownBlocked).</summary>
+    /// <summary>Removes all entries from the backup with the specified deletion reason (e.g. LockdownBlocked).</summary>
     public int RemoveRemovedEntriesByReason(string reason)
     {
         lock (_lock)
@@ -1040,7 +1040,7 @@ public class JsonDataStore
         }
     }
 
-    /// <summary>Удаляет запись из бэкапа по OriginalEntryId.</summary>
+    /// <summary>Removes an entry from the backup by OriginalEntryId.</summary>
     public void RemoveRemovedEntryByOriginalId(string entryId)
     {
         lock (_lock)
@@ -1057,7 +1057,7 @@ public class JsonDataStore
         }
     }
 
-    /// <summary>Удаляет запись из бэкапа удалённых по Id.</summary>
+    /// <summary>Removes an entry from the deleted-entries backup by Id.</summary>
     public void RemoveRemovedEntry(string removedId)
     {
         lock (_lock)

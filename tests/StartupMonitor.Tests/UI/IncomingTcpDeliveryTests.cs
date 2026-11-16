@@ -13,21 +13,21 @@ using StartupMonitor.UI.ViewModels;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет доставку уведомления TCP через изолированный событийный канал в настоящую WPF-модель.</summary>
+/// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class IncomingTcpDeliveryTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Использует общий изолированный диспетчер WPF.</summary>
-    /// <param name="host">Тестовый STA-диспетчер и ресурсы интерфейса.</param>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
     public IncomingTcpDeliveryTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Передаёт внешнее событие через очередь и настоящий named pipe, затем проверяет отображаемые адреса и PID.</summary>
-    /// <param name="localAddress">Локальный IPv4 или IPv6 адрес.</param>
-    /// <param name="remoteAddress">Публичный IPv4 или IPv6 адрес.</param>
-    /// <param name="expectedLocal">Ожидаемая строка локального endpoint.</param>
-    /// <param name="expectedRemote">Ожидаемая строка удалённого endpoint.</param>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
     [Theory]
     [InlineData("10.0.0.3", "8.8.8.8", "10.0.0.3:443", "8.8.8.8:51000")]
     [InlineData("fd00::3", "2001:4860:4860::8888", "[fd00::3]:443", "[2001:4860:4860::8888]:51000")]
@@ -79,16 +79,16 @@ public sealed class IncomingTcpDeliveryTests
         });
     }
 
-    /// <summary>Обрабатывает очередь диспетчера до завершения задачи или ограниченного тайм-аута.</summary>
-    /// <param name="task">Ожидаемая операция.</param>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
     private static void Complete(Task task)
     {
         PumpUntil(() => task.IsCompleted);
         task.GetAwaiter().GetResult();
     }
 
-    /// <summary>Ожидает событие, не блокируя обработку WPF и асинхронного IPC.</summary>
-    /// <param name="condition">Условие завершения.</param>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpDeliveryTests.cs.</summary>
     private static void PumpUntil(Func<bool> condition)
     {
         if (condition()) return;

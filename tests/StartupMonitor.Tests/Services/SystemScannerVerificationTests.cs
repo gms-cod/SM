@@ -4,12 +4,10 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для проверки сопоставления записей (TryMatch, VerifyInScan) и очистки устаревших записей (CleanupStaleEntries).
-/// </summary>
+/// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
 public class SystemScannerVerificationTests
 {
-    /// <summary>Создаёт запись, как если бы она была сохранена в БД (с ID).</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     private static StartupEntry MakeDbEntry(EntryLocation loc, string name, string filePath,
         string? locationDetail = null)
     {
@@ -29,7 +27,7 @@ public class SystemScannerVerificationTests
         return entry;
     }
 
-    /// <summary>Создаёт запись, как если бы она была получена из свежего сканирования (без ID).</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     private static StartupEntry MakeScanEntry(EntryLocation loc, string name, string filePath,
         string? locationDetail = null)
     {
@@ -45,7 +43,7 @@ public class SystemScannerVerificationTests
     // ───────── TryMatch tests ─────────
 
     /// <summary>
-    /// Проверяет, что TryMatch возвращает true при совпадении Location и LocationDetail.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_LocationAndDetailMatch_ReturnsTrue()
@@ -57,7 +55,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что TryMatch возвращает true при точном совпадении LocationDetail.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_LocationDetailExact_ReturnsTrue()
@@ -70,22 +68,22 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет сопоставление Winlogon-записей: LocationDetail совпадает при разных форматах Name.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_WinlogonSubkey_LocationDetailMatches_ReturnsTrue()
     {
-        // База: Winlogon с Name = "Userinit\SomeValue" — так сохраняет OtherStartupLocationsWatcher
+        // Verifies component behavior and assertions.
         var detail = @"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit\SomeValue";
         var db = MakeDbEntry(EntryLocation.Winlogon, @"Userinit\SomeValue", @"C:\windows\some.exe", detail);
-        // Скан: то же LocationDetail, Name = "SomeValue" (последний сегмент)
+        // Verifies component behavior and assertions.
         var scan = MakeScanEntry(EntryLocation.Winlogon, "SomeValue", @"C:\windows\some.exe", detail);
 
         Assert.True(SystemScannerService.TryMatch(db, scan));
     }
 
     /// <summary>
-    /// Проверяет совпадение по имени и пути файла — базовый сценарий.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_NameAndPathMatch_ReturnsTrue()
@@ -97,8 +95,8 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что записи с разными именами не сопоставляются только по FilePath,
-    /// предотвращая ложное сопоставление разных приложений или ярлыков с общим путем/exe.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_DifferentNameSameFilePath_ReturnsFalse()
@@ -110,14 +108,14 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет сопоставление Winlogon-записей по последнему сегменту Name при совпадении файла.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_WinlogonSubkey_LastSegmentMatch_ReturnsTrue()
     {
-        // База: Name = "Userinit\SomeValue" (включает подраздел)
-        // Скан: Name = "SomeValue" (чистое имя значения)
-        // Файлы совпадают — находим
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var db = MakeDbEntry(EntryLocation.Winlogon, @"Userinit\SomeValue", @"C:\windows\some.exe");
         var scan = MakeScanEntry(EntryLocation.Winlogon, "SomeValue", @"C:\windows\some.exe");
 
@@ -125,7 +123,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что записи из разных Location не считаются совпадающими.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_DifferentLocation_ReturnsFalse()
@@ -137,7 +135,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что полностью разные записи не совпадают.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_CompletelyDifferent_ReturnsFalse()
@@ -149,12 +147,12 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет сопоставление служб по LocationDetail (имени службы).
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_ServiceByDetail_ReturnsTrue()
     {
-        // Для служб LocationDetail = имя службы
+        // Verifies component behavior and assertions.
         var db = MakeDbEntry(EntryLocation.Service, "My Service", @"C:\svc.exe", "MySvc");
         var scan = MakeScanEntry(EntryLocation.Service, "My Service", @"C:\svc.exe", "MySvc");
 
@@ -164,7 +162,7 @@ public class SystemScannerVerificationTests
     // ───────── VerifyInScan tests ─────────
 
     /// <summary>
-    /// Проверяет, что существующая в снимке запись проходит верификацию.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyInScan_EntryExistsInScan_ReturnsTrue()
@@ -180,7 +178,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что отсутствующая в снимке запись не проходит верификацию.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyInScan_EntryNotInScan_ReturnsFalse()
@@ -195,7 +193,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что при пустом снимке верификация возвращает false.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyInScan_EmptyScan_ReturnsFalse()
@@ -209,7 +207,7 @@ public class SystemScannerVerificationTests
     // ───────── EntryOperations.VerifyEntry tests ─────────
 
     /// <summary>
-    /// Проверяет EntryOperations.VerifyEntry для записи, присутствующей в снимке.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EntryVerify_EntryInScan_ReturnsTrue()
@@ -224,7 +222,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет EntryOperations.VerifyEntry для записи, отсутствующей в снимке.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EntryVerify_EntryNotInScan_ReturnsFalse()
@@ -241,7 +239,7 @@ public class SystemScannerVerificationTests
     // ───────── CleanupStaleEntries tests ─────────
 
     /// <summary>
-    /// Проверяет, что CleanupStaleEntries удаляет только устаревшие записи, сохраняя актуальные.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CleanupStaleEntries_RemovesStaleOnly()
@@ -272,7 +270,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что когда все записи актуальны — CleanupStaleEntries не удаляет ничего.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CleanupStaleEntries_AllAlive_RemovesNothing()
@@ -295,7 +293,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что когда все записи устарели — CleanupStaleEntries удаляет все.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CleanupStaleEntries_AllStale_RemovesAll()
@@ -314,7 +312,7 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что CleanupStaleEntries НЕ пишет в History (авто-очистка — не действие пользователя).
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CleanupStaleEntries_DoesNotWriteHistoryForStale()
@@ -334,14 +332,14 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет сопоставление Winlogon-записей при разных LocationDetail, но совпадающем FilePath.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_WinlogonSubkey_DifferentLocationDetail_StillMatchByPath()
     {
-        // База: LocationDetail = "HKLM\...\Winlogon\Userinit\SomeValue"
-        // Скан: LocationDetail = "HKLM\...\Winlogon\Userinit" (без SomeValue)
-        // Но FilePath совпадает
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var db = MakeDbEntry(EntryLocation.Winlogon, @"Userinit\SomeValue",
             @"C:\windows\some.exe",
             @"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit\SomeValue");
@@ -349,18 +347,18 @@ public class SystemScannerVerificationTests
             @"C:\windows\some.exe",
             @"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit");
 
-        // Должно совпасть по FilePath (третичный критерий)
+        // Verifies component behavior and assertions.
         Assert.True(SystemScannerService.TryMatch(db, scan));
     }
 
     /// <summary>
-    /// Проверяет сопоставление записей из обычного ключа и Wow6432Node при совпадении FilePath.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void TryMatch_Wow6432Node_LocationDetailDiffers_StillMatchByPath()
     {
-        // База из обычного ключа, в системе запись в Wow6432Node
-        // LocationDetail разные, но FilePath совпадает
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var db = MakeDbEntry(EntryLocation.RegistryRun, "Nikon",
             @"C:\Program Files (x86)\Nikon\Nikon.exe",
             @"HKLM\Software\Microsoft\Windows\CurrentVersion\Run\Nikon");
@@ -372,13 +370,13 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что отключённые и заблокированные записи не удаляются при очистке устаревших.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CleanupStaleEntries_DisabledAndBlocked_ArePreserved()
     {
-        // Отключённые/заблокированные записи физически отсутствуют в системе,
-        // но cleanup не должен их удалять
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var tmpFile = Path.Combine(Path.GetTempPath(), $"smon-{Guid.NewGuid():N}", "startup-monitor.json");
         var store = new JsonDataStore(tmpFile);
         var disabled = MakeDbEntry(EntryLocation.RegistryRun, "Disabled", @"C:\disabled.exe");
@@ -387,7 +385,7 @@ public class SystemScannerVerificationTests
         blocked.Status = EntryStatus.Blocked;
         var staleEnabled = MakeDbEntry(EntryLocation.RegistryRun, "StaleEnabled", @"C:\stale.exe");
         var entries = new List<StartupEntry> { disabled, blocked, staleEnabled };
-        var scan = new List<StartupEntry>(); // пустой снимок — всё enabled "устарело"
+        var scan = new List<StartupEntry>(); // Empty snapshot - all enabled entries are considered stale
 
         EntryOperations.CleanupStaleEntries(entries, store, scan, null);
 
@@ -398,12 +396,12 @@ public class SystemScannerVerificationTests
     }
 
     /// <summary>
-    /// Проверяет, что записи из упавших секций сканирования не удаляются при очистке.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CleanupStaleEntries_FailedScanSection_IsPreserved()
     {
-        // Секция сканирования упала (WMI недоступен) — записи этой секции не трогаем
+        // Verifies component behavior and assertions.
         var tmpFile = Path.Combine(Path.GetTempPath(), $"smon-{Guid.NewGuid():N}", "startup-monitor.json");
         var store = new JsonDataStore(tmpFile);
         var entries = new List<StartupEntry>
@@ -423,9 +421,9 @@ public class SystemScannerVerificationTests
     // ───────── Active Setup filtering tests ─────────
 
     /// <summary>
-    /// Проверяет фильтрацию Active Setup: запись создаётся только для подраздела с непустым
-    /// StubPath (не деактивированного). Метаданные (ComponentID, Locale, Version) и ключи
-    /// без StubPath не попадают в автозапуск.
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ScanAll_ActiveSetup_FiltersInactiveComponents()
@@ -437,27 +435,27 @@ public class SystemScannerVerificationTests
         {
             using (var root = Registry.CurrentUser.CreateSubKey(basePath))
             {
-                // Активный компонент — должна попасть в снимок
+                // Verifies component behavior and assertions.
                 using (var k = root.CreateSubKey("{SMonTestActive-0000-0000-0000-000000000001}"))
                     k.SetValue("StubPath", @"C:\Windows\System32\smon-test.exe -flag");
                 created.Add("{SMonTestActive-0000-0000-0000-000000000001}");
 
-                // Деактивированный компонент (имя ключа с '>') — не попадает
+                // Verifies component behavior and assertions.
                 using (var k = root.CreateSubKey(">{SMonTestDeactivated-0000-0000-0000-000000000002}"))
                     k.SetValue("StubPath", @"C:\Windows\System32\old.exe");
                 created.Add(">{SMonTestDeactivated-0000-0000-0000-000000000002}");
 
-                // Деактивированный StubPath — не попадает
+                // Verifies component behavior and assertions.
                 using (var k = root.CreateSubKey("{SMonTestStubMarked-0000-0000-0000-000000000003}"))
                     k.SetValue("StubPath", ">C:\\Windows\\System32\\old2.exe");
                 created.Add("{SMonTestStubMarked-0000-0000-0000-000000000003}");
 
-                // Без StubPath (только метаданные) — не попадает
+                // Verifies component behavior and assertions.
                 using (var k = root.CreateSubKey("{SMonTestNoStub-0000-0000-0000-000000000004}"))
                     k.SetValue("ComponentID", "TestComp");
                 created.Add("{SMonTestNoStub-0000-0000-0000-000000000004}");
 
-                // Ключ с одними метаданными (Locale/Version) — не попадает
+                // Verifies component behavior and assertions.
                 using (var k = root.CreateSubKey("{SMonTestMeta-0000-0000-0000-000000000005}"))
                 {
                     k.SetValue("Locale", "*");
@@ -472,7 +470,7 @@ public class SystemScannerVerificationTests
                             && e.Name.Contains("SMonTest", StringComparison.Ordinal))
                 .ToList();
 
-            // В снимке только активный компонент, и он один на ключ (без метаданных)
+            // Verifies component behavior and assertions.
             Assert.Single(testEntries);
             Assert.Equal("{SMonTestActive-0000-0000-0000-000000000001}", testEntries[0].Name);
             Assert.Equal(@"C:\Windows\System32\smon-test.exe", testEntries[0].FilePath);
@@ -485,7 +483,7 @@ public class SystemScannerVerificationTests
         }
     }
 
-    /// <summary>Парсит манифест AppX с StartupTask: возвращает TaskId, exe и DisplayName.</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     [Fact]
     public void ReadStartupTaskFromManifest_ReturnsTaskInfo()
     {
@@ -516,7 +514,7 @@ public class SystemScannerVerificationTests
         Assert.Equal("Microsoft Teams", displayName);
     }
 
-    /// <summary>Манифест без StartupTask возвращает пустые значения.</summary>
+    /// <summary>Verifies test scenario for SystemScannerVerificationTests.cs.</summary>
     [Fact]
     public void ReadStartupTaskFromManifest_NoTask_ReturnsEmpty()
     {

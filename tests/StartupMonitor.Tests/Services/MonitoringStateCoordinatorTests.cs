@@ -6,6 +6,9 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class MonitoringStateCoordinatorTests : IDisposable
 {
     private readonly string _tempDir;
@@ -20,6 +23,9 @@ public class MonitoringStateCoordinatorTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void InitialState_MatchesSettings()
     {
         var coord = new MonitoringStateCoordinator(_store);
@@ -27,6 +33,9 @@ public class MonitoringStateCoordinatorTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SetPaused_TogglesState_AndFiresEvent()
     {
         var coord = new MonitoringStateCoordinator(_store);
@@ -44,16 +53,16 @@ public class MonitoringStateCoordinatorTests : IDisposable
         Assert.True(eventFired);
         Assert.True(newState);
 
-        // Проверяем сохранение в настройках JsonDataStore
+        // Verifies component behavior and assertions.
         var cfg = _store.Load();
         Assert.True(cfg.Settings.IsMonitoringPaused);
 
-        // Повторный вызов с тем же значением не должен повторно вызывать событие
+        // Verifies component behavior and assertions.
         eventFired = false;
         coord.SetPaused(true);
         Assert.False(eventFired);
 
-        // Возобновление
+        // Verifies component behavior and assertions.
         coord.SetPaused(false);
         Assert.False(coord.IsPaused);
         Assert.True(eventFired);
@@ -63,6 +72,9 @@ public class MonitoringStateCoordinatorTests : IDisposable
         Assert.False(cfg.Settings.IsMonitoringPaused);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

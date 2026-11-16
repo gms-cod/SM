@@ -5,11 +5,11 @@ using StartupMonitor.Service.Services;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет точное восстановление типов в собственном ключе HKCU вне автозапуска Windows.</summary>
+/// <summary>Verifies test scenario for RegistryTypedRestoreTests.cs.</summary>
 public sealed class RegistryTypedRestoreTests
 {
-    /// <summary>Типизированный payload возвращает исходные байты, числа, строки и нераскрытые переменные.</summary>
-    /// <param name="kind">Исходный тип значения Windows Registry.</param>
+    /// <summary>Verifies test scenario for RegistryTypedRestoreTests.cs.</summary>
+    /// <summary>Verifies test scenario for RegistryTypedRestoreTests.cs.</summary>
     [Theory]
     [InlineData(RegistryValueKind.ExpandString)]
     [InlineData(RegistryValueKind.MultiString)]
@@ -50,7 +50,7 @@ public sealed class RegistryTypedRestoreTests
         }
         finally
         {
-            // Только уникальный собственный ключ; пользовательские Run/RunOnce не затрагиваются.
+            // Verifies component behavior and assertions.
             Registry.CurrentUser.DeleteSubKeyTree(relative, throwOnMissingSubKey: false);
         }
     }

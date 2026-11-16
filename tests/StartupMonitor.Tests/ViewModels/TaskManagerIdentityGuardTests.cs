@@ -5,14 +5,14 @@ using StartupMonitor.UI.ViewModels;
 
 namespace StartupMonitor.Tests.ViewModels;
 
-/// <summary>Проверяет отказ небезопасных команд при неизвестной identity или старой службе без подтверждённой capability.</summary>
+/// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
 public sealed class TaskManagerIdentityGuardTests
 {
-    /// <summary>Вызывает одно из четырёх настоящих действий модели без реальных команд IPC.</summary>
-    /// <param name="viewModel">Проверяемая модель.</param>
-    /// <param name="process">Выбранный процесс.</param>
-    /// <param name="action">Название команды.</param>
-    /// <returns>Задача выполнения действия.</returns>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
     private static Task Execute(TaskManagerViewModel viewModel, ProcessInfo process, string action) => action switch
     {
         "Kill" => viewModel.KillProcessAsync(process),
@@ -22,9 +22,9 @@ public sealed class TaskManagerIdentityGuardTests
         _ => throw new ArgumentOutOfRangeException(nameof(action))
     };
 
-    /// <summary>Проверяет запрет отправки деструктивной команды без точного времени создания процесса.</summary>
-    /// <param name="action">Проверяемая команда.</param>
-    /// <returns>Задача проверки обработчика команды.</returns>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
     [Theory]
     [InlineData("Kill")]
     [InlineData("Block")]
@@ -48,9 +48,9 @@ public sealed class TaskManagerIdentityGuardTests
         Assert.Equal(LocalizationService.Instance["TmProcessIdentityUnavailable"], message);
     }
 
-    /// <summary>Проверяет запрет команды, если служба явно не подтвердила поддержку токена экземпляра.</summary>
-    /// <param name="action">Проверяемая команда.</param>
-    /// <returns>Задача проверки обработчика команды.</returns>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
     [Theory]
     [InlineData("Kill")]
     [InlineData("Block")]
@@ -78,7 +78,7 @@ public sealed class TaskManagerIdentityGuardTests
         Assert.Equal(LocalizationService.Instance["TmProcessInstanceCommandsUnavailable"], message);
     }
 
-    /// <summary>Проверяет, что пропущенное старой службой поле capability не интерпретируется как поддержка нового протокола.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
     [Fact]
     public void ServiceInfo_OldJsonWithoutCapability_DefaultsToUnsupported()
     {
@@ -92,9 +92,9 @@ public sealed class TaskManagerIdentityGuardTests
         Assert.False(info.SupportsProcessInstanceCommands);
     }
 
-    /// <summary>Проверяет отсутствие склейки строки и выделения при неизвестном времени хотя бы одного снимка.</summary>
-    /// <param name="oldKnown">Известно ли время создания в прежнем снимке.</param>
-    /// <param name="newKnown">Известно ли время создания в новом снимке.</param>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerIdentityGuardTests.cs.</summary>
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

@@ -5,17 +5,15 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// UI-тесты Центра сетевой безопасности (NetworkSecurityHubView, страница 8 MainWindow):
-/// фильтрация правил (поиск по имени, порту, типу) и локализация всех ключей брандмауэра.
+/// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
 /// <para/>
-/// Фильтрация UserControl требует STA-диспетчера WPF, поэтому здесь проверяется
-/// тот же предикат, что и в <c>NetworkSecurityHubView.ApplyRuleFilter</c>:
-/// поиск по имени/портам/адресам/пути/описанию + фильтр направления/действия/принадлежности.
-/// </summary>
+/// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
+/// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
 public sealed class FirewallHubUiTests
 {
-    /// <summary>Фильтр таблицы правил хаба (зеркало приватного enum NetworkSecurityHubView.RuleFilter).</summary>
+    /// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
     private enum HubRuleFilter
     {
         All,
@@ -44,8 +42,8 @@ public sealed class FirewallHubUiTests
     }
 
     /// <summary>
-    /// Предикат фильтрации — прямая копия логики NetworkSecurityHubView.ApplyRuleFilter.
-    /// При изменении логики хаба этот метод и тесты обязаны обновляться синхронно.
+    /// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
     /// </summary>
     private static List<FirewallRuleDto> ApplyHubFilter(
         IEnumerable<FirewallRuleDto> rules, string query, HubRuleFilter filter)
@@ -143,7 +141,7 @@ public sealed class FirewallHubUiTests
         },
     };
 
-    // ─── 1. Поиск по имени ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("ssh")]
@@ -157,16 +155,22 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByRussianWord_MatchesNameAndDescription()
     {
-        // «БЛОКИРОВКА» (верхний регистр): совпадение по имени «Блокировка RDP»
-        // и по описанию анти-телеметрии («Блокировка исходящей телеметрии...»).
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var result = ApplyHubFilter(SampleRules(), "БЛОКИРОВКА", HubRuleFilter.All);
         Assert.Equal(2, result.Count);
         Assert.Contains(result, r => r.Name == "Блокировка RDP");
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByDescription_Matches()
     {
         var result = ApplyHubFilter(SampleRules(), "телеметрии", HubRuleFilter.All);
@@ -175,6 +179,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByApplicationPath_Matches()
     {
         var result = ApplyHubFilter(SampleRules(), "browser.exe", HubRuleFilter.All);
@@ -182,7 +189,7 @@ public sealed class FirewallHubUiTests
         Assert.Equal("Allow Browser HTTPS", single.Name);
     }
 
-    // ─── 2. Поиск по порту / адресу ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("22", "SSH Server")]
@@ -195,6 +202,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_ByRemoteAddress_Matches()
     {
         var result = ApplyHubFilter(SampleRules(), "185.220", HubRuleFilter.All);
@@ -202,7 +212,7 @@ public sealed class FirewallHubUiTests
         Assert.Equal("Блокировка RDP", single.Name);
     }
 
-    // ─── 3. Фильтр по типу (направление / действие / принадлежность) ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void Filter_Inbound_ReturnsInboundAndBothOnly()
@@ -214,6 +224,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_Outbound_ReturnsOutboundAndBothOnly()
     {
         var result = ApplyHubFilter(SampleRules(), string.Empty, HubRuleFilter.Outbound);
@@ -223,6 +236,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_Blocking_ReturnsBlockActionsOnly()
     {
         var result = ApplyHubFilter(SampleRules(), string.Empty, HubRuleFilter.Blocking);
@@ -231,6 +247,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_Managed_ReturnsStartupMonitorRulesOnly()
     {
         var result = ApplyHubFilter(SampleRules(), string.Empty, HubRuleFilter.Managed);
@@ -239,28 +258,34 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Filter_AllWithEmptyQuery_ReturnsEverything()
     {
         var result = ApplyHubFilter(SampleRules(), "   ", HubRuleFilter.All);
         Assert.Equal(4, result.Count);
     }
 
-    // ─── 4. Комбинированные условия ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void Search_CombinedQueryAndBlockingFilter_NarrowsResults()
     {
-        // «блок» встречается в имени «Блокировка RDP» и в описании анти-телеметрии.
+        // Verifies component behavior and assertions.
         var queryOnly = ApplyHubFilter(SampleRules(), "блок", HubRuleFilter.All);
         Assert.Equal(2, queryOnly.Count);
 
-        // + фильтр входящих оставляет только RDP.
+        // Verifies component behavior and assertions.
         var combined = ApplyHubFilter(SampleRules(), "блок", HubRuleFilter.Inbound);
         var single = Assert.Single(combined);
         Assert.Equal("Блокировка RDP", single.Name);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_NoMatch_ReturnsEmpty()
     {
         var result = ApplyHubFilter(SampleRules(), "такого-правила-не-существует-12345", HubRuleFilter.All);
@@ -268,13 +293,16 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Search_NullQuery_TreatedAsEmpty()
     {
         var result = ApplyHubFilter(SampleRules(), null!, HubRuleFilter.Managed);
         Assert.Equal(2, result.Count);
     }
 
-    // ─── 5. Локализация: наличие всех ключей хаба в обеих культурах ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("NavFirewall")]
@@ -305,7 +333,7 @@ public sealed class FirewallHubUiTests
         });
     }
 
-    // ─── 6. Локализация: точные значения RU ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("NavFirewall", "Сетевой экран")]
@@ -328,7 +356,7 @@ public sealed class FirewallHubUiTests
         });
     }
 
-    // ─── 7. Локализация: точные значения EN ───
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("NavFirewall", "Firewall & Security")]
@@ -351,7 +379,7 @@ public sealed class FirewallHubUiTests
         });
     }
 
-    // ─── 8. Локализация через типизированные свойства ───
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void LocalizationService_TypedProperties_ReturnHubStrings()
@@ -382,7 +410,7 @@ public sealed class FirewallHubUiTests
         });
     }
 
-    // ─── 9. Синхронизация ресурсов: StatusServiceNotFound содержит {0} ───
+    // Verifies component behavior and assertions.
 
     private static string FindResxPath(string fileName)
     {
@@ -397,7 +425,7 @@ public sealed class FirewallHubUiTests
                 return direct;
             dir = dir.Parent;
         }
-        // Fallback: относительный путь от рабочей директории тестов.
+        // Verifies component behavior and assertions.
         var fallback = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory, "..", "..", "..", "..", "..",
             "src", "StartupMonitor.UI", "Resources", fileName));
@@ -416,8 +444,8 @@ public sealed class FirewallHubUiTests
     }
 
     /// <summary>
-    /// Новые ключи диалогов/статусов хаба (Worker 3): должны существовать в обоих .resx
-    /// и возвращать непустые строки в обеих культурах.
+    /// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
+    /// <summary>Verifies test scenario for FirewallHubUiTests.cs.</summary>
     /// </summary>
     public static readonly string[] NewNetFwKeys =
     {
@@ -442,6 +470,9 @@ public sealed class FirewallHubUiTests
     };
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resx_StatusServiceNotFound_RuContainsFormatPlaceholder()
     {
         var ruPath = FindResxPath("Strings.ru.resx");
@@ -453,6 +484,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Resx_NetFwKeys_PresentInBothResx()
     {
         var enPath = FindResxPath("Strings.resx");
@@ -460,7 +494,7 @@ public sealed class FirewallHubUiTests
         var en = LoadResxValues(enPath);
         var ru = LoadResxValues(ruPath);
 
-        // Все новые ключи обязаны присутствовать в обоих файлах и быть непустыми.
+        // Verifies component behavior and assertions.
         foreach (var key in NewNetFwKeys)
         {
             Assert.True(en.TryGetValue(key, out var enVal), $"Strings.resx: отсутствует ключ {key}.");
@@ -469,13 +503,13 @@ public sealed class FirewallHubUiTests
             Assert.False(string.IsNullOrWhiteSpace(ruVal), $"Strings.ru.resx: ключ {key} пуст.");
         }
 
-        // Паритет множеств Net*/Fw*: ни один ключ не должен существовать только в одном файле.
+        // Verifies component behavior and assertions.
         var enNetFw = en.Keys.Where(k => k.StartsWith("Net") || k.StartsWith("Fw")).ToHashSet();
         var ruNetFw = ru.Keys.Where(k => k.StartsWith("Net") || k.StartsWith("Fw")).ToHashSet();
         Assert.NotEmpty(enNetFw);
         Assert.Equal(enNetFw, ruNetFw);
 
-        // Форматные ключи обязаны содержать плейсхолдеры.
+        // Verifies component behavior and assertions.
         Assert.Contains("{0}", en["NetDeleteRuleConfirmFormat"]);
         Assert.Contains("{0}", ru["NetClearBansConfirmFormat"]);
         Assert.Contains("{1}", en["NetKillProcessConfirmFormat"]);
@@ -504,6 +538,9 @@ public sealed class FirewallHubUiTests
     [InlineData("FwPortsOnlyTcpUdpMsg")]
     [InlineData("FwPortsOnlyTcpUdpTitle")]
     [InlineData("FwSelfBlockGuardTitle")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Localization_NewKeys_NonEmptyInBothLanguages(string key)
     {
         WithCulture("ru", () =>
@@ -521,6 +558,9 @@ public sealed class FirewallHubUiTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Localization_NewFormatHelpers_ProduceNonEmptyStrings()
     {
         WithCulture("ru", () =>

@@ -10,24 +10,24 @@ using StartupMonitor.UI.Views.Dialogs;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет настоящий поллер MainViewModel без подключения службы, реестра и изменения правил ОС.</summary>
+/// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class NetworkAlertPollerLifecycleTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Использует общий STA-диспетчер WPF.</summary>
-    /// <param name="host">Изолированное окружение настоящей разметки приложения.</param>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     public NetworkAlertPollerLifecycleTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Возвращает группу с готовой ИИ-подсказкой, не требующей IPC.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     private static NetworkConnectionAlertDto Alert(string id = "poller-group") => new()
     {
         AlertId = id, ProcessName = "client.exe", ProcessPath = @"C:\Apps\client.exe",
         RemoteAddress = "8.8.8.8", RemotePort = 443, AiPurpose = "Изолированная проверка"
     };
 
-    /// <summary>Прокачивает очередь WPF до наблюдаемого результата с независимым ограничением времени.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     private static void PumpUntil(Func<bool> condition)
     {
         if (condition()) return;
@@ -43,14 +43,14 @@ public sealed class NetworkAlertPollerLifecycleTests
         Assert.True(condition(), "Поллер не завершил ожидаемый переход за три секунды.");
     }
 
-    /// <summary>Ожидает настоящий async-тик и передаёт ошибку проверки вызывающей стороне.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     private static void Complete(Task task)
     {
         PumpUntil(() => task.IsCompleted);
         task.GetAwaiter().GetResult();
     }
 
-    /// <summary>Поздний снимок отменённого поколения не создаёт карточку даже при некооперативном источнике.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     [Fact]
     public void Stop_CancelsPendingReadAndDiscardsLateSnapshot()
         => _host.Run(() =>
@@ -72,7 +72,7 @@ public sealed class NetworkAlertPollerLifecycleTests
             Assert.Equal(0, windows);
         });
 
-    /// <summary>Остановка после готового снимка, но до callback диспетчера отменяет уже зарезервированный показ.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     [Fact]
     public void Stop_BeforeQueuedShow_DoesNotOpenObsoleteWindow()
         => _host.Run(() =>
@@ -86,13 +86,13 @@ public sealed class NetworkAlertPollerLifecycleTests
             model.IsConnected = true;
             model.StartNetworkAlertPoller();
             var tick = model.RefreshNetworkAlertsAsync();
-            // Show ещё стоит в очереди STA и не может выполниться до возврата текущего обработчика.
+            // Verifies component behavior and assertions.
             model.StopNetworkAlertPoller();
             Complete(tick);
             Assert.Equal(0, windows);
         });
 
-    /// <summary>После reconnect используется новая группа; завершившийся позже старый запрос её не заменяет.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     [Fact]
     public void Restart_NewGenerationIgnoresPreviousResponse()
         => _host.Run(() =>
@@ -125,7 +125,7 @@ public sealed class NetworkAlertPollerLifecycleTests
             }
         });
 
-    /// <summary>Открытая карточка продолжает получать статус; внешнее завершение закрывает её без нового решения.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     [Fact]
     public void OpenWindow_RefreshesStatusAndClosesSupersededWithoutBlock()
         => _host.Run(() =>
@@ -159,7 +159,7 @@ public sealed class NetworkAlertPollerLifecycleTests
             }
         });
 
-    /// <summary>Недоставленный Defer закрывает UI безопасно, а локальный cooldown не возвращает тот же запрос на следующем тике.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertPollerLifecycleTests.cs.</summary>
     [Fact]
     public void UndeliveredDefer_DoesNotImmediatelyReopenSameGroup()
         => _host.Run(() =>

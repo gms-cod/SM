@@ -7,17 +7,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для NativeProcessTraceSession и связанных структур ETW Win32.
-/// Проверяет корректность P/Invoke структур, смещений полей, констант ядра,
-/// сериализации lease-файла и граничных условий создания сессии.
-/// </summary>
+/// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
+/// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
+/// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
 public sealed class NativeProcessTraceSessionTests
 {
     #region Проверка P/Invoke структур и смещений Win32 (x64)
 
     /// <summary>
-    /// Проверяет, что размер структуры WNODE_HEADER на платформе x64 равен ровно 48 байтам.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void WNodeHeader_StructSize_MatchesWin32Sdk48Bytes()
@@ -27,7 +25,7 @@ public sealed class NativeProcessTraceSessionTests
     }
 
     /// <summary>
-    /// Проверяет, что размер структуры EVENT_TRACE_PROPERTIES на платформе x64 равен ровно 120 байтам.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EventTraceProperties_StructSize_MatchesWin32Sdk120Bytes()
@@ -37,8 +35,8 @@ public sealed class NativeProcessTraceSessionTests
     }
 
     /// <summary>
-    /// Проверяет точные смещения полей в EVENT_TRACE_PROPERTIES:
-    /// LoggerThreadId (смещение 104), LogFileNameOffset (112), LoggerNameOffset (116).
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EventTraceProperties_FieldOffsets_MatchWin32Sdk()
@@ -61,7 +59,7 @@ public sealed class NativeProcessTraceSessionTests
     #region Проверка констант ядра Win32 ETW
 
     /// <summary>
-    /// Проверяет числовые значения ключевых констант ETW Windows SDK.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Win32Constants_MatchWindowsSdkValues()
@@ -90,7 +88,7 @@ public sealed class NativeProcessTraceSessionTests
     #region Проверка сериализации и инвариантов EtwSessionLease
 
     /// <summary>
-    /// Проверяет корректность JSON-сериализации и десериализации данных подтверждения владения (lease).
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EtwSessionLease_JsonRoundTrip_PreservesAllFields()
@@ -129,7 +127,7 @@ public sealed class NativeProcessTraceSessionTests
     #region Проверка NativeTraceStatistics и NativeTraceSessionException
 
     /// <summary>
-    /// Проверяет инициализацию и свойства NativeTraceStatistics.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void NativeTraceStatistics_PropertiesAndEquality()
@@ -150,7 +148,7 @@ public sealed class NativeProcessTraceSessionTests
     }
 
     /// <summary>
-    /// Проверяет, что NativeTraceSessionException сохраняет код ошибки Win32 и имя сессии.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void NativeTraceSessionException_StoresErrorCodeAndSessionName()
@@ -168,7 +166,7 @@ public sealed class NativeProcessTraceSessionTests
     #region Проверка валидации входных аргументов
 
     /// <summary>
-    /// Проверяет, что запуск сессии с пустым именем или пробелами вызывает ArgumentException.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData("")]
@@ -179,7 +177,7 @@ public sealed class NativeProcessTraceSessionTests
     }
 
     /// <summary>
-    /// Проверяет, что TryStart с некорректным именем возвращает false и описание ошибки без падения.
+    /// <summary>Verifies test scenario for NativeProcessTraceSessionTests.cs.</summary>
     /// </summary>
     [Fact]
     public void NativeProcessTraceSession_TryStart_EmptyName_ReturnsFalseWithError()

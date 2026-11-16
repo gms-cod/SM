@@ -256,13 +256,16 @@ public class AppSettings
         return copy;
     }
 }
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class HistoryEntry
 {
     /// <summary>Уникальный идентификатор записи.</summary>
     [JsonPropertyName("id")]
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
-    /// <summary>Время события (UTC).</summary>
+    /// <summary>Event timestamp (UTC).</summary>
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 

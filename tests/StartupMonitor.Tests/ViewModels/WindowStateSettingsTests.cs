@@ -6,6 +6,9 @@ using Xunit;
 namespace StartupMonitor.Tests.ViewModels;
 
 [Collection("MainViewModelConfig")]
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class WindowStateSettingsTests : IDisposable
 {
     private readonly string _tempConfigFile;
@@ -16,6 +19,9 @@ public class WindowStateSettingsTests : IDisposable
         MainViewModel.CustomConfigPath = _tempConfigFile;
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         MainViewModel.CustomConfigPath = null;
@@ -28,6 +34,9 @@ public class WindowStateSettingsTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void LoadSetting_DefaultValues_WhenFileDoesNotExist()
     {
         var width = MainViewModel.LoadSetting("windowWidth", 1200.0);
@@ -42,6 +51,9 @@ public class WindowStateSettingsTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SaveAndLoad_DoubleWindowDimensions_PersistCorrectly()
     {
         MainViewModel.SaveSetting("windowWidth", 1440.5);
@@ -61,6 +73,9 @@ public class WindowStateSettingsTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SaveAndLoad_WindowState_PersistsMaximizedAndNormal()
     {
         MainViewModel.SaveSetting("windowState", "Maximized");
@@ -73,13 +88,16 @@ public class WindowStateSettingsTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SaveAndLoad_LastActiveTab_PersistsCorrectIndex()
     {
-        MainViewModel.SaveSetting("lastActiveTab", 6); // Диспетчер задач
+        MainViewModel.SaveSetting("lastActiveTab", 6); // Task manager
         var tab = MainViewModel.LoadSetting("lastActiveTab", 0);
         Assert.Equal(6, tab);
 
-        MainViewModel.SaveSetting("lastActiveTab", 7); // Время загрузки
+        MainViewModel.SaveSetting("lastActiveTab", 7); // Boot time
         tab = MainViewModel.LoadSetting("lastActiveTab", 0);
         Assert.Equal(7, tab);
     }

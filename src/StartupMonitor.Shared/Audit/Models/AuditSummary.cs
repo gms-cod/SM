@@ -10,17 +10,52 @@ namespace StartupMonitor.Shared.Audit.Models;
 /// </summary>
 public class AuditSummary
 {
+    /// <summary>Gets or sets the total number of startup entries.</summary>
+    /// <summary>Gets or sets the number of enabled entries.</summary>
+    /// <summary>Gets or sets the number of disabled entries.</summary>
+    /// <summary>Gets or sets the number of blocked entries.</summary>
+    /// <summary>Gets or sets the count of CLI threats.</summary>
+    /// <summary>Gets or sets the count of entries found by CIRCL.</summary>
+    /// <summary>Gets or sets the average AI rating.</summary>
+    /// <summary>Gets or sets the count of rated entries.</summary>
     public int TotalStartupEntries { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int EnabledEntries { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int DisabledEntries { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int BlockedEntries { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int CliThreatsCount { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int CirclFoundCount { get; set; }
     public double AverageAiRating { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int RatedEntriesCount { get; set; }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int TotalProcessesCount { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int SuspendedProcessesCount { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public int ProcessThreatsCount { get; set; }
     public double TotalCpuPercent { get; set; }
     public double TotalRamUsedMb { get; set; }

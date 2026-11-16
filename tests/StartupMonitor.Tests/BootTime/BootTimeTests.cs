@@ -7,9 +7,7 @@ using StartupMonitor.Shared.Models.BootTime;
 
 namespace StartupMonitor.Tests.BootTime;
 
-/// <summary>
-/// Модульные тесты для анализатора времени загрузки Windows (Boot Time Tracer, v1.0.19).
-/// </summary>
+/// <summary>Verifies test scenario for BootTimeTests.cs.</summary>
 public class BootTimeTests : IDisposable
 {
     private readonly string _tempDir;
@@ -22,6 +20,9 @@ public class BootTimeTests : IDisposable
         _store = new JsonDataStore(Path.Combine(_tempDir, "startup-monitor.json"));
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try
@@ -35,6 +36,9 @@ public class BootTimeTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootSessionInfo_FormatDuration_FormatsVariousIntervalsCorrectly()
     {
         Assert.Equal("500 мс", BootSessionInfo.FormatDuration(500));
@@ -45,6 +49,9 @@ public class BootTimeTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootSessionInfo_SpeedRating_ClassifiesCorrectly()
     {
         var fastSession = new BootSessionInfo { BootTimeMs = 20000 };
@@ -61,6 +68,9 @@ public class BootTimeTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootDegradationEvent_Category_MapsCorrectly()
     {
         var appDeg = new BootDegradationEvent { Category = BootDegradationCategory.Application, TotalTimeMs = 3500, DegradationTimeMs = 2100 };
@@ -75,6 +85,9 @@ public class BootTimeTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootTimeReport_DeltaCalculation_ComputesDeltaFromPreviousSession()
     {
         var report = new BootTimeReport
@@ -87,13 +100,16 @@ public class BootTimeTests : IDisposable
             LatestBoot = new BootSessionInfo { BootTimeMs = 25000, Timestamp = DateTime.UtcNow }
         };
 
-        // 25000 - 30000 = -5000 (быстрее на 5 секунд)
+        // Verifies component behavior and assertions.
         Assert.Equal(-5000, report.DeltaPreviousBootMs);
         Assert.Contains("быстрее", report.DisplayDelta);
         Assert.Equal("#10B981", report.DeltaColor);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootTimeReport_DeltaCalculation_ShowsSlowerWhenTimeIncreases()
     {
         var report = new BootTimeReport
@@ -106,13 +122,16 @@ public class BootTimeTests : IDisposable
             LatestBoot = new BootSessionInfo { BootTimeMs = 45000, Timestamp = DateTime.UtcNow }
         };
 
-        // 45000 - 35000 = +10000 (медленнее на 10 секунд)
+        // Verifies component behavior and assertions.
         Assert.Equal(10000, report.DeltaPreviousBootMs);
         Assert.Contains("медленнее", report.DisplayDelta);
         Assert.Equal("#EF4444", report.DeltaColor);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootTimeReport_JsonSerialization_RoundtripPreservesAllFields()
     {
         var report = new BootTimeReport
@@ -156,6 +175,9 @@ public class BootTimeTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BootTimeService_EnrichEntriesWithBootImpact_EnrichesMatchingEntries()
     {
         var service = new BootTimeService(_store, NullLogger<BootTimeService>.Instance);
@@ -178,10 +200,10 @@ public class BootTimeTests : IDisposable
             }
         };
 
-        // Запуск обогащения
+        // Verifies component behavior and assertions.
         service.EnrichEntriesWithBootImpact(entries);
 
-        // Проверяем, что метод завершается без исключений
+        // Verifies component behavior and assertions.
         Assert.NotNull(entries);
         Assert.Equal(2, entries.Count);
     }

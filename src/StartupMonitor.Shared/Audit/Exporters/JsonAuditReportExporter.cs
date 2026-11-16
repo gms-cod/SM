@@ -7,16 +7,19 @@ using StartupMonitor.Shared.Audit.Models;
 namespace StartupMonitor.Shared.Audit.Exporters;
 
 /// <summary>
-/// Генератор структурированного отчета в формате JSON.
+/// Generates a structured report in JSON format.
 /// </summary>
 public class JsonAuditReportExporter : IAuditReportExporter
 {
+    /// <summary>Gets the file extension used for exported reports.</summary>
+    /// <summary>Gets the content type used for exported reports.</summary>
     public string FileExtension => "json";
+    /// <summary>Gets the content type.</summary>
     public string ContentType => "application/json";
 
-    /// <summary>ExportToString: Экспортирует данные отчета ToString.</summary>
-    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Exports report data as a string.</summary>
+    /// <param name="report">The report (AuditReport) to export.</param>
+    /// <returns>The resulting string.</returns>
     public string ExportToString(AuditReport report)
     {
         var options = new JsonSerializerOptions
@@ -30,9 +33,9 @@ public class JsonAuditReportExporter : IAuditReportExporter
         return JsonSerializer.Serialize(report, options);
     }
 
-    /// <summary>ExportToBytes: Экспортирует данные отчета ToBytes.</summary>
-    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
+    /// <summary>Exports report data as a byte array.</summary>
+    /// <param name="report">The report (AuditReport) to export.</param>
+    /// <returns>The resulting byte array.</returns>
     public byte[] ExportToBytes(AuditReport report)
     {
         return Encoding.UTF8.GetBytes(ExportToString(report));

@@ -16,9 +16,15 @@ namespace StartupMonitor.Service.Services.Wmi;
 public class WmiSubscriptionPayload
 {
     [JsonPropertyName("consumer_type")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string ConsumerType { get; set; } = "CommandLineEventConsumer";
 
     [JsonPropertyName("consumer_name")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string ConsumerName { get; set; } = "";
 
     [JsonPropertyName("command_line_template")]
@@ -40,15 +46,27 @@ public class WmiSubscriptionPayload
     public string? ScriptFileName { get; set; }
 
     [JsonPropertyName("filter_name")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string FilterName { get; set; } = "";
 
     [JsonPropertyName("filter_query")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string FilterQuery { get; set; } = "";
 
     [JsonPropertyName("filter_query_language")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string FilterQueryLanguage { get; set; } = "WQL";
 
     [JsonPropertyName("filter_namespace")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string FilterNamespace { get; set; } = @"root\cimv2";
 
     [JsonPropertyName("binding_filter_path")]

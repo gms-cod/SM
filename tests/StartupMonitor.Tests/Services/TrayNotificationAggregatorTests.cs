@@ -3,12 +3,10 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для TrayNotificationAggregator: проверка объединения и группировки всплывающих сообщений.
-/// </summary>
+/// <summary>Verifies test scenario for TrayNotificationAggregatorTests.cs.</summary>
 public class TrayNotificationAggregatorTests
 {
-    /// <summary>Различные сетевые события без идентификатора записи не подавляют друг друга; повторы подавляются.</summary>
+    /// <summary>Verifies test scenario for TrayNotificationAggregatorTests.cs.</summary>
     [Fact]
     public void Enqueue_EmptyEntryId_DeduplicatesByText()
     {
@@ -25,6 +23,9 @@ public class TrayNotificationAggregatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Coalesce_SingleNotification_ReturnsOriginalTextAndId()
     {
         var item = new PendingTrayNotification(
@@ -43,6 +44,9 @@ public class TrayNotificationAggregatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Coalesce_MultipleNotificationsSameCategory_GroupsWithCountAndSummary()
     {
         var items = new List<PendingTrayNotification>
@@ -56,19 +60,22 @@ public class TrayNotificationAggregatorTests
 
         var (title, text, ids) = TrayNotificationAggregator.Coalesce(items);
 
-        // Заголовок должен содержать общее число элементов
+        // Verifies component behavior and assertions.
         Assert.Contains("(5)", title);
-        // В теле должны быть первые элементы
+        // Verifies component behavior and assertions.
         Assert.Contains("App1", text);
         Assert.Contains("App2", text);
         Assert.Contains("App3", text);
-        // Должна присутствовать строчка "...и ещё 2" (или "…и ещё 2")
+        // Verifies component behavior and assertions.
         Assert.Contains("2", text);
-        // Все ID должны быть собраны
+        // Verifies component behavior and assertions.
         Assert.Equal(5, ids.Count);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Coalesce_MixedCategories_CreatesSectionsForEveryCategory()
     {
         var items = new List<PendingTrayNotification>
@@ -80,7 +87,7 @@ public class TrayNotificationAggregatorTests
 
         var (title, text, ids) = TrayNotificationAggregator.Coalesce(items);
 
-        // Общий заголовок со счётчиком всех событий
+        // Verifies component behavior and assertions.
         Assert.Contains("(3)", title);
         Assert.Contains("Telegram", text);
         Assert.Contains("Malware.exe", text);
@@ -89,6 +96,9 @@ public class TrayNotificationAggregatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Classify_IdentifiesKindsCorrectly()
     {
         Assert.Equal(TrayNotificationKind.SystemDanger, TrayNotificationAggregator.Classify(LocalizationService.Instance.SystemDangerTitle));

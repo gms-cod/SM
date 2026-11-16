@@ -8,21 +8,19 @@ using StartupMonitor.UI.Views.Dialogs;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>
-/// Проверяет создание, парсинг XAML и визуализацию диалогового окна системных сведений SystemInfoWindow.
-/// </summary>
+/// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class SystemInfoWindowTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Инициализирует тестовый класс с общим хостом отрисовки WPF.</summary>
-    /// <param name="host">Хост для запуска окон в STA-потоке.</param>
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
     public SystemInfoWindowTests(NetworkRenderingTestHost host) => _host = host;
 
     /// <summary>
-    /// Проверяет, что окно сведений о компьютере корректно загружается, парсит XAML без исключений привязки
-    /// и отображает все расширенные аппаратные характеристики (модель, плата, BIOS, папка Windows).
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SystemInfoWindow_InitializesAndRenders_WithoutBindingExceptions() => _host.Run(() =>
@@ -58,18 +56,18 @@ public sealed class SystemInfoWindowTests
         Assert.NotNull(window);
         Assert.Equal(info, window.Info);
 
-        // Проверяем отображение окна и жизненный цикл в visual tree
+        // Verifies component behavior and assertions.
         window.Show();
         Assert.True(window.IsVisible);
 
-        // Прокачиваем очередь Dispatcher, чтобы все операции отрисовки (включая TitleBar) завершились до закрытия
+        // Verifies component behavior and assertions.
         PumpDispatcher();
 
-        // Проверяем, что в дереве присутствуют TextBlock с расширенной информацией
+        // Verifies component behavior and assertions.
         var textBlocks = FindVisualChildren<TextBlock>(window).ToList();
         Assert.NotEmpty(textBlocks);
 
-        // Проверяем наличие ключевых строк модели и BIOS в отрендеренных блоках
+        // Verifies component behavior and assertions.
         var allTexts = string.Join(" ", textBlocks.Select(t => t.Text));
         Assert.Contains("DESKTOP-TEST", allTexts);
         Assert.Contains("AMD Ryzen 9 7950X", allTexts);
@@ -84,7 +82,7 @@ public sealed class SystemInfoWindowTests
     });
 
     /// <summary>
-    /// Проверяет, что конструктор по умолчанию без явных параметров автоматически собирает сведения и не падает.
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SystemInfoWindow_DefaultConstructor_CollectsAndInitializesSuccessfully() => _host.Run(() =>
@@ -99,7 +97,7 @@ public sealed class SystemInfoWindowTests
     });
 
     /// <summary>
-    /// Проверяет, что структурированный текстовый отчёт ToReportString включает все расширенные поля.
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SystemComputerInfo_ToReportString_IncludesAllExpandedHardwareFields()
@@ -135,7 +133,7 @@ public sealed class SystemInfoWindowTests
     }
 
     /// <summary>
-    /// Прокачивает очередь Dispatcher до состояния ApplicationIdle.
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
     /// </summary>
     private static void PumpDispatcher()
     {
@@ -147,7 +145,7 @@ public sealed class SystemInfoWindowTests
     }
 
     /// <summary>
-    /// Рекурсивно находит всех визуальных потомков заданного типа.
+    /// <summary>Verifies test scenario for SystemInfoWindowTests.cs.</summary>
     /// </summary>
     private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
     {

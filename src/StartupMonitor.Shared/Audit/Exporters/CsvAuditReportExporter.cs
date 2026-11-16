@@ -8,26 +8,32 @@ using StartupMonitor.Shared.Audit.Models;
 namespace StartupMonitor.Shared.Audit.Exporters;
 
 /// <summary>
-/// Генератор отчета в формате CSV (RFC 4180) с поддержкой UTF-8 BOM для полной совместимости с Microsoft Excel.
+/// CSV report generator (RFC 4180) with UTF-8 BOM support for full Microsoft Excel compatibility.
 /// </summary>
 public class CsvAuditReportExporter : IAuditReportExporter
 {
+    /// <summary>Gets the file extension used for exported report files.</summary>
+    /// <summary>Gets the MIME content type for exported CSV report data.</summary>
+    /// <summary>Exports the specified audit report data to a CSV string.</summary>
+    /// <param name="report">The audit report to export.</param>
+    /// <returns>A string containing the report data in CSV format.</returns>
     public string FileExtension => "csv";
+    /// <summary>Gets the MIME content type of the exported CSV data.</summary>
     public string ContentType => "text/csv; charset=utf-8";
 
-    /// <summary>ExportToString: Экспортирует данные отчета ToString.</summary>
-    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>ExportToString: Exports report data to string.</summary>
+    /// <param name="report">Input data: value of the report parameter (AuditReport).</param>
+    /// <returns>Output data: the resulting value of type string.</returns>
     public string ExportToString(AuditReport report)
     {
         var sb = new StringBuilder();
 
-        // 1. Метаданные аудита
+        // 1. Audit metadata
         sb.AppendLine($"# Startup Monitor Audit Report; Version={EscapeCsv(report.Metadata.AppVersion)}; Date={EscapeCsv(report.Metadata.GeneratedAt.ToString("yyyy-MM-dd HH:mm:ss"))}; Host={EscapeCsv(report.Metadata.MachineName)}; User={EscapeCsv(report.Metadata.UserName)}; OS={EscapeCsv(report.Metadata.OsDescription)}");
         sb.AppendLine($"# Summary: TotalEntries={report.Summary.TotalStartupEntries}; Enabled={report.Summary.EnabledEntries}; Disabled={report.Summary.DisabledEntries}; Blocked={report.Summary.BlockedEntries}; CLI_Threats={report.Summary.CliThreatsCount}; CIRCL_Alerts={report.Summary.CirclFoundCount}; AvgAiRating={report.Summary.AverageAiRating.ToString("F1", CultureInfo.InvariantCulture)}/10; ActiveProcesses={report.Summary.TotalProcessesCount}");
         sb.AppendLine();
 
-        // 2. Секция записей автозапуска
+        // 2. Auto-start records section
         sb.AppendLine("--- STARTUP ENTRIES ---");
         sb.AppendLine("Name,Publisher,Status,Location,LocationDetail,FilePath,CommandLine,SHA256,DetectedAt,AiRating,AiCategory,AiRisk,KasperskyZone,KasperskyDetection,HasCliThreat,CliThreatLevel,CliThreatBadge,CliThreatIndicators,AiRecommendation");
 
@@ -62,7 +68,7 @@ public class CsvAuditReportExporter : IAuditReportExporter
             sb.AppendLine(string.Join(",", row));
         }
 
-        // 3. Секция активных процессов (если имеются)
+        // 3. Active processes section (if any)
         if (report.ActiveProcesses != null && report.ActiveProcesses.Count > 0)
         {
             sb.AppendLine();
@@ -104,12 +110,12 @@ public class CsvAuditReportExporter : IAuditReportExporter
         return sb.ToString();
     }
 
-    /// <summary>ExportToBytes: Экспортирует данные отчета ToBytes.</summary>
-    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
+    /// <summary>ExportToBytes: Exports report data as a byte array.</summary>
+/// <param name="report">Input data: value of the report parameter (AuditReport).</param>
+/// <returns>Output data: the resulting value of type byte[].</returns>
     public byte[] ExportToBytes(AuditReport report)
     {
-        // Записываем UTF-8 BOM (\uFEFF: 0xEF, 0xBB, 0xBF) перед содержимым для корректного открытия в Excel
+        // Writes the UTF-8 BOM (\uFEFF: 0xEF, 0xBB, 0xBF) before the content so the file opens correctly in Excel
         var content = ExportToString(report);
         var utf8Bytes = Encoding.UTF8.GetBytes(content);
         var bom = Encoding.UTF8.GetPreamble();
@@ -120,24 +126,24 @@ public class CsvAuditReportExporter : IAuditReportExporter
         return result;
     }
 
-    /// <summary>EscapeCsv: Выполняет операцию EscapeCsv.</summary>
-    /// <param name="value">Входные данные: значение параметра value (string?).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>EscapeCsv: Escapes the specified value according to CSV rules.</summary>
+    /// <param name="value">The value to escape (string?).</param>
+    /// <returns>The resulting string value.</returns>
     public static string EscapeCsv(string? value)
     {
         if (string.IsNullOrEmpty(value))
             return string.Empty;
 
-        // Если значение содержит запятую, кавычку, перевод строки или начинается с спецсимволов формул (=, +, -, @)
+        // If the value contains a comma, a quote, a line break, or starts with a formula character (=, +, -, @)
         bool mustQuote = value.Contains(',') || value.Contains(';') || value.Contains('"') ||
                          value.Contains('\r') || value.Contains('\n') ||
                          value.StartsWith('=') || value.StartsWith('+') || value.StartsWith('-') || value.StartsWith('@');
 
         if (mustQuote)
         {
-            // Экранируем кавычки двойными кавычками
+            // Escapes double quotes by doubling them
             var escaped = value.Replace("\"", "\"\"");
-            // Если начинается с формульных символов, экранируем апострофом для безопасности
+            // If it begins with formula characters, prefixes with an apostrophe for safety
             if (escaped.StartsWith('=') || escaped.StartsWith('+') || escaped.StartsWith('-') || escaped.StartsWith('@'))
             {
                 escaped = "'" + escaped;

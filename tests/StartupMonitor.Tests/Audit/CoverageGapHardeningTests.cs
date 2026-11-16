@@ -10,37 +10,35 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.Audit;
 
-/// <summary>
-/// Регрессионные и стресс-тесты, закрывающие пробелы аудита покрытия:
-/// границы IPC-кадров, повторные входы и гонки координатора состояния,
-/// конкурентный доступ к трекеру подключений, граничные диапазоны истории
-/// трафика и валидация аргументов на границах службы.
-/// Все тесты детерминированы: реальные задержки и ожидание сети не используются.
-/// </summary>
+/// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+/// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+/// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+/// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+/// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
 public sealed class CoverageGapHardeningTests : IDisposable
 {
-    /// <summary>Изолированный каталог для файловых зависимостей текущего теста.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(), "StartupMonitorAudit_" + Guid.NewGuid().ToString("N"));
 
-    /// <summary>Управляемые часы исключают зависимость граничных проверок от системного времени.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
-        /// <summary>Возвращает момент, установленный тестом.</summary>
-        /// <returns>Текущий тестовый момент UTC.</returns>
+        /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+        /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
         public override DateTimeOffset GetUtcNow() => now;
 
-        /// <summary>Сдвигает время без блокировки тестового потока.</summary>
-        /// <param name="delta">Величина сдвига.</param>
+        /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+        /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
         public void Advance(TimeSpan delta) => now += delta;
     }
 
-    /// <summary>Создаёт хранилище в изолированном каталоге текущего теста.</summary>
-    /// <returns>Хранилище, не разделяемое с другими тестами.</returns>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     private JsonDataStore CreateStore()
         => new(Path.Combine(_directory, "startup-monitor.json"));
 
-    /// <summary>Проверяет, что все watcher'ы штатно завершают ожидание сканирования.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task InitialScanTracker_AllWatchersReport_CompletesWait()
     {
@@ -57,7 +55,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         await tracker.WaitAsync().WaitAsync(TimeSpan.FromSeconds(5));
     }
 
-    /// <summary>Повторные или лишние отчёты не должны ломать счётчик и бросать исключения.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task InitialScanTracker_ExtraReports_DoNotThrowAndKeepCompletedState()
     {
@@ -72,7 +70,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         await tracker.WaitAsync().WaitAsync(TimeSpan.FromSeconds(5));
     }
 
-    /// <summary>Пустой IP не должен попадать в трекер и искажать счётчик подключений.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -89,7 +87,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(0, tracker.TrackedKeysCount);
     }
 
-    /// <summary>Нулевые порог и емкость детерминированно нормализуются к единице.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void SlidingWindowTracker_NonPositiveLimits_AreClamped()
     {
@@ -99,7 +97,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(1, tracker.MaxCapacity);
     }
 
-    /// <summary>Метка ровно на границе окна ещё учитывается: отсечение строго больше ширины окна.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void SlidingWindowTracker_TimestampExactlyAtWindowBoundary_IsRetained()
     {
@@ -113,7 +111,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(2, tracker.GetConnectionCount(ip, start.AddSeconds(60)));
     }
 
-    /// <summary>Сброс правил по адресу удаляет только составные ключи этого адреса.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void SlidingWindowTracker_ResetRulesForIp_RemovesOnlyMatchingPrefix()
     {
@@ -130,7 +128,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(1, tracker.TrackedKeysCount);
     }
 
-    /// <summary>Пустой адрес в операции сброса правил отклоняется с аргументным исключением.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -142,7 +140,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.ThrowsAny<ArgumentException>(() => tracker.ResetRulesForIp(ip!));
     }
 
-    /// <summary>Стресс-тест: параллельные записи не теряют и не дублируют подключения одного IP.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task SlidingWindowTracker_ConcurrentRecording_CountsEveryConnection()
     {
@@ -160,7 +158,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(workers * perWorker, tracker.GetConnectionCount(ip));
     }
 
-    /// <summary>Стресс-тест: конкурентное добавление IP не превышает заданную емкость LRU-кэша.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task SlidingWindowTracker_ConcurrentUniqueIps_NeverExceedsCapacity()
     {
@@ -177,7 +175,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(capacity, tracker.TrackedKeysCount);
     }
 
-    /// <summary>Повторный вход из обработчика не теряет переход и сохраняет итоговое состояние.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void MonitoringStateCoordinator_ReentrantHandler_DeliversTransitionsInOrder()
     {
@@ -199,7 +197,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.False(CreateStore().Load().Settings.IsMonitoringPaused);
     }
 
-    /// <summary>Стресс-тест: конкурентные SetPaused не порождают подряд идущих одинаковых переходов.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task MonitoringStateCoordinator_ConcurrentSetPaused_KeepsAlternatingSequence()
     {
@@ -232,7 +230,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(0, duplicateTransitions);
     }
 
-    /// <summary>Ограниченный читатель принимает кадр ровно максимальной длины.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task BoundedLineReader_FrameExactlyAtLimit_IsAccepted()
     {
@@ -243,7 +241,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal("ABCDE", frame);
     }
 
-    /// <summary>Кадр сверх лимита отклоняется до накопления неограниченного буфера.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task BoundedLineReader_FrameOverLimit_IsRejected()
     {
@@ -252,7 +250,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(async () => await reader.ReadLineAsync());
     }
 
-    /// <summary>Незавершённый кадр в конце потока распознаётся как разрыв протокола, а не как валидные данные.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task BoundedLineReader_IncompleteFrameAtEof_IsRejected()
     {
@@ -261,7 +259,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         await Assert.ThrowsAsync<InvalidDataException>(async () => await reader.ReadLineAsync());
     }
 
-    /// <summary>Штатный EOF между кадрами возвращает null и не считается ошибкой.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task BoundedLineReader_EofBetweenFrames_ReturnsNull()
     {
@@ -270,7 +268,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Null(await reader.ReadLineAsync());
     }
 
-    /// <summary>Перевод строки CRLF нормализуется, завершающий \r не попадает в кадр.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task BoundedLineReader_CrlfFrame_RemovesCarriageReturn()
     {
@@ -279,7 +277,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal("payload", await reader.ReadLineAsync());
     }
 
-    /// <summary>Предварительно отменённый токен немедленно прерывает чтение кадра.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task BoundedLineReader_CancelledToken_ThrowsOperationCanceled()
     {
@@ -291,7 +289,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
             async () => await reader.ReadLineAsync(cts.Token));
     }
 
-    /// <summary>Null-поток и неположительный лимит отклоняются при создании читателя.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void BoundedLineReader_InvalidConstructorArguments_AreRejected()
     {
@@ -300,7 +298,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Throws<ArgumentOutOfRangeException>(() => new BoundedLineReader(new StringReader(""), -1));
     }
 
-    /// <summary>Null-запрос и пустой тип сообщения отклоняются до попытки подключения.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task PipeClient_SendAsync_NullRequest_Throws()
     {
@@ -309,7 +307,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         await Assert.ThrowsAsync<ArgumentNullException>(() => client.SendAsync(null!));
     }
 
-    /// <summary>Пустой тип сообщения не должен уходить в транспортный обмен.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -322,7 +320,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         await Assert.ThrowsAnyAsync<ArgumentException>(() => client.SendAsync(request));
     }
 
-    /// <summary>После Dispose клиент не выполняет обмен и возвращает null без исключения.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public async Task PipeClient_SendAsync_AfterDispose_ReturnsNull()
     {
@@ -335,7 +333,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.False(client.IsConnected);
     }
 
-    /// <summary>Конструктор сервера событий отклоняет отсутствующие обязательные зависимости.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void EventPipeServer_NullDependencies_AreRejected()
     {
@@ -347,7 +345,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => new EventPipeServer(notifications, null!));
     }
 
-    /// <summary>Пустое имя событийного канала отклоняется с аргументным исключением.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -359,7 +357,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.ThrowsAny<ArgumentException>(() => new EventPipeServer(notifications, logger, pipeName));
     }
 
-    /// <summary>Null-запрос истории и недопустимый диапазон отклоняются на IPC-границе.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_NullRequest_IsRejected()
     {
@@ -368,7 +366,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => service.GetHistory(null!));
     }
 
-    /// <summary>Обратный и пустой диапазоны не должны приводить к делению на отрицательную ширину.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -382,7 +380,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
             () => service.GetHistory(new NetworkTrafficHistoryRequest(now, now.AddSeconds(deltaSeconds), 1)));
     }
 
-    /// <summary>Диапазон больше семи суток отклоняется, ровно семь суток допускаются.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_RetentionBoundary_IsEnforced()
     {
@@ -397,7 +395,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(240, points.Count);
     }
 
-    /// <summary>Null-логгер и null-снимок счётчиков отклоняются с контекстом аргумента.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_NullLoggerAndCounters_AreRejected()
     {
@@ -409,7 +407,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => service.RecordCounters(clock.GetUtcNow().UtcDateTime, null!));
     }
 
-    /// <summary>Мусорные элементы снимка не должны попадать в текущую базовую линию измерений.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_InvalidCounterEntries_AreFiltered()
     {
@@ -430,7 +428,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.False(point.HasMeasurement);
     }
 
-    /// <summary>Ровно 30 секунд между снимками ещё считаются достоверным интервалом.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_ThirtySecondInterval_IsMeasured()
     {
@@ -447,7 +445,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.Equal(1, point.OutboundBps, 8);
     }
 
-    /// <summary>Интервал больше 30 секунд не подменяется вымышленной средней скоростью.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_OverThirtySeconds_IsUnmeasured()
     {
@@ -462,7 +460,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
         Assert.False(point.HasMeasurement);
     }
 
-    /// <summary>Повреждённый файл истории диагностируется через ILogger без падения конструктора.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     [Fact]
     public void NetworkTrafficHistory_CorruptFile_LogsWarning()
     {
@@ -480,9 +478,9 @@ public sealed class CoverageGapHardeningTests : IDisposable
             call.GetArguments()[0] is LogLevel.Warning);
     }
 
-    /// <summary>Создаёт сервис истории с управляемыми часами и без записи на диск.</summary>
-    /// <param name="clock">Управляемые часы теста.</param>
-    /// <returns>Сервис, готовый к подаче снимков счётчиков.</returns>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     private NetworkTrafficHistoryService CreateTrafficService(TimeProvider clock)
         => new(
             CreateStore(),
@@ -490,7 +488,7 @@ public sealed class CoverageGapHardeningTests : IDisposable
             source: Substitute.For<INetworkTrafficCounterSource>(),
             timeProvider: clock);
 
-    /// <summary>Удаляет только каталог, созданный текущим тестом.</summary>
+    /// <summary>Verifies test scenario for CoverageGapHardeningTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);

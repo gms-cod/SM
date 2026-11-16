@@ -7,9 +7,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Helpers;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class AuthenticodeVerifierTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void VerifyFile_NullOrEmpty_ReturnsUnknown()
     {
         var res1 = AuthenticodeVerifier.VerifyFile(null);
@@ -22,6 +28,9 @@ public class AuthenticodeVerifierTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void VerifyFile_NonExistentFile_ReturnsUnknown()
     {
         var res = AuthenticodeVerifier.VerifyFile(@"C:\NonExistentFolder\NoSuchApp_" + Guid.NewGuid().ToString("N") + ".exe");
@@ -31,12 +40,15 @@ public class AuthenticodeVerifierTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void VerifyFile_UnsignedFile_ReturnsNotSigned()
     {
         string tempFile = Path.Combine(Path.GetTempPath(), $"unsigned_test_{Guid.NewGuid():N}.exe");
         try
         {
-            // Создаем фиктивный исполняемый файл без подписи
+            // Verifies component behavior and assertions.
             File.WriteAllBytes(tempFile, new byte[] { 0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00 });
 
             var res = AuthenticodeVerifier.VerifyFile(tempFile);
@@ -51,6 +63,9 @@ public class AuthenticodeVerifierTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void VerifyFile_SignedWindowsBinary_ReturnsValidAndMicrosoftSigner()
     {
         string signedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
@@ -70,6 +85,9 @@ public class AuthenticodeVerifierTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void VerifyFile_UsesCacheForSameFile()
     {
         string signedPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
@@ -87,6 +105,9 @@ public class AuthenticodeVerifierTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void StartupEntry_SignatureProperties_SerializeCorrectly()
     {
         var entry = new StartupEntry
@@ -109,6 +130,9 @@ public class AuthenticodeVerifierTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessInfo_SignatureProperties_SerializeCorrectly()
     {
         var proc = new ProcessInfo

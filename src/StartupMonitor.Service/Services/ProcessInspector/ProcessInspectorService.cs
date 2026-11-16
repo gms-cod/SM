@@ -547,17 +547,41 @@ public class ProcessInspectorService
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MODULEENTRY32
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwSize;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint th32ModuleID;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint th32ProcessID;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint GlblcntUsage;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint ProccntUsage;
         public IntPtr modBaseAddr;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint modBaseSize;
         public IntPtr hModule;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string szModule;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string szExePath;
     }
 
@@ -567,10 +591,19 @@ public class ProcessInspectorService
         public IntPtr Object;
         public ulong UniqueProcessId;
         public IntPtr HandleValue;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint GrantedAccess;
         public ushort CreatorBackTraceIndex;
         public ushort ObjectTypeIndex;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint HandleAttributes;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint Reserved;
     }
 

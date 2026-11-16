@@ -1,38 +1,38 @@
-// Модели экспорта/импорта правил брандмауэра и готовых пресетов безопасности.
-// Используются службой (SYSTEM), Pipe IPC и UI. Чистые POCO — без зависимости от COM.
+// Models for export/import of firewall rules and preconfigured security presets.
+// Used by service (SYSTEM), Pipe IPC, and UI. Pure POCOs without COM dependency.
 using System.Text.Json.Serialization;
 
 namespace StartupMonitor.Shared.Models.Firewall;
 
-/// <summary>Готовый пресет безопасности брандмауэра.</summary>
+/// <summary>Preconfigured firewall security preset.</summary>
 public enum SecurityPresetType
 {
     /// <summary>Максимальная приватность: блокировка телеметрии MS, Cortana, диагностических серверов.</summary>
     MaxPrivacy = 0,
-    /// <summary>Игровой режим: открытие портов Steam, Battle.net, Epic Games.</summary>
+    /// <summary>Game mode: opens ports for Steam, Battle.net, and Epic Games.</summary>
     Gaming = 1,
-    /// <summary>Публичный Wi-Fi: блокировка входящих NetBIOS, SMB, RDP, RPC.</summary>
+    /// <summary>Public Wi-Fi: blocks incoming NetBIOS, SMB, RDP, and RPC traffic.</summary>
     PublicWifi = 2,
-    /// <summary>Сброс к стандартным параметрам (удаление управляемых правил, режим Normal).</summary>
+    /// <summary>Resets to default settings (removes managed rules, Normal mode).</summary>
     ResetToDefaults = 3
 }
 
-/// <summary>DTO бэкапа правил брандмауэра (экспорт/импорт через Pipe IPC и файлы).</summary>
+/// <summary>Firewall rules backup DTO (export/import via Pipe IPC and files).</summary>
 public sealed class FirewallBackupDto
 {
-    /// <summary>Версия формата бэкапа.</summary>
+    /// <summary>Backup format version.</summary>
     [JsonPropertyName("version")]
     public string Version { get; set; } = "1.6.0";
 
-    /// <summary>Время экспорта (UTC).</summary>
+    /// <summary>Export timestamp (UTC).</summary>
     [JsonPropertyName("exportedAt")]
     public DateTime ExportedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>Человекочитаемое описание бэкапа.</summary>
+    /// <summary>Human-readable backup description.</summary>
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
 
-    /// <summary>Правила брандмауэра.</summary>
+    /// <summary>Firewall rules collection.</summary>
     [JsonPropertyName("rules")]
     public List<FirewallRuleDto> Rules { get; set; } = new();
 }

@@ -10,17 +10,23 @@ using StartupMonitor.Shared.Models;
 namespace StartupMonitor.Shared.Audit.Exporters;
 
 /// <summary>
-/// Генератор автономного интерактивного HTML-отчета аудита системы в корпоративной тёмной теме Fluent/Cyber.
-/// Не требует подключения к интернету (zero-dependency single file) и поддерживает живой поиск, фильтры и печать.
+/// Generates a standalone interactive HTML audit report for the system in a corporate dark Fluent/Cyber theme.
+/// Requires no internet connection (zero-dependency single file) and supports live search, filters, and printing.
 /// </summary>
 public class HtmlAuditReportExporter : IAuditReportExporter
 {
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string FileExtension => "html";
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string ContentType => "text/html; charset=utf-8";
 
-    /// <summary>ExportToString: Экспортирует данные отчета ToString.</summary>
-    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>ExportToString: Exports the report data to a string.</summary>
+    /// <param name="report">The value of the report parameter (AuditReport).</param>
+    /// <returns>The resulting string value.</returns>
     public string ExportToString(AuditReport report)
     {
         var sb = new StringBuilder();
@@ -39,30 +45,30 @@ public class HtmlAuditReportExporter : IAuditReportExporter
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
 
-        // Контейнер отчета
+        // Report container
         sb.AppendLine("  <div class=\"report-wrapper\">");
 
-        // 1. Шапка отчета
+        // 1. Report header
         AppendHeader(sb, m, s);
 
-        // 2. Сетка ключевых показателей (KPI Cards)
+        // 2. Key metrics grid (KPI Cards)
         AppendKpiCards(sb, s);
 
-        // 3. Панель управления (Поиск, Вкладки, Фильтры)
+        // 3. Control panel (Search, Tabs, Filters)
         AppendControls(sb, report);
 
-        // 4. Вкладка: Автозапуск
+        // 4. Tab: Autostart
         AppendStartupEntriesSection(sb, report.StartupEntries);
 
-        // 5. Вкладка: Процессы
+        // 5. Tab: Processes
         AppendProcessesSection(sb, report.ActiveProcesses);
 
-        // 6. Подвал
+        // 6. Footer
         AppendFooter(sb, m);
 
         sb.AppendLine("  </div>"); // /report-wrapper
 
-        // 7. Встроенный JavaScript
+        // 7. Embedded JavaScript
         sb.AppendLine("  <script>");
         AppendScripts(sb);
         sb.AppendLine("  </script>");
@@ -73,18 +79,18 @@ public class HtmlAuditReportExporter : IAuditReportExporter
         return sb.ToString();
     }
 
-    /// <summary>ExportToBytes: Экспортирует данные отчета ToBytes.</summary>
-    /// <param name="report">Входные данные: значение параметра report (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
+    /// <summary>ExportToBytes: Exports report data to bytes.</summary>
+    /// <param name="report">Input data: value of the report parameter (AuditReport).</param>
+    /// <returns>Output data: resulting value of type byte[].</returns>
     public byte[] ExportToBytes(AuditReport report)
     {
         return Encoding.UTF8.GetBytes(ExportToString(report));
     }
 
-    /// <summary>AppendHeader: Добавляет секцию разметки Header.</summary>
-    /// <param name="sb">Входные данные: значение параметра sb (StringBuilder).</param>
-    /// <param name="m">Входные данные: значение параметра m (AuditMetadata).</param>
-    /// <param name="s">Входные данные: значение параметра s (AuditSummary).</param>
+    /// <summary>AppendHeader: Adds the Header markup section.</summary>
+    /// <param name="sb">Input data: value of the sb parameter (StringBuilder).</param>
+    /// <param name="m">Input data: value of the m parameter (AuditMetadata).</param>
+    /// <param name="s">Input data: value of the s parameter (AuditSummary).</param>
     private static void AppendHeader(StringBuilder sb, AuditMetadata m, AuditSummary s)
     {
         sb.AppendLine("    <header class=\"report-header\">");
@@ -108,21 +114,21 @@ public class HtmlAuditReportExporter : IAuditReportExporter
         sb.AppendLine("    </header>");
     }
 
-    /// <summary>AppendKpiCards: Добавляет секцию разметки KpiCards.</summary>
-    /// <param name="sb">Входные данные: значение параметра sb (StringBuilder).</param>
-    /// <param name="s">Входные данные: значение параметра s (AuditSummary).</param>
+    /// <summary>AppendKpiCards: Adds the KpiCards markup section.</summary>
+    /// <param name="sb">The sb parameter (StringBuilder).</param>
+    /// <param name="s">The s parameter (AuditSummary).</param>
     private static void AppendKpiCards(StringBuilder sb, AuditSummary s)
     {
         sb.AppendLine("    <section class=\"kpi-grid\">");
 
-        // Всего записей
+        // Total records
         sb.AppendLine("      <div class=\"kpi-card card-total\">");
         sb.AppendLine("        <div class=\"kpi-title\">Точек автозапуска</div>");
         sb.AppendLine($"        <div class=\"kpi-value\">{s.TotalStartupEntries}</div>");
         sb.AppendLine($"        <div class=\"kpi-detail\">Включено: <strong>{s.EnabledEntries}</strong> • Откл: <strong>{s.DisabledEntries}</strong></div>");
         sb.AppendLine("      </div>");
 
-        // Угрозы CLI
+        // CLI threats
         var threatClass = s.CliThreatsCount > 0 ? "kpi-card card-threats alert" : "kpi-card card-threats";
         sb.AppendLine($"      <div class=\"{threatClass}\">");
         sb.AppendLine("        <div class=\"kpi-title\">Угрозы CLI и скрипты</div>");
@@ -370,7 +376,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>RenderAiStars: Выполняет операцию RenderAiStars.</summary>
     /// <param name="avgRating">Входные данные: значение параметра avgRating (double).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string RenderAiStars(double avgRating)
     {
         if (avgRating <= 0) return "<span class=\"stars-none\">Не оценено</span>";
@@ -400,7 +406,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>RenderEntryAiRating: Выполняет операцию RenderEntryAiRating.</summary>
     /// <param name="entry">Входные данные: значение параметра entry (StartupEntry).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string RenderEntryAiRating(StartupEntry entry)
     {
         if (entry.AiRating <= 0)
@@ -433,7 +439,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
     /// <summary>RenderCirclBadge: Выполняет операцию RenderCirclBadge.</summary>
     /// <param name="zone">Входные данные: значение параметра zone (string?).</param>
     /// <param name="detection">Входные данные: значение параметра detection (string?).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string RenderCirclBadge(string? zone, string? detection)
     {
         var z = zone?.ToLowerInvariant() ?? "";
@@ -451,7 +457,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>RenderThreatBadge: Выполняет операцию RenderThreatBadge.</summary>
     /// <param name="info">Входные данные: значение параметра info (CliThreatInfo?).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string RenderThreatBadge(CliThreatInfo? info)
     {
         if (info == null || !info.HasThreat)
@@ -469,7 +475,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>RenderStartupLink: Выполняет операцию RenderStartupLink.</summary>
     /// <param name="proc">Входные данные: значение параметра proc (ProcessInfo).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string RenderStartupLink(ProcessInfo proc)
     {
         if (!proc.IsFromStartup)
@@ -481,7 +487,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>RenderProcessState: Выполняет операцию RenderProcessState.</summary>
     /// <param name="proc">Входные данные: значение параметра proc (ProcessInfo).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string RenderProcessState(ProcessInfo proc)
     {
         if (proc.IsBlocked) return "<span class=\"badge-status blocked\">Чёрный список</span>";
@@ -493,7 +499,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>GetStatusCssClass: Возвращает StatusCssClass.</summary>
     /// <param name="status">Входные данные: значение параметра status (EntryStatus).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string GetStatusCssClass(EntryStatus status) => status switch
     {
         EntryStatus.Enabled => "enabled",
@@ -504,7 +510,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>GetStatusDisplayName: Возвращает StatusDisplayName.</summary>
     /// <param name="status">Входные данные: значение параметра status (EntryStatus).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string GetStatusDisplayName(EntryStatus status) => status switch
     {
         EntryStatus.Enabled => "Включена",
@@ -515,7 +521,7 @@ public class HtmlAuditReportExporter : IAuditReportExporter
 
     /// <summary>FormatRate: Выполняет операцию FormatRate.</summary>
     /// <param name="kbs">Входные данные: значение параметра kbs (double).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <returns>Extracted file path or empty string.</returns>
     private static string FormatRate(double kbs)
     {
         if (kbs >= 1024.0)

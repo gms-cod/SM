@@ -40,7 +40,13 @@ public static class ServiceProcessHelper
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct ENUM_SERVICE_STATUS_PROCESS
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string lpServiceName;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string lpDisplayName;
         public SERVICE_STATUS_PROCESS ServiceStatusProcess;
     }
@@ -48,14 +54,41 @@ public static class ServiceProcessHelper
     [StructLayout(LayoutKind.Sequential)]
     private struct SERVICE_STATUS_PROCESS
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwServiceType;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwCurrentState;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwControlsAccepted;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwWin32ExitCode;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwServiceSpecificExitCode;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwCheckPoint;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwWaitHint;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwProcessId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public uint dwServiceFlags;
     }
 

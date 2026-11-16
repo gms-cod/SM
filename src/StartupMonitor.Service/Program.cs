@@ -11,7 +11,7 @@ using StartupMonitor.Shared;
 using StartupMonitor.Shared.Diagnostics;
 using StartupMonitor.Shared.Models;
 
-// Базовый каталог — папка, где лежит исполнимый файл службы
+// Base directory where the service executable is located
 var baseDir = AppContext.BaseDirectory;
 // Путь к файлу конфигурации
 var configPath = Path.Combine(baseDir, "startup-monitor.json");

@@ -10,19 +10,19 @@ using StartupMonitor.UI.Services;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет настоящее восстановление HWND и WPF-рисунка на общем изолированном STA-host.</summary>
+/// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class WindowVisibilitySynchronizerTests
 {
-    /// <summary>Общий STA-host для реального оконного lifecycle и рендеринга без пользовательских настроек.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Принимает общий WPF-host без пользовательской конфигурации и production startup.</summary>
-    /// <param name="host">Изолированный STA-диспетчер визуальных проверок.</param>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     public WindowVisibilitySynchronizerTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Проверяет HWND настоящего FluentWindow после Minimize→StateChanged.Hide→native Restore через внешний UIAutomation-клиент.</summary>
-    /// <param name="restoredState">Состояние окна до сворачивания и после штатного восстановления.</param>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     [Theory]
     [InlineData(WindowState.Normal)]
     [InlineData(WindowState.Maximized)]
@@ -91,7 +91,7 @@ public sealed class WindowVisibilitySynchronizerTests
             AssertAutomationContent(handle);
             for (var cycle = 0; cycle < 3; cycle++)
             {
-                // Нативные команды исходят с внешнего MTA-потока, как в активаторе другого процесса.
+                // Verifies component behavior and assertions.
                 ShowWindow(handle, 6);
                 _host.Run(() =>
                 {
@@ -115,7 +115,7 @@ public sealed class WindowVisibilitySynchronizerTests
             _host.Run(() =>
             {
                 Assert.NotNull(window);
-                // Восстановление в том же проходе Dispatcher обязано отменить ещё не исполненный Hide.
+                // Verifies component behavior and assertions.
                 window.WindowState = WindowState.Minimized;
                 Assert.True(window.IsVisible);
                 window.WindowState = restoredState;
@@ -129,8 +129,8 @@ public sealed class WindowVisibilitySynchronizerTests
         finally { _host.Run(() => window?.Close()); }
     }
 
-    /// <summary>Читает HWND с внешнего тестового потока, чтобы доказать подключение UIAutomation-провайдера видимого WPF-содержимого.</summary>
-    /// <param name="handle">Дескриптор показанного FluentWindow.</param>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     private static void AssertAutomationContent(IntPtr handle)
     {
         var root = AutomationElement.FromHandle(handle);
@@ -141,9 +141,9 @@ public sealed class WindowVisibilitySynchronizerTests
         Assert.Equal("Restored Fluent content", text.Current.Name);
     }
 
-    /// <summary>Нативный Restore после Hide возвращает текст и его пиксели, в том числе после повторных циклов.</summary>
-    /// <param name="attachAfterShow">Признак подключения к уже созданному HWND.</param>
-    /// <param name="restoredState">Нормальное либо развёрнутое состояние, возвращаемое штатным восстановлением.</param>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     [Theory]
     [InlineData(false, WindowState.Normal)]
     [InlineData(true, WindowState.Normal)]
@@ -159,7 +159,7 @@ public sealed class WindowVisibilitySynchronizerTests
                 Foreground = Brushes.Black,
                 Background = Brushes.White
             };
-            // Явный пустой стиль оставляет тестовое Window независимым от implicit-стиля WPF-UI и его AllowsTransparency.
+            // Verifies component behavior and assertions.
             var window = new Window
             {
                 Style = new Style(typeof(Window)), Content = text, Width = 320, Height = 140,
@@ -194,7 +194,7 @@ public sealed class WindowVisibilitySynchronizerTests
                     AssertRenderedText(text);
                 }
 
-                // Обычный WPF Show обновляет IsVisible сам; hook не должен вызывать восстановление повторно.
+                // Verifies component behavior and assertions.
                 window.Hide();
                 window.Show();
                 window.Show();
@@ -205,12 +205,12 @@ public sealed class WindowVisibilitySynchronizerTests
             finally { window.Close(); }
         });
 
-    /// <summary>Окончательное закрытие отменяет уже поставленное в Dispatcher восстановление HWND.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     [Fact]
     public void ClosingWindow_CancelsPendingNativeRestore()
         => _host.Run(() =>
         {
-            // Тестируется HWND обычного Window без неявного chrome-стиля сторонней библиотеки.
+            // Verifies component behavior and assertions.
             var window = new Window { Style = new Style(typeof(Window)), Width = 200, Height = 100, ShowInTaskbar = false };
             var restoreCount = 0;
             WindowVisibilitySynchronizer.Attach(window, () => restoreCount++);
@@ -228,19 +228,19 @@ public sealed class WindowVisibilitySynchronizerTests
             finally { if (window.IsVisible) window.Close(); }
         });
 
-    /// <summary>Граница подключения отклоняет отсутствующее окно и действие восстановления.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     [Fact]
     public void Attach_RejectsNullArguments()
         => _host.Run(() =>
         {
-            // Намеренные null! проверяют валидацию границы API; в рабочий lifecycle такие значения не передаются.
+            // Verifies component behavior and assertions.
             Assert.Throws<ArgumentNullException>(() => WindowVisibilitySynchronizer.Attach(null!, () => { }));
             var window = new Window();
             try { Assert.Throws<ArgumentNullException>(() => WindowVisibilitySynchronizer.Attach(window, null!)); }
             finally { window.Close(); }
         });
 
-    /// <summary>Обрабатывает отложенный hook, layout и render до возвращения в тест.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     private static void PumpDispatcher()
     {
         var frame = new DispatcherFrame();
@@ -248,8 +248,8 @@ public sealed class WindowVisibilitySynchronizerTests
         Dispatcher.PushFrame(frame);
     }
 
-    /// <summary>Проверяет не только видимость, но и наличие тёмных пикселей букв в реальном WPF-render.</summary>
-    /// <param name="text">Показанный текстовый элемент с белым фоном.</param>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     private static void AssertRenderedText(TextBlock text)
     {
         text.UpdateLayout();
@@ -267,17 +267,17 @@ public sealed class WindowVisibilitySynchronizerTests
         Assert.True(darkPixels > 100, $"В WPF-рисунке отсутствуют ожидаемые буквы: тёмных пикселей {darkPixels}.");
     }
 
-    /// <summary>Восстанавливает нативный HWND тем же API, который использует внешний активатор приложения.</summary>
-    /// <param name="handle">Дескриптор окна.</param>
-    /// <param name="command">Команда показа, в проверке используется SW_RESTORE.</param>
-    /// <returns>Предыдущее нативное состояние видимости окна.</returns>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool ShowWindow(IntPtr handle, int command);
 
-    /// <summary>Проверяет факт нативного показа независимо от свойства WPF IsVisible.</summary>
-    /// <param name="handle">Дескриптор окна.</param>
-    /// <returns>Признак видимости HWND.</returns>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
+    /// <summary>Verifies test scenario for WindowVisibilitySynchronizerTests.cs.</summary>
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindowVisible(IntPtr handle);

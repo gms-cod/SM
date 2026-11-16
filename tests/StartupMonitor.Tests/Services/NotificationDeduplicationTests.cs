@@ -3,14 +3,12 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для проверки Smart Notification Deduplication:
-/// предотвращение повторного спама всплывающими алертами при циклических триггерах автозапуска.
-/// </summary>
+/// <summary>Verifies test scenario for NotificationDeduplicationTests.cs.</summary>
+/// <summary>Verifies test scenario for NotificationDeduplicationTests.cs.</summary>
 public class NotificationDeduplicationTests
 {
     /// <summary>
-    /// Проверяет, что повторные одинаковые уведомления BlacklistMatch в пределах Cooldown-окна подавляются.
+    /// <summary>Verifies test scenario for NotificationDeduplicationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Enqueue_DuplicateBlacklistMatch_SuppressesDuplicate()
@@ -35,18 +33,18 @@ public class NotificationDeduplicationTests
         };
         var payload = System.Text.Json.JsonSerializer.Serialize(entry);
 
-        // Отправляем одно и то же уведомление дважды
+        // Verifies component behavior and assertions.
         svc.Enqueue(new PipeMessage { Type = PipeMessageTypes.BlacklistMatch, Payload = payload });
         svc.Enqueue(new PipeMessage { Type = PipeMessageTypes.BlacklistMatch, Payload = payload });
 
         mre.Wait(TimeSpan.FromSeconds(5));
 
-        // Должно дойти ровно 1 сообщение, дубль отсечён
+        // Verifies component behavior and assertions.
         Assert.Single(batch);
     }
 
     /// <summary>
-    /// Проверяет, что если у заблокированной программы изменилась командная строка, уведомление не подавляется.
+    /// <summary>Verifies test scenario for NotificationDeduplicationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Enqueue_ChangedCommandLine_DoesNotSuppress()
@@ -85,7 +83,7 @@ public class NotificationDeduplicationTests
     }
 
     /// <summary>
-    /// Проверяет, что повторные ActionNotice с одинаковым именем и действием также подавляются.
+    /// <summary>Verifies test scenario for NotificationDeduplicationTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Enqueue_DuplicateActionNotice_SuppressesDuplicate()

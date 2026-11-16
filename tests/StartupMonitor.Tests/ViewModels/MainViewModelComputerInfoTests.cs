@@ -5,12 +5,12 @@ using Xunit;
 
 namespace StartupMonitor.Tests.ViewModels;
 
-/// <summary>Проверяет завершение длительного сбора сведений о компьютере вместе с моделью.</summary>
+/// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
 [Collection("MainViewModelConfig")]
 public class MainViewModelComputerInfoTests
 {
-    /// <summary>Частичный отказ сообщает об удалении правила и не помечает запись включённой.</summary>
-    /// <returns>Задача проверки частичного восстановления.</returns>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
     [Fact]
     public async Task UnblockEntry_WhenEnableFailsAfterRuleRemoval_ReportsPartialResult()
     {
@@ -31,8 +31,8 @@ public class MainViewModelComputerInfoTests
         Assert.Contains(LocalizationService.Instance["UnblockRuleRemovedButEnableFailed"], error);
     }
 
-    /// <summary>Потеря подключения при включении не меняет статус записи и показывает ошибку.</summary>
-    /// <returns>Задача проверки обработки отказа службы.</returns>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
     [Fact]
     public async Task EnableEntry_WhenDisconnected_KeepsDisabledStatus()
     {
@@ -48,8 +48,8 @@ public class MainViewModelComputerInfoTests
         Assert.False(string.IsNullOrWhiteSpace(error));
     }
 
-    /// <summary>Ошибка опроса не препятствует открытию окна с последним доступным снимком.</summary>
-    /// <returns>Задача проверки отказа источника сведений.</returns>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
     [Fact]
     public async Task OpenSystemInfo_OpensWhenCollectionFails()
     {
@@ -63,8 +63,8 @@ public class MainViewModelComputerInfoTests
         Assert.True(opened);
     }
 
-    /// <summary>Закрытая модель не открывает окно после отмены и безопасно освобождается повторно.</summary>
-    /// <returns>Задача проверки отмены фонового сбора.</returns>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
+    /// <summary>Verifies test scenario for MainViewModelComputerInfoTests.cs.</summary>
     [Fact]
     public async Task OpenSystemInfo_CancelsWaitingWhenDisposed()
     {

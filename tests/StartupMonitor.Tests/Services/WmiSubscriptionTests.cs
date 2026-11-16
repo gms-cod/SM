@@ -9,9 +9,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class WmiSubscriptionTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void WmiSubscriptionPayload_SerializationRoundtrip()
     {
         var payload = new WmiSubscriptionPayload
@@ -40,6 +46,9 @@ public class WmiSubscriptionTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void WmiDisablePayload_SerializationRoundtrip()
     {
         var disablePayload = new WmiDisablePayload(
@@ -56,6 +65,9 @@ public class WmiSubscriptionTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SystemProtection_DetectsCoreWmiSubscriptions()
     {
         Assert.True(SystemProtectionHelper.IsProtectedWmiSubscription("SCM Event Log Consumer"));
@@ -69,6 +81,9 @@ public class WmiSubscriptionTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SystemProtection_IsProtectedSystemEntry_WorksForWmi()
     {
         var entry = new StartupEntry
@@ -91,6 +106,9 @@ public class WmiSubscriptionTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void RemoveFromSystem_RejectsProtectedWmiEntry()
     {
         var entry = new StartupEntry
@@ -108,6 +126,9 @@ public class WmiSubscriptionTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void RestoreSubscription_WithNullOrInvalidPayload_ReturnsError()
     {
         var (s1, err1) = WmiSubscriptionHelper.RestoreSubscription(null);
@@ -120,14 +141,17 @@ public class WmiSubscriptionTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ScanSubscriptions_SafeExecutionOnWindows()
     {
         if (!OperatingSystem.IsWindows()) return;
 
-        // Сканирование WMI не должно бросать исключений
+        // Verifies component behavior and assertions.
         var subs = WmiSubscriptionHelper.ScanSubscriptions();
         Assert.NotNull(subs);
-        // На обычной Windows может быть 0 или несколько встроенных подписок (например SCM Event Log)
+        // Verifies component behavior and assertions.
         foreach (var sub in subs)
         {
             Assert.Equal(EntryLocation.WmiEventSubscription, sub.Location);

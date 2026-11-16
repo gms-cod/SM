@@ -10,29 +10,29 @@ using StartupMonitor.UI.Views.Dialogs;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет настоящее окно свойств и live-модель при замене снимка и асинхронной переоценке без AI/IPC.</summary>
+/// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
 [Collection("WpfNetworkRendering")]
 public sealed class EntryDetailRatingSynchronizationTests
 {
     private readonly NetworkRenderingTestHost _host;
 
-    /// <summary>Использует общий изолированный STA-диспетчер ресурсов приложения.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     public EntryDetailRatingSynchronizationTests(NetworkRenderingTestHost host) => _host = host;
 
-    /// <summary>Возвращает два независимых объекта одной записи для моделирования очередного ответа службы.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     private static StartupEntry Entry(int rating = 5, string risk = "Original risk", bool manual = false) => new()
     {
         Id = "detail-rating-entry", Name = "client", FilePath = @"C:\Apps\client.exe", AiRating = rating,
         AiCategory = "Category", AiRisk = risk, AiRecommendation = "Recommendation", IsUserRating = manual
     };
 
-    /// <summary>Создаёт ViewModel без службы, реестра и фоновых таймеров.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     private static MainViewModel Model(PipeClient client) => new(client,
         _ => Task.FromResult(new List<NetworkConnectionAlertDto>()),
         (_, _) => Task.FromResult<NetworkAlertStatusPayload?>(null),
         _ => throw new InvalidOperationException("Сетевые карточки не относятся к этой проверке"));
 
-    /// <summary>Дожидается WPF-привязок и продолжений с ограничением времени, не блокируя диспетчер.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     private static void PumpUntil(Func<bool> condition)
     {
         if (condition()) return;
@@ -48,7 +48,7 @@ public sealed class EntryDetailRatingSynchronizationTests
         Assert.True(condition(), "Окно свойств не синхронизировалось за три секунды.");
     }
 
-    /// <summary>Дожидается первого ContentRendered: TitleBar WPF-UI требует живой HWND до завершения этого отложенного callback.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     private static void ShowRendered(EntryDetailWindow window)
     {
         var rendered = false;
@@ -57,7 +57,7 @@ public sealed class EntryDetailRatingSynchronizationTests
         PumpUntil(() => rendered);
     }
 
-    /// <summary>Смена серверного экземпляра сразу перепривязывает открытое окно, включая происхождение оценки.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     [Fact]
     public void SnapshotReplacement_UpdatesOpenWindowAndRatingOrigin()
         => _host.Run(() =>
@@ -82,7 +82,7 @@ public sealed class EntryDetailRatingSynchronizationTests
             finally { window.Close(); }
         });
 
-    /// <summary>Новая оценка обновляет актуальный список и открытое окно даже после замены снимка во время запроса.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     [Fact]
     public void RefreshCompletesAfterSnapshotReplacement_UpdatesLiveListWindowAndManualFlag()
         => _host.Run(() =>
@@ -124,7 +124,7 @@ public sealed class EntryDetailRatingSynchronizationTests
             finally { window.Close(); }
         });
 
-    /// <summary>Отсутствие нового ответа сохраняет подтверждённый рейтинг, объяснение и ручной статус.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     [Fact]
     public void RefreshReturnsNoResult_PreservesPreviousDataAndAllowsRetry()
         => _host.Run(() =>
@@ -149,7 +149,7 @@ public sealed class EntryDetailRatingSynchronizationTests
             finally { window.Close(); }
         });
 
-    /// <summary>Дельта с прежним числом звёзд, но новым объяснением/источником не теряется сравнением снимков.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     [Fact]
     public void SameScoreWithChangedExplanation_IsRecognizedAsUpdatedSnapshot()
         => _host.Run(() =>
@@ -163,7 +163,7 @@ public sealed class EntryDetailRatingSynchronizationTests
             Assert.True(Assert.IsType<bool>(method.Invoke(model, [new List<StartupEntry> { updated }, new List<BlacklistRule>()])));
         });
 
-    /// <summary>После закрытия внешняя модель больше не перепривязывает окно и не удерживает его через подписки.</summary>
+    /// <summary>Verifies test scenario for EntryDetailRatingSynchronizationTests.cs.</summary>
     [Fact]
     public void ClosedWindow_DetachesFromEntryAndViewModelNotifications()
         => _host.Run(() =>

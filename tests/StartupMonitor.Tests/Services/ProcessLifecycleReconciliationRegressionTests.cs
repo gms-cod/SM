@@ -3,26 +3,24 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Проверяет восстановление реестра после потери событий, строгое различение экземпляров PID
-/// и изоляцию опубликованных снимков правил от последующих изменений конфигурации.
-/// Все события синтетические: нативные сессии ETW и процессы ОС не создаются.
-/// </summary>
+/// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
 public sealed class ProcessLifecycleReconciliationRegressionTests
 {
     private static readonly DateTime StartUtc = new(2026, 11, 5, 10, 0, 0, DateTimeKind.Utc);
 
-    /// <summary>Создаёт событие с фиксированным PID и управляемыми временем, ключом и порядковым номером.</summary>
-    /// <param name="epoch">Эпоха источника ETW.</param>
-    /// <param name="kind">Вид события.</param>
-    /// <param name="time">Время события в UTC.</param>
-    /// <param name="key">Непрозрачный ключ экземпляра процесса.</param>
-    /// <param name="sequence">Порядковый номер принятого события.</param>
-    /// <returns>Неизменяемое событие для чистого редуктора.</returns>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     private static ProcessLifecycleEvent Event(Guid epoch, LifecycleEventKind kind, DateTime time, ulong key = 42, long sequence = 1) =>
         new(epoch, sequence, kind, 1234, 10, key, sequence * 1000, time, "client.exe", string.Empty);
 
-    /// <summary>Проверяет восстановление пропущенного Stop по полному контрольному снимку.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_AbsentPreviouslyKnownProcess_IsRetired()
     {
@@ -37,7 +35,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Equal(original.InstanceId, Assert.Single(registry.GetHistorySnapshot()).InstanceId);
     }
 
-    /// <summary>Проверяет, что снимок, сделанный раньше поступившего Start, не удаляет новый процесс.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_ProcessStartedAfterSnapshot_RemainsAlive()
     {
@@ -52,7 +50,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Empty(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Проверяет, что старый снимок того же PID не прикрепляет FILETIME прежнего процесса к более позднему Start.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_OlderSnapshotContainsReusedPid_DoesNotOverwriteNewStart()
     {
@@ -70,7 +68,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Empty(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Проверяет быстрое переиспользование PID внутри бывшего двухсекундного допуска.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_CreationTimeChangesByOneMillisecond_CreatesNewGeneration()
     {
@@ -87,7 +85,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Equal(old.InstanceId, Assert.Single(registry.GetHistorySnapshot()).InstanceId);
     }
 
-    /// <summary>Проверяет, что переиспользованный непрозрачный KernelKey не заменяет проверку времени нового Start.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyEvent_NewStartReusesSameKernelKey_AssignsNewGeneration()
     {
@@ -104,7 +102,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Equal(old.InstanceId, Assert.Single(registry.GetHistorySnapshot()).InstanceId);
     }
 
-    /// <summary>Проверяет, что старый бесключевой Stop не завершает новый экземпляр PID.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyEvent_StopBeforeCurrentBirthWithoutKernelKey_DoesNotRetireCurrent()
     {
@@ -119,7 +117,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Empty(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Проверяет, что запоздалый Start старого PID не заменяет новый активный экземпляр.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyEvent_StaleStartBeforeCurrentBirth_DoesNotReplaceCurrent()
     {
@@ -134,7 +132,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Empty(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Проверяет, что rundown не выдаёт время наблюдения существующего процесса за время его создания.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyEvent_Rundown_DoesNotInventCreationTimestamp()
     {
@@ -148,7 +146,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Equal(DateTime.MinValue, observed.CreationTimeUtc);
     }
 
-    /// <summary>Проверяет дополнение неизвестного rundown времени создания точным системным снимком без смены поколения.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_RundownThenAuthoritativeCreation_UpgradesExistingGeneration()
     {
@@ -165,7 +163,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Empty(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Проверяет слияние уже захваченного FILETIME с ожидающим Start, timestamp которого позднее рождения на один такт.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyEvent_QueuedStartAfterAuthoritativeBaseline_PreservesGenerationAndBindsKernelKey()
     {
@@ -186,7 +184,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Equal(baseline.InstanceId, Assert.Single(registry.GetHistorySnapshot()).InstanceId);
     }
 
-    /// <summary>Проверяет, что запоздалое перечисление уже завершённого экземпляра не возвращает его в live-набор.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyEvent_RundownBeforeKnownStop_DoesNotResurrectExitedInstance()
     {
@@ -202,7 +200,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Single(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Проверяет приоритет Stop над снимком, захват которого начался раньше завершения процесса.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_SnapshotPredatesKnownStop_DoesNotResurrectExitedInstance()
     {
@@ -215,12 +213,12 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
 
         Assert.Empty(registry.GetLiveSnapshot());
         Assert.Single(registry.GetHistorySnapshot());
-        // Настоящий новый экземпляр после Stop всё же учитывается.
+        // Verifies component behavior and assertions.
         registry.ApplyBaseline([(1234, 10, StartUtc.AddSeconds(3), "client.exe")], StartUtc.AddSeconds(4));
         Assert.Equal(StartUtc.AddSeconds(3), Assert.Single(registry.GetLiveSnapshot()).CreationTimeUtc);
     }
 
-    /// <summary>Проверяет атомарность относительно исключения перечислителя источника снимка.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_SourceEnumerationFails_DoesNotPartiallyMutateLiveSet()
     {
@@ -234,15 +232,15 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Empty(registry.GetHistorySnapshot());
     }
 
-    /// <summary>Выдаёт одну новую запись и затем воспроизводит контролируемый отказ источника.</summary>
-    /// <returns>Последовательность, которая не может считаться полным авторитетным снимком.</returns>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     private static IEnumerable<(int Pid, int ParentPid, DateTime CreationTimeUtc, string ImageName)> BrokenSnapshot()
     {
         yield return (5678, 10, StartUtc, "partial.exe");
         throw new InvalidOperationException("Controlled snapshot enumeration failure");
     }
 
-    /// <summary>Проверяет явную деградацию при превышении лимита, его жёсткость и восстановление последующим полным снимком.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void ApplyBaseline_LiveCapacityExceeded_RemainsBoundedAndClearsFlagOnlyAfterSuccessfulSnapshot()
     {
@@ -259,7 +257,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Single(registry.GetLiveSnapshot());
     }
 
-    /// <summary>Проверяет, что асинхронные метаданные старого поколения не прикрепляются к новому после сверки.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void TryUpdateMetadata_PidReusedDuringReconciliation_RejectsOldWork()
     {
@@ -277,7 +275,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Null(current.Signer);
     }
 
-    /// <summary>Проверяет приём ленивой подписи только для точного FILETIME и отсутствие повторного сигнала на cache-hit.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void TryUpdateVerifiedMetadata_CurrentCreationTime_AppliesOnceWithoutSignalLoop()
     {
@@ -297,7 +295,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Equal(update.Signer, current.Signer);
     }
 
-    /// <summary>Проверяет отказ поздней подписи после PID reuse и отказ неизвестной identity rundown.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void TryUpdateVerifiedMetadata_LateOldCreationOrUnknownIdentity_IsRejected()
     {
@@ -315,7 +313,7 @@ public sealed class ProcessLifecycleReconciliationRegressionTests
         Assert.Null(Assert.Single(unknown.GetLiveSnapshot()).Signer);
     }
 
-    /// <summary>Проверяет, что изменения исходного mutable правила не изменяют уже опубликованный снимок.</summary>
+    /// <summary>Verifies test scenario for ProcessLifecycleReconciliationRegressionTests.cs.</summary>
     [Fact]
     public void BlacklistRuleSnapshot_SourceRuleMutated_DoesNotChangePublishedPolicy()
     {

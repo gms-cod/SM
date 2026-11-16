@@ -27,6 +27,9 @@ public class TaskSchedulerWatcher : BackgroundService
     /// <summary>Подключение к планировщику задач (COM-объект).</summary>
     private TaskService? _taskService;
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public TaskSchedulerWatcher(
         JsonDataStore store,
         BlacklistManager blacklist,

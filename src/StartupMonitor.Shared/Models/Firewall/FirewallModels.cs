@@ -37,6 +37,18 @@ public enum FirewallAction
     Allow = 1
 }
 
+/// <summary>Запрос изменения действия по умолчанию для выбранных профилей и одного направления.</summary>
+/// <param name="Profiles">Непустая комбинация профилей Windows.</param>
+/// <param name="Direction">Входящее или исходящее направление.</param>
+/// <param name="Action">Разрешение или блокировка по умолчанию.</param>
+public sealed record FirewallDefaultPolicyRequest(FirewallProfile Profiles, FirewallDirection Direction, FirewallAction Action);
+
+/// <summary>Фактически прочитанная политика одного профиля.</summary>
+/// <param name="Profile">Профиль сети.</param>
+/// <param name="Inbound">Действие для входящих соединений.</param>
+/// <param name="Outbound">Действие для исходящих соединений.</param>
+public sealed record FirewallDefaultPolicyState(FirewallProfile Profile, FirewallAction Inbound, FirewallAction Outbound);
+
 /// <summary>Профили сети Windows (битовая маска, как в INetFwRule.Profiles).</summary>
 [Flags]
 public enum FirewallProfile

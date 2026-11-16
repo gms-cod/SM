@@ -8,9 +8,7 @@ using StartupMonitor.UI.Converters;
 
 namespace StartupMonitor.Tests.Delayed;
 
-/// <summary>
-/// Тесты для функциональности отложенного запуска программ (Delayed Startup, v1.0.17).
-/// </summary>
+/// <summary>Verifies test scenario for DelayedStartupTests.cs.</summary>
 public class DelayedStartupTests : IDisposable
 {
     private readonly string _tempDir;
@@ -28,6 +26,9 @@ public class DelayedStartupTests : IDisposable
         _manager = new DelayedStartupManager(_store, NullLogger<DelayedStartupManager>.Instance, _notifications);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         _notifications.Dispose();
@@ -42,6 +43,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PrepareExecutionTarget_UnquotedSimplePath_ReturnsExeAndWorkingDir()
     {
         var dummyExe = Path.Combine(_tempDir, "dummy_app.exe");
@@ -55,6 +59,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PrepareExecutionTarget_QuotedPathWithArgs_ParsesExeAndCommandLine()
     {
         var dummyExe = Path.Combine(_tempDir, "program with spaces.exe");
@@ -69,6 +76,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PrepareExecutionTarget_EmptyOrWhitespace_ReturnsEmpty()
     {
         var (exe, cmd, workingDir) = UserSessionLauncher.PrepareExecutionTarget("   ", "");
@@ -78,6 +88,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Payload_SetDelayedEntry_SerializationRoundTrip()
     {
         var payload = new SetDelayedEntryPayload("entry-123", 45);
@@ -90,6 +103,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Payload_CancelDelayedEntry_SerializationRoundTrip()
     {
         var payload = new CancelDelayedEntryPayload("entry-456");
@@ -101,6 +117,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Payload_LaunchDelayedEntry_SerializationRoundTrip()
     {
         var payload = new LaunchDelayedEntryPayload("entry-789");
@@ -112,6 +131,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DelayedStartupManager_SetDelayed_UpdatesStatusAndDelaySeconds()
     {
         var appPath = Path.Combine(_tempDir, "testapp.exe");
@@ -138,6 +160,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DelayedStartupManager_CancelDelayed_RestoresStatusToEnabled()
     {
         var appPath = Path.Combine(_tempDir, "testapp2.exe");
@@ -164,6 +189,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DelayedStartupManager_SetDelayed_EntryNotFound_ReturnsError()
     {
         var (success, error) = _manager.SetDelayed("non-existent-id", 30);
@@ -173,6 +201,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DelayedStartupManager_CancelDelayed_EntryNotFound_ReturnsError()
     {
         var (success, error) = _manager.CancelDelayed("non-existent-id");
@@ -182,6 +213,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DelayedStartupManager_LaunchNow_EntryNotFound_ReturnsError()
     {
         var (success, error) = _manager.LaunchNow("non-existent-id");
@@ -191,6 +225,9 @@ public class DelayedStartupTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void StatusToColorConverter_DelayedStatus_ReturnsAmberBrush()
     {
         var converter = new StatusToColorConverter();
@@ -198,13 +235,16 @@ public class DelayedStartupTests : IDisposable
 
         Assert.NotNull(result);
         var brush = Assert.IsAssignableFrom<SolidColorBrush>(result);
-        // Должен быть янтарным / оранжевым оттенком (R > 200, G > 100, B < 50)
+        // Verifies component behavior and assertions.
         Assert.True(brush.Color.R >= 200);
         Assert.True(brush.Color.G >= 100);
         Assert.True(brush.Color.B <= 50);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void StatusToDisplayConverter_DelayedStatus_ReturnsNonEmptyLocalizedText()
     {
         var converter = new StatusToDisplayConverter();

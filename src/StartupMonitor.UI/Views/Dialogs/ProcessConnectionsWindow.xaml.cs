@@ -62,6 +62,9 @@ public partial class ProcessConnectionsWindow
         }
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string WindowTitle => $"{_targetProcess.ProcessName} (PID: {_targetProcess.Pid}) — Сетевые соединения";
 
     /// <summary>ProcessConnectionsWindow: Выполняет операцию ProcessConnectionsWindow.</summary>

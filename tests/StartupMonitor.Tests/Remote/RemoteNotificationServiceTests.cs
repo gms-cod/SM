@@ -7,10 +7,8 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Remote;
 
-/// <summary>
-/// Модульные тесты для RemoteNotificationService: проверка форматирования Telegram HTML,
-/// Discord Webhook JSON Embeds, фильтрации событий и безопасной обработки сетевых ошибок.
-/// </summary>
+/// <summary>Verifies test scenario for RemoteNotificationServiceTests.cs.</summary>
+/// <summary>Verifies test scenario for RemoteNotificationServiceTests.cs.</summary>
 public class RemoteNotificationServiceTests : IDisposable
 {
     private readonly string _tempDir;
@@ -23,6 +21,9 @@ public class RemoteNotificationServiceTests : IDisposable
         _store = new JsonDataStore(_tempDir);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, true); } catch { }
@@ -33,8 +34,14 @@ public class RemoteNotificationServiceTests : IDisposable
         public List<HttpRequestMessage> SentRequests { get; } = new();
         public List<string> SentBodies { get; } = new();
         public HttpStatusCode StatusCodeToReturn { get; set; } = HttpStatusCode.OK;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string ResponseBodyToReturn { get; set; } = "{\"ok\":true}";
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             SentRequests.Add(request);
@@ -51,6 +58,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void EscapeHtml_ReplacesSpecialCharsProperly()
     {
         var input = "powershell -enc <script> & 'hello'";
@@ -59,6 +69,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task NotifyNewEntry_WhenTelegramEnabled_SendsExpectedHtml()
     {
         var cfg = _store.Load();
@@ -97,6 +110,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task NotifyThreat_WhenDiscordEnabled_SendsExpectedEmbed()
     {
         var cfg = _store.Load();
@@ -140,6 +156,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task NotifyBlocked_WhenBothChannelsEnabled_DispatchesToBoth()
     {
         var cfg = _store.Load();
@@ -173,6 +192,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task Notify_WhenChannelsDisabled_DoesNotSendRequests()
     {
         var cfg = _store.Load();
@@ -192,6 +214,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task Notify_WhenEventToggledOff_SuppressesNotification()
     {
         var cfg = _store.Load();
@@ -213,6 +238,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task TestTelegramAsync_SuccessAndFailureHandling()
     {
         var cfg = _store.Load();
@@ -236,6 +264,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task TestDiscordAsync_SuccessAndFailureHandling()
     {
         var cfg = _store.Load();
@@ -259,6 +290,9 @@ public class RemoteNotificationServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void RemoteNotificationPayloads_Serialization_RoundTrip()
     {
         var payload = new RemoteNotificationConfigPayload(

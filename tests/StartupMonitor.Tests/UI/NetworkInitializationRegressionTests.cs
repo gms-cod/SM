@@ -5,10 +5,10 @@ using StartupMonitor.UI.Views;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет реальные XAML-события во время создания сетевой истории.</summary>
+/// <summary>Verifies test scenario for NetworkInitializationRegressionTests.cs.</summary>
 public sealed partial class NetworkRenderingRegressionTests
 {
-    /// <summary>Конструктор не пишет ошибки ранних фильтров, а готовая таблица получает исходный пустой снимок.</summary>
+    /// <summary>Verifies test scenario for NetworkInitializationRegressionTests.cs.</summary>
     [Fact]
     public void HistoryConstructor_InitializesTableWithoutFilterErrors()
         => _host.Run(() =>
@@ -29,7 +29,7 @@ public sealed partial class NetworkRenderingRegressionTests
             finally { view.Deactivate(); }
         });
 
-    /// <summary>Фильтр и выделение безопасно обрабатывают ещё не созданные в XAML кнопки.</summary>
+    /// <summary>Verifies test scenario for NetworkInitializationRegressionTests.cs.</summary>
     [Fact]
     public void HistoryActions_IgnoreEarlyEventsUntilAllControlsExist()
         => _host.Run(() =>

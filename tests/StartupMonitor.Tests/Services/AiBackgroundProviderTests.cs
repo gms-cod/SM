@@ -2,10 +2,10 @@
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет доступность фоновой оценки для локальных и удалённых AI-провайдеров.</summary>
+/// <summary>Verifies test scenario for AiBackgroundProviderTests.cs.</summary>
 public sealed class AiBackgroundProviderTests
 {
-    /// <summary>Локальный адрес допускается без ключа, удалённый требует заданного ключа.</summary>
+    /// <summary>Verifies test scenario for AiBackgroundProviderTests.cs.</summary>
     [Theory]
     [InlineData("", "http://localhost:11434/v1/chat/completions", true)]
     [InlineData("", "http://127.0.0.1:11434/v1/chat/completions", true)]

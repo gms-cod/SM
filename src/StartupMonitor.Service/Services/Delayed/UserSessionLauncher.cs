@@ -26,17 +26,53 @@ public static class UserSessionLauncher
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct STARTUPINFO
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int cb;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string lpReserved;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string lpDesktop;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public string lpTitle;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwX;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwY;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwXSize;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwYSize;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwXCountChars;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwYCountChars;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwFillAttribute;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwFlags;
         public short wShowWindow;
         public short cbReserved2;
@@ -51,7 +87,13 @@ public static class UserSessionLauncher
     {
         public IntPtr hProcess;
         public IntPtr hThread;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwProcessId;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int dwThreadId;
     }
 

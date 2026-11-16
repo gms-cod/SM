@@ -4,9 +4,7 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Юнит-тесты протокола Named Pipe для операций Firewall и Port Defender (Worker 2).
-/// </summary>
+/// <summary>Verifies test scenario for FirewallPipeTests.cs.</summary>
 public class FirewallPipeTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -15,6 +13,9 @@ public class FirewallPipeTests
     };
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BlockIpPayload_RoundTrip()
     {
         var payload = new BlockIpPayload("198.51.100.1", FirewallDirection.Inbound, true, 15, "Brute force attack");
@@ -30,6 +31,9 @@ public class FirewallPipeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UnblockIpPayload_RoundTrip()
     {
         var payload = new UnblockIpPayload("198.51.100.1", FirewallDirection.Both);
@@ -42,6 +46,9 @@ public class FirewallPipeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BlockPortPayload_RoundTrip()
     {
         var payload = new BlockPortPayload(3389, FirewallProtocol.Tcp, FirewallDirection.Inbound, @"C:\Windows\System32\mstsc.exe", "RDP Lock");
@@ -57,6 +64,9 @@ public class FirewallPipeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void UnblockPortPayload_RoundTrip()
     {
         var payload = new UnblockPortPayload(80, FirewallProtocol.Tcp, FirewallDirection.Inbound, null);
@@ -71,6 +81,9 @@ public class FirewallPipeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ActiveBansPayload_RoundTrip()
     {
         var ban = new ActiveBanDto
@@ -102,6 +115,9 @@ public class FirewallPipeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void PortDefenderConfigDto_RoundTrip()
     {
         var config = new PortDefenderConfigDto
@@ -141,6 +157,9 @@ public class FirewallPipeTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FirewallOperationResult_Serialization()
     {
         var ok = FirewallOperationResult.Ok("IP заблокирован.", "StartupMonitor_Blocked_IPs_In", created: true);

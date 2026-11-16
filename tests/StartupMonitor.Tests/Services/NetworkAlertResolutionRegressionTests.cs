@@ -5,21 +5,19 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Проверяет подтверждение пользовательского решения, сохранение ожидающего алерта
-/// при отказе брандмауэра и изоляцию решений для разных исполняемых файлов.
-/// Реальные правила Windows Firewall не изменяются: используется явный шов применения.
-/// </summary>
+/// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
 public sealed class NetworkAlertResolutionRegressionTests
 {
     private const string AppPath = @"C:\Apps\client.exe";
     private const string OtherPath = @"D:\Other\client.exe";
 
-    /// <summary>Создаёт исходящее соединение с управляемыми PID, портом и удалённым адресом.</summary>
-    /// <param name="pid">Идентификатор тестового процесса.</param>
-    /// <param name="port">Удалённый порт.</param>
-    /// <param name="address">Публичный удалённый адрес.</param>
-    /// <returns>Независимый снимок сокета.</returns>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     private static ProcessNetworkSocket Socket(int pid = 1001, int port = 443, string address = "8.8.8.8") => new()
     {
         ProcessId = pid,
@@ -32,11 +30,11 @@ public sealed class NetworkAlertResolutionRegressionTests
         State = "ESTABLISHED"
     };
 
-    /// <summary>Создаёт детектор без обращения к реальному брандмауэру или процессам.</summary>
-    /// <param name="sockets">Управляемый список соединений.</param>
-    /// <param name="apply">Действие применения правила либо имитация отказа.</param>
-    /// <param name="sessionPolicy">Управляемый адаптер временных правил, если требуется проверка вызовов.</param>
-    /// <returns>Детектор, подлежащий освобождению вызывающей стороной.</returns>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     private static NetworkConnectionAlertService CreateService(List<ProcessNetworkSocket> sockets, Action<FirewallRuleDto> apply, TestSessionFirewallPolicy? sessionPolicy = null) =>
         new(new ProcessNetworkTracker(), new WindowsFirewallService(), sessionFirewall: sessionPolicy ?? new TestSessionFirewallPolicy())
         {
@@ -46,10 +44,10 @@ public sealed class NetworkAlertResolutionRegressionTests
             ApplyFirewallRuleOverride = apply
         };
 
-    /// <summary>Формирует решение для конкретного алерта без доверия к клиентским метаданным.</summary>
-    /// <param name="alert">Авторитетный алерт службы.</param>
-    /// <param name="resolution">Выбранное пользователем действие.</param>
-    /// <returns>Запрос применения решения.</returns>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     private static ResolveNetworkAlertRequest Request(NetworkConnectionAlertDto alert, NetworkAlertResolution resolution) => new()
     {
         AlertId = alert.AlertId,
@@ -60,8 +58,8 @@ public sealed class NetworkAlertResolutionRegressionTests
         Resolution = resolution
     };
 
-    /// <summary>Проверяет отсутствие ложного подтверждения и изменения истории при отказе применения правила.</summary>
-    /// <param name="resolution">Постоянное действие, требующее реального правила брандмауэра.</param>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Theory]
     [InlineData(NetworkAlertResolution.AllowAlways)]
     [InlineData(NetworkAlertResolution.BlockAlways)]
@@ -83,7 +81,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.False(service.IsBlacklistedApp(AppPath, "client.exe"));
     }
 
-    /// <summary>Проверяет отклонение неизвестного действия без потери ожидающего запроса.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_UnknownResolution_DoesNotAcknowledgeOrRemovePending()
     {
@@ -99,7 +97,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Empty(service.SessionDecisions);
     }
 
-    /// <summary>Проверяет, что клиент не может перенаправить действие на другой исполняемый файл.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_ClientSuppliesDifferentPath_DoesNotApplyRuleToThatPath()
     {
@@ -119,7 +117,7 @@ public sealed class NetworkAlertResolutionRegressionTests
             Assert.Equal(alert.AlertId, Assert.Single(service.GetPendingAlerts()).AlertId);
     }
 
-    /// <summary>Проверяет, что одинаковое имя файла в другом каталоге не наследует разрешение.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_SameFilenameAtDifferentPaths_PreservesUnrelatedPending()
     {
@@ -134,7 +132,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Equal(OtherPath, Assert.Single(service.GetPendingAlerts()).ProcessPath);
     }
 
-    /// <summary>Проверяет ограничение разрешения порта выбранным портом, включая другие подключения приложения.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_AllowPort_DoesNotResolveOtherPortsOfSameApplication()
     {
@@ -150,7 +148,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.False(service.IsPortAllowed(8443));
     }
 
-    /// <summary>Проверяет, что разрешение удалённого порта создаёт реальную TCP-политику до подтверждения действия.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_AllowPort_CreatesOutboundTcpRuleForAuthoritativePort()
     {
@@ -172,7 +170,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.False(service.IsPortAllowed(8443));
     }
 
-    /// <summary>Проверяет отказ временного разрешения, которое текущий режим WFP не может обеспечить.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_UnsupportedSessionAllow_DoesNotAcknowledgeOrInvokePolicy()
     {
@@ -190,7 +188,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Empty(service.SessionDecisions);
     }
 
-    /// <summary>Проверяет повторную доставку подтверждённого решения после потери ответа IPC без повторного правила.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_RetriedAfterLostAcknowledgement_IsIdempotent()
     {
@@ -206,7 +204,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Empty(service.GetPendingAlerts());
     }
 
-    /// <summary>Проверяет, что повторная доставка другого решения не считается подтверждением исходного.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ResolveAlert_RetryChangesAction_DoesNotAcknowledgeDifferentDecision()
     {
@@ -222,9 +220,9 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Equal(FirewallAction.Allow, Assert.Single(applied).Action);
     }
 
-    /// <summary>Проверяет, что сессионные решения подтверждаются после обращения к временному адаптеру, без постоянного правила.</summary>
-    /// <param name="resolution">Выбранное сессионное действие.</param>
-    /// <param name="action">Соответствующее направление политики адаптера.</param>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Theory]
     [InlineData(NetworkAlertResolution.AllowSession, FirewallAction.Allow)]
     [InlineData(NetworkAlertResolution.BlockSession, FirewallAction.Block)]
@@ -247,8 +245,8 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Empty(service.GetPendingAlerts());
     }
 
-    /// <summary>Проверяет, что отказ временной политики не подменяется подавлением следующих уведомлений.</summary>
-    /// <param name="resolution">Сессионное действие пользователя.</param>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Theory]
     [InlineData(NetworkAlertResolution.AllowSession)]
     [InlineData(NetworkAlertResolution.BlockSession)]
@@ -267,7 +265,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Equal(NetworkConnectionVerdict.PendingAlert, Assert.Single(service.GetConnectionHistory()).Verdict);
     }
 
-    /// <summary>Проверяет, что истечение временного правила вновь требует решения для нового соединения приложения.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ScanNewConnections_SessionPolicyExpired_DoesNotSilentlySuppressNewConnection()
     {
@@ -284,7 +282,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Equal(8443, Assert.Single(service.GetPendingAlerts()).RemotePort);
     }
 
-    /// <summary>Проверяет передачу ограниченного TTL общему сессионному адаптеру и возврат к запросам после явного снятия.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ApplySessionAccess_TimedDecisionAndClear_DoNotCreatePermanentRule()
     {
@@ -306,8 +304,8 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Equal(1, service.ScanNewConnections());
     }
 
-    /// <summary>Проверяет отклонение недопустимого TTL до вызова адаптера и изменения очереди.</summary>
-    /// <param name="minutes">Недопустимая длительность правила в минутах.</param>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Theory]
     [InlineData(-1)]
     [InlineData(0)]
@@ -326,7 +324,7 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Empty(service.SessionDecisions);
     }
 
-    /// <summary>Проверяет приоритет временной блокировки над постоянным белым списком в журнале новых соединений.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public void ScanNewConnections_SessionBlockOverridesWhitelistVerdict()
     {
@@ -346,10 +344,10 @@ public sealed class NetworkAlertResolutionRegressionTests
     }
 
     /// <summary>
-    /// Проверяет повторную доставку одного решения во время применения правила:
-    /// ожидающее уведомление сохраняется до успеха, а конкурентные запросы применяют правило один раз.
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     /// </summary>
-    /// <returns>Задача, завершающаяся после обоих подтверждений без реального IPC или брандмауэра.</returns>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Fact]
     public async Task ResolveAlert_ConcurrentDuplicateRequest_CommitsOnceAfterRuleApplication()
     {
@@ -383,10 +381,10 @@ public sealed class NetworkAlertResolutionRegressionTests
         Assert.Empty(service.GetPendingAlerts());
     }
 
-    /// <summary>Проверяет точную область очистки конфликтующих правил, сохраняя чужие правила и одноимённые приложения.</summary>
-    /// <param name="rulePath">Путь приложения в правиле брандмауэра.</param>
-    /// <param name="managed">Принадлежит ли правило StartupMonitor.</param>
-    /// <param name="expected">Должно ли правило считаться принадлежащим целевому приложению.</param>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertResolutionRegressionTests.cs.</summary>
     [Theory]
     [InlineData(@"C:\Apps\client.exe", true, true)]
     [InlineData("\"c:/apps/client.exe\"", true, true)]

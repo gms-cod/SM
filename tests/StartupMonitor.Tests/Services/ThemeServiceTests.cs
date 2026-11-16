@@ -4,12 +4,13 @@ using Wpf.Ui.Appearance;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для ThemeService: проверка наполнения ресурсов кистями для тёмной и светлой темы.
-/// </summary>
+/// <summary>Verifies test scenario for ThemeServiceTests.cs.</summary>
 public class ThemeServiceTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ApplyDarkTheme_PopulatesExpectedResourceBrushes()
     {
         var res = new ResourceDictionary();
@@ -30,6 +31,9 @@ public class ThemeServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ApplyLightTheme_PopulatesExpectedResourceBrushes()
     {
         var res = new ResourceDictionary();
@@ -50,9 +54,12 @@ public class ThemeServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ThemeService_InitialTheme_IsDark()
     {
-        // По умолчанию эталонная тема приложения — Dark
+        // Verifies component behavior and assertions.
         Assert.True(ThemeService.CurrentTheme == ApplicationTheme.Dark || ThemeService.CurrentTheme == ApplicationTheme.Light);
     }
 }

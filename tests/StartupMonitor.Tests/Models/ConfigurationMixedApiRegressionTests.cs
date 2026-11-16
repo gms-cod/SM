@@ -2,13 +2,13 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>Проверяет согласование намерений одного writer при чередовании Save и UpdateEntry.</summary>
+/// <summary>Verifies test scenario for ConfigurationMixedApiRegressionTests.cs.</summary>
 public sealed class ConfigurationMixedApiRegressionTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitorMixedApi_" + Guid.NewGuid().ToString("N"));
 
-    /// <summary>Возврат статуса к исходному значению сохраняется через другой API без отката конкурентного рейтинга и новых записей.</summary>
-    /// <param name="entryFirst">True начинает с UpdateEntry; false начинает с полного Save.</param>
+    /// <summary>Verifies test scenario for ConfigurationMixedApiRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ConfigurationMixedApiRegressionTests.cs.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -38,8 +38,8 @@ public sealed class ConfigurationMixedApiRegressionTests : IDisposable
         Assert.Contains(actual.Entries, item => item.Id == "concurrent");
     }
 
-    /// <summary>Возврат рейтинга к нулю сохраняется через другой API, не отменяя параллельное отключение записи.</summary>
-    /// <param name="entryFirst">True начинает с UpdateEntry; false начинает с полного Save.</param>
+    /// <summary>Verifies test scenario for ConfigurationMixedApiRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for ConfigurationMixedApiRegressionTests.cs.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -65,7 +65,7 @@ public sealed class ConfigurationMixedApiRegressionTests : IDisposable
         Assert.Equal(0, actual.AiRating);
     }
 
-    /// <summary>Удаляет только уникальный каталог, принадлежащий данному экземпляру теста.</summary>
+    /// <summary>Verifies test scenario for ConfigurationMixedApiRegressionTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);

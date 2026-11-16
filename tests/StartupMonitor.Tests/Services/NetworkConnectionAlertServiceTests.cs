@@ -5,11 +5,9 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты детектора новых сетевых подключений
-/// (<see cref="NetworkConnectionAlertService"/>): фильтрация частных адресов
-/// и системных процессов, обработка решений AllowAlways / BlockAlways / AllowSession.
-/// </summary>
+/// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+/// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
 public sealed class NetworkConnectionAlertServiceTests
 {
     private const string EvilPath = @"C:\Apps\evil.exe";
@@ -60,7 +58,7 @@ public sealed class NetworkConnectionAlertServiceTests
     private static Dictionary<int, string> Paths(params (int Pid, string Path)[] pairs) =>
         pairs.ToDictionary(p => p.Pid, p => p.Path);
 
-    // ── Фильтрация частных адресов ──
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("127.0.0.1")]
@@ -85,6 +83,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ScanNewConnections_UdpListeningSocketWithoutRemote_IsFiltered()
     {
         using var svc = CreateService(
@@ -94,7 +95,7 @@ public sealed class NetworkConnectionAlertServiceTests
         Assert.Equal(0, svc.ScanNewConnections());
     }
 
-    // ── Фильтрация системных процессов ──
+    // Verifies component behavior and assertions.
 
     [Theory]
     [InlineData("System")]
@@ -106,7 +107,7 @@ public sealed class NetworkConnectionAlertServiceTests
     [InlineData("StartupMonitor.UI.exe")]
     public void ScanNewConnections_SystemProcesses_AreIgnored(string processName)
     {
-        // Доверие проверяется по реальному расположению компонента, а не одному имени.
+        // Verifies component behavior and assertions.
         var path = processName.StartsWith("StartupMonitor", StringComparison.OrdinalIgnoreCase)
             ? Path.Combine(AppContext.BaseDirectory, processName)
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", processName == "System" ? "ntoskrnl.exe" : processName);
@@ -128,12 +129,18 @@ public sealed class NetworkConnectionAlertServiceTests
     [InlineData("evil.exe", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsTrustedProcess_MatchesExpected(string? processName, bool expected)
     {
         Assert.Equal(expected, NetworkConnectionAlertService.IsTrustedProcess(processName, null));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsTrustedProcess_MatchesByProcessPathFileName()
     {
         Assert.True(NetworkConnectionAlertService.IsTrustedProcess(
@@ -142,7 +149,7 @@ public sealed class NetworkConnectionAlertServiceTests
             "unknown", @"C:\Apps\evil.exe"));
     }
 
-    // ── Создание алертов ──
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void ScanNewConnections_PublicAddress_CreatesAlertWithFields()
@@ -168,6 +175,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ScanNewConnections_SameConnectionTwice_ProducesSingleAlert()
     {
         var sockets = new List<ProcessNetworkSocket>
@@ -182,6 +192,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ScanNewConnections_DifferentRemotes_AggregateIntoOneApplicationGroup()
     {
         using var svc = CreateService(
@@ -197,6 +210,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ScanNewConnections_ExistingFirewallRule_SkipsAlert()
     {
         using var svc = CreateService(
@@ -208,7 +224,7 @@ public sealed class NetworkConnectionAlertServiceTests
         Assert.Empty(svc.GetPendingAlerts());
     }
 
-    // ── Резолв алертов ──
+    // Verifies component behavior and assertions.
 
     private static NetworkConnectionAlertDto ScanSingle(NetworkConnectionAlertService svc)
     {
@@ -217,6 +233,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_AllowAlways_CreatesAllowRuleAndRemovesAlert()
     {
         var applied = new List<FirewallRuleDto>();
@@ -246,6 +265,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_WhitelistProgram_CreatesAllowRuleAndWhitelistsSession()
     {
         var applied = new List<FirewallRuleDto>();
@@ -275,6 +297,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_BlockAlways_CreatesBlockRuleAndRemovesAlert()
     {
         var applied = new List<FirewallRuleDto>();
@@ -303,6 +328,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_AllowSession_NoFirewallRule_SessionWhitelisted()
     {
         var applied = new List<FirewallRuleDto>();
@@ -328,13 +356,16 @@ public sealed class NetworkConnectionAlertServiceTests
         var key = NetworkConnectionAlertService.BuildSessionKey(EvilPath, "evil.exe");
         Assert.Equal(NetworkAlertResolution.AllowSession, svc.SessionDecisions[key]);
 
-        // Повторный скан (включая новый remote того же процесса) алертов не даёт.
+        // Verifies component behavior and assertions.
         sockets.Add(Sock(1234, "evil.exe", "9.9.9.9", 53));
         Assert.Equal(0, svc.ScanNewConnections());
         Assert.Empty(svc.GetPendingAlerts());
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_AllowAlways_PreventsFutureAlerts()
     {
         var applied = new List<FirewallRuleDto>();
@@ -356,6 +387,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_UnknownId_ReturnsFalse()
     {
         var applied = new List<FirewallRuleDto>();
@@ -379,6 +413,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ResolveAlert_NullOrEmptyRequest_ReturnsFalse()
     {
         using var svc = CreateService();
@@ -387,7 +424,7 @@ public sealed class NetworkConnectionAlertServiceTests
         Assert.False(svc.ResolveAlert(new ResolveNetworkAlertRequest()));
     }
 
-    // ── Включение/выключение ──
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void SetAlertsEnabled_Disabled_SkipsScanAndClearsPending()
@@ -410,6 +447,9 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetPendingAlerts_ReturnsSnapshotOrderedByDetectionTime()
     {
         using var svc = CreateService(
@@ -427,7 +467,7 @@ public sealed class NetworkConnectionAlertServiceTests
         Assert.True(pending[0].DetectedAt <= pending[1].DetectedAt);
     }
 
-    // ── Потокобезопасность и приоритет Blacklist > Whitelist ──
+    // Verifies component behavior and assertions.
 
     [Fact]
     public void Blacklist_HasAbsolutePriorityOver_Whitelist()
@@ -436,7 +476,7 @@ public sealed class NetworkConnectionAlertServiceTests
             new List<ProcessNetworkSocket> { Sock(1234, "conflict.exe", "93.184.216.34", 443) },
             Paths((1234, @"C:\Apps\conflict.exe")));
 
-        // Сначала добавляем алерт и применяем Whitelist
+        // Verifies component behavior and assertions.
         Assert.Equal(1, svc.ScanNewConnections());
         var alert = Assert.Single(svc.GetPendingAlerts());
         svc.ResolveAlert(new ResolveNetworkAlertRequest
@@ -450,8 +490,8 @@ public sealed class NetworkConnectionAlertServiceTests
         Assert.True(svc.IsWhitelistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
         Assert.False(svc.IsBlacklistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
 
-        // Теперь применяем Blacklist к той же программе
-        // Генерируем новый алерт для резолва
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var svc2 = CreateService(
             new List<ProcessNetworkSocket> { Sock(5678, "conflict.exe", "93.184.216.35", 80) },
             Paths((5678, @"C:\Apps\conflict.exe")));
@@ -465,12 +505,15 @@ public sealed class NetworkConnectionAlertServiceTests
             ProcessName = "conflict.exe"
         });
 
-        // Проверяем: в svc2 при добавлении в черный список программа строго заблокирована
+        // Verifies component behavior and assertions.
         Assert.True(svc2.IsBlacklistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
         Assert.False(svc2.IsWhitelistedApp(@"C:\Apps\conflict.exe", "conflict.exe"));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ConcurrentAccess_ToWhitelistedAndBlacklistedApps_DoesNotThrow()
     {
         using var svc = CreateService();
@@ -506,8 +549,8 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет ограничение размера истории сетевых подключений (MaxHistoryItems = 2500)
-    /// и вытеснение самых старых записей.
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RecordHistory_LimitsMaxItems_AndPrunesOldest()
@@ -535,7 +578,7 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет полную очистку истории сетевых подключений.
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ClearConnectionHistory_PurgesAllEntries()
@@ -555,7 +598,7 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет обновление статуса в истории при вызове ResolveAlert.
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ResolveAlert_UpdatesHistoryItemVerdict()
@@ -585,14 +628,14 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что при включённых автономных решениях ИИ с режимом AllowSession
-    /// алерт НЕ добавляется в очередь всплывающего окна, а решение AllowSession
-    /// мгновенно фиксируется в сессии и журнале истории с метаданными ИИ.
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public async Task ScanNewConnections_AutonomousAllowSession_AppliesDecisionWithoutAlert()
     {
-        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        // Verifies component behavior and assertions.
         var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
         var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
@@ -616,12 +659,12 @@ public sealed class NetworkConnectionAlertServiceTests
 
             var added = svc.ScanNewConnections();
 
-            // Всплывающий алерт НЕ должен создаваться
+            // Verifies component behavior and assertions.
             Assert.Equal(0, added);
             Assert.Equal(0, svc.PendingCount);
             Assert.Empty(svc.GetPendingAlerts());
 
-            // Ожидаем завершения асинхронной фиксации автономного решения
+            // Verifies component behavior and assertions.
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while (DateTime.UtcNow < deadline && svc.GetConnectionHistory().Count == 0)
             {
@@ -641,13 +684,13 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что при включённых автономных решениях ИИ с режимом BlockSession
-    /// применяется сессионная блокировка без всплывающих окон.
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public async Task ScanNewConnections_AutonomousBlockSession_AppliesDecisionWithoutAlert()
     {
-        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        // Verifies component behavior and assertions.
         var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
         var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
@@ -691,13 +734,13 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что при отключённых автономных решениях ИИ алерт создаётся штатно
-    /// и обогащается полями AI (AiPurpose, AiBlockingRisk, AiRecommendation).
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public async Task ScanNewConnections_StandardMode_EnrichesPendingAlertWithAi()
     {
-        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        // Verifies component behavior and assertions.
         var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
         var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
@@ -746,13 +789,13 @@ public sealed class NetworkConnectionAlertServiceTests
     }
 
     /// <summary>
-    /// Проверяет, что AiRatingService.EvaluateNetworkProcessAsync мгновенно
-    /// распознаёт компоненты StartupMonitor и системные доверенные службы Windows.
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkConnectionAlertServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public async Task AiRatingService_EvaluateNetworkProcessAsync_ReturnsImmediateTrustedVerdict()
     {
-        // Все секционные файлы теста изолированы одним уникальным каталогом.
+        // Verifies component behavior and assertions.
         var tmpDirectory = Directory.CreateTempSubdirectory("StartupMonitorAlertTests_");
         var tmp = Path.Combine(tmpDirectory.FullName, "startup-monitor.json");
         try
@@ -763,7 +806,7 @@ public sealed class NetworkConnectionAlertServiceTests
 
             using var aiService = new StartupMonitor.Service.Services.Ai.AiRatingService(cache, logger, string.Empty);
 
-            // Проверка для StartupMonitor
+            // Verifies component behavior and assertions.
             var smonVerdict = await aiService.EvaluateNetworkProcessAsync(
                 "StartupMonitor.Service.exe",
                 Path.Combine(AppContext.BaseDirectory, "StartupMonitor.Service.exe"),
@@ -774,7 +817,7 @@ public sealed class NetworkConnectionAlertServiceTests
             Assert.Equal("AllowAlways", smonVerdict.Value.RecommendedAction);
             Assert.Contains("Startup Monitor", smonVerdict.Value.Purpose);
 
-            // Проверка для доверенного процесса Windows
+            // Verifies component behavior and assertions.
             var sysVerdict = await aiService.EvaluateNetworkProcessAsync(
                 "svchost.exe",
                 @"C:\Windows\System32\svchost.exe",

@@ -3,19 +3,37 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Управляемый результат firewall-операций для unit-тестов без обращения к COM или сетевым правилам машины.</summary>
+/// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
 internal sealed class TestPortDefenderFirewall : IPortDefenderFirewall
 {
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal bool BlockSucceeds { get; set; } = true;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal bool UnblockSucceeds { get; set; } = true;
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal bool ThrowOnBlock { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal bool ThrowOnUnblock { get; set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal int BlockCalls { get; private set; }
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     internal int UnblockCalls { get; private set; }
 
-    /// <summary>Возвращает управляемый результат блокировки и учитывает число попыток.</summary>
-    /// <param name="request">Запрошенная блокировка.</param>
-    /// <returns>Успех или отказ, выбранный сценарием теста.</returns>
+    /// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
+    /// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
+    /// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
     public FirewallOperationResult BlockIp(BlockIpRequest request)
     {
         BlockCalls++;
@@ -23,9 +41,9 @@ internal sealed class TestPortDefenderFirewall : IPortDefenderFirewall
         return BlockSucceeds ? FirewallOperationResult.Ok("Blocked", "TestRule") : FirewallOperationResult.Fail("Injected refusal");
     }
 
-    /// <summary>Возвращает управляемый результат разбана, не меняя настройки операционной системы.</summary>
-    /// <param name="request">Запрошенный разбан.</param>
-    /// <returns>Успех или отказ, выбранный сценарием теста.</returns>
+    /// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
+    /// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
+    /// <summary>Verifies test scenario for TestPortDefenderFirewall.cs.</summary>
     public FirewallOperationResult UnblockIp(UnblockIpRequest request)
     {
         UnblockCalls++;

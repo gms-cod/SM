@@ -5,9 +5,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.UI;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class SymbolRegularVerificationTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AllXamlSymbols_MustExistInWpfUiSymbolRegular()
     {
         var baseDir = AppContext.BaseDirectory;
@@ -45,6 +51,9 @@ public class SymbolRegularVerificationTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AllXamlAlignments_MustBeValid()
     {
         var baseDir = AppContext.BaseDirectory;

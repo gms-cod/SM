@@ -13,7 +13,7 @@ public sealed class BoundedLineReader
     private int _position;
     private int _length;
 
-    /// <summary>Инициализирует ограниченный читатель без передачи владения исходным потоком.</summary>
+    /// <summary>Initializes a bounded reader without taking ownership of underlying stream.</summary>
     /// <param name="reader">Последовательно используемый текстовый поток.</param>
     /// <param name="maximumCharacters">Предельное количество символов одного кадра.</param>
     public BoundedLineReader(TextReader reader, int maximumCharacters = MaximumFrameCharacters)

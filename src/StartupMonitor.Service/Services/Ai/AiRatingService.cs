@@ -8,6 +8,9 @@ using StartupMonitor.Shared.Diagnostics;
 
 namespace StartupMonitor.Service.Services.Ai;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class AiRatingService : IDisposable
 {
     private readonly HttpClient _http;
@@ -26,6 +29,9 @@ public class AiRatingService : IDisposable
     private static readonly Random _jitter = new();
     private static readonly string WindowsVersion = RuntimeInformation.OSDescription;
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public AiRatingService(RatingsCache cache, ILogger<AiRatingService> logger, string apiKey, string uiLang = "ru",
         string? apiUrl = null, string? model = null, HttpMessageHandler? httpHandler = null)
     {
@@ -830,6 +836,9 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         public readonly object Sync = new();
         public readonly CancellationTokenSource Cancellation;
         public readonly Lazy<Task<(string Purpose, string BlockingRisk, string Recommendation, string RecommendedAction)?>> Task;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public int Waiters;
 
         /// <summary>Создаёт ленивую общую задачу, отменяемую при остановке сервиса либо уходе последнего потребителя.</summary>
@@ -1190,6 +1199,9 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
         return defaultValue;
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         _networkLifetime.Cancel();

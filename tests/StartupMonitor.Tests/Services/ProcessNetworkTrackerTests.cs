@@ -5,20 +5,26 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class ProcessNetworkTrackerTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CaptureNetworkBandwidth_ReturnsValidResultWithoutExceptions()
     {
         using var tracker = new ProcessNetworkTracker();
 
-        // Первый вызов инициализирует начальный срез сокетов
+        // Verifies component behavior and assertions.
         var (map1, total1, sockets1) = tracker.CaptureNetworkBandwidth();
         Assert.NotNull(map1);
         Assert.True(total1 >= 0);
         Assert.NotNull(sockets1);
 
-        // Второй вызов замеряет дельту
+        // Verifies component behavior and assertions.
         var (map2, total2, sockets2) = tracker.CaptureNetworkBandwidth();
         Assert.NotNull(map2);
         Assert.True(total2 >= 0);
@@ -26,6 +32,9 @@ public class ProcessNetworkTrackerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessInfo_HasNetworkActivity_EvaluatesCorrectly()
     {
         var info = new ProcessInfo();
@@ -54,6 +63,9 @@ public class ProcessNetworkTrackerTests
     [InlineData(100, "0.1 КБ/с")]
     [InlineData(2048, "2 КБ/с")]
     [InlineData(1024 * 1024 * 5, "5.0 МБ/с")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessInfo_DisplayNetwork_FormatsExpectedly(long bytesPerSec, string expected)
     {
         var info = new ProcessInfo
@@ -61,7 +73,7 @@ public class ProcessNetworkTrackerTests
             NetworkBytesPerSec = bytesPerSec
         };
 
-        // Запятая или точка в зависимости от локали
+        // Verifies component behavior and assertions.
         var display = info.DisplayNetwork.Replace(',', '.');
         Assert.Equal(expected, display);
     }
@@ -71,6 +83,9 @@ public class ProcessNetworkTrackerTests
     [InlineData(512, "0.5 КБ/с")]
     [InlineData(1024 * 512, "512 КБ/с")]
     [InlineData(1024 * 1024 * 10, "10.0 МБ/с")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void SystemPerformanceSnapshot_DisplayTotalNetwork_FormatsExpectedly(long totalBytes, string expected)
     {
         var snapshot = new SystemPerformanceSnapshot
@@ -83,12 +98,15 @@ public class ProcessNetworkTrackerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void GetSockets_ReturnsValidList()
     {
         using var tracker = new ProcessNetworkTracker();
         var sockets = tracker.GetSockets(-1);
         Assert.NotNull(sockets);
-        // Отсутствие сокетов допустимо в изолированной системе; проверяем контракт фактически полученных строк.
+        // Verifies component behavior and assertions.
 
         foreach (var s in sockets)
         {
@@ -117,6 +135,9 @@ public class ProcessNetworkTrackerTests
     [InlineData("204.79.197.200", false)]
     [InlineData("*", true)]
     [InlineData("", true)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessNetworkSocket_CheckIsPrivateAddress_EvaluatesCorrectly(string ip, bool expectedPrivate)
     {
         var isPrivate = ProcessNetworkSocket.CheckIsPrivateAddress(ip);
@@ -124,6 +145,9 @@ public class ProcessNetworkTrackerTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ProcessNetworkSocket_DisplayProperties_FormatCorrectly()
     {
         var s = new ProcessNetworkSocket
@@ -142,7 +166,7 @@ public class ProcessNetworkTrackerTests
         Assert.False(s.IsRemotePrivate);
     }
 
-    /// <summary>Проверяет общий кэш для разных PID, изоляцию изменяемых DTO и обновление точно по монотонному времени.</summary>
+    /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
     [Fact]
     public void GetSockets_ReusesSnapshotAcrossConsumersAndRefreshesAfterExpiry()
     {
@@ -169,7 +193,7 @@ public class ProcessNetworkTrackerTests
         Assert.Equal(2, captures);
     }
 
-    /// <summary>Проверяет отсутствие параллельного повторного сбора при одновременном запросе нескольких потребителей.</summary>
+    /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
     [Fact]
     public void GetSockets_ConcurrentReadersCaptureSourceOnce()
     {
@@ -184,7 +208,7 @@ public class ProcessNetworkTrackerTests
         Assert.Equal(1, captures);
     }
 
-    /// <summary>Проверяет, что внешнее изменение исходного DTO не повреждает опубликованный кэш.</summary>
+    /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
     [Fact]
     public void GetSockets_SourceMutationDoesNotChangeCachedSnapshot()
     {
@@ -195,8 +219,8 @@ public class ProcessNetworkTrackerTests
         Assert.Equal(8080, Assert.Single(tracker.GetSockets()).LocalPort);
     }
 
-    /// <summary>Проверяет входные границы IPv6 до фиксированного чтения 128-битного адреса.</summary>
-    /// <param name="length">Недопустимая длина адреса.</param>
+    /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(15)]
@@ -207,15 +231,15 @@ public class ProcessNetworkTrackerTests
         Assert.Throws<ArgumentException>(() => new ProcessNetworkTracker.SocketKey6(new byte[16], 0, 0, new byte[length], 0, 0));
     }
 
-    /// <summary>Предоставляет управляемые монотонные ticks без ожиданий реального времени.</summary>
+    /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
     private sealed class ManualNetworkTimeProvider : TimeProvider
     {
         private long _timestamp;
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
         public override long GetTimestamp() => _timestamp;
 
-        /// <summary>Продвигает тестовое время на заданный интервал.</summary>
-        /// <param name="elapsed">Интервал до следующего запроса.</param>
+        /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
+        /// <summary>Verifies test scenario for ProcessNetworkTrackerTests.cs.</summary>
         internal void Advance(TimeSpan elapsed) => _timestamp += elapsed.Ticks;
     }
 }

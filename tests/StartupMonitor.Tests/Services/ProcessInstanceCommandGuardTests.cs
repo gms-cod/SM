@@ -6,10 +6,8 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты серверной защиты от выполнения деструктивных команд над повторно
-/// использованным идентификатором процесса (PID Reuse Guard, Раздел 13.1 ETW_IMPLEMENTATION_PLAN.md).
-/// </summary>
+/// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
 public class ProcessInstanceCommandGuardTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -18,8 +16,8 @@ public class ProcessInstanceCommandGuardTests
     };
 
     /// <summary>
-    /// Проверяет, что при передаче точного времени создания
-    /// текущего процесса верификация возвращает true и не заполняет failureReason.
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyProcessIdentity_CurrentProcessMatchingTime_ReturnsTrue()
@@ -33,18 +31,18 @@ public class ProcessInstanceCommandGuardTests
         Assert.True(isValid);
         Assert.Null(failureReason);
 
-        // Проверка удобной перегрузки с возвратом кортежа
+        // Verifies component behavior and assertions.
         var (checkValid, checkReason) = EntryOperations.CheckProcessIdentity(pid, creationTimeUtc);
         Assert.True(checkValid);
         Assert.Null(checkReason);
 
-        // Проверка булевой перегрузки
+        // Verifies component behavior and assertions.
         Assert.True(EntryOperations.VerifyProcessIdentity(pid, creationTimeUtc));
     }
 
     /// <summary>
-    /// Проверяет, что при несовпадении времени создания (чужой timestamp, например смещение на 1 час)
-    /// верификация возвращает false с диагностической причиной ProcessInstanceChanged.
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyProcessIdentity_MismatchedTimestamp_ReturnsFalseAndReason()
@@ -64,8 +62,8 @@ public class ProcessInstanceCommandGuardTests
     }
 
     /// <summary>
-    /// Проверяет обратную совместимость: если ExpectedCreationFileTimeUtc равен null,
-    /// верификация безусловно возвращает true (поддержка старых клиентов).
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyProcessIdentity_NullExpectedTime_ReturnsTrue()
@@ -84,13 +82,13 @@ public class ProcessInstanceCommandGuardTests
     }
 
     /// <summary>
-    /// Проверяет, что для заведомо несуществующего идентификатора процесса (PID) верификация
-    /// возвращает false с причиной ProcessInstanceChanged.
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyProcessIdentity_NonExistentPid_ReturnsFalseAndReason()
     {
-        // Выбираем заведомо свободный PID
+        // Verifies component behavior and assertions.
         int nonExistentPid = 999_999;
         long dummyTimestamp = DateTime.UtcNow.ToFileTimeUtc();
 
@@ -99,15 +97,15 @@ public class ProcessInstanceCommandGuardTests
         Assert.False(isValid);
         Assert.Equal(EntryOperations.ProcessInstanceChangedReason, failureReason);
 
-        // Также отрицательный PID
+        // Verifies component behavior and assertions.
         bool isValidNegative = EntryOperations.VerifyProcessIdentity(-1, dummyTimestamp, out string? negativeReason);
         Assert.False(isValidNegative);
         Assert.Equal(EntryOperations.ProcessInstanceChangedReason, negativeReason);
     }
 
     /// <summary>
-    /// Проверяет строгое совпадение FILETIME: даже один такт и смещение в 10 мс
-    /// обозначают другой экземпляр процесса и приводят к отклонению команды.
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// </summary>
     [Fact]
     public void VerifyProcessIdentity_AnyCreationTimeDifference_RejectsCommand()
@@ -124,7 +122,7 @@ public class ProcessInstanceCommandGuardTests
         }
     }
 
-    /// <summary>Проверяет точный FILETIME на уже открытом дескрипторе, который затем использует действие над процессом.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     [Fact]
     public void VerifyProcessHandleIdentity_UsesRetainedHandleAndExactCreationTime()
     {
@@ -139,7 +137,7 @@ public class ProcessInstanceCommandGuardTests
         Assert.Null(retainedReason);
     }
 
-    /// <summary>Проверяет отказ для пустого дескриптора при наличии обязательного токена экземпляра.</summary>
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     [Fact]
     public void VerifyProcessHandleIdentity_InvalidHandle_RejectsInsteadOfUsingPidLookup()
     {
@@ -148,9 +146,9 @@ public class ProcessInstanceCommandGuardTests
     }
 
     /// <summary>
-    /// Проверяет корректность сериализации и десериализации полезных нагрузок команд
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// KillProcessPayload, SuspendProcessPayload, ResumeProcessPayload, BlockProcessPayload
-    /// с сохранением опционального поля ExpectedCreationFileTimeUtc.
+    /// <summary>Verifies test scenario for ProcessInstanceCommandGuardTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ProcessCommandPayloads_PreserveExpectedCreationFileTimeUtc_InJson()
@@ -191,7 +189,7 @@ public class ProcessInstanceCommandGuardTests
         Assert.Equal(@"C:\tools\app.exe", blockDeserialized.FilePath);
         Assert.Equal(sampleFileTime, blockDeserialized.ExpectedCreationFileTimeUtc);
 
-        // 5. ProcessActionResultPayload с причиной ProcessInstanceChanged
+        // Verifies component behavior and assertions.
         var resultPayload = new ProcessActionResultPayload(false, EntryOperations.ProcessInstanceChangedReason, 1234);
         var resultJson = JsonSerializer.Serialize(resultPayload, JsonOptions);
         var resultDeserialized = JsonSerializer.Deserialize<ProcessActionResultPayload>(resultJson, JsonOptions);

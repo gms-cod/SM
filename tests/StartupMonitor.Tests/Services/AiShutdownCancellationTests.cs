@@ -7,12 +7,12 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет прекращение реальной AI-задачи при остановке, включая незавершённый HTTP и минутный Retry-After, без сетевых запросов.</summary>
+/// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
 public sealed class AiShutdownCancellationTests
 {
-    /// <summary>Поддельное имя или аргумент с названием продукта не дают автоматического доверенного рейтинга.</summary>
-    /// <param name="name">Имя проверяемой записи.</param>
-    /// <param name="command">Командная строка проверяемой записи.</param>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     [Theory]
     [InlineData("StartupMonitor fake", "malware.exe")]
     [InlineData("Unrelated", "malware.exe --StartupMonitor")]
@@ -28,9 +28,9 @@ public sealed class AiShutdownCancellationTests
         Assert.Equal(3, result?.Score);
     }
 
-    /// <summary>Ответ на старый контекст не меняет запись после редактирования или установки ручной оценки.</summary>
-    /// <param name="operation">Путь фонового или ручного обращения к поставщику.</param>
-    /// <param name="manual">Признак установки ручной оценки во время HTTP.</param>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     [Theory]
     [InlineData("single", false)]
     [InlineData("batch", false)]
@@ -73,14 +73,14 @@ public sealed class AiShutdownCancellationTests
         else Assert.Equal("changed --argument", saved.CommandLine);
     }
 
-    /// <summary>Формирует неоценённую пользовательскую запись, которая не попадает в системные shortcut.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     private static StartupEntry Entry() => new()
     {
         Id = "shutdown-ai-entry", Name = "Audit client", FilePath = @"C:\Apps\audit-client.exe"
     };
 
-    /// <summary>Остановка доходит до HTTP каждого публичного пути и отменяет исходную задачу вместо оставления её в фоне.</summary>
-    /// <param name="operationName">Проверяемый путь UI/фоновой оценки.</param>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     [Theory]
     [InlineData("batch")]
     [InlineData("single")]
@@ -116,7 +116,7 @@ public sealed class AiShutdownCancellationTests
         Assert.DoesNotContain(fixture.Logger.Levels, level => level >= LogLevel.Warning);
     }
 
-    /// <summary>Отмена Retry-After не ждёт минуту, не запускает повтор и освобождает semaphore для следующего пакета.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     [Fact]
     public async Task Cancellation_InterruptsMinuteBackoffAndReleasesBatchOwnership()
     {
@@ -137,7 +137,7 @@ public sealed class AiShutdownCancellationTests
         Assert.Equal(3, fixture.Cache.Get(entry)?.Score);
     }
 
-    /// <summary>Даже пакет без явно переданного токена прекращается при Dispose владельца AI, не удерживая работающий retry.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     [Fact]
     public async Task Dispose_CancelsOutstandingBatchBackoff()
     {
@@ -150,7 +150,7 @@ public sealed class AiShutdownCancellationTests
         Assert.Equal(1, fixture.Handler.Calls);
     }
 
-    /// <summary>Уже отменённый запуск не захватывает semaphore и не обращается к провайдеру.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     [Fact]
     public async Task CancelledBeforeStart_DoesNotSendOrRetainBatchOwnership()
     {
@@ -163,7 +163,7 @@ public sealed class AiShutdownCancellationTests
         Assert.Equal(1, fixture.Handler.Calls);
     }
 
-    /// <summary>Возвращает управляемое минутное ограничение, совпадающее с исходным shutdown-дефектом.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     private static HttpResponseMessage RateLimited()
     {
         var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
@@ -171,7 +171,7 @@ public sealed class AiShutdownCancellationTests
         return response;
     }
 
-    /// <summary>Возвращает OpenAI-совместимый подтверждённый рейтинг для проверки освобождения batch semaphore.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     private static HttpResponseMessage Rating() => new(HttpStatusCode.OK)
     {
         Content = new StringContent(JsonSerializer.Serialize(new
@@ -180,7 +180,7 @@ public sealed class AiShutdownCancellationTests
         }))
     };
 
-    /// <summary>Владеет отдельным хранилищем и оценщиком; каждый HTTP направляется только в управляемый обработчик.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     private sealed class Fixture : IDisposable
     {
         private readonly string _directory = Path.Combine(Path.GetTempPath(), "sm-ai-shutdown-" + Guid.NewGuid().ToString("N"));
@@ -191,7 +191,7 @@ public sealed class AiShutdownCancellationTests
         internal RatingsCache Cache { get; }
         internal AiRatingService Service { get; }
 
-        /// <summary>Подключает источник HTTP-ответов без внешней сети и настоящих API-ключей.</summary>
+        /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
         internal Fixture(Func<CancellationToken, Task<HttpResponseMessage>> send)
         {
             Handler = new Handler(send);
@@ -200,11 +200,11 @@ public sealed class AiShutdownCancellationTests
             Service = new AiRatingService(Cache, Logger, "unit-test", apiUrl: "https://unit.test/chat", httpHandler: Handler);
         }
 
-        /// <summary>Добавляет реальную запись в тестовое хранилище до проверки условной записи ответа.</summary>
-        /// <param name="entry">Проверяемая запись автозапуска.</param>
+        /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
+        /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
         internal void Persist(StartupEntry entry) => _store.AddEntry(entry);
 
-        /// <summary>Отменяет оценщик и удаляет только собственные временные данные теста.</summary>
+        /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
         public void Dispose()
         {
             Service.Dispose();
@@ -212,10 +212,16 @@ public sealed class AiShutdownCancellationTests
         }
     }
 
-    /// <summary>Фиксирует число HTTP-попыток и наблюдает настоящий токен HttpClient.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     private sealed class Handler(Func<CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         internal int Calls;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref Calls);
@@ -223,12 +229,18 @@ public sealed class AiShutdownCancellationTests
         }
     }
 
-    /// <summary>Позволяет проверить, что штатная отмена не журналируется как ошибка/тайм-аут.</summary>
+    /// <summary>Verifies test scenario for AiShutdownCancellationTests.cs.</summary>
     private sealed class RecordingLogger : ILogger<AiRatingService>
     {
         internal List<LogLevel> Levels { get; } = [];
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public bool IsEnabled(LogLevel logLevel) => true;
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             lock (Levels) Levels.Add(logLevel);

@@ -2,13 +2,13 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>Проверяет отдельную версию правил ЧС, изоляцию снимка и откат секций при неуспешном сохранении.</summary>
+/// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
 public sealed class BlacklistSnapshotVersionTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitorBlacklistVersion_" + Guid.NewGuid().ToString("N"));
 
-    /// <summary>Создаёт изолированное хранилище с одним правилом и существующими секционными файлами.</summary>
-    /// <returns>Хранилище, принадлежащее текущему тесту.</returns>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
     private JsonDataStore CreateStore()
     {
         var store = new JsonDataStore(_directory);
@@ -19,7 +19,7 @@ public sealed class BlacklistSnapshotVersionTests : IDisposable
         return store;
     }
 
-    /// <summary>Проверяет, что настройки, история и записи автозапуска не перезапускают поколение правил ЧС.</summary>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
     [Fact]
     public void Save_UnrelatedChanges_DoNotChangeBlacklistVersionOrPublishEvent()
     {
@@ -39,7 +39,7 @@ public sealed class BlacklistSnapshotVersionTests : IDisposable
         Assert.Equal(0, events);
     }
 
-    /// <summary>Проверяет обновление поколения при добавлении, изменении и удалении правил через общий Save.</summary>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
     [Fact]
     public void Save_EachRuleMutation_PublishesNewVersionAndIsolatedSnapshot()
     {
@@ -72,7 +72,7 @@ public sealed class BlacklistSnapshotVersionTests : IDisposable
         Assert.Equal(version, store.BlacklistRevision);
     }
 
-    /// <summary>Проверяет отказ последней секции: кэш и версия не публикуются, ранее записанные секции возвращаются к старым данным.</summary>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
     [Fact]
     public void Save_SettingsFileLocked_RollsBackEarlierSectionsAndDoesNotPublishBlacklist()
     {
@@ -108,7 +108,7 @@ public sealed class BlacklistSnapshotVersionTests : IDisposable
         Assert.Equal(1, events);
     }
 
-    /// <summary>Проверяет, что подписчик события может получить новый снимок из другого потока без блокировки Save.</summary>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
     [Fact]
     public void BlacklistChanged_IsRaisedAfterStoreLockIsReleased()
     {
@@ -130,7 +130,7 @@ public sealed class BlacklistSnapshotVersionTests : IDisposable
         Assert.Equal(store.BlacklistRevision, observedVersion);
     }
 
-    /// <summary>Удаляет только уникальный каталог текущего теста после закрытия всех файлов.</summary>
+    /// <summary>Verifies test scenario for BlacklistSnapshotVersionTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);

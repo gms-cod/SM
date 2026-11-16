@@ -3,47 +3,53 @@ using System.Text.Json.Serialization;
 
 namespace StartupMonitor.Shared.Models;
 
-/// <summary>Снимок общей производительности системы и список активных процессов.</summary>
+/// <summary>System performance snapshot and list of active processes.</summary>
 public class SystemPerformanceSnapshot
 {
-    /// <summary>Общая суммарная загрузка процессора ОС (0.0% - 100.0%).</summary>
+    /// <summary>Overall OS CPU utilization (0.0% - 100.0%).</summary>
     public double TotalCpuPercent { get; set; }
 
-    /// <summary>Общий объем физической памяти системы в байтах.</summary>
+    /// <summary>Total system physical memory in bytes.</summary>
     public long TotalMemoryBytes { get; set; }
 
-    /// <summary>Используемый объем физической памяти системы в байтах.</summary>
+    /// <summary>Used system physical memory in bytes.</summary>
     public long UsedMemoryBytes { get; set; }
 
-    /// <summary>Процент используемой памяти (0.0% - 100.0%).</summary>
+    /// <summary>Percentage of memory utilized (0.0% - 100.0%).</summary>
     public double MemoryPercent => TotalMemoryBytes > 0 ? (UsedMemoryBytes * 100.0 / TotalMemoryBytes) : 0.0;
 
-    /// <summary>Алиас процента используемой памяти.</summary>
+    /// <summary>Alias for percentage of memory utilized.</summary>
     public double TotalMemoryPercent => MemoryPercent;
 
-    /// <summary>Суммарная дисковая активность всей системы (Байт/с).</summary>
+    /// <summary>Aggregate system disk activity (bytes/sec).</summary>
     public long TotalDiskIoBytesPerSec { get; set; }
 
-    /// <summary>Суммарный сетевой обмен всей системы (Байт/с).</summary>
+    /// <summary>Aggregate system network throughput (bytes/sec).</summary>
     public long TotalNetworkBytesPerSec { get; set; }
 
-    /// <summary>Общее количество запущенных процессов.</summary>
+    /// <summary>Total count of running processes.</summary>
     public int TotalProcessesCount { get; set; }
 
-    /// <summary>Общее количество потоков в ОС.</summary>
+    /// <summary>Total number of threads in the OS.</summary>
     public int TotalThreadsCount { get; set; }
 
-    /// <summary>Список активных процессов со снимком их метрик.</summary>
+    /// <summary>List of active processes with a snapshot of their metrics.</summary>
     public List<ProcessInfo> Processes { get; set; } = [];
 
-    // Вспомогательные свойства форматирования для UI
+    // Auxiliary formatting properties for UI
     [JsonIgnore]
     public string DisplayTotalCpu => $"{TotalCpuPercent:F0} %";
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayTotalRam => $"{UsedMemoryBytes / (1024.0 * 1024 * 1024):F1} / {TotalMemoryBytes / (1024.0 * 1024 * 1024):F1} ГБ ({MemoryPercent:F0}%)";
 
     [JsonIgnore]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string DisplayTotalDisk => TotalDiskIoBytesPerSec switch
     {
         < 1024 => "0 КБ/с",
@@ -52,6 +58,7 @@ public class SystemPerformanceSnapshot
     };
 
     [JsonIgnore]
+    /// <summary>Gets the formatted total network bandwidth usage as a human-readable string.</summary>
     public string DisplayTotalNetwork => TotalNetworkBytesPerSec switch
     {
         <= 0 => "0 КБ/с",

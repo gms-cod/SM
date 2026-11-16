@@ -5,10 +5,10 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет исключительное право показа, возврат аренды и достоверность IPC-подтверждения без изменения ОС.</summary>
+/// <summary>Verifies test scenario for NetworkAlertClaimTests.cs.</summary>
 public sealed class NetworkAlertClaimTests
 {
-    /// <summary>Один AlertId не выдаётся одновременно двум клиентам; второй получает другую доступную группу.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertClaimTests.cs.</summary>
     [Fact]
     public void SeparateClients_DoNotReceiveTheSameAlert()
     {
@@ -20,7 +20,7 @@ public sealed class NetworkAlertClaimTests
         Assert.Equal("first", Assert.Single(registry.GetNext("client-a", alerts)).AlertId);
     }
 
-    /// <summary>После истечения аренды живой запрос доступен новому клиенту без потери пользовательского события.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertClaimTests.cs.</summary>
     [Fact]
     public void ExpiredLease_IsReturnedToQueue()
     {
@@ -33,7 +33,7 @@ public sealed class NetworkAlertClaimTests
         Assert.Single(registry.GetNext("client-b", alerts));
     }
 
-    /// <summary>Отключение клиента сразу освобождает его карточку, а продление защищает от преждевременной выдачи.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertClaimTests.cs.</summary>
     [Fact]
     public void Disconnect_ReleasesClaimAndRenewalKeepsOwnership()
     {
@@ -49,7 +49,7 @@ public sealed class NetworkAlertClaimTests
         Assert.Single(registry.GetNext("client-b", alerts));
     }
 
-    /// <summary>Чужой клиент не освобождает действующую аренду; удалённый запрос не блокирует новую очередь.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertClaimTests.cs.</summary>
     [Fact]
     public void Release_IsOwnerScopedAndCompletedGroupsArePruned()
     {
@@ -61,7 +61,7 @@ public sealed class NetworkAlertClaimTests
         Assert.True(registry.TryAcquire("client-b", "old"));
     }
 
-    /// <summary>Отказ координатора списков передаётся UI как отказ, сохраняя причину и признак неуспеха.</summary>
+    /// <summary>Verifies test scenario for NetworkAlertClaimTests.cs.</summary>
     [Fact]
     public void FailedPolicyOperation_IsNeverTransportSuccess()
     {

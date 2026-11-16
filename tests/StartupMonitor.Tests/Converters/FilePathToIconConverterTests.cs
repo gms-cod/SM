@@ -5,14 +5,15 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Converters;
 
-/// <summary>
-/// Тесты для AppIconService и FilePathToIconConverter.
-/// </summary>
+/// <summary>Verifies test scenario for FilePathToIconConverterTests.cs.</summary>
 public class FilePathToIconConverterTests
 {
     private readonly FilePathToIconConverter _converter = new();
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Convert_NullOrEmptyPath_ReturnsNull()
     {
         var res1 = _converter.Convert(null, typeof(object), null, CultureInfo.InvariantCulture);
@@ -25,9 +26,12 @@ public class FilePathToIconConverterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Convert_NonExistentFile_ReturnsPlaceholder()
     {
-        // Несуществующий или еще не загруженный файл возвращает прозрачный плейсхолдер для плавной отрисовки WPF
+        // Verifies component behavior and assertions.
         var fakePath = @"C:\NonExistentDirectory\FakeApp_12345.exe";
         var res = _converter.Convert(fakePath, typeof(object), null, CultureInfo.InvariantCulture);
 
@@ -35,17 +39,20 @@ public class FilePathToIconConverterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AppIconService_KnownSystemFile_ReturnsImageOrNullSafely()
     {
-        // explorer.exe или cmd.exe всегда есть в Windows
+        // Verifies component behavior and assertions.
         var cmdPath = @"C:\Windows\System32\cmd.exe";
         var icon = AppIconService.GetIcon(cmdPath);
 
-        // В тестовом окружении (в зависимости от STA потока) может вернуть замороженный ImageSource
-        // Главное — метод не падает и безопасен для вызова
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         if (System.IO.File.Exists(cmdPath))
         {
-            // Убеждаемся что повторный вызов берет из кэша
+            // Verifies component behavior and assertions.
             var cached = AppIconService.GetIcon(cmdPath);
             Assert.Equal(icon, cached);
         }

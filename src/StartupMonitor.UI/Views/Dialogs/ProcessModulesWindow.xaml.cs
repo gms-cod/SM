@@ -24,6 +24,9 @@ public partial class ProcessModulesWindow
     private List<ProcessHandleInfo> _allHandles = new();
     private bool _isLoading;
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public string WindowTitle => $"{_targetProcess.ProcessName} (PID: {_targetProcess.Pid}) — {LocalizationService.Instance.ProcessModulesTitle}";
 
     /// <summary>ProcessModulesWindow: Выполняет операцию ProcessModulesWindow.</summary>

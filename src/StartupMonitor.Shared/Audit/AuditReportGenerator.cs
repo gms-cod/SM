@@ -7,7 +7,7 @@ using StartupMonitor.Shared.Audit.Models;
 namespace StartupMonitor.Shared.Audit;
 
 /// <summary>
-/// Фасад для генерации и экспорта отчетов аудита в различных форматах (HTML, CSV, JSON).
+/// Facade for generating and exporting audit reports in various formats (HTML, CSV, JSON).
 /// </summary>
 public static class AuditReportGenerator
 {
@@ -19,34 +19,34 @@ public static class AuditReportGenerator
     public static CsvAuditReportExporter CsvExporter => CsvExporterInstance.Value;
     public static JsonAuditReportExporter JsonExporter => JsonExporterInstance.Value;
 
-    /// <summary>GenerateHtml: Выполняет операцию GenerateHtml.</summary>
-    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>GenerateHtml: Performs the GenerateHtml operation.</summary>
+    /// <param name="report)">Input: the value of the report) parameter (AuditReport).</param>
+    /// <returns>Output: the resulting value of type string.</returns>
     public static string GenerateHtml(AuditReport report) => HtmlExporter.ExportToString(report);
-    /// <summary>GenerateCsv: Выполняет операцию GenerateCsv.</summary>
-    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>GenerateCsv: Performs the GenerateCsv operation.</summary>
+    /// <param name="report)">Input: the value of the report) parameter (AuditReport).</param>
+    /// <returns>Output: the resulting value of type string.</returns>
     public static string GenerateCsv(AuditReport report) => CsvExporter.ExportToString(report);
-    /// <summary>GenerateJson: Выполняет операцию GenerateJson.</summary>
-    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа string.</returns>
+    /// <summary>Performs the GenerateJson operation.</summary>
+    /// <param name="report)">The value of the report parameter (AuditReport).</param>
+    /// <returns>The resulting string value.</returns>
     public static string GenerateJson(AuditReport report) => JsonExporter.ExportToString(report);
 
-    /// <summary>GenerateHtmlBytes: Выполняет операцию GenerateHtmlBytes.</summary>
-    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
+    /// <summary>Performs the GenerateHtmlBytes operation.</summary>
+    /// <param name="report)">The value of the report parameter (AuditReport).</param>
+    /// <returns>The resulting byte array.</returns>
     public static byte[] GenerateHtmlBytes(AuditReport report) => HtmlExporter.ExportToBytes(report);
-    /// <summary>GenerateCsvBytes: Выполняет операцию GenerateCsvBytes.</summary>
-    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
+    /// <summary>Performs the GenerateCsvBytes operation.</summary>
+    /// <param name="report)">The value of the report parameter (AuditReport).</param>
+    /// <returns>The resulting byte array.</returns>
     public static byte[] GenerateCsvBytes(AuditReport report) => CsvExporter.ExportToBytes(report);
-    /// <summary>GenerateJsonBytes: Выполняет операцию GenerateJsonBytes.</summary>
-    /// <param name="report)">Входные данные: значение параметра report) (AuditReport).</param>
-    /// <returns>Выходные данные: результирующее значение типа byte[].</returns>
+    /// <summary>Generates JSON bytes for the specified report.</summary>
+    /// <param name="report)">The audit report to convert to JSON.</param>
+    /// <returns>A byte array containing the generated JSON data.</returns>
     public static byte[] GenerateJsonBytes(AuditReport report) => JsonExporter.ExportToBytes(report);
 
     /// <summary>
-    /// Получить экспортер по расширению или названию формата (.html, .csv, .json).
+    /// Gets the exporter for the specified file extension or format name (.html, .csv, .json).
     /// </summary>
     public static IAuditReportExporter GetExporter(string formatOrExtension)
     {
@@ -61,7 +61,7 @@ public static class AuditReportGenerator
     }
 
     /// <summary>
-    /// Экспортировать отчет в строку по расширению или формату.
+    /// Exports the report to a string using the specified file extension or format.
     /// </summary>
     public static string Export(AuditReport report, string formatOrExtension)
     {
@@ -69,7 +69,7 @@ public static class AuditReportGenerator
     }
 
     /// <summary>
-    /// Экспортировать отчет в массив байтов (с учетом BOM для CSV и кодировок).
+    /// Exports the report to a byte array, accounting for BOM for CSV and encodings.
     /// </summary>
     public static byte[] ExportBytes(AuditReport report, string formatOrExtension)
     {

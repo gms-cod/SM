@@ -8,18 +8,18 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет реальные дельты, пропуски, retention и запись истории без обращения к сети.</summary>
+/// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
 public sealed class NetworkTrafficHistoryTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "StartupMonitorTrafficTests_" + Guid.NewGuid().ToString("N"));
     private readonly TestClock _clock = new(new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero));
 
-    /// <summary>Создаёт сервис с управляемыми часами в изолированном каталоге.</summary>
-    /// <returns>Не запущенный сборщик для детерминированной подачи счётчиков.</returns>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     private NetworkTrafficHistoryService CreateService() => new(new JsonDataStore(_directory),
         NullLogger<NetworkTrafficHistoryService>.Instance, timeProvider: _clock);
 
-    /// <summary>Пустая история не подменяется фиктивным измеренным нулём.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void MissingSamples_ReturnUnmeasuredBuckets()
     {
@@ -30,7 +30,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.All(points, point => Assert.False(point.HasMeasurement));
     }
 
-    /// <summary>Средние RX/TX вычисляются из настоящих раздельных накопительных счётчиков.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void CounterDeltas_ProduceIndependentReceiveAndSendRates()
     {
@@ -44,7 +44,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(20, point.OutboundBps, 8);
     }
 
-    /// <summary>Неизменившиеся счётчики дают измеренный ноль, отличный от отсутствия данных.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void UnchangedCounters_AreMeasuredZero()
     {
@@ -58,7 +58,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(0, point.OutboundBps);
     }
 
-    /// <summary>Сброс счётчика не порождает отрицательную скорость и начинает новый интервал.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void CounterReset_StartsNewBaseline()
     {
@@ -73,7 +73,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(20, point.OutboundBps, 8);
     }
 
-    /// <summary>Смена интерфейса и длинная пауза не заполняют пропуск вымышленной скоростью.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void InterfaceChangeAndLongGap_RemainUnmeasured()
     {
@@ -85,7 +85,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.All(service.GetHistory(new(now, now.AddMinutes(3), 3)), point => Assert.False(point.HasMeasurement));
     }
 
-    /// <summary>Разрыв внутри одной минуты остаётся отсутствием данных после возобновления замеров и перезапуска.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public async Task GapWithinMinute_RemainsUnmeasuredAfterPersistence()
     {
@@ -111,7 +111,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         }
     }
 
-    /// <summary>Старые непрерывные бакеты мигрируют; бакеты с неизвестным положением пауз не выдают фиктивное покрытие.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void LegacyHistory_MigratesOnlyUnambiguousCoverage()
     {
@@ -132,7 +132,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(100, points[1].InboundBps, 8);
     }
 
-    /// <summary>Слишком большой файл истории не срывает запуск настоящего Host и заменяется допустимой новой историей.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public async Task OversizedHistory_DoesNotPreventHostedServiceStartup()
     {
@@ -152,7 +152,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.InRange(new FileInfo(path).Length, 2, NetworkTrafficHistoryService.MaximumHistoryBytes);
     }
 
-    /// <summary>Семь суток фрагментированных наблюдений сохраняются в пределах того же лимита, который проверяет загрузчик.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public async Task FragmentedWeek_PersistedFileRemainsReadableAndBounded()
     {
@@ -161,7 +161,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         using (var service = CreateService())
         {
             long bytes = 0;
-            // Пустой снимок имитирует отключение адаптера: разрывы нельзя объединять в непрерывную минуту.
+            // Verifies component behavior and assertions.
             for (var minute = start; minute < end; minute = minute.AddMinutes(1))
             {
                 for (var second = 0; second < 60; second += 10)
@@ -181,7 +181,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(100, point.InboundBps, 8);
     }
 
-    /// <summary>Переход через минутную границу сохраняет оба интервала и общую скорость.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void MinuteBoundary_SplitsMeasuredIntervalWithoutDuplicatingBytes()
     {
@@ -193,7 +193,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.All(points, point => { Assert.True(point.HasMeasurement); Assert.Equal(100, point.InboundBps, 8); });
     }
 
-    /// <summary>Откат часов не создаёт повторного учёта уже измеренного времени.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void ClockMovesBackwards_DoesNotDuplicateIntervals()
     {
@@ -206,7 +206,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(100, Assert.Single(service.GetHistory(new(now, now.AddMinutes(1), 1))).InboundBps, 8);
     }
 
-    /// <summary>Минутная история переживает перезапуск, сохраняя признак измерения.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public async Task PersistAndReload_RoundTripMeasuredBuckets()
     {
@@ -224,7 +224,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal(100, point.InboundBps, 8);
     }
 
-    /// <summary>Retention удаляет просроченные измерения и с диска, и из памяти.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public async Task ExpiredBuckets_AreRemovedBeforePersistence()
     {
@@ -237,7 +237,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Equal("[]", await File.ReadAllTextAsync(Path.Combine(_directory, "network-traffic-history.json")));
     }
 
-    /// <summary>Отсутствие и повреждение файла не препятствуют запуску сборщика.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public void MalformedHistory_IsIgnoredWithoutBreakingNewMeasurements()
     {
@@ -248,7 +248,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.False(Assert.Single(service.GetHistory(new(now.AddMinutes(-1), now, 1))).HasMeasurement);
     }
 
-    /// <summary>Ограничение запроса предотвращает чрезмерное выделение памяти на IPC-границе.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(241)]
@@ -260,7 +260,7 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         Assert.Throws<ArgumentOutOfRangeException>(() => service.GetHistory(new(now.AddMinutes(-1), now, count)));
     }
 
-    /// <summary>Повторное освобождение worker метаданных не отменяет уже уничтоженный CTS.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     [Fact]
     public async Task MetadataWorker_DisposeIsIdempotent()
     {
@@ -270,21 +270,21 @@ public sealed class NetworkTrafficHistoryTests : IDisposable
         await worker.DisposeAsync();
     }
 
-    /// <summary>Удаляет только собственный каталог после завершения использующих его сервисов.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
     }
 
-    /// <summary>Управляемые часы исключают ожидания реального времени из тестов retention.</summary>
+    /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
     private sealed class TestClock(DateTimeOffset now) : TimeProvider
     {
-        /// <summary>Возвращает установленное тестом время.</summary>
-        /// <returns>Текущий тестовый момент UTC.</returns>
+        /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
+        /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
         public override DateTimeOffset GetUtcNow() => now;
 
-        /// <summary>Сдвигает время без блокировки тестового потока.</summary>
-        /// <param name="delta">Величина сдвига.</param>
+        /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
+        /// <summary>Verifies test scenario for NetworkTrafficHistoryTests.cs.</summary>
         public void Advance(TimeSpan delta) => now += delta;
     }
 }

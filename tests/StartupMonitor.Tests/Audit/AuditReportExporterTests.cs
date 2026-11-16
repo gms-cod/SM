@@ -13,6 +13,9 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Audit;
 
+/// <summary>
+/// Provides operations for this member.
+/// </summary>
 public class AuditReportExporterTests
 {
     private static AuditReport CreateSampleReport()
@@ -116,6 +119,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AuditSummary_Calculate_CorrectCounters()
     {
         var report = CreateSampleReport();
@@ -137,6 +143,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void HtmlReport_GeneratesOfflineHtml_WithExpectedStructure()
     {
         var report = CreateSampleReport();
@@ -156,6 +165,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void HtmlReport_EscapesSpecialCharacters_ToPreventXss()
     {
         var xssEntry = new StartupEntry
@@ -174,6 +186,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void HtmlReport_RendersThreatBadgesAndAiStars()
     {
         var report = CreateSampleReport();
@@ -187,6 +202,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CsvReport_IncludesUtf8Bom_ForExcel()
     {
         var report = CreateSampleReport();
@@ -200,6 +218,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CsvReport_EscapesQuotesAndCommas_AccordingToRfc4180()
     {
         var entry = new StartupEntry
@@ -218,6 +239,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CsvReport_ContainsHeadersAndDataRows()
     {
         var report = CreateSampleReport();
@@ -233,6 +257,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void JsonReport_GeneratesValidJson_AndRoundtrips()
     {
         var report = CreateSampleReport();
@@ -244,7 +271,7 @@ public class AuditReportExporterTests
         Assert.Contains("\"startupEntries\":", json);
         Assert.Contains("\"activeProcesses\":", json);
 
-        // Проверяем валидность JSON через JsonDocument
+        // Verifies component behavior and assertions.
         using var doc = JsonDocument.Parse(json);
         Assert.NotNull(doc);
         Assert.Equal(3, doc.RootElement.GetProperty("startupEntries").GetArrayLength());
@@ -258,6 +285,9 @@ public class AuditReportExporterTests
     [InlineData("csv", typeof(CsvAuditReportExporter))]
     [InlineData(".json", typeof(JsonAuditReportExporter))]
     [InlineData("json", typeof(JsonAuditReportExporter))]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AuditReportGenerator_GetExporter_SupportsExtensions(string ext, Type expectedType)
     {
         var exporter = AuditReportGenerator.GetExporter(ext);
@@ -265,6 +295,9 @@ public class AuditReportExporterTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AuditReportGenerator_GetExporter_ThrowsOnUnsupported()
     {
         Assert.Throws<NotSupportedException>(() => AuditReportGenerator.GetExporter(".pdf"));

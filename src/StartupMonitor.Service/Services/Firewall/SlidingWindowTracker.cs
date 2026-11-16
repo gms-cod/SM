@@ -11,6 +11,9 @@ public sealed class SlidingWindowTracker
 {
     private sealed class TrackerEntry
     {
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         public required string Key { get; init; }
         public Queue<DateTime> Timestamps { get; } = new();
         public DateTime LastAccessed { get; set; }

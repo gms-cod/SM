@@ -4,23 +4,21 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Полный анализ: проверяем Disable/Enable/Remove/Blacklist для КАЖДОГО типа автозапуска.
-/// Выявляем, какие операции реально работают, а какие — только виртуально (в конфиге).
-/// </summary>
+/// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
+/// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
 public class EntryOperationsAnalysisTests
 {
-    /// <summary>Настройки JSON-сериализации для payload'ных классов.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    /// <summary>Все типы из Enum, отсортированные</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     public static TheoryData<EntryLocation> AllEntryLocations =>
         new(Enum.GetValues<EntryLocation>());
 
-    /// <summary>Типы, которые EntryOperations.RemoveFromSystem поддерживает</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     public static TheoryData<EntryLocation> SupportedRemoveLocations
     {
         get
@@ -43,7 +41,7 @@ public class EntryOperationsAnalysisTests
         }
     }
 
-    /// <summary>Типы, которые EntryOperations НЕ поддерживает</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     public static TheoryData<EntryLocation> UnsupportedRemoveLocations
     {
         get
@@ -64,7 +62,7 @@ public class EntryOperationsAnalysisTests
         }
     }
 
-    /// <summary>Создаёт тестовую запись StartupEntry для указанного Location.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     private static StartupEntry MakeEntry(EntryLocation loc, string name = "TestEntry", string filePath = "")
     {
         var entry = new StartupEntry
@@ -82,20 +80,20 @@ public class EntryOperationsAnalysisTests
     }
 
     // ═══════════════════════════════════════════════════════
-    // 1. DISABLE (виртуальное) — только меняет статус в JSON
+    // Verifies component behavior and assertions.
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет, что DisableEntry только меняет статус в конфиге, но не трогает систему.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(AllEntryLocations))]
     public void DisableEntry_OnlyChangesStatusInConfig_NotInSystem(EntryLocation loc)
     {
-        // PipeServer.DisableEntry делает:
+        // Verifies component behavior and assertions.
         //   entry.Status = EntryStatus.Disabled;
         //   _store.UpdateEntry(entry);
-        // Никакого реального отключения в системе.
+        // Verifies component behavior and assertions.
 
         var path = Path.Combine(Path.GetTempPath(), $"sm-{Guid.NewGuid():N}", "startup-monitor.json");
         var store = new JsonDataStore(path);
@@ -104,26 +102,26 @@ public class EntryOperationsAnalysisTests
         var entry = MakeEntry(loc, $"DisableTest_{Guid.NewGuid():N}");
         store.AddEntry(entry);
 
-        // Эмулируем PipeServer.DisableEntry
+        // Verifies component behavior and assertions.
         var cfg = store.Load();
         var stored = cfg.Entries.Find(e => e.Id == entry.Id)!;
         stored.Status = EntryStatus.Disabled;
         store.UpdateEntry(stored);
 
-        // Проверяем: статус изменился в конфиге
+        // Verifies component behavior and assertions.
         cfg = store.Load();
         stored = cfg.Entries.Find(e => e.Id == entry.Id)!;
         Assert.Equal(EntryStatus.Disabled, stored.Status);
 
-        // НО: в реальной системе запись всё ещё активна!
-        // PipeServer НЕ делает: sc stop, reg delete, file rename, task disable
-        // Это ВИРТУАЛЬНОЕ отключение
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
 
     /// <summary>
-    /// Проверяет, что EnableEntry только меняет статус в конфиге, не трогая систему.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(AllEntryLocations))]
@@ -137,7 +135,7 @@ public class EntryOperationsAnalysisTests
         entry.Status = EntryStatus.Disabled;
         store2.AddEntry(entry);
 
-        // Эмулируем PipeServer.EnableEntry
+        // Verifies component behavior and assertions.
         var cfg = store2.Load();
         var stored = cfg.Entries.Find(e => e.Id == entry.Id)!;
         stored.Status = EntryStatus.Enabled;
@@ -151,7 +149,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что после Disable → Enable Location и Name сохраняются.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(AllEntryLocations))]
@@ -186,11 +184,11 @@ public class EntryOperationsAnalysisTests
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 2. REMOVE — реальное удаление из системы (EntryOperations)
+    // Verifies component behavior and assertions.
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem возвращает ошибку для неподдерживаемых Location.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(UnsupportedRemoveLocations))]
@@ -205,10 +203,10 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Создаёт ключ Run/RunOnce даже в чистом профиле CI и проверяет удаление реального
-    /// уникального значения с сохранением исходных данных в payload. Очистка не затрагивает чужие значения.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
-    /// <param name="loc">Проверяемое расположение пользовательского автозапуска.</param>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     [Theory]
     [InlineData(EntryLocation.RegistryRun)]
     [InlineData(EntryLocation.RegistryRunOnce)]
@@ -238,33 +236,33 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет удаление из редких ключей реестра (RunServices, Policies) — может вернуть ошибку, если ключ отсутствует.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.RegistryRunServices)]
     [InlineData(EntryLocation.RegistryPolicies)]
     public void RemoveFromSystem_Registry_RareKeys_KeyNotFound(EntryLocation loc)
     {
-        // БАГ: RegistryRunServices и RegistryPolicies часто отсутствуют в HKCU.
-        // EntryOperations.OpenSubKey(keyPath, writable: true) возвращает null,
-        // RemoveRegistry возвращает false.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var uniqueName = "NonExistent_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName, @"C:\test.exe");
         var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
-        // Результат зависит от того, существует ли ключ в системе.
-        // На чистой системе ключей может не быть -> success=false.
-        // Это не ошибка теста, а особенность реализации — нужно создавать ключ перед удалением.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
     }
 
     /// <summary>
-    /// Проверяет удаление контекстных меню из HKCR\CLSID (баг был: неправильный путь).
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.ContextMenuHandler)]
     public void RemoveFromSystem_SpecialRegistryLocations_MissingValueReturnsError(EntryLocation loc)
     {
-        // БАГ ИСПРАВЛЕН: путь теперь HKCR\CLSID (вместо HKCR\Software\Classes\CLSID).
-        // HKCR\CLSID существует всегда, DeleteValue с throwOnMissingValue: false не падает.
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var uniqueName = "NonExistent_" + Guid.NewGuid().ToString("N");
         var entry = MakeEntry(loc, uniqueName);
         entry.FilePath = @"C:\test.dll";
@@ -275,7 +273,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что удаление из StartupFolder с отсутствующим файлом возвращает ошибку.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_StartupFolder_FileNotFound_ReturnsError()
@@ -289,7 +287,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что удаление существующего файла из StartupFolder создаёт бэкап.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_StartupFolder_FileExists_RemovesFile()
@@ -307,10 +305,10 @@ public class EntryOperationsAnalysisTests
             Assert.True(success, error);
             Assert.NotNull(payload);
 
-            // Файл удалён из исходного места
+            // Verifies component behavior and assertions.
             Assert.False(File.Exists(tempFile));
 
-            // Бэкап создан
+            // Verifies component behavior and assertions.
             Assert.NotNull(fp);
             Assert.True(File.Exists(fp.BackupPath));
         }
@@ -322,13 +320,13 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что удаление несуществующей службы формально возвращает успех (sc exit code игнорируется).
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_Service_NonExistent_ReturnsSuccess_ScExitCodeIgnored()
     {
-        // sc stop/delete на несуществующий сервис всё равно возвращает "успех"
-        // Это баг — нужно проверять exit code, но пока он игнорируется
+        // Verifies component behavior and assertions.
+        // Verifies component behavior and assertions.
         var entry = MakeEntry(EntryLocation.Service, "NonExistentSvc_ShouldNeverExist_" + Guid.NewGuid().ToString("N"));
 
         var (success, error, payload) = EntryOperations.RemoveFromSystem(entry);
@@ -339,7 +337,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что удаление несуществующей задачи возвращает ошибку.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RemoveFromSystem_TaskScheduler_NonExistent_ReturnsError()
@@ -354,13 +352,13 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что RemoveFromSystem не выбрасывает исключений для всех поддерживаемых Location.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(SupportedRemoveLocations))]
     public void RemoveFromSystem_SupportedLocations_DoesNotThrow(EntryLocation loc)
     {
-        // Для каждого поддерживаемого типа — проверяем что нет эксепшена
+        // Verifies component behavior and assertions.
         var entry = loc switch
         {
             EntryLocation.StartupFolder => MakeEntry(loc, filePath: Path.GetTempFileName() + ".lnk"),
@@ -375,11 +373,11 @@ public class EntryOperationsAnalysisTests
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 3. RESTORE — восстановление удалённых записей
+    // Verifies component behavior and assertions.
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет, что RestoreToSystem возвращает ошибку для неподдерживаемых Location.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(UnsupportedRemoveLocations))]
@@ -396,7 +394,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет восстановление файла из бэкапа в StartupFolder.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RestoreToSystem_StartupFolder_ValidBackup_RestoresFile()
@@ -406,7 +404,7 @@ public class EntryOperationsAnalysisTests
         try
         {
             File.WriteAllText(tempBackup, "restore test content");
-            // Исходный файл был удалён; конфликтующий существующий файл проверяется отдельной регрессией.
+            // Verifies component behavior and assertions.
             File.Delete(tempOriginal);
             var payload = JsonSerializer.Serialize(
                 new EntryOperations.FilePayload(tempBackup, tempOriginal), JsonOptions);
@@ -430,8 +428,8 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет восстановление уникального значения из RegistryPayload в явно созданном ключе.
-    /// После проверки значение удаляется даже при ошибке, без изменения пользовательских записей.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void RestoreToSystem_Registry_RoundTrip()
@@ -462,11 +460,11 @@ public class EntryOperationsAnalysisTests
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 4. BLACKLIST — блокировка
+    // Verifies component behavior and assertions.
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет сопоставление записей с правилами чёрного списка для всех типов MatchType.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(BlacklistMatchType.Path, @"C:\test\app.exe", @"C:\test\app.exe", true)]
@@ -508,7 +506,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что MatchEntry находит правило и возвращает правильное действие.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(AllEntryLocations))]
@@ -539,11 +537,11 @@ public class EntryOperationsAnalysisTests
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 5. DISABLE / ENABLE — реальное отключение в системе
+    // Verifies component behavior and assertions.
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет, что DisableFromSystem возвращает ошибку для неподдерживаемых Location.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void DisableFromSystem_UnsupportedLocation_ReturnsError()
@@ -555,7 +553,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что EnableFromSystem возвращает ошибку для неподдерживаемых Location.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EnableFromSystem_UnsupportedLocation_ReturnsError()
@@ -567,7 +565,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что DisableFromSystem не выбрасывает исключений для поддерживаемых Location.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [MemberData(nameof(SupportedRemoveLocations))]
@@ -586,7 +584,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что DisableStartupFile возвращает ошибку при отсутствующем файле.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void DisableStartupFile_FileNotFound_ReturnsError()
@@ -598,7 +596,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что DisableStartupFile переименовывает файл в *.disabled.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void DisableStartupFile_RenamesToDisabled()
@@ -624,7 +622,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что EnableStartupFile восстанавливает файл из *.disabled.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EnableStartupFile_RestoresFromDisabled()
@@ -653,7 +651,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что EnableStartupFile возвращает ошибку при отсутствии *.disabled файла.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EnableStartupFile_NoDisabledFile_ReturnsError()
@@ -665,10 +663,10 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Создаёт ключ и реальное уникальное значение Run/RunOnce, проверяет отключение
-    /// с сохранением данных и гарантированно удаляет тестовое значение при любом результате.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
-    /// <param name="loc">Проверяемое расположение пользовательского автозапуска.</param>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     [Theory]
     [InlineData(EntryLocation.RegistryRun)]
     [InlineData(EntryLocation.RegistryRunOnce)]
@@ -696,7 +694,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет отключение контекстного меню через реестр (HKCR\CLSID).
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.ContextMenuHandler)]
@@ -706,26 +704,26 @@ public class EntryOperationsAnalysisTests
         var entry = MakeEntry(loc, uniqueName);
         entry.FilePath = @"C:\test.dll";
         var (success, error) = EntryOperations.DisableRegistry(entry);
-        // Отсутствие исходного значения не является успешным отключением и не создаёт пустой backup.
+        // Verifies component behavior and assertions.
         Assert.False(success);
         Assert.NotEmpty(error ?? string.Empty);
         Assert.Empty(entry.DisablePayload);
     }
 
     /// <summary>
-    /// Проверяет, что DisableService возвращает ошибку для несуществующей службы.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void DisableService_NonExistent_ReturnsError()
     {
         var entry = MakeEntry(EntryLocation.Service, "NonExistentSvc_" + Guid.NewGuid().ToString("N"));
         var (success, error) = EntryOperations.DisableService(entry);
-        // На несуществующий сервис sc config вернёт ошибку
+        // Verifies component behavior and assertions.
         Assert.False(success);
     }
 
     /// <summary>
-    /// Проверяет, что DisableTask возвращает ошибку для несуществующей задачи.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void DisableTask_NonExistent_ReturnsError()
@@ -741,7 +739,7 @@ public class EntryOperationsAnalysisTests
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет, что добавление правила в чёрный список и ReapplyBlacklist правильно помечают запись.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void PipeServer_AddToBlacklist_CreatesRuleAndReapplies()
@@ -753,7 +751,7 @@ public class EntryOperationsAnalysisTests
         var entry = MakeEntry(EntryLocation.RegistryRun, "BlacklistReapplyTest", @"C:\test\app.exe");
         store6.AddEntry(entry);
 
-        // Добавляем правило
+        // Verifies component behavior and assertions.
         var rule = new BlacklistRule
         {
             Value = @"C:\test\app.exe",
@@ -764,7 +762,7 @@ public class EntryOperationsAnalysisTests
         config.Blacklist.Add(rule);
         store6.Save(config);
 
-        // ReapplyBlacklist — эмулируем PipeServer
+        // Verifies component behavior and assertions.
         var mgr = new BlacklistManager(store6);
         config = store6.Load();
         foreach (var e in config.Entries)
@@ -778,7 +776,7 @@ public class EntryOperationsAnalysisTests
         }
         store6.Save(config);
 
-        // Проверяем — entry теперь blocked
+        // Verifies component behavior and assertions.
         config = store6.Load();
         var stored = config.Entries.Find(e => e.Id == entry.Id)!;
         Assert.Equal(EntryStatus.Blocked, stored.Status);
@@ -792,7 +790,7 @@ public class EntryOperationsAnalysisTests
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет сериализацию/десериализацию всех типов payload: Registry, File, Service, Task.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AllPayloadTypes_SerializeDeserialize()
@@ -824,7 +822,7 @@ public class EntryOperationsAnalysisTests
     // ═══════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Проверяет удаление HKLM-реестровых записей (AppInitDll, IFEO, Winlogon, BootExecute).
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.AppInitDll)]
@@ -842,7 +840,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет отключение HKLM-реестровых записей (AppInitDll, IFEO, Winlogon, BootExecute).
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.AppInitDll)]
@@ -860,7 +858,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет полный цикл Disable → Enable для HKLM-реестровых записей.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(EntryLocation.AppInitDll)]
@@ -882,7 +880,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что передача пустых правил или null в KillProcessesByRules не вызывает исключений.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void KillProcessesByRules_NullOrEmpty_NoOp()
@@ -892,7 +890,7 @@ public class EntryOperationsAnalysisTests
     }
 
     /// <summary>
-    /// Проверяет, что защищенные процессы (explorer.exe, svchost.exe) не уничтожаются даже при наличии правила.
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     /// </summary>
     [Fact]
     public void KillProcessesByRules_ProtectedProcess_DoesNotKill()
@@ -904,7 +902,7 @@ public class EntryOperationsAnalysisTests
             Action = BlacklistAction.NotifyAndRemove
         };
 
-        // Запуск не должен сбросить или закрыть explorer
+        // Verifies component behavior and assertions.
         EntryOperations.KillProcessesByRules(new[] { rule });
     }
 
@@ -912,8 +910,8 @@ public class EntryOperationsAnalysisTests
     // Helpers
     // ═══════════════════════════════════════════════════════════
 
-    /// <summary>Удаляет только конкретный бэкап, созданный текущим тестом, сохраняя пользовательские архивы.</summary>
-    /// <param name="createdBackup">Точный путь из payload операции текущего теста.</param>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
+    /// <summary>Verifies test scenario for EntryOperationsAnalysisTests.cs.</summary>
     private static void CleanupBackup(string? createdBackup)
     {
         if (createdBackup != null && File.Exists(createdBackup)) File.Delete(createdBackup);

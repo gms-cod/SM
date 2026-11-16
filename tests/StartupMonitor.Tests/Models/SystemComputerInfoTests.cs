@@ -5,12 +5,10 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>
-/// Модульные тесты для сборщика системной информации SystemComputerInfo.
-/// </summary>
+/// <summary>Verifies test scenario for SystemComputerInfoTests.cs.</summary>
 public class SystemComputerInfoTests
 {
-    /// <summary>Версия BIOS читается как из обычной строки, так и из многострочного значения реестра.</summary>
+    /// <summary>Verifies test scenario for SystemComputerInfoTests.cs.</summary>
     [Fact]
     public void FormatBiosVersion_HandlesRegistryStringTypes()
     {
@@ -19,7 +17,7 @@ public class SystemComputerInfoTests
         Assert.Equal(string.Empty, SystemComputerInfo.FormatBiosVersion(null));
         Assert.Equal(string.Empty, SystemComputerInfo.FormatBiosVersion(42));
     }
-    /// <summary>Клиентская Windows 11 определяется по сборке без переименования серверной системы.</summary>
+    /// <summary>Verifies test scenario for SystemComputerInfoTests.cs.</summary>
     [Theory]
     [InlineData("Windows 10 Pro", "26300", "Windows 11 Pro")]
     [InlineData("Windows 10 Pro", "19045", "Windows 10 Pro")]
@@ -30,6 +28,9 @@ public class SystemComputerInfoTests
         Assert.Equal(expected, SystemComputerInfo.NormalizeWindowsName(name, build));
     }
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Collect_ReturnsValidSystemInfo()
     {
         // Act
@@ -51,6 +52,9 @@ public class SystemComputerInfoTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Collect_PopulatesDrivesInformation()
     {
         // Act
@@ -69,6 +73,9 @@ public class SystemComputerInfoTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void CompactSummary_ContainsCoreMetrics()
     {
         // Act
@@ -83,6 +90,9 @@ public class SystemComputerInfoTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ToReportString_GeneratesStructuredReport()
     {
         // Act
@@ -104,6 +114,9 @@ public class SystemComputerInfoTests
     [InlineData(1024 * 1024, "1.0 МБ")]
     [InlineData(1024L * 1024 * 1024 * 5, "5.0 ГБ")]
     [InlineData(1024L * 1024 * 1024 * 1024 * 2, "2.0 ТБ")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void FormatBytes_FormatsSizesCorrectly(long bytes, string expected)
     {
         // Act

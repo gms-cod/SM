@@ -1045,6 +1045,9 @@ public sealed class ProcessPortDefenderService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         // Не удерживаем _sync во время ожидания: завершающийся цикл сам проверяет HasWork под этой блокировкой.

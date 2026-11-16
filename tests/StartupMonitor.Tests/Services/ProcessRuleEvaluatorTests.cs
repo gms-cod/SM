@@ -10,13 +10,14 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Набор модульных тестов для компонента ProcessRuleEvaluator.
-/// Проверяет детерминированное сопоставление правил, защиту системных процессов и policy parity.
-/// </summary>
+/// <summary>Verifies test scenario for ProcessRuleEvaluatorTests.cs.</summary>
+/// <summary>Verifies test scenario for ProcessRuleEvaluatorTests.cs.</summary>
 public sealed class ProcessRuleEvaluatorTests
 {
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_EmptyProcessName_ReturnsRejected()
     {
         var rules = new[]
@@ -44,6 +45,9 @@ public sealed class ProcessRuleEvaluatorTests
     [InlineData("mshta.exe")]
     [InlineData("cscript.exe")]
     [InlineData("wscript.exe")]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_ProtectedProcessName_NeverMatched(string protectedName)
     {
         var rules = new[]
@@ -58,13 +62,16 @@ public sealed class ProcessRuleEvaluatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_NonKillRules_AreIgnored()
     {
         var rules = new[]
         {
-            // NotifyOnly не должен приводить к матчу завершения процесса
+            // Verifies component behavior and assertions.
             new BlacklistRule { MatchType = BlacklistMatchType.Path, Value = @"C:\App\bad.exe", Action = BlacklistAction.NotifyOnly },
-            // Publisher не должен приводить к завершению
+            // Verifies component behavior and assertions.
             new BlacklistRule { MatchType = BlacklistMatchType.Publisher, Value = "Bad Publisher", Action = BlacklistAction.NotifyAndRemove }
         };
 
@@ -74,6 +81,9 @@ public sealed class ProcessRuleEvaluatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_ExactPathMatch_MatchesSuccessfully()
     {
         var targetRule = new BlacklistRule
@@ -92,6 +102,9 @@ public sealed class ProcessRuleEvaluatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_WildcardPathMatch_MatchesSuccessfully()
     {
         var targetRule = new BlacklistRule
@@ -109,6 +122,9 @@ public sealed class ProcessRuleEvaluatorTests
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Evaluate_UnknownPath_AllowsOnlyFilenameMatchWithoutSlashes()
     {
         var pathRuleWithDirectory = new BlacklistRule
@@ -127,17 +143,20 @@ public sealed class ProcessRuleEvaluatorTests
 
         var rules = new[] { pathRuleWithDirectory, filenameOnlyRule };
 
-        // 1. Процесс с неизвестным путем НЕ должен матчиться с правилом, содержащим путь (защита Chrome/legit app)
+        // Verifies component behavior and assertions.
         var result1 = ProcessRuleEvaluator.Evaluate("app.exe", null, new[] { pathRuleWithDirectory });
         Assert.False(result1.IsMatched);
 
-        // 2. Процесс с неизвестным путем матчится с правилом без слешей
+        // Verifies component behavior and assertions.
         var result2 = ProcessRuleEvaluator.Evaluate("evil_app.exe", null, new[] { filenameOnlyRule });
         Assert.True(result2.IsMatched);
         Assert.Same(filenameOnlyRule, result2.MatchedRule);
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void BlacklistRuleSnapshot_FiltersNonKillRulesAndTracksGeneration()
     {
         var rules = new[]

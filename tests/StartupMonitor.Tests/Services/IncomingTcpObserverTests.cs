@@ -11,12 +11,12 @@ using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет границы наблюдения входящих соединений без изменения реальных сетевых правил.</summary>
+/// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
 public sealed class IncomingTcpObserverTests
 {
-    /// <summary>Сетевой фильтр исключает локальные IPv4 и IPv6, включая отображённые IPv4-адреса.</summary>
-    /// <param name="value">Адрес удалённого узла.</param>
-    /// <param name="expected">Ожидаемый признак внутреннего адреса.</param>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
     [Theory]
     [InlineData("fc00::1234", true)]
     [InlineData("fd12::1234", true)]
@@ -28,8 +28,8 @@ public sealed class IncomingTcpObserverTests
         Assert.Equal(expected, IncomingTcpObserver.IsInternalAddress(IPAddress.Parse(value)));
     }
 
-    /// <summary>Настройка выключена по умолчанию и сохраняется при изменении через настоящий IPC-обработчик.</summary>
-    /// <returns>Задача проверки записи настройки.</returns>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
     [Fact]
     public async Task Setting_IsOptIn_AndRoundTripsThroughServer()
     {
@@ -55,8 +55,8 @@ public sealed class IncomingTcpObserverTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
     }
 
-    /// <summary>Проверяет фильтр локального трафика, ограничение частоты и данные события, доходящего до очереди UI.</summary>
-    /// <returns>Задача получения уведомления.</returns>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
+    /// <summary>Verifies test scenario for IncomingTcpObserverTests.cs.</summary>
     [Fact]
     public async Task Observation_FiltersPrivateAndLimitsNotifications()
     {

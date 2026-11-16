@@ -6,9 +6,7 @@ using Xunit;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Модульные тесты для сервиса проверки репутации Kaspersky OpenTIP.
-/// </summary>
+/// <summary>Verifies test scenario for KasperskyScanServiceTests.cs.</summary>
 public class KasperskyScanServiceTests : IDisposable
 {
     private readonly string _testDir;
@@ -21,6 +19,9 @@ public class KasperskyScanServiceTests : IDisposable
         _store = new JsonDataStore(Path.Combine(_testDir, "startup-entries.json"));
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try
@@ -32,6 +33,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ParseKasperskyResponse_CleanFile_ParsesCorrectly()
     {
         var json = @"{
@@ -54,8 +58,8 @@ public class KasperskyScanServiceTests : IDisposable
         Assert.Empty(result.DetectionName);
     }
 
-    /// <summary>Отмена активного запроса при остановке службы не превращается в ложный отказ проверки.</summary>
-    /// <returns>Задача проверки распространения отмены без реальных сетевых обращений.</returns>
+    /// <summary>Verifies test scenario for KasperskyScanServiceTests.cs.</summary>
+    /// <summary>Verifies test scenario for KasperskyScanServiceTests.cs.</summary>
     [Fact]
     public async Task ScanEntryAsync_CallerCancellationPropagates()
     {
@@ -76,6 +80,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ParseKasperskyResponse_MalwareFile_ExtractsDetections()
     {
         var json = @"{
@@ -108,6 +115,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void ParseKasperskyResponse_InvalidJson_ReturnsErrorResult()
     {
         var json = "{ invalid json content ";
@@ -120,6 +130,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task ScanEntryAsync_OwnService_ReturnsGreenTrustedWithoutNetwork()
     {
         var handler = new MockHttpMessageHandler(_ =>
@@ -142,6 +155,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task ScanEntryAsync_CleanResponse_UpdatesEntry()
     {
         var cleanJson = @"{
@@ -181,6 +197,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task ScanEntryAsync_NotFoundResponse_SetsGreyNotFound()
     {
         var handler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
@@ -203,6 +222,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task TestConnectionAsync_ValidKey_ReturnsSuccess()
     {
         var cleanJson = @"{
@@ -226,6 +248,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task TestConnectionAsync_InvalidKey_ReturnsAuthError()
     {
         var handler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
@@ -239,6 +264,9 @@ public class KasperskyScanServiceTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public async Task TestConnectionAsync_EmptyKey_ReturnsImmediateFailure()
     {
         var handler = new MockHttpMessageHandler(_ => throw new Exception("Must not be called"));
@@ -255,6 +283,9 @@ public class KasperskyScanServiceTests : IDisposable
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
         public MockHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) => _handler = handler;
 
+        /// <summary>
+        /// Provides operations for this member.
+        /// </summary>
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             return Task.FromResult(_handler(request));

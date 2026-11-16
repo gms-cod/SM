@@ -3,12 +3,10 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для LogReaderService: чтение логов службы и UI, фильтрация, поиск последнего файла, ограничение записей.
-/// </summary>
+/// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
 public class LogReaderServiceTests : IDisposable
 {
-    /// <summary>Временная директория для файлов логов.</summary>
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     private readonly string _tempDir;
 
     public LogReaderServiceTests()
@@ -17,7 +15,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет парсинг лога службы в правильном формате: дата-уровень-сообщение.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadServiceLog_ParsesCorrectFormat()
@@ -46,7 +44,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет парсинг лога UI: время-идентификатор-сообщение.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadUiLog_ParsesCorrectFormat()
@@ -75,7 +73,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что ReadServiceLog возвращает пустой список при отсутствии файла.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadServiceLog_ReturnsEmpty_WhenFileNotFound()
@@ -86,7 +84,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что ReadUiLog возвращает пустой список при отсутствии файла.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadUiLog_ReturnsEmpty_WhenFileNotFound()
@@ -97,7 +95,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что FindLatestServiceLog находит самый новый файл среди нескольких.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void FindLatestServiceLog_ReturnsNewestFile()
@@ -122,7 +120,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что FindLatestServiceLog возвращает null при отсутствии папки logs.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void FindLatestServiceLog_ReturnsNull_WhenNoLogsDir()
@@ -133,7 +131,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что FindLatestServiceLog возвращает null при отсутствии файлов в папке logs.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void FindLatestServiceLog_ReturnsNull_WhenNoLogFiles()
@@ -146,7 +144,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что ReadAllLogs комбинирует записи из логов службы и UI и сортирует по времени (новые — первые).
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadAllLogs_CombinesAndSortsEntries()
@@ -166,14 +164,14 @@ public class LogReaderServiceTests : IDisposable
 
         var result = LogReaderService.ReadAllLogs(_tempDir);
 
-        // Свежие записи — первыми (UI 10:30:01 новее SERVICE 10:30:00)
+        // Verifies component behavior and assertions.
         Assert.Equal(2, result.Count);
         Assert.Equal("UI", result[0].Source);
         Assert.Equal("SERVICE", result[1].Source);
     }
 
     /// <summary>
-    /// Проверяет, что ReadAllLogs ограничивает количество возвращаемых записей (макс. 2000).
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadAllLogs_LimitsToMaxEntries()
@@ -187,13 +185,13 @@ public class LogReaderServiceTests : IDisposable
 
         var result = LogReaderService.ReadAllLogs(_tempDir);
 
-        // Максимум 2000 свежих, самая новая — первой
+        // Verifies component behavior and assertions.
         Assert.True(result.Count <= 2000);
         Assert.Equal("Line 2499", result[0].Message);
     }
 
     /// <summary>
-    /// Проверяет, что фильтрация по пустой строке возвращает все записи.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Filter_ReturnsAll_WhenSearchEmpty()
@@ -210,7 +208,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что фильтрация возвращает только записи, содержащие искомый текст.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Filter_ReturnsMatching()
@@ -228,7 +226,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что фильтрация регистронезависима.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void Filter_IsCaseInsensitive()
@@ -244,7 +242,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет парсинг лога UI с датой yyyy-MM-dd HH:mm:ss.fff.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ReadUiLog_ParsesFullDateFormat()
@@ -269,7 +267,7 @@ public class LogReaderServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Проверяет, что FindLatestServiceLogs возвращает до maxFiles самых свежих файлов в порядке убывания.
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     /// </summary>
     [Fact]
     public void FindLatestServiceLogs_ReturnsDescendingOrder()
@@ -289,7 +287,7 @@ public class LogReaderServiceTests : IDisposable
         Assert.Contains("service-20260912.log", result[2]);
     }
 
-    /// <summary>Удаляет временные файлы теста.</summary>
+    /// <summary>Verifies test scenario for LogReaderServiceTests.cs.</summary>
     public void Dispose()
     {
         if (Directory.Exists(_tempDir))

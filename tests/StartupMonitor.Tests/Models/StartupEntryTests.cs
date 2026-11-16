@@ -2,13 +2,11 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Models;
 
-/// <summary>
-/// Тесты для модели StartupEntry: проверка значений по умолчанию, свойств при создании, длин enum'ов.
-/// </summary>
+/// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
 public class StartupEntryTests
 {
     /// <summary>
-    /// Проверяет, что при создании пустой записи проставляются ID, статус Enabled и дата DetectedAt.
+    /// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CreateEntry_DefaultValues()
@@ -22,7 +20,7 @@ public class StartupEntryTests
     }
 
     /// <summary>
-    /// Проверяет, что при создании записи с заполненными полями все значения сохраняются корректно.
+    /// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
     /// </summary>
     [Fact]
     public void CreateEntry_WithValues()
@@ -44,7 +42,7 @@ public class StartupEntryTests
     }
 
     /// <summary>
-    /// Проверяет количество значений в EntryLocation (29 типов автозапуска).
+    /// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EntryLocation_AllValuesCovered()
@@ -54,7 +52,7 @@ public class StartupEntryTests
     }
 
     /// <summary>
-    /// Проверяет количество значений в EntryStatus (5 статусов: Enabled, Disabled, Blocked, Removed, Delayed).
+    /// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
     /// </summary>
     [Fact]
     public void EntryStatus_AllValuesCovered()
@@ -64,7 +62,7 @@ public class StartupEntryTests
     }
 
     /// <summary>
-    /// Проверяет свойство IsUserRating по умолчанию и генерацию PropertyChanged при изменении.
+    /// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
     /// </summary>
     [Fact]
     public void IsUserRating_DefaultAndNotification_Works()
@@ -81,7 +79,7 @@ public class StartupEntryTests
     }
 
     /// <summary>
-    /// Проверяет создание DTO SetUserRatingRequest и корректность передачи параметров.
+    /// <summary>Verifies test scenario for StartupEntryTests.cs.</summary>
     /// </summary>
     [Fact]
     public void SetUserRatingRequest_PropertiesAssignment_Works()

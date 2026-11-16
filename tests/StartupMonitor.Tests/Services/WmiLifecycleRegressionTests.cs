@@ -6,10 +6,10 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>Проверяет завершение debounce при отмене до первого сканирования без подключения к WMI системы.</summary>
+/// <summary>Verifies test scenario for WmiLifecycleRegressionTests.cs.</summary>
 public sealed class WmiLifecycleRegressionTests
 {
-    /// <summary>Даже отмена первого WaitAsync завершает writer и worker до окончания ExecuteAsync.</summary>
+    /// <summary>Verifies test scenario for WmiLifecycleRegressionTests.cs.</summary>
     [Fact]
     public async Task CancelledInitialScan_CompletesDebounceChannel()
     {

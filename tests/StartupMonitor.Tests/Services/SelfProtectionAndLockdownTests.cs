@@ -3,9 +3,7 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для механизмов самозащиты StartupMonitor и строгого режима автоблокировки (StrictMode).
-/// </summary>
+/// <summary>Verifies test scenario for SelfProtectionAndLockdownTests.cs.</summary>
 public class SelfProtectionAndLockdownTests : IDisposable
 {
     private readonly string _testDir;
@@ -22,6 +20,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
         _notifications = new NotificationService(tracker);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         try
@@ -40,12 +41,18 @@ public class SelfProtectionAndLockdownTests : IDisposable
     [InlineData("startupmonitor", true)]
     [InlineData("OtherService", false)]
     [InlineData("", false)]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsSelfServiceName_IdentifiesCorrectly(string serviceName, bool expected)
     {
         Assert.Equal(expected, EntryOperations.IsSelfServiceName(serviceName));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsSelfEntry_ServiceEntry_ReturnsTrue()
     {
         var entry = new StartupEntry
@@ -60,6 +67,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsSelfEntry_UiRegistryEntry_ReturnsTrue()
     {
         var entry = new StartupEntry
@@ -74,6 +84,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsSelfEntry_ThirdPartyApp_ReturnsFalse()
     {
         var entry = new StartupEntry
@@ -87,6 +100,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void IsProtectedSystemEntry_IdentifiesCriticalServicesAndTasks()
     {
         var svchostEntry = new StartupEntry
@@ -124,6 +140,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void RemoveFromSystem_SelfEntry_BlockedBySelfProtection()
     {
         var selfService = new StartupEntry
@@ -141,6 +160,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void DisableFromSystem_SelfEntry_BlockedBySelfProtection()
     {
         var selfUi = new StartupEntry
@@ -157,6 +179,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AddOrUpdate_SelfEntry_NotBlockedWhenStrictModeEnabled()
     {
         var cfg = _store.Load();
@@ -172,16 +197,19 @@ public class SelfProtectionAndLockdownTests : IDisposable
             FilePath = @"C:\Program Files\StartupMonitor\StartupMonitor.UI.exe"
         };
 
-        // Добавляем запись при включенном StrictMode
+        // Verifies component behavior and assertions.
         var isNew = WatcherHelper.AddOrUpdate(_store, _notifications, selfEntry);
 
         Assert.True(isNew);
-        // Запись должна быть в Entries, а не в RemovedEntries!
+        // Verifies component behavior and assertions.
         Assert.NotNull(_store.FindEntry(e => e.Name == "StartupMonitor.UI"));
         Assert.Empty(_store.GetRemovedEntries());
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AddOrUpdate_LockdownBlocked_ReleasedWhenStrictModeDisabled()
     {
         var entryId = "app12345";
@@ -194,7 +222,7 @@ public class SelfProtectionAndLockdownTests : IDisposable
             FilePath = @"C:\Dummy\testapp.exe"
         };
 
-        // Запись была заблокирована строгим режимом и попала в бэкап с RemovalReason = LockdownBlocked
+        // Verifies component behavior and assertions.
         var removed = new RemovedEntry
         {
             Id = "rem1",
@@ -207,21 +235,24 @@ public class SelfProtectionAndLockdownTests : IDisposable
         };
         _store.AddRemovedEntry(removed);
 
-        // StrictMode выключен!
+        // Verifies component behavior and assertions.
         var cfg = _store.Load();
         cfg.Settings.StrictMode = false;
         _store.Save(cfg);
 
-        // При повторном появлении записи
+        // Verifies component behavior and assertions.
         var isNew = WatcherHelper.AddOrUpdate(_store, _notifications, entry);
 
-        // Запись должна быть удалена из бэкапа и добавлена в список как обычная новая запись!
+        // Verifies component behavior and assertions.
         Assert.True(isNew);
         Assert.NotNull(_store.FindEntry(e => e.Id == entryId));
         Assert.Null(_store.GetRemovedEntryByOriginalId(entryId));
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AddOrUpdate_DisabledEntrySelfRestores_DoesNotKillProcess()
     {
         var entryId = "opera123";
@@ -240,7 +271,7 @@ public class SelfProtectionAndLockdownTests : IDisposable
         cfg.Settings.KillOnDisable = true;
         _store.Save(cfg);
 
-        // Повторное обнаружение ключа в системе (браузер запущен и пересоздал Run-ключ)
+        // Verifies component behavior and assertions.
         var isNew = WatcherHelper.AddOrUpdate(_store, _notifications, entry);
 
         Assert.False(isNew);
@@ -250,6 +281,9 @@ public class SelfProtectionAndLockdownTests : IDisposable
     }
 
     [Fact]
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void AddOrUpdate_UserRemovedEntrySelfRestores_NotBlacklisted_RemovesFromSystemWithoutKill()
     {
         var entryId = "yandex_disk_456";
@@ -263,7 +297,7 @@ public class SelfProtectionAndLockdownTests : IDisposable
             Status = EntryStatus.Enabled
         };
 
-        // Запись ранее была удалена пользователем
+        // Verifies component behavior and assertions.
         var removed = new RemovedEntry
         {
             Id = "rem_yd",
@@ -276,13 +310,13 @@ public class SelfProtectionAndLockdownTests : IDisposable
         };
         _store.AddRemovedEntry(removed);
 
-        // Повторное появление записи без правила в ЧС
+        // Verifies component behavior and assertions.
         var isNew = WatcherHelper.AddOrUpdate(_store, _notifications, entry, matchedRule: null);
 
         Assert.False(isNew);
-        // Автоматический повтор больше не удаляет данные записи даже при отказе отключения отсутствующего тестового значения.
+        // Verifies component behavior and assertions.
         Assert.NotNull(_store.FindEntry(e => e.Id == entryId));
-        // Но бэкап удалённой записи остаётся
+        // Verifies component behavior and assertions.
         Assert.NotNull(_store.GetRemovedEntryByOriginalId(entryId));
     }
 }

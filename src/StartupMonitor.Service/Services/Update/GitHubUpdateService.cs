@@ -577,6 +577,9 @@ public sealed class GitHubUpdateService : IDisposable
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/octet-stream"));
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public static string CleanVersionTag(string rawTag)
     {
         if (string.IsNullOrWhiteSpace(rawTag)) return "0.0.0";
@@ -586,6 +589,9 @@ public sealed class GitHubUpdateService : IDisposable
         return dashIndex > 0 ? cleaned[..dashIndex] : cleaned;
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public static Version ParseSemVer(string versionStr)
     {
         if (Version.TryParse(versionStr, out var v))
@@ -686,6 +692,9 @@ public sealed class GitHubUpdateService : IDisposable
         return DateTime.MinValue;
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public static (string DownloadUrl, string FileName, long SizeBytes, DateTime? UpdatedAtUtc) FindInstallerAsset(JsonElement releaseRoot)
     {
         if (!releaseRoot.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
@@ -732,6 +741,9 @@ public sealed class GitHubUpdateService : IDisposable
         return ("", "", 0, null);
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public static string? ExtractSha256Checksum(string body, JsonElement releaseRoot)
     {
         if (!string.IsNullOrWhiteSpace(body))
@@ -771,6 +783,9 @@ public sealed class GitHubUpdateService : IDisposable
         return Path.Combine(Path.GetTempPath(), "StartupMonitorUpdates");
     }
 
+    /// <summary>
+    /// Provides operations for this member.
+    /// </summary>
     public void Dispose()
     {
         lock (_lock)

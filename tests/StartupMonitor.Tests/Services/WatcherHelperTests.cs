@@ -4,15 +4,13 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.Services;
 
-/// <summary>
-/// Тесты для вспомогательных методов WatcherHelper: парсинг путей, определение местоположения записей.
-/// </summary>
+/// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
 public class WatcherHelperTests
 {
     // ───── ParsePath ─────
 
     /// <summary>
-    /// Проверяет, что ParsePath возвращает пустую строку для null, пустой строки и пробелов.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParsePath_NullOrEmpty_ReturnsEmpty()
@@ -23,7 +21,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет извлечение пути из кавычек: путь в кавычках с аргументами и без.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"""C:\Program Files\MyApp\app.exe"" --arg", @"C:\Program Files\MyApp\app.exe")]
@@ -36,7 +34,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет извлечение пути без кавычек: путь, путь с аргументами, путь без расширения.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"C:\Simple\app.exe", @"C:\Simple\app.exe")]
@@ -49,7 +47,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет извлечение для .com и .bat файлов — они также должны корректно парситься.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"C:\Tools\helper.com /quiet", @"C:\Tools\helper.com")]
@@ -60,7 +58,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет извлечение DLL-пути из rundll32.exe — особая команда с запятой.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParsePath_DllRegSvr32_Roundtrip()
@@ -71,7 +69,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет, что путь без пробелов возвращается целиком.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParsePath_NoSpace_ReturnsFullString()
@@ -82,7 +80,7 @@ public class WatcherHelperTests
     // ───── ParseServicePath ─────
 
     /// <summary>
-    /// Проверяет, что ParseServicePath возвращает пустую строку для null, пустого и пробелов.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(null, "")]
@@ -94,7 +92,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет извлечение пути службы из кавычек.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"""C:\Program Files\Service\svc.exe"" --arg", @"C:\Program Files\Service\svc.exe")]
@@ -106,7 +104,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет извлечение пути службы без кавычек.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"C:\Service\svc.exe", @"C:\Service\svc.exe")]
@@ -118,7 +116,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет, что для пути с пробелами без кавычек берётся только первый токен (особенность sc).
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void ParseServicePath_SpaceInUnquotedPath_FirstTokenOnly()
@@ -130,7 +128,7 @@ public class WatcherHelperTests
     // ───── GetLocationFromKeyPath ─────
 
     /// <summary>
-    /// Проверяет видимый отказ отключения отсутствующего источника без потери ручной резервной копии.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AddOrUpdate_RemovedEntry_MissingSourceRemainsVisibleWithOriginalBackup()
@@ -148,12 +146,12 @@ public class WatcherHelperTests
         };
         entry.Id = WatcherHelper.ComputeStableId(entry);
 
-        // Запись добавлена, затем удалена пользователем из системы (→ список восстановления)
+        // Verifies component behavior and assertions.
         store.AddEntry(entry);
         store.AddRemovedEntry(new RemovedEntry { OriginalEntryId = entry.Id, RestorePayload = "original user backup" });
         store.RemoveEntry(entry.Id);
 
-        // Запись снова обнаружена watcher'ом — не должна вернуться в общий список
+        // Verifies component behavior and assertions.
         using var notif = new NotificationService(new InitialScanTracker());
         var added = WatcherHelper.AddOrUpdate(store, notif, entry);
 
@@ -167,7 +165,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет обратимое отключение собственной безвредной записи строгим режимом без переноса в удалённые.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AddOrUpdate_StrictModeEnabled_DisablesAndKeepsVisibleEntry()
@@ -208,7 +206,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет, что при выключенном StrictMode новая запись успешно регистрируется.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void AddOrUpdate_StrictModeDisabled_AddsNormally()
@@ -236,7 +234,7 @@ public class WatcherHelperTests
     // ───── LooksLikeCommand ─────
 
     /// <summary>
-    /// Проверяет, что команды автозапуска распознаются: пути, кавычки, %env%, bare-exe.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"C:\Windows\System32\app.exe")]
@@ -255,8 +253,8 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет, что мусорные значения реестра не распознаются как команды:
-    /// числа, "yes", CLSID, имена DLL/драйверов без пути, списки, деактивированные StubPath.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData("15")]
@@ -284,7 +282,7 @@ public class WatcherHelperTests
     // ───── GetActiveSetupStubPath ─────
 
     /// <summary>
-    /// Проверяет, что активный компонент Active Setup возвращает StubPath.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void GetActiveSetupStubPath_ActiveComponent_ReturnsStub()
@@ -304,7 +302,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет, что компонент без StubPath не является автозапуском.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void GetActiveSetupStubPath_NoStubPath_ReturnsNull()
@@ -322,7 +320,7 @@ public class WatcherHelperTests
     }
 
     /// <summary>
-    /// Проверяет, что деактивированный компонент (StubPath с '>') не является автозапуском.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Fact]
     public void GetActiveSetupStubPath_DeactivatedStub_ReturnsNull()
@@ -342,7 +340,7 @@ public class WatcherHelperTests
     // ───── GetLocationFromKeyPath ─────
 
     /// <summary>
-    /// Проверяет определение типа автозагрузки по пути реестрового ключа.
+    /// <summary>Verifies test scenario for WatcherHelperTests.cs.</summary>
     /// </summary>
     [Theory]
     [InlineData(@"Software\Microsoft\Windows\CurrentVersion\Run", EntryLocation.RegistryRun)]

@@ -7,12 +7,12 @@ using StartupMonitor.Shared.Models;
 
 namespace StartupMonitor.Tests.UI;
 
-/// <summary>Проверяет реальную таблицу процессов без создания MainWindow и изменения пользовательских настроек.</summary>
+/// <summary>Verifies test scenario for TaskManagerLayoutRegressionTests.cs.</summary>
 public sealed partial class NetworkRenderingRegressionTests
 {
-    /// <summary>Имя процесса остаётся видимым, правые действия доступны прокруткой, список сохраняет виртуализацию.</summary>
-    /// <param name="pageWidth">Ширина страницы после вычета боковой навигации из ширины окна.</param>
-    /// <param name="height">Доступная высота таблицы.</param>
+    /// <summary>Verifies test scenario for TaskManagerLayoutRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerLayoutRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerLayoutRegressionTests.cs.</summary>
     [Theory]
     [InlineData(840, 320)]
     [InlineData(1196, 500)]
@@ -65,8 +65,8 @@ public sealed partial class NetworkRenderingRegressionTests
             }
         });
 
-    /// <summary>Извлекает производственный XAML блока таблицы, используя настоящие ресурсы приложения из общего STA-host.</summary>
-    /// <returns>Независимый Border с заголовком и ListBox, не запускающий IPC или lifecycle MainWindow.</returns>
+    /// <summary>Verifies test scenario for TaskManagerLayoutRegressionTests.cs.</summary>
+    /// <summary>Verifies test scenario for TaskManagerLayoutRegressionTests.cs.</summary>
     private static Border LoadProcessTable()
     {
         var document = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "StartupMonitor.UI", "Views", "MainWindow.xaml"));

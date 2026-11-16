@@ -49,15 +49,15 @@ public class UpdateInfo
     [JsonPropertyName("service_version")]
     public string ServiceVersion { get; set; } = string.Empty;
 
-    /// <summary>Версия UI-клиента, переданная в запросе проверки (может отсутствовать у старых клиентов).</summary>
+    /// <summary>The UI client version passed in the check request (may be absent in older clients).</summary>
     [JsonPropertyName("client_version")]
     public string? ClientVersion { get; set; }
 
-    /// <summary>Признак: доступно ли обновление для UI-клиента (remote &gt; clientVersion или новее по дате).</summary>
+    /// <summary>Indicates whether an update is available for the UI client (remote &gt; clientVersion or newer by date).</summary>
     [JsonPropertyName("is_update_available_for_client")]
     public bool IsUpdateAvailableForClient { get; set; }
 
-    /// <summary>Дата создания/обновления файла инсталлятора на сервере (UTC).</summary>
+    /// <summary>The creation/update date of the installer file on the server (UTC).</summary>
     [JsonPropertyName("installer_date")]
     public DateTime? InstallerDate { get; set; }
 
