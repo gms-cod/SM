@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using StartupMonitor.Shared.Models;
+using StartupMonitor.Service.Services.Firewall;
+using StartupMonitor.Shared.Models.Firewall;
 using StartupMonitor.Shared.Diagnostics;
 
 namespace StartupMonitor.Service.Services.Ai;
@@ -1202,10 +1204,228 @@ Respond ONLY with a valid JSON object without any extra text or markdown wrapper
     /// <summary>
     /// Provides operations for this member.
     /// </summary>
+    /// <summary>
+    /// Кэш вердиктов ИИ по аномалиям трафика для исключения повторных запросов.
+    /// Ключ: "{SHA256}:{RemoteAddress}:{RemotePort}".
+    /// </summary>
+    private readonly ConcurrentDictionary<string, AnomalyAiVerdictDto> _anomalyVerdictCache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Оценивает риск сетевой аномалии с использованием LLM (с кэшированием и fallback на локальный эвристический движок).
+    /// </summary>
+    /// <param name="incident">Данные инцидента сетевой активности. Не может быть null.</param>
+    /// <param name="cancellationToken">Токен отмены операции.</param>
+    /// <returns>Вердикт ИИ или эвристического движка <see cref="AnomalyAiVerdictDto"/>.</returns>
+    /// <exception cref="ArgumentNullException">Выбрасывается, если <paramref name="incident"/> или его обязательные компоненты равны null.</exception>
+    public async Task<AnomalyAiVerdictDto> RateTrafficAnomalyAsync(IncidentTelemetryDto incident, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        ArgumentNullException.ThrowIfNull(incident.Process);
+        ArgumentNullException.ThrowIfNull(incident.Traffic);
+        ArgumentNullException.ThrowIfNull(incident.Heuristics);
+
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _networkLifetime.Token);
+        var ct = lifetime.Token;
+        ct.ThrowIfCancellationRequested();
+
+        // 1. Проверка кэша по связке (хэш исполняемого файла, удаленный адрес, порт)
+        var cacheKey = $"{incident.Process.Sha256}:{incident.Traffic.RemoteAddress}:{incident.Traffic.RemotePort}";
+        if (!string.IsNullOrEmpty(incident.Process.Sha256) && _anomalyVerdictCache.TryGetValue(cacheKey, out var cached))
+        {
+            return new AnomalyAiVerdictDto
+            {
+                IncidentId = incident.IncidentId,
+                RiskLevel = cached.RiskLevel,
+                RiskLabel = cached.RiskLabel,
+                UserExplanation = cached.UserExplanation,
+                TechnicalSummary = cached.TechnicalSummary,
+                RecommendedAction = cached.RecommendedAction,
+                ActionReason = cached.ActionReason,
+                Source = "Cache",
+                EvaluatedAt = DateTime.UtcNow
+            };
+        }
+
+        // 2. Проверка доступности LLM (наличие ключа/локального URL, Circuit Breaker, Rate Limit cooldown)
+        if (!CanRequestRatings(_apiKey, _apiUrl) || DateTime.UtcNow < _networkCooldownUntil || DateTime.UtcNow < _cooldownUntil)
+        {
+            _logger.LogDebug("RateTrafficAnomalyAsync: LLM недоступен или активен Cooldown. Задействован OfflineHeuristicEngine.");
+            return OfflineHeuristicEngine.Evaluate(incident);
+        }
+
+        // 3. Запрос к LLM с защитой от сбоев
+        try
+        {
+            var prompt = BuildTrafficAnomalyPrompt(incident);
+            var body = new
+            {
+                model = _model,
+                messages = new[]
+                {
+                    new { role = "system", content = "Ты — ведущий эксперт информационной безопасности (EDR SOC Analyst). Анализируй сетевые аномалии Windows и выдавай ответ СТРОГО в формате JSON без постороннего текста." },
+                    new { role = "user", content = prompt }
+                },
+                temperature = 0.1,
+                max_tokens = 1000,
+                response_format = new { type = "json_object" }
+            };
+
+            var jsonBody = JsonSerializer.Serialize(body);
+            using var content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
+            using var request = new HttpRequestMessage(HttpMethod.Post, _apiUrl);
+
+            if (!string.IsNullOrWhiteSpace(_apiKey))
+                request.Headers.Add("Authorization", $"Bearer {_apiKey.Trim()}");
+            else if (IsLocalUrl(_apiUrl))
+                request.Headers.Add("Authorization", "Bearer ollama");
+
+            request.Content = content;
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
+
+            using var response = await _http.SendAsync(request, timeoutCts.Token).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("RateTrafficAnomalyAsync: LLM API вернул статус {StatusCode}. Fallback на OfflineHeuristicEngine.", response.StatusCode);
+                return OfflineHeuristicEngine.Evaluate(incident);
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync(timeoutCts.Token).ConfigureAwait(false);
+            var verdict = ParseTrafficAnomalyResponse(responseJson, incident.IncidentId);
+
+            if (verdict != null)
+            {
+                if (!string.IsNullOrEmpty(incident.Process.Sha256))
+                {
+                    _anomalyVerdictCache[cacheKey] = verdict;
+                }
+                return verdict;
+            }
+
+            _logger.LogWarning("RateTrafficAnomalyAsync: не удалось распарсить JSON вердикт LLM. Fallback на OfflineHeuristicEngine.");
+            return OfflineHeuristicEngine.Evaluate(incident);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("RateTrafficAnomalyAsync: сбой при запросе к LLM ({Error}). Fallback на OfflineHeuristicEngine.", ex.Message);
+            return OfflineHeuristicEngine.Evaluate(incident);
+        }
+    }
+
+    /// <summary>
+    /// Формирует структурированный промпт для анализа сетевой аномалии.
+    /// </summary>
+    private static string BuildTrafficAnomalyPrompt(IncidentTelemetryDto incident)
+    {
+        return $@"Проанализируй сетевой инцидент безопасности Windows:
+Процесс: {incident.Process.Name} (PID: {incident.Process.Pid})
+Путь: {incident.Process.Path}
+Подпись: {incident.Process.Signer} (IsSystem={incident.Process.IsSystem})
+Командная строка: {incident.Process.CommandLine}
+Сетевая активность: {incident.Traffic.Direction} {incident.Traffic.Protocol} к {incident.Traffic.RemoteAddress}:{incident.Traffic.RemotePort}
+Эвристика: Beaconing={incident.Heuristics.IsBeaconing}, Jitter={incident.Traffic.JitterPercent:F1}%, UserWritablePath={incident.Heuristics.IsUserWritablePath}, NonStandardPort={incident.Heuristics.IsNonStandardPort}, RiskScore={incident.Traffic.RiskScore}
+
+Сформируй вердикт в формате JSON:
+{{
+  ""risk_level"": <число от 1 (безопасно) до 5 (критическая угроза)>,
+  ""risk_label"": ""<краткое описание риска на русском>"",
+  ""user_explanation"": ""<подробное понятное объяснение для пользователя на русском: что делает процесс, подозрителен ли и почему>"",
+  ""technical_summary"": ""<техническая сводка: порты, протокол, паттерны>"",
+  ""recommended_action"": ""<одно из: 'AllowAlways', 'AllowSession', 'BlockSession', 'BlockAlways'>"",
+  ""action_reason"": ""<обоснование рекомендации на русском>""
+}}";
+    }
+
+    /// <summary>
+    /// Парсит и валидирует ответ LLM в структурированный вердикт <see cref="AnomalyAiVerdictDto"/>.
+    /// </summary>
+    private AnomalyAiVerdictDto? ParseTrafficAnomalyResponse(string json, string incidentId)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            string? text = null;
+            if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+            {
+                var first = choices[0];
+                if (first.TryGetProperty("message", out var msg) && msg.TryGetProperty("content", out var contentProp))
+                {
+                    text = contentProp.GetString();
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            var cleaned = text.Trim();
+            var jsonBlockMatch = System.Text.RegularExpressions.Regex.Match(cleaned, @"```(?:json)?\s*(\{[\s\S]*?\})\s*```");
+            if (jsonBlockMatch.Success)
+            {
+                cleaned = jsonBlockMatch.Groups[1].Value.Trim();
+            }
+            else
+            {
+                var firstBrace = cleaned.IndexOf('{');
+                var lastBrace = cleaned.LastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace)
+                {
+                    cleaned = cleaned.Substring(firstBrace, lastBrace - firstBrace + 1).Trim();
+                }
+            }
+
+            using var verdictDoc = JsonDocument.Parse(cleaned);
+            var vRoot = verdictDoc.RootElement;
+
+            int riskLevel = 2;
+            if (vRoot.TryGetProperty("risk_level", out var rlProp) && rlProp.TryGetInt32(out var rl))
+            {
+                riskLevel = Math.Clamp(rl, 1, 5);
+            }
+
+            var riskLabel = GetJsonStringProperty(vRoot, "risk_label", "Неизвестно");
+            var userExplanation = GetJsonStringProperty(vRoot, "user_explanation", string.Empty);
+            var technicalSummary = GetJsonStringProperty(vRoot, "technical_summary", string.Empty);
+            var recommendedAction = GetJsonStringProperty(vRoot, "recommended_action", "AllowSession");
+            var actionReason = GetJsonStringProperty(vRoot, "action_reason", string.Empty);
+
+            var validActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "AllowAlways", "AllowSession", "BlockSession", "BlockAlways"
+            };
+            if (!validActions.Contains(recommendedAction))
+            {
+                recommendedAction = riskLevel >= 4 ? "BlockAlways" : (riskLevel == 3 ? "BlockSession" : "AllowSession");
+            }
+
+            return new AnomalyAiVerdictDto
+            {
+                IncidentId = incidentId,
+                RiskLevel = riskLevel,
+                RiskLabel = riskLabel,
+                UserExplanation = userExplanation,
+                TechnicalSummary = technicalSummary,
+                RecommendedAction = recommendedAction,
+                ActionReason = actionReason,
+                Source = "LLM",
+                EvaluatedAt = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("ParseTrafficAnomalyResponse: ошибка парсинга вердикта: {Error}", ex.Message);
+            return null;
+        }
+    }
+
     public void Dispose()
     {
         _networkLifetime.Cancel();
         _networkEvaluationsCache.Clear();
+        _anomalyVerdictCache.Clear();
         _http.Dispose();
     }
 }

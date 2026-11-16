@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
 using System.Collections.Concurrent;
@@ -1852,6 +1852,68 @@ public class PipeClient : IDisposable
         {
             // Закрытие отдельного канала гарантирует, что поздний ответ службы
             // уйдёт в уже закрытый pipe и не будет прочитан следующим запросом.
+            try { pipe?.Dispose(); } catch (ObjectDisposedException ex) { LogResponseFailure(ex); }
+        }
+    }
+
+    /// <summary>
+    /// Запрашивает у службы детальный анализ сетевой аномалии ИИ (справка, уровень риска, рекомендация).
+    /// </summary>
+    /// <param name="incident">Данные инцидента сетевой активности.</param>
+    /// <param name="ct">Токен отмены запроса.</param>
+    /// <returns>Вердикт ИИ или оффлайн-движка <see cref="AnomalyAiVerdictDto"/> либо null при сбое.</returns>
+    public async Task<AnomalyAiVerdictDto?> RequestAnomalyAiExplanationAsync(
+        IncidentTelemetryDto incident, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(incident);
+        NamedPipeClientStream? pipe = null;
+        try
+        {
+            pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await pipe.ConnectAsync(3000, ct).ConfigureAwait(false);
+
+            using var reader = new StreamReader(pipe);
+            using var writer = new StreamWriter(pipe) { AutoFlush = true };
+
+            var req = new RequestAnomalyAiExplanationPayload(incident);
+            var requestJson = JsonSerializer.Serialize(new PipeMessage
+            {
+                Type = PipeMessageTypes.RequestAnomalyAiExplanation,
+                Payload = JsonSerializer.Serialize(req, JsonOptions)
+            }, JsonOptions);
+
+            await writer.WriteLineAsync(requestJson.AsMemory(), ct).ConfigureAwait(false);
+            await writer.FlushAsync(ct).ConfigureAwait(false);
+
+            using var responseCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            responseCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+            var line = await reader.ReadLineAsync(responseCts.Token).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(line))
+                return null;
+
+            var response = JsonSerializer.Deserialize<PipeMessage>(line, JsonOptions);
+            if (response != null
+                && response.Type == PipeMessageTypes.AnomalyAiVerdictResponse
+                && !string.IsNullOrWhiteSpace(response.Payload))
+            {
+                var payload = JsonSerializer.Deserialize<AnomalyAiVerdictResponsePayload>(response.Payload, JsonOptions);
+                return payload?.Verdict;
+            }
+
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LogResponseFailure(ex);
+            return null;
+        }
+        finally
+        {
             try { pipe?.Dispose(); } catch (ObjectDisposedException ex) { LogResponseFailure(ex); }
         }
     }

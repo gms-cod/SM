@@ -1,4 +1,4 @@
-// DTO модели алертов о новых сетевых подключениях программ.
+﻿// DTO модели алертов о новых сетевых подключениях программ.
 // Используются службой (SYSTEM), Pipe IPC и UI. Не зависят от COM — чистые POCO.
 using System.Text.Json.Serialization;
 
@@ -78,6 +78,18 @@ public class NetworkConnectionAlertDto
     /// <summary>Рекомендуемое нейросетью действие ("AllowSession", "AllowAlways", "BlockSession", "BlockAlways").</summary>
     [JsonPropertyName("aiRecommendedAction")]
     public string? AiRecommendedAction { get; set; }
+
+    /// <summary>Признак сетевой аномалии (C2 маяк, подозрительный порт).</summary>
+    [JsonPropertyName("isAnomaly")]
+    public bool IsAnomaly { get; set; }
+
+    /// <summary>Детали наблюдения аномалии (Jitter, тип аномалии, скор риска).</summary>
+    [JsonPropertyName("anomalyDetails")]
+    public TrafficAnomalyObservation? AnomalyDetails { get; set; }
+
+    /// <summary>Структурированный вердикт ИИ по аномалии.</summary>
+    [JsonPropertyName("aiVerdict")]
+    public AnomalyAiVerdictDto? AiVerdict { get; set; }
 }
 
 /// <summary>Решение пользователя по сетевому алерту с поддержкой ненавязчивых и постоянных политик.</summary>

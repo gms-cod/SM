@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Collections.Concurrent;
 using System.Security.Principal;
 
@@ -4163,6 +4163,37 @@ public class PipeServer : BackgroundService
                     break;
 
 
+
+                case PipeMessageTypes.RequestAnomalyAiExplanation:
+                    try
+                    {
+                        var req = JsonSerializer.Deserialize<RequestAnomalyAiExplanationPayload>(message.Payload ?? "{}", JsonOptions);
+                        if (req == null || req.Incident == null)
+                        {
+                            response.Type = PipeMessageTypes.Error;
+                            response.Payload = "Некорректный запрос оценки аномалии.";
+                            break;
+                        }
+
+                        AnomalyAiVerdictDto verdict;
+                        if (_aiRating != null)
+                        {
+                            verdict = await _aiRating.RateTrafficAnomalyAsync(req.Incident, ct);
+                        }
+                        else
+                        {
+                            verdict = StartupMonitor.Service.Services.Firewall.OfflineHeuristicEngine.Evaluate(req.Incident);
+                        }
+
+                        response.Type = PipeMessageTypes.AnomalyAiVerdictResponse;
+                        response.Payload = JsonSerializer.Serialize(new AnomalyAiVerdictResponsePayload(verdict), JsonOptions);
+                    }
+                    catch (Exception ex)
+                    {
+                        response.Type = PipeMessageTypes.Error;
+                        response.Payload = $"Ошибка при оценке аномалии ИИ: {ex.Message}";
+                    }
+                    break;
 
                 case PipeMessageTypes.EvaluateNetworkAlert:
 

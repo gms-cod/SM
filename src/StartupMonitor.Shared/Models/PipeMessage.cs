@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models.Firewall;
 
 namespace StartupMonitor.Shared.Models;
@@ -292,6 +292,12 @@ public static class PipeMessageTypes
     public const string EvaluateNetworkAlertResponse = "EvaluateNetworkAlertResponse";
     /// <summary>Установка настроек автономных решений ИИ для сетевых подключений.</summary>
     public const string SetAiAutonomousDecisions = "SetAiAutonomousDecisions";
+    /// <summary>Событие обнаружения аномалии сетевого трафика (маяк C2, сканирование, подозрительный порт).</summary>
+    public const string TrafficAnomalyEvent = "TrafficAnomalyEvent";
+    /// <summary>Запрос глубокого анализа сетевой аномалии с помощью ИИ.</summary>
+    public const string RequestAnomalyAiExplanation = "RequestAnomalyAiExplanation";
+    /// <summary>Ответ службы со структурированным вердиктом ИИ по сетевой аномалии.</summary>
+    public const string AnomalyAiVerdictResponse = "AnomalyAiVerdictResponse";
 
     /// <summary>Установка тихого режима для сокетов без определенного процесса (PID = 0).</summary>
     public const string SetFirewallSilentPid0 = "SetFirewallSilentPid0";
@@ -688,3 +694,19 @@ public sealed class ApplySecurityPresetRequest
 /// <summary>Полезная нагрузка ответа с результатом применения пресета безопасности.</summary>
 public record SecurityPresetResultPayload(SecurityPresetType Preset, int AppliedCount, bool Success, string Message);
 
+
+/// <summary>Полезная нагрузка события обнаружения сетевой аномалии.</summary>
+public record TrafficAnomalyEventPayload(
+    [property: JsonPropertyName("observation")] TrafficAnomalyObservation Observation,
+    [property: JsonPropertyName("verdict")] AnomalyAiVerdictDto? Verdict = null
+);
+
+/// <summary>Полезная нагрузка запроса анализа аномалии нейросетью.</summary>
+public record RequestAnomalyAiExplanationPayload(
+    [property: JsonPropertyName("incident")] IncidentTelemetryDto Incident
+);
+
+/// <summary>Полезная нагрузка ответа со структурированным вердиктом нейросети по сетевой аномалии.</summary>
+public record AnomalyAiVerdictResponsePayload(
+    [property: JsonPropertyName("verdict")] AnomalyAiVerdictDto Verdict
+);
