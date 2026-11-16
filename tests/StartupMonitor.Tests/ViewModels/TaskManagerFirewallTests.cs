@@ -250,6 +250,29 @@ public class TaskManagerFirewallTests
         Assert.Equal(0, fakeClient.AddToWhitelistCallCount);
         Assert.Equal(0, fakeClient.AddToBlacklistCallCount);
     }
+
+    /// <summary>
+    /// Проверяет, что свойства локализации действий брандмауэра <see cref="LocalizationService.ActionAddFirewallWhitelist"/>
+    /// и <see cref="LocalizationService.ActionAddFirewallBlacklist"/> возвращают корректные непустые строки,
+    /// загруженные из ресурсов, и не равны названиям ключей.
+    /// </summary>
+    [Fact]
+    public void LocalizationService_FirewallActionProperties_ReturnNonEmptyStrings()
+    {
+        // Arrange
+        var loc = LocalizationService.Instance;
+
+        // Act
+        string whitelistAction = loc.ActionAddFirewallWhitelist;
+        string blacklistAction = loc.ActionAddFirewallBlacklist;
+
+        // Assert
+        Assert.False(string.IsNullOrWhiteSpace(whitelistAction));
+        Assert.NotEqual("ActionAddFirewallWhitelist", whitelistAction);
+
+        Assert.False(string.IsNullOrWhiteSpace(blacklistAction));
+        Assert.NotEqual("ActionAddFirewallBlacklist", blacklistAction);
+    }
 }
 
 /// <summary>

@@ -856,6 +856,12 @@ public class LocalizationService : INotifyPropertyChanged
     public string PmEmptyModules => this["PmEmptyModules"];
     public string PmEmptyHandles => this["PmEmptyHandles"];
     public string ActionProcessModules => this["ActionProcessModules"];
+
+    /// <summary>Пункт контекстного меню: добавление процесса в белый список брандмауэра.</summary>
+    public string ActionAddFirewallWhitelist => this["ActionAddFirewallWhitelist"];
+
+    /// <summary>Пункт контекстного меню: добавление процесса в чёрный список брандмауэра.</summary>
+    public string ActionAddFirewallBlacklist => this["ActionAddFirewallBlacklist"];
     public string SysInfoBtn => this["SysInfoBtn"];
     public string SysInfoTooltip => this["SysInfoTooltip"];
     public string SysInfoTitle => this["SysInfoTitle"];
