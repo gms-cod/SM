@@ -2408,4 +2408,14 @@
   <data name="RestoreEntryResultUnknown" xml:space="preserve"><value>Служба не подтвердила результат. Перед повтором проверьте список записей.</value></data>
   <data name="ActionAutoDisableConflict" xml:space="preserve"><value>{0}: автоматическое отключение не выполнено, поскольку запись автозапуска изменилась. Текущее значение и исходная резервная копия сохранены.</value></data>
   <data name="ActionAutoDisableFailed" xml:space="preserve"><value>{0}: не удалось подтвердить автоматическое отключение. Проверьте состояние записи и журнал событий.</value></data>
+  <data name="ActionProcessModules" xml:space="preserve"><value>Загруженные модули и DLL...</value></data>
+  <data name="ActionAddFirewallWhitelist" xml:space="preserve"><value>Добавить в белый список Firewall</value></data>
+  <data name="ActionAddFirewallBlacklist" xml:space="preserve"><value>Добавить в чёрный список Firewall</value></data>
+  <data name="TmFirewallWhitelistSuccess" xml:space="preserve"><value>Процесс '{0}' успешно добавлен в белый список Firewall.</value></data>
+  <data name="TmFirewallBlacklistSuccess" xml:space="preserve"><value>Процесс '{0}' успешно заблокирован и добавлен в чёрный список Firewall.</value></data>
+  <data name="TmFirewallSystemProtected" xml:space="preserve"><value>Блокировка сетевой активности системных процессов Windows запрещена политикой безопасности во избежание сбоев операционной системы.</value></data>
+  <data name="TmFirewallWhitelistConfirm" xml:space="preserve"><value>Добавить '{0}' в белый список Firewall?&#x0a;Программа получит постоянный сетевой доступ.</value></data>
+  <data name="TmFirewallBlacklistConfirm" xml:space="preserve"><value>Заблокировать сетевую активность '{0}' в брандмауэре Windows?&#x0a;Программа будет занесена в чёрный список Firewall.</value></data>
+  <data name="TmFirewallPathNotFound" xml:space="preserve"><value>Не удалось определить путь к исполняемому файлу процесса.</value></data>
+  <data name="TmFirewallError" xml:space="preserve"><value>Ошибка операции с Firewall: {0}</value></data>
 </root>

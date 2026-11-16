@@ -2409,4 +2409,14 @@ Import with overwrite of existing rules?</value>
   <data name="RestoreEntryResultUnknown" xml:space="preserve"><value>The service did not confirm the result. Check the entry list before retrying.</value></data>
   <data name="ActionAutoDisableConflict" xml:space="preserve"><value>{0}: automatic disabling was not applied because the startup value changed. The current value and original backup were preserved.</value></data>
   <data name="ActionAutoDisableFailed" xml:space="preserve"><value>{0}: automatic disabling could not be confirmed. Check the entry status and event history.</value></data>
+  <data name="ActionProcessModules" xml:space="preserve"><value>Loaded Modules and DLLs...</value></data>
+  <data name="ActionAddFirewallWhitelist" xml:space="preserve"><value>Add to Firewall Whitelist</value></data>
+  <data name="ActionAddFirewallBlacklist" xml:space="preserve"><value>Add to Firewall Blacklist</value></data>
+  <data name="TmFirewallWhitelistSuccess" xml:space="preserve"><value>Process '{0}' successfully added to Firewall whitelist.</value></data>
+  <data name="TmFirewallBlacklistSuccess" xml:space="preserve"><value>Process '{0}' successfully blocked and added to Firewall blacklist.</value></data>
+  <data name="TmFirewallSystemProtected" xml:space="preserve"><value>Blocking Windows system processes is prohibited by security policy to avoid operating system crashes.</value></data>
+  <data name="TmFirewallWhitelistConfirm" xml:space="preserve"><value>Add '{0}' to Firewall whitelist?&#x0a;The program will be granted permanent network access.</value></data>
+  <data name="TmFirewallBlacklistConfirm" xml:space="preserve"><value>Block network activity of '{0}' in Windows Firewall?&#x0a;The program will be added to the Firewall blacklist.</value></data>
+  <data name="TmFirewallPathNotFound" xml:space="preserve"><value>Could not determine the executable path of the process.</value></data>
+  <data name="TmFirewallError" xml:space="preserve"><value>Firewall operation error: {0}</value></data>
 </root>

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.IO.Pipes;
 using System.Security.Principal;
 using System.Collections.Concurrent;
@@ -2244,7 +2244,7 @@ public class PipeClient : IDisposable
     }
 
     /// <summary>Добавляет путь к приложению в белый список брандмауэра.</summary>
-    public async Task<bool> AddToFirewallWhitelistAsync(string path, CancellationToken ct = default)
+    public virtual async Task<bool> AddToFirewallWhitelistAsync(string path, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
         try
@@ -2293,7 +2293,7 @@ public class PipeClient : IDisposable
     }
 
     /// <summary>Добавляет путь к приложению в чёрный список брандмауэра.</summary>
-    public async Task<bool> AddToFirewallBlacklistAsync(string path, string? reason = null, CancellationToken ct = default)
+    public virtual async Task<bool> AddToFirewallBlacklistAsync(string path, string? reason = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
         try
