@@ -35,6 +35,21 @@ public class KasperskyScanService
     /// <summary>
     /// Проверяет подключение к API Kaspersky OpenTIP с переданным токеном.
     /// </summary>
+    /// <summary>
+    /// Выполняет проверку произвольного SHA-256 хеша через Kaspersky OpenTIP API.
+    /// </summary>
+    /// <param name="sha256">SHA-256 хэш файла.</param>
+    /// <param name="ct">Токен отмены.</param>
+    /// <returns>Результат проверки KasperskyResult или null при ошибке/отключенном токене.</returns>
+    public async Task<KasperskyResult?> ScanHashAsync(string sha256, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(sha256)) return null;
+        var settings = _store.GetSettings();
+        if (!settings.KasperskyEnabled || string.IsNullOrWhiteSpace(settings.KasperskyApiKey))
+            return null;
+        return await QueryKasperskyHashAsync(sha256.Trim(), settings.KasperskyApiKey, settings.KasperskyApiUrl, ct);
+    }
+
     public async Task<KasperskyTestResult> TestConnectionAsync(string apiKey, string? apiUrl = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(apiKey))

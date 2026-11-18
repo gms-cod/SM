@@ -943,6 +943,16 @@ public partial class MainWindow
         NavigateToPage(0);
     }
 
+    /// <summary>Обрабатывает двойной клик на процесс в диспетчере процессов для открытия окна детальных свойств.</summary>
+    private void OnProcessItemDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is ListBoxItem item && item.DataContext is ProcessInfo proc)
+        {
+            _viewModel?.TaskManager?.ShowProcessDetailsCommand.Execute(proc);
+            e.Handled = true;
+        }
+    }
+
     private static bool IsWindowPlacementVisible(Rect bounds)
     {
         var virtualScreen = new Rect(

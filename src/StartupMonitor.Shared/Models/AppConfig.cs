@@ -223,6 +223,30 @@ public class AppSettings
     [JsonPropertyName("ransomware_shield")]
     public RansomwareShieldConfigDto RansomwareShield { get; set; } = new();
 
+    /// <summary>Включена ли проверка активных процессов на вредоносность.</summary>
+    [JsonPropertyName("process_threat_scan_enabled")]
+    public bool ProcessThreatScanEnabled { get; set; } = true;
+
+    /// <summary>Включена ли проверка процессов через Kaspersky OpenTIP.</summary>
+    [JsonPropertyName("process_threat_kaspersky_enabled")]
+    public bool ProcessThreatKasperskyEnabled { get; set; } = true;
+
+    /// <summary>Включен ли интеллектуальный анализ поведения процессов через ИИ.</summary>
+    [JsonPropertyName("process_threat_ai_enabled")]
+    public bool ProcessThreatAiEnabled { get; set; } = true;
+
+    /// <summary>Действие при обнаружении вредоносного процесса ("AlertOnly", "AutoKill", "AutoSuspend").</summary>
+    [JsonPropertyName("process_threat_action")]
+    public string ProcessThreatAction { get; set; } = "AlertOnly";
+
+    /// <summary>Порог риска ИИ (0-100), при котором срабатывает действие.</summary>
+    [JsonPropertyName("process_threat_risk_threshold")]
+    public int ProcessThreatRiskThreshold { get; set; } = 80;
+
+    /// <summary>Белый список процессов, исключенных из проверки.</summary>
+    [JsonPropertyName("process_threat_whitelist")]
+    public List<string> ProcessThreatWhitelist { get; set; } = new();
+
     /// <summary>Создает глубокую независимую копию настроек приложения.</summary>
     public AppSettings Clone()
     {
@@ -259,6 +283,8 @@ public class AppSettings
         copy.FirewallWhitelistedApps = [..FirewallWhitelistedApps];
         copy.FirewallBlacklistedApps = [..FirewallBlacklistedApps];
         copy.RansomwareShield = RansomwareShield?.Clone() ?? new();
+
+        copy.ProcessThreatWhitelist = [..ProcessThreatWhitelist];
         return copy;
     }
 }

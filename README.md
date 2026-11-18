@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/version-v2.4.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Version v2.4.0"></a>
+  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/version-v2.5.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Version v2.5.0"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Platform Windows">
   <img src="https://img.shields.io/badge/stack-.NET%208%20%7C%20C%23%20%7C%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Tech Stack">
   <img src="https://img.shields.io/badge/tests-1%2C936%20passing%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests 100% Passing">
@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.md"><strong>User Guide</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Architecture</strong></a> •
-  <a href="docs/releases/v2.4.0.md"><strong>Release Notes</strong></a> •
+  <a href="docs/releases/v2.5.0.md"><strong>Release Notes</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Download Setup</strong></a>
 </p>
 
@@ -53,6 +53,7 @@ Modern software, bloatware, background telemetry updaters, and evasive malware l
 | 🏰 **Port Defender (Fail2ban)** | Port Sentinel & Sliding Window Tracker | Continuous monitoring of ports 3389 (RDP), 22 (SSH), and 445 (SMB). Automatically isolates brute-force IP addresses with strict protection for local subnets. |
 | 🧠 **AI Threat Heuristics** | Groq (`openai/gpt-oss-120b`) & Local Ollama | Natural-language decomposition of startup commands, CLI arguments, and PE characteristics in Russian or English with 1–10 star safety rating. |
 | 🛡️ **Kaspersky Threat Intel** | Kaspersky OpenTIP Gateway | Automated SHA-256 cloud reputation lookup classifying items into Green, Yellow, Red, or Grey risk zones with official malware attribution. |
+| 🩺 **Real-Time Process Scan & Pulse** | Continuous Audit & AI + Kaspersky Scoring | Continuous on-the-fly process scanning every 15s, dynamic pulse indicator color grading (Green → Dark Red), and detailed process properties window. |
 | 🔒 **Safe 29-Location Control** | Reversible Deactivation & Shadow Vault | 3 distinct operations: **Disable** (temporary, keeps binaries intact), **Block** (persistent blacklist), and **Remove** (purged with safety backup in Recycle Bin). |
 | 📸 **Differential Auditing** | Baseline Snapshots ("Before & After") | Compare system states before and after software installations with colored deltas: Added (`+`), Modified (`~`), Removed (`-`). |
 | 📲 **24/7 Remote Alerts** | Telegram Bot & Discord Webhooks | Direct push notifications sent from the background service to your smartphone, even when the UI client is closed. |
@@ -96,13 +97,13 @@ Startup Monitor adheres to strict privilege separation and defense-in-depth prin
 ## 🚀 Quick Start & Installation
 
 ### Option 1: Signed Installer (Recommended)
-1. Download **`StartupMonitorSetup-v2.4.0.exe`** from the [**Latest GitHub Release**](https://github.com/gms-cod/SM/releases/latest).
-2. Verify the SHA-256 hash against `StartupMonitorSetup-v2.4.0.exe.sha256`.
+1. Download **`StartupMonitorSetup-2.5.0.exe`** from the [**Latest GitHub Release**](https://github.com/gms-cod/SM/releases/latest).
+2. Verify the SHA-256 hash against `StartupMonitorSetup-2.5.0.exe.sha256`.
 3. Run the installer. The wizard will automatically install binaries to `C:\Program Files\StartupMonitor\`, register and start the Windows Service, and launch the GUI.
 
 > [!TIP]
 > **Silent Deployment**: For enterprise rollout, execute:  
-> `StartupMonitorSetup-v2.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+> `StartupMonitorSetup-2.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
 
 ### Option 2: Portable Package (`SMon2`)
 1. Extract the `SMon2/` folder to any drive (fully self-contained .NET 8 x64, zero external dependencies).
@@ -126,7 +127,7 @@ cd SM
 # 2. Compile Release solution
 dotnet build StartupMonitor.sln -c Release
 
-# 3. Execute test suite (1,936 tests, 100% pass rate)
+# 3. Execute test suite (1,944 tests, 100% pass rate)
 dotnet test tests/StartupMonitor.Tests -c Release
 
 # 4. Generate self-contained distribution in SMon2/
@@ -140,7 +141,7 @@ powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
 - 📘 **[User Guide (All 11 Tabs, Integrations & FAQ)](docs/USER_GUIDE.md)**
 - 🏛️ **[Technical Architecture & Data Flows](docs/ARCHITECTURE.md)**
 - 🔬 **[Swarm Security Audit & Code Verification](docs/SWARM_INSPECTION_AUDIT_2026-11-07.md)**
-- 📝 **[Release Notes v2.4.0](docs/releases/v2.4.0.md)**
+- 📝 **[Release Notes v2.5.0](docs/releases/v2.5.0.md)**
 - 📚 **[Full Method Catalog (939 Subroutines)](docs/METHOD_CATALOG.md)**
 
 ---

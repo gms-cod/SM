@@ -2419,4 +2419,49 @@ Import with overwrite of existing rules?</value>
   <data name="TmFirewallBlacklistConfirm" xml:space="preserve"><value>Block network activity of '{0}' in Windows Firewall?&#x0a;The program will be added to the Firewall blacklist.</value></data>
   <data name="TmFirewallPathNotFound" xml:space="preserve"><value>Could not determine the executable path of the process.</value></data>
   <data name="TmFirewallError" xml:space="preserve"><value>Firewall operation error: {0}</value></data>
+  <data name="ProcessThreatSection" xml:space="preserve">
+    <value>Active Process Threat Defense (AI &amp; Kaspersky)</value>
+  </data>
+  <data name="ProcessThreatDescription" xml:space="preserve">
+    <value>Automatic reputation checking of running processes via Kaspersky OpenTIP and AI behavioral analysis with optional termination.</value>
+  </data>
+  <data name="ProcessThreatScanLabel" xml:space="preserve">
+    <value>Scan active processes</value>
+  </data>
+  <data name="ProcessThreatKasperskyToggle" xml:space="preserve">
+    <value>Kaspersky OpenTIP reputation check</value>
+  </data>
+  <data name="ProcessThreatAiToggle" xml:space="preserve">
+    <value>AI behavioral risk analysis</value>
+  </data>
+  <data name="ProcessThreatActionLabel" xml:space="preserve">
+    <value>Action on malicious process detection:</value>
+  </data>
+  <data name="ProcessThreatActionAlert" xml:space="preserve">
+    <value>Alert only</value>
+  </data>
+  <data name="ProcessThreatActionKill" xml:space="preserve">
+    <value>Terminate process automatically</value>
+  </data>
+  <data name="ProcessThreatActionSuspend" xml:space="preserve">
+    <value>Suspend process (Safe freeze)</value>
+  </data>
+  <data name="ProcessThreatThresholdLabel" xml:space="preserve">
+    <value>AI Risk threshold for action trigger (%):</value>
+  </data>
+  <data name="ProcessThreatScanButton" xml:space="preserve">
+    <value>Check Threats (AI &amp; Kaspersky)</value>
+  </data>
+  <data name="ProcessThreatScanTooltip" xml:space="preserve">
+    <value>Scan running processes via Kaspersky OpenTIP and behavioral AI</value>
+  </data>
+  <data name="ActionScanProcessThreats" xml:space="preserve">
+    <value>Check for threats (Kaspersky + AI)</value>
+  </data>
+  <data name="ActionCopySha256" xml:space="preserve">
+    <value>Copy SHA-256 Hash</value>
+  </data>
+  <data name="ActionProcessProperties" xml:space="preserve">
+    <value>Process Properties...</value>
+  </data>
 </root>

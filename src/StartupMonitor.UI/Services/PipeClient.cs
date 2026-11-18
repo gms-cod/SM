@@ -65,6 +65,9 @@ public class PipeClient : IDisposable
     /// <summary>Событие обновления прогресса загрузки дистрибутива обновления.</summary>
     public event EventHandler<UpdateProgressInfo>? UpdateProgressReceived;
 
+    /// <summary>Событие тревоги защиты процессов (Kaspersky / ИИ).</summary>
+    public event EventHandler<ProcessThreatAlertPayload>? ProcessThreatAlertReceived;
+
     /// <summary>Флаг подключения к основному каналу.</summary>
     public bool IsConnected => _pipe?.IsConnected ?? false;
 
@@ -186,6 +189,17 @@ public class PipeClient : IDisposable
                                 }
                                 catch (Exception ex) when (ex is JsonException or NotSupportedException)
                                 { LogResponseFailure(ex, "Events.UpdateProgress"); }
+                            }
+                            else if (msg.Type == PipeMessageTypes.ProcessThreatAlert && !string.IsNullOrEmpty(msg.Payload))
+                            {
+                                try
+                                {
+                                    var alert = JsonSerializer.Deserialize<ProcessThreatAlertPayload>(msg.Payload, JsonOptions);
+                                    if (alert != null)
+                                        ProcessThreatAlertReceived?.Invoke(this, alert);
+                                }
+                                catch (Exception ex) when (ex is JsonException or NotSupportedException)
+                                { LogResponseFailure(ex, "Events.ProcessThreatAlert"); }
                             }
                         }
                     }
@@ -614,6 +628,34 @@ public class PipeClient : IDisposable
         });
     }
 
+    /// <summary>Отправляет конфигурацию защиты активных процессов (ИИ и Kaspersky) службе.</summary>
+    public async Task SetProcessThreatConfigAsync(bool enabled, bool kasperskyEnabled, bool aiEnabled, string action, int threshold)
+    {
+        var payload = JsonSerializer.Serialize(new ProcessThreatConfigDto
+        {
+            Enabled = enabled,
+            KasperskyEnabled = kasperskyEnabled,
+            AiEnabled = aiEnabled,
+            Action = Enum.TryParse<ProcessThreatAction>(action, true, out var act) ? act : ProcessThreatAction.AlertOnly,
+            RiskThreshold = threshold
+        }, JsonOptions);
+
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.SetProcessThreatConfig,
+            Payload = payload
+        });
+    }
+
+    /// <summary>Запускает внеплановую проверку активных процессов на угрозы через службу.</summary>
+    public async Task TriggerProcessThreatScanAsync()
+    {
+        await SendAsync(new PipeMessage
+        {
+            Type = PipeMessageTypes.TriggerProcessThreatScan
+        });
+    }
+
     /// <summary>Отправляет конфигурацию автоматических политик защиты Auto-Guards службе.</summary>
     public async Task SetAutoGuardConfigAsync(AutoGuardConfigPayload config)
     {

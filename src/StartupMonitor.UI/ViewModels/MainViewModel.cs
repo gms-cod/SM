@@ -468,6 +468,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.Connected -= OnPipeClientConnected;
         _pipeClient.EventsReceived -= OnPipeClientEventsReceived;
         _pipeClient.Disconnected -= OnPipeClientDisconnected;
+        _pipeClient.ProcessThreatAlertReceived -= OnProcessThreatAlertReceived;
         StopSystemThemeWatcher();
         StopNetworkAlertPoller();
         _pollingTimer?.Dispose();
@@ -937,6 +938,77 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Сообщение статуса проверки подключения к Kaspersky OpenTIP.</summary>
     [ObservableProperty]
     private string _kasperskyTestStatusMessage = string.Empty;
+
+    /// <summary>Включена ли проверка активных процессов на вредоносность.</summary>
+    [ObservableProperty]
+    private bool _processThreatScanEnabled = true;
+
+    partial void OnProcessThreatScanEnabledChanged(bool value)
+    {
+        SaveSetting("processThreatScanEnabled", value);
+        _ = _pipeClient.SetProcessThreatConfigAsync(value, ProcessThreatKasperskyEnabled, ProcessThreatAiEnabled, ProcessThreatAction, ProcessThreatRiskThreshold);
+    }
+
+    /// <summary>Включена ли проверка процессов через Kaspersky OpenTIP.</summary>
+    [ObservableProperty]
+    private bool _processThreatKasperskyEnabled = true;
+
+    partial void OnProcessThreatKasperskyEnabledChanged(bool value)
+    {
+        SaveSetting("processThreatKasperskyEnabled", value);
+        _ = _pipeClient.SetProcessThreatConfigAsync(ProcessThreatScanEnabled, value, ProcessThreatAiEnabled, ProcessThreatAction, ProcessThreatRiskThreshold);
+    }
+
+    /// <summary>Включен ли ИИ-анализ поведения активных процессов.</summary>
+    [ObservableProperty]
+    private bool _processThreatAiEnabled = true;
+
+    partial void OnProcessThreatAiEnabledChanged(bool value)
+    {
+        SaveSetting("processThreatAiEnabled", value);
+        _ = _pipeClient.SetProcessThreatConfigAsync(ProcessThreatScanEnabled, ProcessThreatKasperskyEnabled, value, ProcessThreatAction, ProcessThreatRiskThreshold);
+    }
+
+    /// <summary>Действие при обнаружении вредоносного процесса ("AlertOnly", "AutoKill", "AutoSuspend").</summary>
+    [ObservableProperty]
+    private string _processThreatAction = "AlertOnly";
+
+    partial void OnProcessThreatActionChanged(string value)
+    {
+        SaveSetting("processThreatAction", value);
+        OnPropertyChanged(nameof(IsProcessThreatActionAlert));
+        OnPropertyChanged(nameof(IsProcessThreatActionKill));
+        OnPropertyChanged(nameof(IsProcessThreatActionSuspend));
+        _ = _pipeClient.SetProcessThreatConfigAsync(ProcessThreatScanEnabled, ProcessThreatKasperskyEnabled, ProcessThreatAiEnabled, value, ProcessThreatRiskThreshold);
+    }
+
+    /// <summary>Порог риска ИИ (0-100) для срабатывания защиты.</summary>
+    [ObservableProperty]
+    private int _processThreatRiskThreshold = 80;
+
+    partial void OnProcessThreatRiskThresholdChanged(int value)
+    {
+        SaveSetting("processThreatRiskThreshold", value);
+        _ = _pipeClient.SetProcessThreatConfigAsync(ProcessThreatScanEnabled, ProcessThreatKasperskyEnabled, ProcessThreatAiEnabled, ProcessThreatAction, value);
+    }
+
+    public bool IsProcessThreatActionAlert
+    {
+        get => string.Equals(ProcessThreatAction, "AlertOnly", StringComparison.OrdinalIgnoreCase);
+        set { if (value) ProcessThreatAction = "AlertOnly"; }
+    }
+
+    public bool IsProcessThreatActionKill
+    {
+        get => string.Equals(ProcessThreatAction, "AutoKill", StringComparison.OrdinalIgnoreCase);
+        set { if (value) ProcessThreatAction = "AutoKill"; }
+    }
+
+    public bool IsProcessThreatActionSuspend
+    {
+        get => string.Equals(ProcessThreatAction, "AutoSuspend", StringComparison.OrdinalIgnoreCase);
+        set { if (value) ProcessThreatAction = "AutoSuspend"; }
+    }
 
     /// <summary>Флаг успешности проверки Kaspersky (true = зеленый, false = красный).</summary>
     [ObservableProperty]
@@ -969,6 +1041,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             IsKasperskyTesting = false;
         }
+    }
+
+    /// <summary>Запускает внеочередную проверку активных процессов на угрозы (Kaspersky + ИИ).</summary>
+    [RelayCommand]
+    public async Task TriggerProcessThreatScanAsync()
+    {
+        try
+        {
+            await _pipeClient.TriggerProcessThreatScanAsync();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"MainViewModel: Ошибка запуска сканирования процессов: {ex.Message}");
+        }
+    }
+
+    /// <summary>Копирует хэш SHA-256 процесса в буфер обмена Windows.</summary>
+    [RelayCommand]
+    public void CopySha256(ProcessInfo? proc)
+    {
+        if (proc == null || string.IsNullOrWhiteSpace(proc.Sha256Hash)) return;
+        try
+        {
+            System.Windows.Clipboard.SetText(proc.Sha256Hash);
+        }
+        catch { }
     }
 
     // ───────────────────────────── Auto-Guards ─────────────────────────────
@@ -1625,6 +1723,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _kasperskyEnabled = LoadSetting("kasperskyEnabled", true);
         _kasperskyApiKey = LoadSetting("kasperskyApiKey", "Zem+jUJbQEiqHPpwsfjTyQ==");
         _kasperskyApiUrl = LoadSetting("kasperskyApiUrl", "https://opentip.kaspersky.com/api/v1/search/hash");
+
+        _processThreatScanEnabled = LoadSetting("processThreatScanEnabled", true);
+        _processThreatKasperskyEnabled = LoadSetting("processThreatKasperskyEnabled", true);
+        _processThreatAiEnabled = LoadSetting("processThreatAiEnabled", true);
+        _processThreatAction = LoadSetting("processThreatAction", "AlertOnly");
+        _processThreatRiskThreshold = LoadSetting("processThreatRiskThreshold", 80);
         _autoGuardMode = LoadSetting("autoGuardMode", "AuditOnly");
         _guardBlockDangerousCli = LoadSetting("guardBlockDangerousCli", false);
         _guardBlockTempPath = LoadSetting("guardBlockTempPath", false);
@@ -1688,6 +1792,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _pipeClient.Connected += OnPipeClientConnected;
         _pipeClient.EventsReceived += OnPipeClientEventsReceived;
         _pipeClient.Disconnected += OnPipeClientDisconnected;
+        _pipeClient.ProcessThreatAlertReceived += OnProcessThreatAlertReceived;
         AppIconService.IconLoaded += OnIconLoaded;
         _ = RefreshComputerInfoAsync(_computerInfoToken);
     }
@@ -1878,6 +1983,26 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         var text = address ?? string.Empty;
         return text.Contains(':') ? $"[{text}]:{port}" : $"{text}:{port}";
+    }
+
+    /// <summary>Обрабатывает оповещение об обнаруженной угрозе процесса (Kaspersky / ИИ).</summary>
+    private void OnProcessThreatAlertReceived(object? sender, ProcessThreatAlertPayload alert)
+    {
+        if (alert == null) return;
+        System.Windows.Application.Current?.Dispatcher?.BeginInvoke(() =>
+        {
+            var verdictText = alert.KasperskyDetection ?? alert.AiVerdict ?? alert.KasperskyZone;
+            var text = $"[Защита процессов] PID {alert.ProcessId} ({alert.ProcessName}): {verdictText} ({alert.AiExplanation ?? alert.KasperskyZone})";
+            App.Log(text);
+            try
+            {
+                NotificationRequested?.Invoke(
+                    "Startup Monitor — Обнаружена угроза процесса!",
+                    $"Процесс {alert.ProcessName} (PID: {alert.ProcessId}): {verdictText}. Действие: {alert.ActionTaken}",
+                    alert.Sha256 ?? string.Empty);
+            }
+            catch { }
+        });
     }
 
     /// <summary>OnPipeClientDisconnected: Обрабатывает событие OnPipeClientDisconnected.</summary>

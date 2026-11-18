@@ -1342,6 +1342,130 @@
                     </StackPanel>
                 </ui:Card>
 
+                <!-- Карточка защиты активных процессов (ИИ и Kaspersky) -->
+
+                <ui:Card Margin="0 16 0 0">
+
+                    <StackPanel>
+
+                        <TextBlock Text="{Binding ProcessThreatSection, Source={StaticResource Loc}}" FontSize="18" FontWeight="600" Margin="0 0 0 4" />
+
+                        <TextBlock Text="{Binding ProcessThreatDescription, Source={StaticResource Loc}}" FontSize="12"
+
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" Margin="0 0 0 16" />
+
+
+
+                        <Grid Margin="0 0 0 12">
+
+                            <Grid.ColumnDefinitions>
+
+                                <ColumnDefinition Width="280" />
+
+                                <ColumnDefinition Width="*" />
+
+                            </Grid.ColumnDefinitions>
+
+                            <Grid.RowDefinitions>
+
+                                <RowDefinition Height="Auto" />
+
+                                <RowDefinition Height="Auto" />
+
+                                <RowDefinition Height="Auto" />
+
+                                <RowDefinition Height="Auto" />
+
+                                <RowDefinition Height="Auto" />
+
+                            </Grid.RowDefinitions>
+
+
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding ProcessThreatScanLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" />
+
+                            <ui:ToggleSwitch Grid.Row="0" Grid.Column="1"
+
+                                             IsChecked="{Binding ProcessThreatScanEnabled, Mode=TwoWay}" />
+
+
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding ProcessThreatKasperskyToggle, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 12 0 0" />
+
+                            <ui:ToggleSwitch Grid.Row="1" Grid.Column="1" Margin="0 12 0 0"
+
+                                             IsChecked="{Binding ProcessThreatKasperskyEnabled, Mode=TwoWay}"
+
+                                             IsEnabled="{Binding ProcessThreatScanEnabled}" />
+
+
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding ProcessThreatAiToggle, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 12 0 0" />
+
+                            <ui:ToggleSwitch Grid.Row="2" Grid.Column="1" Margin="0 12 0 0"
+
+                                             IsChecked="{Binding ProcessThreatAiEnabled, Mode=TwoWay}"
+
+                                             IsEnabled="{Binding ProcessThreatScanEnabled}" />
+
+
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="{Binding ProcessThreatActionLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 14 0 0" />
+
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0 14 0 0">
+
+                                <RadioButton Content="{Binding ProcessThreatActionAlert, Source={StaticResource Loc}}"
+
+                                             IsChecked="{Binding IsProcessThreatActionAlert, Mode=TwoWay}"
+
+                                             GroupName="ProcessThreatActionGroup" Margin="0 0 20 0" VerticalAlignment="Center"
+
+                                             IsEnabled="{Binding ProcessThreatScanEnabled}" />
+
+                                <RadioButton Content="{Binding ProcessThreatActionKill, Source={StaticResource Loc}}"
+
+                                             IsChecked="{Binding IsProcessThreatActionKill, Mode=TwoWay}"
+
+                                             GroupName="ProcessThreatActionGroup" Margin="0 0 20 0" VerticalAlignment="Center"
+
+                                             IsEnabled="{Binding ProcessThreatScanEnabled}" />
+
+                                <RadioButton Content="{Binding ProcessThreatActionSuspend, Source={StaticResource Loc}}"
+
+                                             IsChecked="{Binding IsProcessThreatActionSuspend, Mode=TwoWay}"
+
+                                             GroupName="ProcessThreatActionGroup" VerticalAlignment="Center"
+
+                                             IsEnabled="{Binding ProcessThreatScanEnabled}" />
+
+                            </StackPanel>
+
+
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="{Binding ProcessThreatThresholdLabel, Source={StaticResource Loc}}" VerticalAlignment="Center" Margin="0 14 0 0" />
+
+                            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0 14 0 0" VerticalAlignment="Center">
+
+                                <Slider Width="220" Minimum="60" Maximum="95" TickFrequency="5" IsSnapToTickEnabled="True"
+
+                                        Value="{Binding ProcessThreatRiskThreshold, Mode=TwoWay}"
+
+                                        IsEnabled="{Binding ProcessThreatScanEnabled}" VerticalAlignment="Center" Margin="0 0 16 0" />
+
+                                <TextBlock Text="{Binding ProcessThreatRiskThreshold, StringFormat='{}{0} %'}"
+
+                                           FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                            </StackPanel>
+
+                        </Grid>
+
+                    </StackPanel>
+
+                </ui:Card>
+
+
+
                 <!-- Карточка автоматических политик защиты (Auto-Guards) -->
                 <ui:Card Margin="0 16 0 0">
                     <StackPanel>
@@ -2009,6 +2133,11 @@
                                            Style="{DynamicResource FilterTabButtonStyle}"
                                            Appearance="{Binding SelectedFilter, Converter={StaticResource FilterToAppearanceConverter}, ConverterParameter=autostart}"
                                            Command="{Binding SetFilterCommand}" CommandParameter="autostart" />
+                                <ui:Button Content="{Binding ProcessThreatScanButton, Source={StaticResource Loc}}" Margin="8 0 0 0"
+                                           Icon="{ui:SymbolIcon ShieldCheckmark24}"
+                                           Appearance="Primary"
+                                           Command="{Binding TriggerProcessThreatScanCommand}"
+                                           ToolTip="{Binding ProcessThreatScanTooltip, Source={StaticResource Loc}}" />
                             </WrapPanel>
                         </Grid>
                     </StackPanel>
@@ -2149,6 +2278,15 @@
                                 <Setter Property="ContextMenu">
                                     <Setter.Value>
                                         <ContextMenu Background="#202530" BorderBrush="#374151" BorderThickness="1" Padding="4">
+                                            <MenuItem Header="{Binding ActionProcessProperties, Source={StaticResource Loc}}"
+                                                      FontWeight="Bold" Foreground="#F8FAFC"
+                                                      Command="{Binding PlacementTarget.Tag.ShowProcessDetailsCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                                <MenuItem.Icon>
+                                                    <ui:SymbolIcon Symbol="Info24" Foreground="#38BDF8" FontSize="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator Background="#374151" Margin="4 2" />
                                             <MenuItem Header="{Binding ActionKillProcess, Source={StaticResource Loc}}"
                                                       Foreground="#F87171" FontWeight="600"
                                                       Command="{Binding PlacementTarget.Tag.KillProcessCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
@@ -2181,6 +2319,21 @@
                                                       CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
                                                 <MenuItem.Icon>
                                                     <ui:SymbolIcon Symbol="ShieldDismiss24" Foreground="#EF4444" FontSize="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{Binding ActionScanProcessThreats, Source={StaticResource Loc}}"
+                                                      Foreground="#F8FAFC"
+                                                      Command="{Binding PlacementTarget.Tag.TriggerProcessThreatScanCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                                <MenuItem.Icon>
+                                                    <ui:SymbolIcon Symbol="ShieldCheckmark24" Foreground="#10B981" FontSize="16" />
+                                                </MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{Binding ActionCopySha256, Source={StaticResource Loc}}"
+                                                      Foreground="#F8FAFC"
+                                                      Command="{Binding PlacementTarget.Tag.CopySha256Command, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}">
+                                                <MenuItem.Icon>
+                                                    <ui:SymbolIcon Symbol="Copy24" Foreground="#60A5FA" FontSize="16" />
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator Background="#374151" Margin="4 2" />
@@ -2265,7 +2418,12 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:ProcessInfo}">
-                                <Grid>
+                                <Grid Background="Transparent">
+                                    <Grid.InputBindings>
+                                        <MouseBinding MouseAction="LeftDoubleClick"
+                                                      Command="{Binding DataContext.ShowProcessDetailsCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                      CommandParameter="{Binding}" />
+                                    </Grid.InputBindings>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="28" />
                                         <ColumnDefinition Width="*" />
@@ -2278,9 +2436,10 @@
                                         <ColumnDefinition Width="140" />
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Иконка пульса нагрузки -->
-                                    <Viewbox Grid.Column="0" Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                        <Path Data="{StaticResource IconPulse}" Fill="#00D2D3" Stretch="Uniform" />
+                                    <!-- Иконка пульса нагрузки с цветовой индикацией безопасности ИИ + Kaspersky -->
+                                    <Viewbox Grid.Column="0" Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                             ToolTip="{Binding PulseTooltip}">
+                                        <Path Data="{StaticResource IconPulse}" Fill="{Binding PulseColorHex}" Stretch="Uniform" />
                                     </Viewbox>
 
                                     <!-- Имя + PID + Описание -->
@@ -2361,6 +2520,48 @@
                                                                    Foreground="{Binding ThreatInfo.ThreatLevel, Converter={StaticResource ThreatLevelToForegroundConverter}}" />
                                                     <TextBlock Text="{Binding ThreatInfo.BadgeText}" FontSize="10" FontWeight="600"
                                                                Foreground="{Binding ThreatInfo.ThreatLevel, Converter={StaticResource ThreatLevelToForegroundConverter}}" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Бейдж угрозы Kaspersky OpenTIP -->
+                                            <Border Visibility="{Binding HasKasperskyThreat, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                    Margin="6 0 0 0" Padding="5 1" CornerRadius="3" VerticalAlignment="Center"
+                                                    Background="#EF4444" BorderBrush="#DC2626" BorderThickness="1">
+                                                <Border.ToolTip>
+                                                    <ToolTip Placement="Top" MaxWidth="400">
+                                                        <Border Background="#F0101721" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="8" Padding="10">
+                                                            <StackPanel>
+                                                                <TextBlock Text="Kaspersky OpenTIP: Угроза обнаружена!" FontWeight="Bold" FontSize="12" Foreground="#EF4444" Margin="0 0 0 4" />
+                                                                <TextBlock Text="{Binding KasperskyZoneText, StringFormat='Зона: {0}'}" FontSize="11" Foreground="#F8FAFC" />
+                                                                <TextBlock Text="{Binding KasperskyDetection, StringFormat='Сигнатура: {0}'}" FontSize="11" Foreground="#FCA5A5" TextWrapping="Wrap" Margin="0 2 0 0" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </ToolTip>
+                                                </Border.ToolTip>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="Shield24" FontSize="10" Margin="0 0 3 0" VerticalAlignment="Center" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="{Binding KasperskyZoneText}" FontSize="10" FontWeight="600" Foreground="#FFFFFF" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Бейдж угрозы ИИ (Поведенческий анализ) -->
+                                            <Border Visibility="{Binding HasAiThreat, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                    Margin="6 0 0 0" Padding="5 1" CornerRadius="3" VerticalAlignment="Center"
+                                                    Background="#7C3AED" BorderBrush="#6D28D9" BorderThickness="1">
+                                                <Border.ToolTip>
+                                                    <ToolTip Placement="Top" MaxWidth="450">
+                                                        <Border Background="#F0101721" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="8" Padding="10">
+                                                            <StackPanel>
+                                                                <TextBlock Text="ИИ-анализ поведения: Высокий риск" FontWeight="Bold" FontSize="12" Foreground="#C084FC" Margin="0 0 0 4" />
+                                                                <TextBlock Text="{Binding DisplayAiVerdict, StringFormat='Вердикт: {0}'}" FontSize="11" FontWeight="SemiBold" Foreground="#F8FAFC" />
+                                                                <TextBlock Text="{Binding AiExplanation, StringFormat='Обоснование: {0}'}" FontSize="10.5" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0 4 0 0" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </ToolTip>
+                                                </Border.ToolTip>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="Bot24" FontSize="10" Margin="0 0 3 0" VerticalAlignment="Center" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="{Binding DisplayAiVerdict}" FontSize="10" FontWeight="600" Foreground="#FFFFFF" />
                                                 </StackPanel>
                                             </Border>
                                         </StackPanel>

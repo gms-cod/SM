@@ -23,6 +23,14 @@ public class PipeMessage
 /// <summary>Константы типов сообщений для обмена через именованный канал.</summary>
 public static class PipeMessageTypes
 {
+    /// <summary>Установить конфигурацию защиты активных процессов.</summary>
+    public const string SetProcessThreatConfig = "SetProcessThreatConfig";
+    /// <summary>Запросить конфигурацию защиты активных процессов.</summary>
+    public const string GetProcessThreatConfig = "GetProcessThreatConfig";
+    /// <summary>Событие обнаружения угрозы процесса.</summary>
+    public const string ProcessThreatAlert = "ProcessThreatAlert";
+    /// <summary>Запустить внеплановую проверку активных процессов.</summary>
+    public const string TriggerProcessThreatScan = "TriggerProcessThreatScan";
     /// <summary>Наблюдательное событие входящего TCP, без действия брандмауэра.</summary>
     public const string IncomingTcpObserved = "IncomingTcpObserved";
     /// <summary>Чтение настройки наблюдения входящих TCP.</summary>

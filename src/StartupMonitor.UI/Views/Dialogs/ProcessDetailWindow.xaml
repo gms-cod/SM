@@ -1,0 +1,300 @@
+<ui:FluentWindow
+    x:Class="StartupMonitor.UI.Views.Dialogs.ProcessDetailWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:services="clr-namespace:StartupMonitor.UI.Services"
+    xmlns:models="clr-namespace:StartupMonitor.Shared.Models;assembly=StartupMonitor.Shared"
+    Title="Свойства процесса и рейтинг безопасности"
+    WindowStartupLocation="CenterOwner"
+    Background="{DynamicResource WindowBackgroundBrush}"
+    ExtendsContentIntoTitleBar="True"
+    ShowInTaskbar="False"
+    Width="820" Height="720"
+    MinHeight="550" MinWidth="680">
+
+    <Grid Margin="18,0,18,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- TitleBar -->
+        <ui:TitleBar Grid.Row="0" Title="Свойства процесса и рейтинг безопасности"
+                     ShowMinimize="False" ShowMaximize="True" ShowClose="True" />
+
+        <!-- Шапка окна: Название, PID, кнопки управления -->
+        <Grid Grid.Row="1" Margin="4,4,4,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Path Data="{StaticResource IconPulse}" Width="22" Height="22"
+                          Fill="{Binding Process.PulseColorHex}" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <TextBlock Text="{Binding Process.ProcessName}"
+                               FontSize="20" FontWeight="Bold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                    <Border Background="#1E293B" CornerRadius="4" Padding="6 2" Margin="10 0 0 0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Process.ProcessId, StringFormat='PID: {0}'}"
+                                   FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" Foreground="#38BDF8" />
+                    </Border>
+                    <Border Visibility="{Binding Process.IsSystemProcess, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Background="#064E3B" CornerRadius="4" Padding="6 2" Margin="6 0 0 0" VerticalAlignment="Center">
+                        <TextBlock Text="Системный" FontSize="11" FontWeight="600" Foreground="#34D399" />
+                    </Border>
+                    <Border Visibility="{Binding Process.IsStartupEntry, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Background="#1E3A8A" CornerRadius="4" Padding="6 2" Margin="6 0 0 0" VerticalAlignment="Center">
+                        <TextBlock Text="Автозапуск" FontSize="11" FontWeight="600" Foreground="#60A5FA" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="{Binding Process.Description}"
+                           FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="32,3,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button Appearance="Danger" Icon="{ui:SymbolIcon DismissCircle24}"
+                           Content="Завершить процесс"
+                           Click="OnKillProcessClick" Margin="0,0,8,0" Padding="12,6" />
+                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}"
+                           Content="Копировать всё"
+                           Click="OnCopyAllClick" Padding="12,6" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Скроллируемое содержимое -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+            <StackPanel Margin="4,0,4,0">
+
+                <!-- 1. Карточка комплексного рейтинга безопасности (ИИ + Kaspersky) -->
+                <Border Style="{StaticResource FluentGlassCard}" Margin="0,0,0,12" Padding="16">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="18"
+                                               Foreground="{Binding Process.PulseColorHex}" Margin="0,0,8,0" />
+                                <TextBlock Text="Комплексный рейтинг безопасности (ИИ + Kaspersky)"
+                                           FontSize="15" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                            </StackPanel>
+                            <Border Grid.Column="1" Background="{Binding Process.PulseColorHex}" CornerRadius="6" Padding="10 3">
+                                <TextBlock Text="{Binding SafetyVerdictSummary}" FontWeight="Bold" FontSize="12" Foreground="#FFFFFF" />
+                            </Border>
+                        </Grid>
+
+                        <Grid Margin="0,4,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Блок Kaspersky OpenTIP -->
+                            <Border Grid.Column="0" Background="#141C2B" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0 0 6 0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0 0 0 6">
+                                        <ui:SymbolIcon Symbol="Shield24" FontSize="14" Foreground="#10B981" Margin="0 0 6 0" />
+                                        <TextBlock Text="Kaspersky OpenTIP" FontWeight="Bold" FontSize="13" Foreground="#F8FAFC" />
+                                    </StackPanel>
+                                    <Grid Margin="0 2">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Зона:" Foreground="#94A3B8" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Process.KasperskyZoneText}" FontWeight="SemiBold" FontSize="12" Foreground="#F1F5F9" />
+                                    </Grid>
+                                    <Grid Margin="0 2">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Детект:" Foreground="#94A3B8" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayKasperskyDetection}" FontSize="12" Foreground="#FCA5A5" TextWrapping="Wrap" />
+                                    </Grid>
+                                    <Grid Margin="0 2">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Проверка:" Foreground="#94A3B8" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="Непрерывная на лету (SHA-256)" FontSize="11" Foreground="#64748B" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Блок ИИ Поведенческий анализ -->
+                            <Border Grid.Column="1" Background="#141C2B" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="8" Padding="12" Margin="6 0 0 0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0 0 0 6">
+                                        <ui:SymbolIcon Symbol="Bot24" FontSize="14" Foreground="#C084FC" Margin="0 0 6 0" />
+                                        <TextBlock Text="ИИ-анализ поведения" FontWeight="Bold" FontSize="13" Foreground="#F8FAFC" />
+                                    </StackPanel>
+                                    <Grid Margin="0 2">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Вердикт:" Foreground="#94A3B8" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Process.DisplayAiVerdict}" FontWeight="SemiBold" FontSize="12" Foreground="#F1F5F9" />
+                                    </Grid>
+                                    <Grid Margin="0 2">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Пояснение:" Foreground="#94A3B8" FontSize="12" />
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayAiExplanation}" FontSize="11.5" Foreground="#CBD5E1" TextWrapping="Wrap" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Блок CLI Эвристики (если есть) -->
+                        <Border Visibility="{Binding Process.HasThreat, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Background="#2A1B18" BorderBrush="#7F1D1D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0 6 0 0">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0 0 0 4">
+                                    <ui:SymbolIcon Symbol="Warning24" FontSize="14" Foreground="#F87171" Margin="0 0 6 0" />
+                                    <TextBlock Text="Эвристика командной строки (CLI Threats):" FontWeight="Bold" FontSize="12.5" Foreground="#FCA5A5" />
+                                    <TextBlock Text="{Binding Process.ThreatInfo.BadgeText}" FontWeight="SemiBold" FontSize="12" Foreground="#EF4444" Margin="6 0 0 0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Process.ThreatInfo.Description}" FontSize="11.5" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0 2 0 4" />
+                                <ItemsControl ItemsSource="{Binding Process.ThreatInfo.Indicators}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat='• {0}'}" FontSize="11" Foreground="#F87171" Margin="4 1" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- 2. Карточка системных метаданных и путей -->
+                <Border Style="{StaticResource FluentGlassCard}" Margin="0,0,0,12" Padding="16">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0 0 0 12">
+                            <ui:SymbolIcon Symbol="DocumentFolder24" FontSize="16" Foreground="#38BDF8" Margin="0 0 8 0" />
+                            <TextBlock Text="Метаданные и исполняемый файл" FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+
+                        <!-- Путь к файлу -->
+                        <TextBlock Text="Расположение файла:" Foreground="#94A3B8" FontSize="11.5" Margin="0 0 0 2" />
+                        <Grid Margin="0 0 0 10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding Process.FilePath, Mode=OneWay}" IsReadOnly="True"
+                                     FontFamily="Consolas" FontSize="11.5" Padding="8 5" Background="#0F172A" BorderBrush="#334155" />
+                            <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}" ToolTip="Копировать путь"
+                                       Click="OnCopyPathClick" Margin="6 0 0 0" Padding="8 5" />
+                            <ui:Button Grid.Column="2" Appearance="Secondary" Icon="{ui:SymbolIcon FolderOpen24}" ToolTip="Открыть папку"
+                                       Click="OnOpenFolderClick" Margin="6 0 0 0" Padding="8 5" />
+                        </Grid>
+
+                        <!-- Хэш SHA-256 -->
+                        <TextBlock Text="Контрольная сумма SHA-256:" Foreground="#94A3B8" FontSize="11.5" Margin="0 0 0 2" />
+                        <Grid Margin="0 0 0 10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding Process.Sha256Hash, Mode=OneWay}" IsReadOnly="True"
+                                     FontFamily="Consolas" FontSize="11.5" Padding="8 5" Background="#0F172A" BorderBrush="#334155" />
+                            <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}" ToolTip="Копировать SHA-256"
+                                       Click="OnCopySha256Click" Margin="6 0 0 0" Padding="8 5" />
+                        </Grid>
+
+                        <!-- Командная строка -->
+                        <TextBlock Text="Командная строка CLI:" Foreground="#94A3B8" FontSize="11.5" Margin="0 0 0 2" />
+                        <Grid Margin="0 0 0 10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding Process.CommandLine, Mode=OneWay}" IsReadOnly="True"
+                                     FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" MaxHeight="80"
+                                     Padding="8 5" Background="#0F172A" BorderBrush="#334155" VerticalScrollBarVisibility="Auto" />
+                            <ui:Button Grid.Column="1" Appearance="Secondary" Icon="{ui:SymbolIcon Copy24}" ToolTip="Копировать CLI"
+                                       Click="OnCopyCommandLineClick" Margin="6 0 0 0" Padding="8 5" VerticalAlignment="Top" />
+                        </Grid>
+
+                        <!-- Цифровая подпись и родитель -->
+                        <Grid Margin="0 4 0 0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0 0 6 0">
+                                <TextBlock Text="Цифровая подпись:" Foreground="#94A3B8" FontSize="11.5" />
+                                <TextBlock Text="{Binding Process.Publisher, FallbackValue='Не подписан'}" FontWeight="SemiBold" FontSize="12" Foreground="#F1F5F9" Margin="0 2 0 0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="6 0 0 0">
+                                <TextBlock Text="Родительский процесс:" Foreground="#94A3B8" FontSize="11.5" />
+                                <TextBlock Text="{Binding Process.ParentProcessId, StringFormat='Parent PID: {0}'}" FontFamily="Consolas" FontSize="12" Foreground="#38BDF8" Margin="0 2 0 0" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. Карточка потребления системных ресурсов -->
+                <Border Style="{StaticResource FluentGlassCard}" Margin="0,0,0,12" Padding="16">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0 0 0 12">
+                            <ui:SymbolIcon Symbol="DesktopPulse24" FontSize="16" Foreground="#10B981" Margin="0 0 8 0" />
+                            <TextBlock Text="Использование системных ресурсов" FontSize="14" FontWeight="SemiBold" Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#141C2B" CornerRadius="6" Padding="10" Margin="0 0 4 0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="ЦП" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Process.DisplayCpu}" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="#38BDF8" HorizontalAlignment="Center" Margin="0 4 0 0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Background="#141C2B" CornerRadius="6" Padding="10" Margin="4 0 4 0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Память" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Process.DisplayRam}" FontFamily="Consolas" FontSize="15" FontWeight="Bold" Foreground="#A78BFA" HorizontalAlignment="Center" Margin="0 4 0 0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Background="#141C2B" CornerRadius="6" Padding="10" Margin="4 0 4 0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Диск" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Process.DisplayDisk}" FontFamily="Consolas" FontSize="14" FontWeight="SemiBold" Foreground="#FCD34D" HorizontalAlignment="Center" Margin="0 4 0 0" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="3" Background="#141C2B" CornerRadius="6" Padding="10" Margin="4 0 0 0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="Сеть" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Process.DisplayNetwork}" FontFamily="Consolas" FontSize="14" FontWeight="SemiBold" Foreground="#34D399" HorizontalAlignment="Center" Margin="0 4 0 0" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Нижняя панель действий -->
+        <Grid Grid.Row="3" Margin="4,12,4,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Globe24}"
+                           Content="Сетевые подключения"
+                           Click="OnOpenConnectionsClick" Margin="0 0 8 0" Padding="12 6" />
+                <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon Cube24}"
+                           Content="Модули и DLL"
+                           Click="OnOpenModulesClick" Margin="0 0 8 0" Padding="12 6" />
+            </StackPanel>
+
+            <ui:Button Grid.Column="1" Appearance="Primary" Content="Закрыть"
+                       Click="OnCloseClick" Padding="20,6" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

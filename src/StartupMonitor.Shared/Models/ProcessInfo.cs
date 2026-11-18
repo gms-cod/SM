@@ -230,6 +230,189 @@ public class ProcessInfo : INotifyPropertyChanged
     /// <summary>Приостановлен ли процесс (заморожен потоками через NtSuspendProcess).</summary>
     public bool IsSuspended { get => _isSuspended; set => Set(ref _isSuspended, value); }
 
+    private string _sha256Hash = string.Empty;
+    /// <summary>SHA-256 хэш исполняемого файла процесса.</summary>
+    public string Sha256Hash
+    {
+        get => _sha256Hash;
+        set => Set(ref _sha256Hash, value);
+    }
+
+    private string _kasperskyZone = string.Empty;
+    /// <summary>Зона Kaspersky OpenTIP (Green / Yellow / Red / Grey / NotFound).</summary>
+    public string KasperskyZone
+    {
+        get => _kasperskyZone;
+        set
+        {
+            if (Set(ref _kasperskyZone, value))
+            {
+                OnPropertyChanged(nameof(HasKasperskyThreat));
+                OnPropertyChanged(nameof(KasperskyZoneText));
+                OnPropertyChanged(nameof(PulseColorHex));
+                OnPropertyChanged(nameof(PulseTooltip));
+            }
+        }
+    }
+
+    private string _kasperskyDetection = string.Empty;
+    /// <summary>Сигнатура детекта Kaspersky (если есть).</summary>
+    public string KasperskyDetection
+    {
+        get => _kasperskyDetection;
+        set
+        {
+            if (Set(ref _kasperskyDetection, value))
+            {
+                OnPropertyChanged(nameof(PulseColorHex));
+                OnPropertyChanged(nameof(PulseTooltip));
+            }
+        }
+    }
+
+    private int? _aiRiskScore;
+    /// <summary>Оценка риска ИИ (0–100), null если не проверялся.</summary>
+    public int? AiRiskScore
+    {
+        get => _aiRiskScore;
+        set
+        {
+            if (Set(ref _aiRiskScore, value))
+            {
+                OnPropertyChanged(nameof(HasAiThreat));
+                OnPropertyChanged(nameof(DisplayAiVerdict));
+                OnPropertyChanged(nameof(PulseColorHex));
+                OnPropertyChanged(nameof(PulseTooltip));
+            }
+        }
+    }
+
+    private string _aiVerdict = string.Empty;
+    /// <summary>Вердикт ИИ (Safe / Suspicious / Malicious).</summary>
+    public string AiVerdict
+    {
+        get => _aiVerdict;
+        set
+        {
+            if (Set(ref _aiVerdict, value))
+            {
+                OnPropertyChanged(nameof(DisplayAiVerdict));
+                OnPropertyChanged(nameof(PulseColorHex));
+                OnPropertyChanged(nameof(PulseTooltip));
+            }
+        }
+    }
+
+    private string _aiExplanation = string.Empty;
+    /// <summary>Подробное пояснение ИИ к вердикту.</summary>
+    public string AiExplanation
+    {
+        get => _aiExplanation;
+        set => Set(ref _aiExplanation, value);
+    }
+
+    private string _threatActionTaken = string.Empty;
+    /// <summary>Действие, примененное к процессу (None / AlertOnly / AutoKill / AutoSuspend).</summary>
+    public string ThreatActionTaken
+    {
+        get => _threatActionTaken;
+        set => Set(ref _threatActionTaken, value);
+    }
+
+    [JsonIgnore]
+    /// <summary>Имеет ли процесс критический вердикт Kaspersky (Red/Malware).</summary>
+    public bool HasKasperskyThreat => string.Equals(KasperskyZone, "Red", StringComparison.OrdinalIgnoreCase);
+
+    [JsonIgnore]
+    /// <summary>Имеет ли процесс высокий риск ИИ (подозрителен или вредоносен).</summary>
+    public bool HasAiThreat => AiRiskScore.HasValue && AiRiskScore.Value >= 70;
+
+    [JsonIgnore]
+    /// <summary>Текстовое отображение зоны Kaspersky.</summary>
+    public string KasperskyZoneText => KasperskyZone switch
+    {
+        "Green" => "Безопасен",
+        "Yellow" => "Подозрителен",
+        "Red" => "Вредоносен",
+        "Grey" => "Неизвестен",
+        "NotFound" => "Не найден",
+        _ => string.Empty
+    };
+
+    [JsonIgnore]
+    /// <summary>Текстовое отображение вердикта ИИ.</summary>
+    public string DisplayAiVerdict => !string.IsNullOrEmpty(AiVerdict)
+        ? (AiRiskScore.HasValue ? $"{AiVerdict} ({AiRiskScore.Value}%)" : AiVerdict)
+        : string.Empty;
+
+    [JsonIgnore]
+    /// <summary>
+    /// Цвет значка пульса процесса в шестнадцатеричном формате (#RRGGBB).
+    /// Градация от зелёного (безопасен) через жёлтый/оранжевый (подозрителен) до тёмно-красного (вредоносен).
+    /// </summary>
+    public string PulseColorHex
+    {
+        get
+        {
+            // Критическая угроза: красная зона Касперского, высокий риск ИИ (>=75%) или высокий CLI-риск
+            if (HasKasperskyThreat || (AiRiskScore.HasValue && AiRiskScore.Value >= 75) ||
+                (ThreatInfo != null && ThreatInfo.ThreatLevel == CliThreatLevel.High))
+            {
+                return "#DC2626"; // Тёмно-красный
+            }
+
+            // Подозрительный: желтая зона Касперского, средний риск ИИ (>=45%) или средний CLI-риск
+            if (string.Equals(KasperskyZone, "Yellow", StringComparison.OrdinalIgnoreCase) ||
+                (AiRiskScore.HasValue && AiRiskScore.Value >= 45) ||
+                (ThreatInfo != null && ThreatInfo.ThreatLevel == CliThreatLevel.Medium))
+            {
+                return "#F59E0B"; // Оранжево-жёлтый
+            }
+
+            // Низкий риск: оценка риска ИИ 20–44% или низкий CLI-риск
+            if ((AiRiskScore.HasValue && AiRiskScore.Value >= 20) ||
+                (ThreatInfo != null && ThreatInfo.ThreatLevel == CliThreatLevel.Low))
+            {
+                return "#EAB308"; // Жёлтый
+            }
+
+            // Безопасен: зеленая зона Касперского, низкий риск ИИ (<20%) или проверенный системный процесс
+            if (string.Equals(KasperskyZone, "Green", StringComparison.OrdinalIgnoreCase) ||
+                (AiRiskScore.HasValue && AiRiskScore.Value < 20) ||
+                IsSystemProcess)
+            {
+                return "#10B981"; // Изумрудно-зелёный
+            }
+
+            // По умолчанию (в очереди анализа / нейтральный) — бирюзовый пульс
+            return "#00D2D3";
+        }
+    }
+
+    [JsonIgnore]
+    /// <summary>
+    /// Подробный текст подсказки для значка пульса процесса.
+    /// </summary>
+    public string PulseTooltip
+    {
+        get
+        {
+            var kStatus = !string.IsNullOrEmpty(KasperskyZone)
+                ? $"{KasperskyZoneText} ({KasperskyZone})" + (!string.IsNullOrEmpty(KasperskyDetection) ? $": {KasperskyDetection}" : "")
+                : "В очереди анализа";
+
+            var aiStatus = !string.IsNullOrEmpty(AiVerdict)
+                ? $"{DisplayAiVerdict}"
+                : "В очереди анализа";
+
+            var cliStatus = ThreatInfo != null && ThreatInfo.HasThreat
+                ? ThreatInfo.BadgeText
+                : "Чисто";
+
+            return $"Рейтинг безопасности процесса PID {ProcessId} ({ProcessName}):\n• Kaspersky: {kStatus}\n• ИИ-поведение: {aiStatus}\n• CLI-эвристика: {cliStatus}\n(Двойной клик для просмотра всех свойств)";
+        }
+    }
+
     private CliThreatInfo? _threatInfo;
     /// <summary>Информация об эвристической оценке командной строки и пути процесса.</summary>
     public CliThreatInfo? ThreatInfo
@@ -238,7 +421,11 @@ public class ProcessInfo : INotifyPropertyChanged
         set
         {
             if (Set(ref _threatInfo, value))
+            {
                 OnPropertyChanged(nameof(HasThreat));
+                OnPropertyChanged(nameof(PulseColorHex));
+                OnPropertyChanged(nameof(PulseTooltip));
+            }
         }
     }
 

@@ -111,7 +111,10 @@ try
             services.AddSingleton<HashLookupService>();
             services.AddSingleton<SystemScannerService>();
             services.AddSingleton<ProcessStartupLinker>();
-            services.AddSingleton<ProcessMetadataEnricher>();
+            services.AddSingleton<ProcessMetadataEnricher>();
+            services.AddSingleton<StartupMonitor.Service.Services.ProcessLifecycle.ISystemProcessSafeguard, StartupMonitor.Service.Services.ProcessLifecycle.SystemProcessSafeguard>();
+            services.AddSingleton<StartupMonitor.Service.Services.ProcessLifecycle.ProcessThreatScanCoordinator>();
+            services.AddHostedService(sp => sp.GetRequiredService<StartupMonitor.Service.Services.ProcessLifecycle.ProcessThreatScanCoordinator>());
             services.AddSingleton<ProcessMetricsTracker>();
 
             // Регистрация подсистемы мониторинга жизненного цикла процессов (ETW Process Lifecycle)

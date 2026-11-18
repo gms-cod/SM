@@ -775,6 +775,58 @@ public class LocalizationService : INotifyPropertyChanged
     public string AuthenticodeAiIntegration => this["AuthenticodeAiIntegration"];
 
     /// <summary>Заголовок секции Kaspersky в настройках.</summary>
+    /// <summary>Заголовок секции защиты активных процессов.</summary>
+
+    public string ProcessThreatSection => this["ProcessThreatSection"];
+
+    /// <summary>Описание секции защиты активных процессов.</summary>
+
+    public string ProcessThreatDescription => this["ProcessThreatDescription"];
+
+    /// <summary>Метка включения проверки активных процессов.</summary>
+
+    public string ProcessThreatScanLabel => this["ProcessThreatScanLabel"];
+
+    /// <summary>Тумблер проверки Kaspersky OpenTIP.</summary>
+
+    public string ProcessThreatKasperskyToggle => this["ProcessThreatKasperskyToggle"];
+
+    /// <summary>Тумблер проверки ИИ.</summary>
+
+    public string ProcessThreatAiToggle => this["ProcessThreatAiToggle"];
+
+    /// <summary>Метка выбора действия.</summary>
+
+    public string ProcessThreatActionLabel => this["ProcessThreatActionLabel"];
+
+    /// <summary>Действие: только предупреждать.</summary>
+
+    public string ProcessThreatActionAlert => this["ProcessThreatActionAlert"];
+
+    /// <summary>Действие: завершать процесс.</summary>
+
+    public string ProcessThreatActionKill => this["ProcessThreatActionKill"];
+
+    /// <summary>Действие: замораживать процесс.</summary>
+
+    public string ProcessThreatActionSuspend => this["ProcessThreatActionSuspend"];
+
+    /// <summary>Метка порога риска.</summary>
+
+    public string ProcessThreatThresholdLabel => this["ProcessThreatThresholdLabel"];
+    /// <summary>Кнопка запуска проверки активных процессов на угрозы.</summary>
+    public string ProcessThreatScanButton => this["ProcessThreatScanButton"];
+    /// <summary>Подсказка кнопки запуска проверки процессов.</summary>
+    public string ProcessThreatScanTooltip => this["ProcessThreatScanTooltip"];
+    /// <summary>Пункт меню проверки процесса на угрозы.</summary>
+    public string ActionScanProcessThreats => this["ActionScanProcessThreats"];
+    /// <summary>Пункт меню копирования хэша SHA-256.</summary>
+    public string ActionCopySha256 => this["ActionCopySha256"];
+    /// <summary>Пункт меню свойств процесса.</summary>
+    public string ActionProcessProperties => this["ActionProcessProperties"];
+
+
+
     public string KasperskySection => this["KasperskySection"];
     /// <summary>Описание секции Kaspersky.</summary>
     public string KasperskyDescription => this["KasperskyDescription"];

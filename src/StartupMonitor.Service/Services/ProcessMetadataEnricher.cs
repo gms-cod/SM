@@ -28,7 +28,13 @@ public record CachedProcessMetadata(
     DigitalSignatureStatus SignatureStatus = DigitalSignatureStatus.Unknown,
     string? SignerName = null,
     string? SignatureIssuer = null,
-    bool SignatureChecked = false
+    bool SignatureChecked = false,
+    string? Sha256Hash = null,
+    string? KasperskyZone = null,
+    string? KasperskyDetection = null,
+    int? AiRiskScore = null,
+    string? AiVerdict = null,
+    string? AiExplanation = null
 );
 
 /// <summary>Передаёт подтверждённые метаданные без изменяемого DTO и без ссылки на кэш worker.</summary>
@@ -99,6 +105,12 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
             {
                 proc.ThreatInfo = cached.ThreatInfo;
             }
+            if (!string.IsNullOrEmpty(cached.Sha256Hash)) proc.Sha256Hash = cached.Sha256Hash;
+            if (!string.IsNullOrEmpty(cached.KasperskyZone)) proc.KasperskyZone = cached.KasperskyZone;
+            if (!string.IsNullOrEmpty(cached.KasperskyDetection)) proc.KasperskyDetection = cached.KasperskyDetection;
+            if (cached.AiRiskScore.HasValue) proc.AiRiskScore = cached.AiRiskScore;
+            if (!string.IsNullOrEmpty(cached.AiVerdict)) proc.AiVerdict = cached.AiVerdict;
+            if (!string.IsNullOrEmpty(cached.AiExplanation)) proc.AiExplanation = cached.AiExplanation;
             if (!cached.SignatureChecked) QueueEnrichment(proc, key);
             else PublishMetadata(key, cached);
             return;
@@ -260,6 +272,10 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
                     bool isProtected = EntryOperations.IsProtectedProcessName(proc.ProcessName);
                     proc.IsSystemProcess = isProtected;
 
+                    // Потоковый анализ на лету: запрашиваем проверку в ProcessThreatScanCoordinator
+                    StartupMonitor.Service.Services.ProcessLifecycle.ProcessThreatScanCoordinator.TryEnrich(proc);
+                    StartupMonitor.Service.Services.ProcessLifecycle.ProcessThreatScanCoordinator.TryQueueScan(proc, proc.StartTime);
+
                     // Сохраняем в кэш
                     var metadata = new CachedProcessMetadata(
                         proc.FilePath,
@@ -273,7 +289,13 @@ public class ProcessMetadataEnricher : IDisposable, IAsyncDisposable
                         proc.SignatureStatus,
                         proc.SignerName,
                         proc.SignatureIssuer,
-                        SignatureChecked: !string.IsNullOrEmpty(proc.FilePath)
+                        SignatureChecked: !string.IsNullOrEmpty(proc.FilePath),
+                        proc.Sha256Hash,
+                        proc.KasperskyZone,
+                        proc.KasperskyDetection,
+                        proc.AiRiskScore,
+                        proc.AiVerdict,
+                        proc.AiExplanation
                     );
                     _cache[key] = metadata;
                     if (metadata.SignatureChecked) PublishMetadata(key, metadata);

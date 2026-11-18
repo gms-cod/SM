@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/версия-v2.4.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Версия v2.4.0"></a>
+  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/версия-v2.5.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Версия v2.5.0"></a>
   <img src="https://img.shields.io/badge/платформа-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Платформа Windows">
   <img src="https://img.shields.io/badge/стек-.NET%208%20%7C%20C%23%20%7C%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Технологический стек">
   <img src="https://img.shields.io/badge/тесты-1%2C936%20пройдены%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Тесты 100% Passing">
@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.ru.md"><strong>Руководство пользователя</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Архитектура</strong></a> •
-  <a href="docs/releases/v2.4.0.md"><strong>История изменений</strong></a> •
+  <a href="docs/releases/v2.5.0.md"><strong>История изменений</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Скачать инсталлятор</strong></a>
 </p>
 
@@ -53,6 +53,7 @@
 | 🏰 **Защита портов Port Defender** | Port Sentinel & Скользящее окно | Защита портов 3389 (RDP), 22 (SSH) и 445 (SMB) от подбора паролей. Автоматическая изоляция атакующих IP с защитой домашних и корпоративных подсетей. |
 | 🧠 **ИИ-анализ угроз** | Groq (`openai/gpt-oss-120b`) / Ollama | Нейросетевой разбор аргументов командной строки и PE-структуры на русском или английском языке с формированием рейтинга безопасности 1–10 звезд. |
 | 🛡️ **Репутация Kaspersky OpenTIP** | Облачный шлюз Kaspersky OpenTIP | Автоматическая сверка SHA-256 хешей с базой угроз: точные зоны риска (Green, Yellow, Red, Grey) и наименования вредоносного ПО. |
+| 🩺 **Анализ процессов на лету & Пульс безопасности** | Непрерывный мониторинг & Рейтинг ИИ + Kaspersky | Фоновый аудит запущенных процессов каждые 15 секунд, динамическая цветовая индикация пульса (зелёный → тёмно-красный) и детальное окно свойств с хэшами, CLI и ресурсами. |
 | 🔒 **Безопасное управление 29 точками** | Обратимая деактивация & Теневой архив | Четкое разделение операций: **Отключить** (деактивация без удаления), **Заблокировать** (правило ЧС) и **Удалить** (с бэкапом в «Удалённые»). |
 | 📸 **Дифференциальный аудит** | Эталонные снимки «Было — Стало» | Сравнение состояния системы до и после установки программ с наглядной цветовой маркировкой: Добавлено (`+`), Изменено (`~`), Удалено (`-`). |
 | 📲 **Круглосуточные алерты 24/7** | Telegram-бот и Discord Webhooks | Мгновенная доставка push-уведомлений о новых точках автозапуска и сетевых инцидентах на смартфон прямо из системной службы. |
@@ -96,13 +97,13 @@ Startup Monitor построен в соответствии с принципа
 ## 🚀 Быстрый старт и установка
 
 ### Вариант 1: Официальный инсталлятор с цифровой подписью (Рекомендуется)
-1. Скачайте файл **`StartupMonitorSetup-v2.4.0.exe`** из раздела [**актуального релиза на GitHub**](https://github.com/gms-cod/SM/releases/latest).
-2. Сверьте контрольную сумму SHA-256 с файлом `StartupMonitorSetup-v2.4.0.exe.sha256`.
+1. Скачайте файл **`StartupMonitorSetup-2.5.0.exe`** из раздела [**актуального релиза на GitHub**](https://github.com/gms-cod/SM/releases/latest).
+2. Сверьте контрольную сумму SHA-256 с файлом `StartupMonitorSetup-2.5.0.exe.sha256`.
 3. Запустите установщик. Мастер автоматически установит файлы в `C:\Program Files\StartupMonitor\`, создаст и запустит фоновую службу Windows и откроет интерфейс.
 
 > [!TIP]
 > **Тихая установка в корпоративной среде**:  
-> `StartupMonitorSetup-v2.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+> `StartupMonitorSetup-2.5.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
 
 ### Вариант 2: Портативный запуск (`SMon2`)
 1. Распакуйте каталог `SMon2/` в любую папку (полностью автономный .NET 8 x64, установка сторонних сред не требуется).
@@ -126,7 +127,7 @@ cd SM
 # 2. Компиляция в конфигурации Release
 dotnet build StartupMonitor.sln -c Release
 
-# 3. Запуск полного набора тестов (1,936 тестов, 100% успешных)
+# 3. Запуск полного набора тестов (1,944 тестов, 100% успешных)
 dotnet test tests/StartupMonitor.Tests -c Release
 
 # 4. Сборка автономного портативного пакета в SMon2/
@@ -140,7 +141,7 @@ powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
 - 📘 **[Руководство пользователя (все 11 вкладок, интеграции и FAQ)](docs/USER_GUIDE.ru.md)**
 - 🏛️ **[Архитектура системы и потоки данных](docs/ARCHITECTURE.md)**
 - 🔬 **[Отчет безопасности полного аудита роя субагентов](docs/SWARM_INSPECTION_AUDIT_2026-11-07.md)**
-- 📝 **[История изменений выпуска v2.4.0](docs/releases/v2.4.0.md)**
+- 📝 **[История изменений выпуска v2.5.0](docs/releases/v2.5.0.md)**
 - 📚 **[Каталог всех методов кодовой базы (939 функций)](docs/METHOD_CATALOG.md)**
 
 ---

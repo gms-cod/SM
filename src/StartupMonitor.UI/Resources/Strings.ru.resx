@@ -2418,4 +2418,49 @@
   <data name="TmFirewallBlacklistConfirm" xml:space="preserve"><value>Заблокировать сетевую активность '{0}' в брандмауэре Windows?&#x0a;Программа будет занесена в чёрный список Firewall.</value></data>
   <data name="TmFirewallPathNotFound" xml:space="preserve"><value>Не удалось определить путь к исполняемому файлу процесса.</value></data>
   <data name="TmFirewallError" xml:space="preserve"><value>Ошибка операции с Firewall: {0}</value></data>
+  <data name="ProcessThreatSection" xml:space="preserve">
+    <value>Защита активных процессов (ИИ и Kaspersky)</value>
+  </data>
+  <data name="ProcessThreatDescription" xml:space="preserve">
+    <value>Автоматическая репутационная проверка запущенных процессов через Kaspersky OpenTIP и поведенческий анализ ИИ с возможностью закрытия.</value>
+  </data>
+  <data name="ProcessThreatScanLabel" xml:space="preserve">
+    <value>Проверять активные процессы</value>
+  </data>
+  <data name="ProcessThreatKasperskyToggle" xml:space="preserve">
+    <value>Проверка через Kaspersky OpenTIP</value>
+  </data>
+  <data name="ProcessThreatAiToggle" xml:space="preserve">
+    <value>Интеллектуальный анализ поведения через ИИ</value>
+  </data>
+  <data name="ProcessThreatActionLabel" xml:space="preserve">
+    <value>Действие при обнаружении вредоносного процесса:</value>
+  </data>
+  <data name="ProcessThreatActionAlert" xml:space="preserve">
+    <value>Только предупреждать</value>
+  </data>
+  <data name="ProcessThreatActionKill" xml:space="preserve">
+    <value>Автоматически завершать процесс</value>
+  </data>
+  <data name="ProcessThreatActionSuspend" xml:space="preserve">
+    <value>Замораживать процесс (Suspend)</value>
+  </data>
+  <data name="ProcessThreatThresholdLabel" xml:space="preserve">
+    <value>Порог риска ИИ для срабатывания защиты (%):</value>
+  </data>
+  <data name="ProcessThreatScanButton" xml:space="preserve">
+    <value>Проверить на угрозы (ИИ + Kaspersky)</value>
+  </data>
+  <data name="ProcessThreatScanTooltip" xml:space="preserve">
+    <value>Просканировать активные процессы через Kaspersky OpenTIP и поведенческий ИИ</value>
+  </data>
+  <data name="ActionScanProcessThreats" xml:space="preserve">
+    <value>Проверить на угрозы (Kaspersky + ИИ)</value>
+  </data>
+  <data name="ActionCopySha256" xml:space="preserve">
+    <value>Скопировать SHA-256 хэш</value>
+  </data>
+  <data name="ActionProcessProperties" xml:space="preserve">
+    <value>Свойства процесса...</value>
+  </data>
 </root>
