@@ -11,10 +11,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/версия-v2.2.3-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Версия v2.2.3"></a>
+  <a href="https://github.com/gms-cod/SM/releases/latest"><img src="https://img.shields.io/badge/версия-v2.4.0-00D2D3?style=for-the-badge&logo=windows&logoColor=white" alt="Версия v2.4.0"></a>
   <img src="https://img.shields.io/badge/платформа-Windows%2010%20%2F%2011%20(x64)-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Платформа Windows">
   <img src="https://img.shields.io/badge/стек-.NET%208%20%7C%20C%23%20%7C%20WPF%20Fluent%202-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Технологический стек">
-  <img src="https://img.shields.io/badge/тесты-1%2C809%20пройдены%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Тесты 100% Passing">
+  <img src="https://img.shields.io/badge/тесты-1%2C936%20пройдены%20(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Тесты 100% Passing">
   <img src="https://img.shields.io/badge/подпись-SHA256%20Authenticode-06B6D4?style=for-the-badge&logo=hackthebox&logoColor=white" alt="Authenticode">
   <a href="LICENSE"><img src="https://img.shields.io/badge/лицензия-MIT-3B82F6?style=for-the-badge" alt="Лицензия MIT"></a>
 </p>
@@ -26,7 +26,7 @@
 <p align="center">
   <a href="docs/USER_GUIDE.ru.md"><strong>Руководство пользователя</strong></a> •
   <a href="docs/ARCHITECTURE.md"><strong>Архитектура</strong></a> •
-  <a href="docs/releases/v2.2.4.md"><strong>История изменений</strong></a> •
+  <a href="docs/releases/v2.4.0.md"><strong>История изменений</strong></a> •
   <a href="https://github.com/gms-cod/SM/releases/latest"><strong>Скачать инсталлятор</strong></a>
 </p>
 
@@ -48,6 +48,7 @@
 | Преимущество | Технология | Практическая ценность |
 | :--- | :--- | :--- |
 | ⚡ **Ядро ETW Kernel Engine** | `Microsoft-Windows-Kernel-Process` | Суб-миллисекундный перехват жизненного цикла процессов (Start/Stop) без опроса и нагрузки на CPU. Защита от коллизий PID и отказоустойчивая сверка. |
+| ☣️ **Анти-рансомваре защита** | Anti-Ransomware Shield & Canary Traps | Превентивный перехват деструктивных команд (vssadmin, bcdedit), лексикографические ловушки-приманки, атомарная заморозка за < 1 мс, сетевой WFP-карантин и пофайловый откат из теневых копий VSS. |
 | 🧱 **Динамический WFP-брандмауэр** | Windows Filtering Platform & IP Helper | Временные фильтры уровня приложений прямо в сетевом стеке Windows. Мгновенные сетевые алерты с определением GeoIP (страна, флаг, город, ASN). |
 | 🏰 **Защита портов Port Defender** | Port Sentinel & Скользящее окно | Защита портов 3389 (RDP), 22 (SSH) и 445 (SMB) от подбора паролей. Автоматическая изоляция атакующих IP с защитой домашних и корпоративных подсетей. |
 | 🧠 **ИИ-анализ угроз** | Groq (`openai/gpt-oss-120b`) / Ollama | Нейросетевой разбор аргументов командной строки и PE-структуры на русском или английском языке с формированием рейтинга безопасности 1–10 звезд. |
@@ -66,7 +67,7 @@ Startup Monitor построен в соответствии с принципа
 ┌────────────────────────────────────────────────────────────────────────┐
 │             StartupMonitor.UI (WPF .NET 8 Fluent 2, win-x64)           │
 │                                                                        │
-│  MainViewModel ─── TaskManagerVM ─── ThemeService ─── LocalizationSvc │
+│  MainViewModel ─── TaskManagerVM ─── RansomwareShieldVM ─── ThemeSvc   │
 │         │                                                              │
 │         ▼                                                              │
 │  PipeClient (Named Pipe IPC) ─── TrayNotificationAggregator ───────────┘
@@ -80,7 +81,8 @@ Startup Monitor построен в соответствии с принципа
 │  ├─ ETW Process Engine (Microsoft-Windows-Kernel-Process, 0% CPU Idle) │
 │  ├─ Watchers: 29 веток реестра, папок, служб SCM, задач, WMI-подписок │
 │  ├─ Network Security Hub: Dynamic WFP Filters, Port Defender, IP Helper │
-│  ├─ ProcessInspectorService & NtSuspendProcess / NtResumeProcess APIs  │
+│  ├─ Anti-Ransomware Shield: Canary Traps, VSS Guard, WFP Isolation    │
+│  ├─ ProcessFreezer (NtSuspendProcess), ShannonEntropy, VSS Restorer    │
 │  ├─ AutoGuardEngine (Превентивные политики Temp / Script / Unsigned)   │
 │  ├─ DelayedStartupManager (Session 0 Bypass через DuplicateTokenEx)    │
 │  ├─ KasperskyScanService & AiRatingService (Groq / Ollama / OpenAI)    │
@@ -94,13 +96,13 @@ Startup Monitor построен в соответствии с принципа
 ## 🚀 Быстрый старт и установка
 
 ### Вариант 1: Официальный инсталлятор с цифровой подписью (Рекомендуется)
-1. Скачайте файл **`StartupMonitorSetup-v2.1.1.exe`** из раздела [**актуального релиза на GitHub**](https://github.com/gms-cod/SM/releases/latest).
-2. Сверьте контрольную сумму SHA-256 с файлом `StartupMonitorSetup-v2.1.1.exe.sha256`.
+1. Скачайте файл **`StartupMonitorSetup-v2.4.0.exe`** из раздела [**актуального релиза на GitHub**](https://github.com/gms-cod/SM/releases/latest).
+2. Сверьте контрольную сумму SHA-256 с файлом `StartupMonitorSetup-v2.4.0.exe.sha256`.
 3. Запустите установщик. Мастер автоматически установит файлы в `C:\Program Files\StartupMonitor\`, создаст и запустит фоновую службу Windows и откроет интерфейс.
 
 > [!TIP]
 > **Тихая установка в корпоративной среде**:  
-> `StartupMonitorSetup-v2.1.1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
+> `StartupMonitorSetup-v2.4.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART`
 
 ### Вариант 2: Портативный запуск (`SMon2`)
 1. Распакуйте каталог `SMon2/` в любую папку (полностью автономный .NET 8 x64, установка сторонних сред не требуется).
@@ -124,7 +126,7 @@ cd SM
 # 2. Компиляция в конфигурации Release
 dotnet build StartupMonitor.sln -c Release
 
-# 3. Запуск полного набора тестов (1,368 тестов, 100% успешных)
+# 3. Запуск полного набора тестов (1,936 тестов, 100% успешных)
 dotnet test tests/StartupMonitor.Tests -c Release
 
 # 4. Сборка автономного портативного пакета в SMon2/
@@ -135,10 +137,10 @@ powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
 
 ## 📖 Подробная документация
 
-- 📘 **[Руководство пользователя (все 10 вкладок, интеграции и FAQ)](docs/USER_GUIDE.ru.md)**
+- 📘 **[Руководство пользователя (все 11 вкладок, интеграции и FAQ)](docs/USER_GUIDE.ru.md)**
 - 🏛️ **[Архитектура системы и потоки данных](docs/ARCHITECTURE.md)**
 - 🔬 **[Отчет безопасности полного аудита роя субагентов](docs/SWARM_INSPECTION_AUDIT_2026-11-07.md)**
-- 📝 **[История изменений выпуска v2.1.1](docs/releases/v2.1.1.md)**
+- 📝 **[История изменений выпуска v2.4.0](docs/releases/v2.4.0.md)**
 - 📚 **[Каталог всех методов кодовой базы (939 функций)](docs/METHOD_CATALOG.md)**
 
 ---
