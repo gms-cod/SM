@@ -1,0 +1,325 @@
+<UserControl x:Class="StartupMonitor.UI.Views.RansomwareShieldView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             Background="{ui:ThemeResource ApplicationBackgroundBrush}">
+
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="NeonCyanBrush" Color="#00D2D3" />
+        <SolidColorBrush x:Key="NeonEmeraldBrush" Color="#10B981" />
+        <SolidColorBrush x:Key="NeonCrimsonBrush" Color="#EF4444" />
+        <SolidColorBrush x:Key="NeonAmberBrush" Color="#F59E0B" />
+        <SolidColorBrush x:Key="CardGlassBackground" Color="#1E293B" Opacity="0.65" />
+        <SolidColorBrush x:Key="CardGlassBorder" Color="#334155" Opacity="0.8" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32 0 32 24">
+
+            <!-- Заголовок и кнопки управления -->
+            <Grid Margin="0 0 0 20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <StackPanel Orientation="Horizontal" Margin="0 0 0 4">
+                        <Viewbox Width="26" Height="26" Margin="0 0 10 0">
+                            <Path Data="M12 1L3 5V11C3 16.55 6.84 21.74 12 23C17.16 21.74 21 16.55 21 11V5L12 1ZM12 7C13.1 7 14 7.9 14 9C14 9.74 13.6 10.38 13 10.72V15C13 15.55 12.55 16 12 16C11.45 16 11 15.55 11 15V10.72C10.4 10.38 10 9.74 10 9C10 7.9 10.9 7 12 7Z"
+                                  Fill="{StaticResource NeonCyanBrush}" Stretch="Uniform" />
+                        </Viewbox>
+                        <TextBlock Text="{Binding RansomwareHeader, Source={StaticResource Loc}}" 
+                                   FontSize="26" FontWeight="700" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding RansomwareSubtitle, Source={StaticResource Loc}}" 
+                               FontSize="13" Foreground="#94A3B8" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Кнопки управления -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button Margin="0 0 8 0"
+                               Content="{Binding BtnCreateVssSnapshot, Source={StaticResource Loc}}"
+                               Icon="{ui:SymbolIcon Camera24}"
+                               Appearance="Secondary"
+                               Command="{Binding CreateVssSnapshotCommand}"
+                               Padding="14 8" CornerRadius="8" />
+
+                    <ui:Button Margin="0 0 8 0"
+                               Content="{Binding BtnRefreshStats, Source={StaticResource Loc}}"
+                               Icon="{ui:SymbolIcon ArrowClockwise24}"
+                               Appearance="Secondary"
+                               Command="{Binding RefreshStatsCommand}"
+                               Padding="14 8" CornerRadius="8" />
+
+                    <ui:Button Content="{Binding BtnSaveRansomwareSettings, Source={StaticResource Loc}}"
+                               Icon="{ui:SymbolIcon Checkmark24}"
+                               Appearance="Primary"
+                               Command="{Binding SaveSettingsCommand}"
+                               Padding="16 8" CornerRadius="8" />
+                </StackPanel>
+            </Grid>
+
+            <!-- 4 Стеклянные карточки метрик -->
+            <Grid Margin="0 0 0 20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Карточка 1: Статус защиты -->
+                <Border Grid.Column="0" Margin="0 0 6 0" Background="{StaticResource CardGlassBackground}"
+                        BorderBrush="{StaticResource CardGlassBorder}" BorderThickness="1" CornerRadius="12" Padding="16 14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="{Binding CardShieldStatus, Source={StaticResource Loc}}" 
+                                   FontSize="12" FontWeight="500" Foreground="#94A3B8" />
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0 6 0 8" VerticalAlignment="Center">
+                            <Ellipse Width="10" Height="10" Margin="0 0 8 0">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="#10B981" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                <Setter Property="Fill" Value="#64748B" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="{Binding StatusBadgeText}" FontSize="18" FontWeight="700" 
+                                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                        <Border Grid.Row="2" Height="2" CornerRadius="1" Background="{StaticResource NeonEmeraldBrush}" />
+                    </Grid>
+                </Border>
+
+                <!-- Карточка 2: Активных ловушек -->
+                <Border Grid.Column="1" Margin="6 0" Background="{StaticResource CardGlassBackground}"
+                        BorderBrush="{StaticResource CardGlassBorder}" BorderThickness="1" CornerRadius="12" Padding="16 14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="{Binding CardActiveTraps, Source={StaticResource Loc}}" 
+                                   FontSize="12" FontWeight="500" Foreground="#94A3B8" />
+                        <TextBlock Grid.Row="1" Text="{Binding ActiveTrapsCount}" FontSize="28" FontWeight="700" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0 2 0 6" VerticalAlignment="Center" />
+                        <Border Grid.Row="2" Height="2" CornerRadius="1" Background="{StaticResource NeonCyanBrush}" />
+                    </Grid>
+                </Border>
+
+                <!-- Карточка 3: Заблокировано атак -->
+                <Border Grid.Column="2" Margin="6 0" Background="{StaticResource CardGlassBackground}"
+                        BorderBrush="{StaticResource CardGlassBorder}" BorderThickness="1" CornerRadius="12" Padding="16 14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="{Binding CardBlockedAttacks, Source={StaticResource Loc}}" 
+                                   FontSize="12" FontWeight="500" Foreground="#94A3B8" />
+                        <TextBlock Grid.Row="1" Text="{Binding BlockedAttacksCount}" FontSize="28" FontWeight="700" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0 2 0 6" VerticalAlignment="Center" />
+                        <Border Grid.Row="2" Height="2" CornerRadius="1" Background="{StaticResource NeonCrimsonBrush}" />
+                    </Grid>
+                </Border>
+
+                <!-- Карточка 4: Восстановлено файлов -->
+                <Border Grid.Column="3" Margin="6 0 0 0" Background="{StaticResource CardGlassBackground}"
+                        BorderBrush="{StaticResource CardGlassBorder}" BorderThickness="1" CornerRadius="12" Padding="16 14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="{Binding CardRestoredFiles, Source={StaticResource Loc}}" 
+                                   FontSize="12" FontWeight="500" Foreground="#94A3B8" />
+                        <TextBlock Grid.Row="1" Text="{Binding RestoredFilesCount}" FontSize="28" FontWeight="700" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0 2 0 6" VerticalAlignment="Center" />
+                        <Border Grid.Row="2" Height="2" CornerRadius="1" Background="{StaticResource NeonAmberBrush}" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Секция опций защиты -->
+            <TextBlock Text="Параметры эшелонированной защиты" FontSize="16" FontWeight="700" 
+                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0 0 0 12" />
+
+            <!-- Карточка: Общее включение щита -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Глобальный мониторинг Anti-Ransomware Shield" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="Включает все активные эшелоны анализа, ловушки и перехватчик деструктивных вызовов" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Карточка: Защита VSS -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OptProtectVss, Source={StaticResource Loc}}" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding OptProtectVssDesc, Source={StaticResource Loc}}" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding ProtectVssShadowCopies, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Карточка: Canary Traps -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OptEnableCanary, Source={StaticResource Loc}}" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding OptEnableCanaryDesc, Source={StaticResource Loc}}" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding EnableCanaryTraps, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Карточка: Атомарная заморозка процесса -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OptAutoSuspend, Source={StaticResource Loc}}" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding OptAutoSuspendDesc, Source={StaticResource Loc}}" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoSuspendProcess, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Карточка: Сетевой карантин -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OptIsolateNetwork, Source={StaticResource Loc}}" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding OptIsolateNetworkDesc, Source={StaticResource Loc}}" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding IsolateNetworkOnAttack, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Карточка: Автоматический откат из VSS -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OptAutoRollback, Source={StaticResource Loc}}" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding OptAutoRollbackDesc, Source={StaticResource Loc}}" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoRollbackAffectedFiles, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Карточка: Доверенные подписи Authenticode -->
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16 12" Margin="0 0 0 20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding OptWhitelistSigners, Source={StaticResource Loc}}" FontSize="14" FontWeight="600" 
+                                   Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding OptWhitelistSignersDesc, Source={StaticResource Loc}}" 
+                                   FontSize="12" Foreground="#94A3B8" Margin="0 2 0 0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch Grid.Column="1" IsChecked="{Binding WhitelistTrustedSigners, Mode=TwoWay}" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Журнал инцидентов -->
+            <TextBlock Text="{Binding IncidentsHistoryHeader, Source={StaticResource Loc}}" FontSize="16" FontWeight="700" 
+                       Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}" Margin="0 0 0 12" />
+
+            <Border Background="{StaticResource CardGlassBackground}" BorderBrush="{StaticResource CardGlassBorder}" 
+                    BorderThickness="1" CornerRadius="10" Padding="16" MinHeight="100">
+                <Grid>
+                    <!-- Если атак нет -->
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" 
+                                Visibility="{Binding HasIncidents, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverse}">
+                        <Viewbox Width="32" Height="32" Margin="0 0 0 8">
+                            <Path Data="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z"
+                                  Fill="{StaticResource NeonEmeraldBrush}" Stretch="Uniform" />
+                        </Viewbox>
+                        <TextBlock Text="{Binding EmptyIncidentsText, Source={StaticResource Loc}}" 
+                                   FontSize="13" Foreground="#94A3B8" HorizontalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Список инцидентов -->
+                    <ListView ItemsSource="{Binding Incidents}" 
+                              Visibility="{Binding HasIncidents, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="{Binding ColTimestamp, Source={StaticResource Loc}}" Width="140" DisplayMemberBinding="{Binding TimestampDisplay}" />
+                                <GridViewColumn Header="{Binding ColProcess, Source={StaticResource Loc}}" Width="160" DisplayMemberBinding="{Binding ProcessName}" />
+                                <GridViewColumn Header="{Binding ColPid, Source={StaticResource Loc}}" Width="70" DisplayMemberBinding="{Binding ProcessId}" />
+                                <GridViewColumn Header="{Binding ColTrigger, Source={StaticResource Loc}}" Width="200" DisplayMemberBinding="{Binding TriggerReasonDisplay}" />
+                                <GridViewColumn Header="{Binding ColAction, Source={StaticResource Loc}}" Width="200" DisplayMemberBinding="{Binding ActionTakenDisplay}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Grid>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

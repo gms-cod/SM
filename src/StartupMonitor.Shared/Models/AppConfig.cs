@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models.Firewall;
+using StartupMonitor.Shared.Models.Ransomware;
 
 namespace StartupMonitor.Shared.Models;
 
@@ -218,6 +219,10 @@ public class AppSettings
     [JsonPropertyName("ai_autonomous_decision_mode")]
     public string AiAutonomousDecisionMode { get; set; } = "AllowSession";
 
+    /// <summary>Конфигурация щита защиты от вымогателей (Ransomware Shield).</summary>
+    [JsonPropertyName("ransomware_shield")]
+    public RansomwareShieldConfigDto RansomwareShield { get; set; } = new();
+
     /// <summary>Создает глубокую независимую копию настроек приложения.</summary>
     public AppSettings Clone()
     {
@@ -253,6 +258,7 @@ public class AppSettings
         copy.FirewallAllowedPorts = [..FirewallAllowedPorts];
         copy.FirewallWhitelistedApps = [..FirewallWhitelistedApps];
         copy.FirewallBlacklistedApps = [..FirewallBlacklistedApps];
+        copy.RansomwareShield = RansomwareShield?.Clone() ?? new();
         return copy;
     }
 }

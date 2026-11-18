@@ -128,7 +128,7 @@ public partial class MainWindow
         {
             _hasShown = true;
             var savedTab = MainViewModel.LoadSetting("lastActiveTab", 0);
-            if (savedTab < 0 || savedTab > 9) savedTab = 0;
+            if (savedTab < 0 || savedTab > 10) savedTab = 0;
             App.Log($"MainWindow: Loaded, savedTab={savedTab}, WindowState={WindowState}, IsMinimized={App.IsMinimized}");
             NavigateToPage(savedTab);
             await StartupSequence();
@@ -152,6 +152,11 @@ public partial class MainWindow
                 else if (savedTab == 7) _ = _viewModel.LoadBootTimeAsync();
                 else if (savedTab == 8) _ = RefreshFirewallHubAsync();
                 else if (savedTab == 9) _ = LoadSnapshotsAsync();
+                else if (savedTab == 10)
+                {
+                    RansomwareShieldView.DataContext = _viewModel.RansomwareShield;
+                    _ = _viewModel.RansomwareShield.RefreshStatsAsync();
+                }
             }
 
             // При --minimized окно уже свёрнуто через WindowState в конструкторе.
@@ -682,9 +687,10 @@ public partial class MainWindow
         BootTimePage.Visibility = idx == 7 ? Visibility.Visible : Visibility.Collapsed;
         FirewallPage.Visibility = idx == 8 ? Visibility.Visible : Visibility.Collapsed;
         SnapshotsPage.Visibility = idx == 9 ? Visibility.Visible : Visibility.Collapsed;
+        RansomwareShieldPage.Visibility = idx == 10 ? Visibility.Visible : Visibility.Collapsed;
 
-        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8, NavItemSnapshots };
-        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8, NavBarSnapshots };
+        var items = new[] { NavItem0, NavItem1, NavItem2, NavItem3, NavItem4, NavItem5, NavItem6, NavItem7, NavItem8, NavItemSnapshots, NavItemRansomware };
+        var bars = new[] { NavBar0, NavBar1, NavBar2, NavBar3, NavBar4, NavBar5, NavBar6, NavBar7, NavBar8, NavBarSnapshots, NavBarRansomware };
         Brush selected;
         try { selected = (Brush)FindResource("ControlFillColorSecondaryBrush"); }
         catch { selected = Brushes.Transparent; }
@@ -734,6 +740,11 @@ public partial class MainWindow
             _ = RefreshFirewallHubAsync();
         else if (idx == 9)
             _ = LoadSnapshotsAsync();
+        else if (idx == 10)
+        {
+            RansomwareShieldView.DataContext = _viewModel.RansomwareShield;
+            _ = _viewModel.RansomwareShield.RefreshStatsAsync();
+        }
     }
 
 

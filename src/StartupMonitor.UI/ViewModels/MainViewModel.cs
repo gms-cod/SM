@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -114,6 +114,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Модель представления Диспетчера задач (процессы и системная производительность).</summary>
     public TaskManagerViewModel TaskManager { get; }
+    public RansomwareShieldViewModel RansomwareShield { get; }
 
     /// <summary>Флаг подключения к службе.</summary>
     [ObservableProperty]
@@ -1583,6 +1584,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _networkAlertStatusProvider = statusProvider ?? throw new ArgumentNullException(nameof(statusProvider));
         _networkAlertWindowFactory = windowFactory ?? throw new ArgumentNullException(nameof(windowFactory));
         TaskManager = new TaskManagerViewModel(pipeClient);
+        RansomwareShield = new RansomwareShieldViewModel(pipeClient);
     }
 
     /// <summary>Создаёт MainViewModel, инициализирует опции и подписывается на события PipeClient.</summary>
@@ -1682,6 +1684,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         CurrentFilter = LoadFilter();
         LoadSort();
         TaskManager = new TaskManagerViewModel(_pipeClient);
+        RansomwareShield = new RansomwareShieldViewModel(_pipeClient);
         _pipeClient.Connected += OnPipeClientConnected;
         _pipeClient.EventsReceived += OnPipeClientEventsReceived;
         _pipeClient.Disconnected += OnPipeClientDisconnected;

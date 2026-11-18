@@ -119,7 +119,7 @@ public sealed partial class NetworkRenderingRegressionTests
         var navigation = document.Descendants().Single(element => (string?)element.Attribute(xaml + "Name") == "SidebarNavigation");
         var ids = navigation.Elements().Where(element => element.Attribute("Tag") is not null)
             .Select(element => (string?)element.Attribute("Tag")).ToArray();
-        Assert.Equal(new[] { "0", "6", "8", "7", "9", "4", "1", "3", "5" }, ids);
+        Assert.Equal(new[] { "0", "6", "8", "10", "7", "9", "4", "1", "3", "5" }, ids);
         Assert.Equal(ids.Length, ids.Distinct().Count());
     }
 

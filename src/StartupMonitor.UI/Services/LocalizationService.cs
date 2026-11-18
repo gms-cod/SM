@@ -1517,4 +1517,81 @@ public class LocalizationService : INotifyPropertyChanged
     public string NetAclRowKillProcessTip => this["NetAclRowKillProcessTip"];
     /// <summary>Локализованная строка «В матрице доступа нет приложений по выбранному фильтру.».</summary>
     public string NetAclEmptyText => this["NetAclEmptyText"];
+
+    // ──── Анти-рансомваре защита (Anti-Ransomware Shield) ────
+    private string GetWithFallback(string key, string ru, string en)
+    {
+        try
+        {
+            var val = ResourceManager.GetString(key, CultureInfo.CurrentUICulture);
+            if (!string.IsNullOrEmpty(val) && val != key) return val;
+        }
+        catch { }
+        return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("en", StringComparison.OrdinalIgnoreCase) ? en : ru;
+    }
+
+    /// <summary>Пункт навигации: Защита от шифровальщиков.</summary>
+    public string NavRansomwareShield => GetWithFallback("NavRansomwareShield", "Защита от шифровальщиков", "Anti-Ransomware Shield");
+    /// <summary>Заголовок страницы: Анти-рансомваре защита.</summary>
+    public string RansomwareHeader => GetWithFallback("RansomwareHeader", "Анти-рансомваре защита", "Anti-Ransomware Shield");
+    /// <summary>Подзаголовок страницы анти-рансомваре.</summary>
+    public string RansomwareSubtitle => GetWithFallback("RansomwareSubtitle", "Предотвращение атак программ-вымогателей, защита теневых копий VSS и файлов-приманок", "Prevent ransomware attacks, protect VSS shadow copies and canary trap files");
+    /// <summary>Статус: Защита активна.</summary>
+    public string RansomwareShieldActive => GetWithFallback("RansomwareShieldActive", "Защита активна", "Protection active");
+    /// <summary>Статус: Защита отключена.</summary>
+    public string RansomwareShieldDisabled => GetWithFallback("RansomwareShieldDisabled", "Защита отключена", "Protection disabled");
+    /// <summary>Карточка: Статус защиты.</summary>
+    public string CardShieldStatus => GetWithFallback("CardShieldStatus", "Статус защиты", "Shield Status");
+    /// <summary>Карточка: Активных ловушек.</summary>
+    public string CardActiveTraps => GetWithFallback("CardActiveTraps", "Активных ловушек", "Active Traps");
+    /// <summary>Карточка: Заблокировано атак.</summary>
+    public string CardBlockedAttacks => GetWithFallback("CardBlockedAttacks", "Заблокировано атак", "Blocked Attacks");
+    /// <summary>Карточка: Остановлено процессов.</summary>
+    public string CardSuspendedProcesses => GetWithFallback("CardSuspendedProcesses", "Остановлено процессов", "Suspended Processes");
+    /// <summary>Карточка: Восстановлено файлов.</summary>
+    public string CardRestoredFiles => GetWithFallback("CardRestoredFiles", "Восстановлено файлов", "Restored Files");
+    /// <summary>Опция: Защита теневых копий VSS.</summary>
+    public string OptProtectVss => GetWithFallback("OptProtectVss", "Защита теневых копий VSS и сред восстановления", "Protect VSS shadow copies and recovery environments");
+    /// <summary>Описание опции защиты VSS.</summary>
+    public string OptProtectVssDesc => GetWithFallback("OptProtectVssDesc", "Блокирует попытки удаления теневых копий и каталогов восстановления (vssadmin, bcdedit, wmic)", "Blocks attempts to delete shadow copies and recovery catalogs (vssadmin, bcdedit, wmic)");
+    /// <summary>Опция: Использовать файлы-ловушки.</summary>
+    public string OptEnableCanary => GetWithFallback("OptEnableCanary", "Использовать лексикографические файлы-ловушки", "Use lexicographical canary trap files");
+    /// <summary>Описание опции файлов-ловушек.</summary>
+    public string OptEnableCanaryDesc => GetWithFallback("OptEnableCanaryDesc", "Размещает приманки (!000_SecurityCanary.docx) в ключевых папках с отслеживанием через IOCP", "Deploys traps (!000_SecurityCanary.docx) in priority folders monitored via IOCP");
+    /// <summary>Опция: Мгновенная заморозка процесса.</summary>
+    public string OptAutoSuspend => GetWithFallback("OptAutoSuspend", "Мгновенная атомарная заморозка процесса", "Instant atomic process freeze");
+    /// <summary>Описание опции заморозки.</summary>
+    public string OptAutoSuspendDesc => GetWithFallback("OptAutoSuspendDesc", "Приостанавливает все потоки процесса вымогателя через NtSuspendProcess за микросекунды", "Suspends all ransomware threads via NtSuspendProcess in microseconds");
+    /// <summary>Опция: Сетевой карантин.</summary>
+    public string OptIsolateNetwork => GetWithFallback("OptIsolateNetwork", "Сетевой карантин (C2 Killswitch)", "Network quarantine (C2 Killswitch)");
+    /// <summary>Описание опции сетевого карантина.</summary>
+    public string OptIsolateNetworkDesc => GetWithFallback("OptIsolateNetworkDesc", "Блокирует сетевой трафик атакующего процесса для предотвращения передачи ключей", "Blocks network traffic of the attacking process to prevent key exfiltration");
+    /// <summary>Опция: Автоматическое восстановление из снимков VSS.</summary>
+    public string OptAutoRollback => GetWithFallback("OptAutoRollback", "Автоматическое восстановление из теневых копий", "Automatic rollback from shadow copies");
+    /// <summary>Описание опции восстановления.</summary>
+    public string OptAutoRollbackDesc => GetWithFallback("OptAutoRollbackDesc", "Мгновенно восстанавливает поврежденные ловушки и файлы из снимков VSS", "Instantly restores damaged traps and files from VSS snapshots");
+    /// <summary>Опция: Доверять подписанным процессам Microsoft.</summary>
+    public string OptWhitelistSigners => GetWithFallback("OptWhitelistSigners", "Доверять подписанным процессам Microsoft", "Trust signed Microsoft processes");
+    /// <summary>Описание опции доверенных подписей.</summary>
+    public string OptWhitelistSignersDesc => GetWithFallback("OptWhitelistSignersDesc", "Пропускает доверенные процессы без задержек", "Skips verified trusted processes without delay");
+    /// <summary>Кнопка сохранения настроек.</summary>
+    public string BtnSaveRansomwareSettings => GetWithFallback("BtnSaveRansomwareSettings", "Сохранить настройки", "Save Settings");
+    /// <summary>Кнопка обновления статистики.</summary>
+    public string BtnRefreshStats => GetWithFallback("BtnRefreshStats", "Обновить статистику", "Refresh Stats");
+    /// <summary>Кнопка создания снимка VSS.</summary>
+    public string BtnCreateVssSnapshot => GetWithFallback("BtnCreateVssSnapshot", "Создать снимок VSS", "Create VSS Snapshot");
+    /// <summary>Заголовок журнала инцидентов.</summary>
+    public string IncidentsHistoryHeader => GetWithFallback("IncidentsHistoryHeader", "Журнал зафиксированных атак и инцидентов", "Ransomware Incidents Log");
+    /// <summary>Колонка: Время.</summary>
+    public string ColTimestamp => GetWithFallback("ColTimestamp", "Время", "Time");
+    /// <summary>Колонка: Процесс.</summary>
+    public string ColProcess => GetWithFallback("ColProcess", "Процесс", "Process");
+    /// <summary>Колонка: Причина.</summary>
+    public string ColTrigger => GetWithFallback("ColTrigger", "Причина", "Trigger");
+    /// <summary>Колонка: Действие.</summary>
+    public string ColAction => GetWithFallback("ColAction", "Действие", "Action");
+    /// <summary>Колонка: Статус.</summary>
+    public string ColStatus => GetWithFallback("ColStatus", "Статус", "Status");
+    /// <summary>Текст пустого журнала.</summary>
+    public string EmptyIncidentsText => GetWithFallback("EmptyIncidentsText", "Атак шифровальщиков не зафиксировано. Система находится под защитой.", "No ransomware attacks detected. System is protected.");
 }

@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using StartupMonitor.Shared.Models.Firewall;
+using StartupMonitor.Shared.Models.Ransomware;
 
 namespace StartupMonitor.Shared.Models;
 
@@ -343,6 +344,21 @@ public static class PipeMessageTypes
     public const string SetAppAccessControlState = "SetAppAccessControlState";
     /// <summary>Ответ на установку состояния доступа в матрице контроля доступа.</summary>
     public const string SetAppAccessControlStateResponse = "SetAppAccessControlStateResponse";
+
+    /// <summary>Запрос текущей конфигурации щита защиты от вымогателей (Ransomware Shield).</summary>
+    public const string GetRansomwareShieldConfig = "GetRansomwareShieldConfig";
+    /// <summary>Ответ со снимком конфигурации щита защиты от вымогателей.</summary>
+    public const string GetRansomwareShieldConfigResponse = "GetRansomwareShieldConfigResponse";
+    /// <summary>Установка конфигурации щита защиты от вымогателей.</summary>
+    public const string SetRansomwareShieldConfig = "SetRansomwareShieldConfig";
+    /// <summary>Запрос статистики и метрик защиты от вымогателей.</summary>
+    public const string GetRansomwareShieldStats = "GetRansomwareShieldStats";
+    /// <summary>Ответ со статистикой и метриками защиты от вымогателей.</summary>
+    public const string GetRansomwareShieldStatsResponse = "GetRansomwareShieldStatsResponse";
+    /// <summary>Событие обнаружения атаки программы-вымогателя (рассылается клиентам).</summary>
+    public const string RansomwareAttackDetected = "RansomwareAttackDetected";
+    /// <summary>Решение оператора по нейтрализации или разморозке инцидента атаки вымогателя.</summary>
+    public const string ResolveRansomwareAttack = "ResolveRansomwareAttack";
 
 }
 
@@ -710,3 +726,41 @@ public record RequestAnomalyAiExplanationPayload(
 public record AnomalyAiVerdictResponsePayload(
     [property: JsonPropertyName("verdict")] AnomalyAiVerdictDto Verdict
 );
+
+/// <summary>
+/// Полезная нагрузка запроса разрешения или нейтрализации инцидента атаки программы-вымогателя.
+/// </summary>
+public sealed class ResolveRansomwareAttackRequest
+{
+    /// <summary>Уникальный идентификатор инцидента.</summary>
+    [JsonPropertyName("incidentId")]
+    public string IncidentId { get; set; } = string.Empty;
+
+    /// <summary>Идентификатор процесса (PID).</summary>
+    [JsonPropertyName("processId")]
+    public int ProcessId { get; set; }
+
+    /// <summary>Применяемое действие защиты (Terminated, Unfrozen, Restored и т.д.).</summary>
+    [JsonPropertyName("action")]
+    public RansomwareActionType Action { get; set; } = RansomwareActionType.Terminated;
+
+    /// <summary>Требуется ли выполнить откат повреждённых файлов из теневых копий VSS.</summary>
+    [JsonPropertyName("rollbackFiles")]
+    public bool RollbackFiles { get; set; }
+
+    /// <summary>Конструктор по умолчанию для десериализации.</summary>
+    public ResolveRansomwareAttackRequest() { }
+
+    /// <summary>Инициализирует запрос решения инцидента.</summary>
+    /// <param name="incidentId">Входные данные: идентификатор инцидента.</param>
+    /// <param name="processId">Входные данные: идентификатор процесса.</param>
+    /// <param name="action">Входные данные: применяемое защитное действие.</param>
+    /// <param name="rollbackFiles">Входные данные: флаг отката поврежденных файлов.</param>
+    public ResolveRansomwareAttackRequest(string incidentId, int processId, RansomwareActionType action, bool rollbackFiles = false)
+    {
+        IncidentId = incidentId;
+        ProcessId = processId;
+        Action = action;
+        RollbackFiles = rollbackFiles;
+    }
+}
